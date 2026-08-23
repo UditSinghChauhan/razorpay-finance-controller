@@ -1,9 +1,17 @@
 # EVALUATION_SPEC — ASSAY
 
-**Spec version:** 1.1.0 · **Date:** 2026-08-23
+**Spec version:** 1.1.1 · **Date:** 2026-08-23
 
 Every metric answers the question: **what decision does this number let someone
 make?** A metric that does not change anyone's behaviour is not reported.
+
+Spec 1.1.1 changed **no metric, no baseline, no ablation and no sweep.** It was a
+factual-correction pass over statements about Razorpay behaviour; the frozen
+metric list in `PREREGISTRATION.md §8` is untouched. It did add two reporting
+rules, both of which constrain how claims are presented rather than what is
+measured: report requirement 11 (§5.4), which requires the provenance register,
+and one forbidden practice (§5.5), which bars describing an ASSAY modelling
+assumption as documented Razorpay behaviour.
 
 ---
 
@@ -399,8 +407,11 @@ significantly different** — no bolding of a 2% lead over a 15% interval.
 9. The abstention DoS panel: spike flags by split, source attribution, and
    `largest_exception_in_top_n` across all runs.
 10. The declared threats to validity (`PREREGISTRATION.md §10`), unedited.
-11. Every `EXPLORATORY`-labelled metric, clearly separated.
-12. A named list of what was **not** tested: FX, real bank formats, multiple
+11. The provenance register (`DATA_MODEL.md §22`), or a link to it, so a reader
+    can check which statements about Razorpay are documented, which are ASSAY's
+    modelling assumptions, and which are explicitly not claimed.
+12. Every `EXPLORATORY`-labelled metric, clearly separated.
+13. A named list of what was **not** tested: FX, real bank formats, multiple
     merchant profiles, non-INR settlement, production volumes, and any live
     Razorpay settlement data (none exists in the test account).
 
@@ -417,6 +428,8 @@ Listed explicitly because each is a plausible temptation under deadline pressure
 - Reporting harm in record counts rather than rupees.
 - Any claim of real-data provenance.
 - Any claim that Razorpay's reconciliation has a gap or defect.
+- Describing an `[ASSAY-MODEL]` assumption as documented Razorpay behaviour, or
+  citing a marketing page where an API reference exists (`DATA_MODEL.md §22`).
 - Any assertion about what a commercial vendor does internally.
 - Reporting only the `--llm=replay` column while omitting `--llm=offline`.
 - Any number in the demo that does not exist in a committed run artifact.

@@ -1,6 +1,12 @@
 # ARCHITECTURE — ASSAY
 
-**Spec version:** 1.1.0 · **Date:** 2026-08-23
+**Spec version:** 1.1.1 · **Date:** 2026-08-23
+
+Spec 1.1.1 is a factual-correction release. The only change in this document is
+the name and definition of one probe (§5): settlement constituents come from the
+date-scoped recon report, not from `GET /v1/settlements/:id`, which returns the
+settlement entity alone. **No component, boundary, package, interface or data flow
+changed.**
 
 Every section answers *why*, not just *what*. Where a component exists only
 because a deterministic rule cannot do the job, that argument is made explicitly.
@@ -200,8 +206,9 @@ bank credit line  ₹4,52,310  value_date 2026-08-14  narration "NEFT-RZPX0001�
   │                → ABSTAIN, certificate {A} vs {B,C}
   │
   ├─ R2 LLM        classify_exception → UTR_PREFIX_COLLISION
-  │                R3 propose_probe   → fetch_settlement_detail(setl_A)
-  │                → probe executed deterministically, still no discriminator
+  │                R3 propose_probe   → fetch_settlement_recon(setl_A, date)
+  │                → deterministic date-scoped recon-report query for the lines
+  │                  carrying setl_A; still no discriminator
   │
   ├─ S5 validate   abstention path: I1,I2,I6 checked; posting to Suspense
   │

@@ -4,6 +4,8 @@ A settlement reconciliation controller for Razorpay-shaped payment data.
 Razorpay AI Buildathon 2026 — **Track 04: AI Finance Controller**.
 
 > **Status: SPECIFICATION PHASE. No application code exists yet.**
+> **Spec version 1.1.1** — a pre-seal factual-correction release verified against
+> current official Razorpay documentation (`docs/DECISION_BRIEF.md §A.4`).
 
 ASSAY reconciles three independent views of the same money — the payment
 gateway's recon report, the bank statement, and the merchant's own ledger —
@@ -33,6 +35,10 @@ settlement data was used or could be used. Real API contracts and real test-mode
 objects were used to calibrate the schema, arithmetic and identifier grammars of
 a programmatically generated financial universe. No external validity is claimed
 — see `docs/PREREGISTRATION.md §2` and §10.
+
+Every statement this specification makes about Razorpay behaviour is classified as
+**documented**, **an ASSAY modelling assumption**, or **explicitly not claimed**.
+The full register is `docs/DATA_MODEL.md §22`.
 
 ## Schedule
 

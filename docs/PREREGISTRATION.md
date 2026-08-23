@@ -1,9 +1,19 @@
 # PREREGISTRATION — ASSAY Benchmark v1.0.0
 
-**Spec version:** 1.1.0 · **Benchmark version:** 1.0.0
+**Spec version:** 1.1.1 · **Benchmark version:** 1.0.0
 
 **Status: FROZEN on commit. Amendments require a version bump and a new seal.**
 **Date frozen:** 2026-08-23 · **Sealed at:** _(pending — see §9)_
+
+**Amendment 1.1.1 (pre-seal, factual correction).** Applied before the seal and
+before any dataset was generated or any result existed. It corrects statements
+about Razorpay behaviour that verification against current official documentation
+found to be wrong or over-claimed, and adds a provenance classification to every
+such statement (`DATA_MODEL.md §0` rule 6 and §22). **No metric, threshold,
+scenario family, split, baseline, ablation, seed count or stopping rule changed.**
+The three substantive changes are: the fee/GST arithmetic convention (§2, §4.2),
+the UPI and netbanking fee constants (§4.2), and the `F07` mechanism (§4.1).
+`DECISION_BRIEF.md §F` rows F6 and F7 are closed by this amendment.
 
 This document is written **before any test-split result exists**. Its purpose is
 to make post-hoc rationalisation impossible: metrics, thresholds, dataset
@@ -45,9 +55,12 @@ exists to prevent.
 
 | Element | Provenance |
 |---|---|
-| API field names, types, units, ID grammars | **Real.** Verified against Razorpay Test Mode (`/v1/payments`, `/v1/orders`, `/v1/refunds`, `/v1/settlements`, `/v1/settlements/recon/combined`) and published API documentation. |
-| Fee/GST arithmetic identity (`credit = amount − fee − tax`, tax = 18% of fee) | **Real.** Structural identity taken from the documented recon report schema. |
-| Settlement cycle shape (T+1..T+3, UTR format) | **Real.** Documented Razorpay behaviour. |
+| API field names, types, units, value sets | **Real, and re-verified in spec 1.1.1** against the published API reference for `/v1/payments`, `/v1/orders`, `/v1/refunds`, `/v1/settlements`, `/v1/settlements/recon/combined` and `/v1/disputes`. That re-verification found and fixed four schema errors carried in 1.1.0: `card_network: "Amex"` (documented value is `American Express`), `speed_processed: "optimum"` (documented only for `speed_requested`), `Dispute.status` missing `under_review`, and card attributes placed on the Payment entity when they are settlement-recon columns. Each field's provenance class is recorded in `DATA_MODEL.md §22`. |
+| ID grammars | **Prefixes real; suffix length assumed.** The `pay_` / `order_` / `rfnd_` / `setl_` / `adj_` / `disp_` prefixes are documented. The 14-character suffix is consistent across every official sample but is not stated as a contract, so it is a declared ASSAY assumption (`DATA_MODEL.md §0` rule 3). |
+| Fee/GST arithmetic identity (`credit = amount − fee`, where `fee` is GST-inclusive and `tax` is the GST component inside it) | **Real, but sourced precisely.** The GST-inclusive convention is documented on the **Payment entity** (*"Fee (including GST) charged by Razorpay"*) and on the instant-settlement entity (*"Total amount (fees+tax)"*); the recon endpoint documents `tax` as *"the tax on the fee"*. The recon endpoint does **not** state the identity itself — ASSAY derives it, and says so. Spec 1.1.0's claim that `credit = amount − fee − tax` was "taken from the documented recon report schema" was false and is withdrawn (`DATA_MODEL.md §6`). |
+| GST rate of 18% on the fee | **Real.** Stated on Razorpay's pricing documentation (*"2% + 18% GST"*) and corroborated by the documented Payment sample (`amount 2100, fee 50, tax 8`). The rate is statutory, not Razorpay-set. |
+| Settlement `fees` / `tax` are 0 on a normal settlement | **Real.** Documented verbatim on the Settlements entity and shown in the `settlement.processed` webhook sample. |
+| Settlement cycle baseline (T+2 **working** days, domestic; UTR present on every settlement) | **Real.** Documented Razorpay behaviour. ASSAY's calendar-day simulation of it, and its T+1/T+3 dispersion, are **synthetic** — see §4.2. |
 | Calibration objects | **Real but tiny.** The test account holds 1 captured payment (₹300.00), 9 orders (1 paid), 0 refunds, 0 settlements, 0 recon rows. |
 | Transaction volumes, merchant behaviour, distributions | **Synthetic.** Programmatically generated. |
 | Bank statements, merchant ledgers | **Synthetic.** No real bank data exists in the test account. |
@@ -115,22 +128,24 @@ and manufactured puzzles are what make adversarial evaluation look artificial.
 | `F04` | Duplicate bank credit / re-presented UTR | Banks do re-present and double-post credits, especially around NEFT batch boundaries | dev + test |
 | `F05` | Missing capture record | Authorised-but-uncaptured payments and PG report lag produce settled amounts with no capture row | dev + test |
 | `F06` | Equal-amount collision | Two payments of identical amount, same day, same method; only one settles. Common for fixed-price SKUs | dev + test |
-| `F07` | Chargeback hold and later release | Disputes lock funds via `on_hold`, then release them in a later cycle as an adjustment | **test only** |
+| `F07` | Chargeback deduction and later reversal | Razorpay documents that a lost dispute results in the amount being **deducted from the merchant's account** (the Dispute entity carries `amount_deducted`). ASSAY models the deduction as a debit adjustment line in one settlement and a subsequent win as a credit adjustment line in a later cycle. Corrected in spec 1.1.1: the previous `on_hold`-based mechanism was not supported — `on_hold` is documented as a Razorpay **Route transfer** flag, not a dispute mechanism | **test only** |
 | `F08` | Bank narration corruption | Statement exports truncate narration (commonly ~35 chars) and mangle UTRs; `settlement_id` absent from the merchant's copy | **test only** |
 | `F09` | Late / out-of-order arrival across a period boundary | T+3 settlements for month-end captures land in the next period | **test only** |
 | `F10` | Adversarial metadata | Merchant-controlled `notes` fields carrying instruction-shaped text; conflicting references; forged-looking IDs | **test only** |
 | `F11` | Multi-currency / FX settlement | Real for exporters, but a separate truth model | **specified, NOT IMPLEMENTED** |
-| `F12` | Split settlement across two bank credits | Large settlements split by banking limits | dev + test |
+| `F12` | Split settlement across two bank credits | Large settlements split by banking limits. **Not representable under the frozen model:** invariant `I5` ties a bank line to `Σ settlement.amount`, and the ground-truth `bank_mappings` shape records bank line → settlements with no per-bank-line partial amount, so a single settlement carried by two credits cannot be recorded or tied out. Implementing it would require changing `I5` and the ground-truth schema | **specified, NOT IMPLEMENTED** |
 
 ### 4.2 Frozen generation parameters
 
 ```
-  Fee rates (basis points on gross, before GST):
-      card    : 200      upi : 0       netbanking : 190
+  Fee rates (basis points on gross, EX-GST; the observable `fee` field is
+  GST-inclusive — see the fee model below and DATA_MODEL.md §6):
+      card    : 200      upi : 200     netbanking : 200
       wallet  : 200      emi : 300
   GST on fee                : 1800 bps (18%)
   Rounding                  : half-up to nearest paisa, applied once per line
   Settlement cycle          : T+2 default; T+1 for 10% of batches; T+3 for 15%
+                              (CALENDAR days — see the timing note below)
   Settlement window bound   : T_min = 1 day, T_max = 7 days   (constraint C4)
   F03 mid-period rate change: card 200 → 195 bps at 60% through the period
   Payment amount distribution: log-normal, median ₹1,850, p99 ₹2,40,000
@@ -138,6 +153,73 @@ and manufactured puzzles are what make adversarial evaluation look artificial.
   Adjustment rate           : 0.8% of settlements
   Dispute rate              : 0.15% of captured payments
 ```
+
+**The fee model, and what each number is `[RZP-DOC]` / `[ASSAY-MODEL]`.**
+
+```
+  fee_ex_gst = round_half_up(amount * rate_bps / 10_000)
+  tax        = round_half_up(fee_ex_gst * 1800 / 10_000)
+  fee        = fee_ex_gst + tax        // this is what the recon line carries
+  credit     = amount - fee            // == amount - fee_ex_gst - tax
+```
+
+- `card`, `wallet`, `upi`, `netbanking` at **200 bps** — `[RZP-DOC]`. Razorpay's
+  pricing documentation states 2% per transaction covering *"all modes cards, UPI,
+  wallets, and net banking"*, and its structured pricing data declares
+  `price: 2.00 PERCENT`. The documented Payment sample confirms it arithmetically
+  (2% of ₹21.00 = 42 paise, +18% GST = `fee: 50`, `tax: 8`).
+- **UPI corrected from 0 → 200 bps in spec 1.1.1.** Zero MDR is a bank/government
+  rate, not Razorpay's charge: the pricing documentation states explicitly that
+  *"a standard platform or technology fee of 2% will be applied"* to zero-MDR UPI.
+  A 0-bps UPI leg would have distorted the fee mass across the whole benchmark on
+  a factually wrong premise.
+- **Netbanking corrected from 190 → 200 bps in spec 1.1.1.** No Razorpay source
+  states 1.9%; the documented list price is 2%.
+- `emi` at **300 bps** — `[RZP-DOC]`, but from Razorpay's official *blog* rather
+  than its API or pricing reference (*"EMI, Corporate Cards, Amex/Diners, Pay
+  Later, and certain premium methods are typically 3% + GST"*). This is a weaker
+  source tier and is labelled as such.
+- The **F03 mid-period change (200 → 195 bps)** is `[ASSAY-MODEL]`. Mid-period
+  repricing is commercially real — Razorpay documents custom pricing above
+  ₹5 Lakh monthly volume — but 195 bps is an invented figure standing in for
+  "the rate changed," not a published Razorpay rate.
+- **Instrument rates ASSAY does not model `[ASSAY-MODEL]`:** international cards
+  (documented ~3%), international bank transfers (~1%), Amex / Diners / corporate
+  cards (~3%), Pay Later (~3%), Credit Card on UPI (2.15%, stated on the pricing
+  page). The generator emits none of these instruments, precisely so that no line
+  carries a rate that misrepresents published pricing.
+
+**A consequence of correction 3, stated before any result exists.** With card,
+UPI, netbanking and wallet all at 200 bps, two payments of equal gross now produce
+an equal `credit` *regardless of method*, where previously a UPI line at 0 bps
+settled at its gross and a card line did not. Equal-credit collisions of the `F06`
+kind should therefore become **more** frequent, not less — the expected direction
+is marginally lower coverage and marginally higher abstention than spec 1.1.0
+would have produced. This is recorded here so that if the dev split shows it, it
+is a predicted consequence of a factual correction rather than a post-hoc
+explanation. It is not a reason to revert the constants: 0 bps for UPI was
+factually wrong, and a benchmark made easier by a wrong number is worth nothing.
+
+**The settlement-timing model `[ASSAY-MODEL]`, and how it differs from Razorpay.**
+
+`[RZP-DOC]` The documented standard domestic cycle is **T+2 working days** from
+capture, where working days exclude Sundays, the second and fourth Saturdays, and
+bank holidays. The cycle is subject to bank approval and varies by business
+vertical and risk. International payments follow a longer documented cycle (T+7
+working days) and are out of scope.
+
+`[ASSAY-MODEL]` ASSAY simulates **calendar** days and deliberately implements **no
+bank-holiday calendar**. The T+1 / T+2 / T+3 mix above is a synthetic dispersion
+standing in for the documented bank/vertical/risk variation; it is not a claim
+that Razorpay publishes a T+1..T+3 band. `C4`'s `T_max = 7` calendar days is
+sized to absorb the working-day expansion — a capture before a weekend plus a
+public holiday can exceed five calendar days — and is deliberately generous rather
+than tight. Consequence, stated in advance: because no holiday calendar is
+modelled, ASSAY's settlement-lag distribution is smoother than a real merchant's,
+which makes `SE3` (temporal proximity to the modal lag) a slightly *easier* signal
+here than it would be in production. That direction of bias is reported, not
+corrected, because adding a holiday engine would change the benchmark rather than
+describe it.
 
 ### 4.3 Degradation operators
 
@@ -153,9 +235,9 @@ must state what it models.
 | `DUPLICATE_ROW` | Double export, double import, bank re-presentation |
 | `SHIFT_TIMESTAMP(±d)` | Clock skew between PG, bank and ERP |
 | `SWAP_ORDER_REF` | Merchant ERP reference schemes that do not map cleanly |
-| `INJECT_NOTES(payload)` | Merchant-controlled free-text fields (`F10` only) |
+| `INJECT_NOTES(payload)` | Merchant-controlled free-text fields (`F10` only). `notes` is a documented **object** of up to 15 key-value pairs, so the payload may hide in a key as well as a value; the whole object is quarantined as one blob (`DATA_MODEL.md §10`) |
 | `CONFLICT_REFERENCE` | A row referencing two mutually exclusive parents |
-| `ROUND_BANK_AMOUNT` | Declared bank-side rounding; the only source of `C6` tolerance |
+| `ROUND_BANK_AMOUNT` | Declared bank-side rounding; the only sanctioned source of a `C6` tolerance. **Not exercised in benchmark v1.0.0** — no family declares it, and neither a tolerance magnitude nor an engine-visible signal that it is in force is specified. Activating it requires a spec amendment supplying both |
 
 ---
 
@@ -399,7 +481,7 @@ Stated here, before results, so they cannot be presented later as afterthoughts.
 | # | Threat | Mitigation | Residual risk |
 |---|---|---|---|
 | V1 | Generator and solver share the author's assumptions | Oracle independent of both (§5.1–5.2); completeness **and** consistency gates; frozen, individually justified constraints; family-level holdout | **Real and not eliminated.** If the shared constraint *declaration* misrepresents production, everything is consistently wrong. |
-| V2 | Synthetic data does not resemble production | Real API contracts, real fee/GST arithmetic, distributions from public payment-industry norms | **High.** No external validity is claimed. |
+| V2 | Synthetic data does not resemble production | Real API contracts and value sets (§2), Razorpay's documented fee/GST convention and published 2% / 18% rates (§4.2), distributions from public payment-industry norms | **High.** No external validity is claimed. Note specifically that the bank statement and merchant ledger are entirely invented, that no bank-holiday calendar is modelled, and that a single merchant profile is simulated. |
 | V3 | Developer tunes against the test split | AL1–AL7; sealed hashes; held-out families; single sealed run | Moderate — self-enforced |
 | V4 | Baselines are strawmen | `B2-LLM-DIRECT` is the *obvious* approach, not a weakened one, given equal prompt effort and token budget; ablations A1–A3 are same-system controls | Low for ablations, moderate for baselines |
 | V5 | Harm function chosen to flatter ASSAY | Harm frozen here; two independent harm measures reported; cost parameters swept | Low |
