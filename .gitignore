@@ -1,0 +1,29 @@
+# --- Secrets: Razorpay + Anthropic credentials must NEVER be committed ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+**/credentials.json
+
+# --- Sealed benchmark ground truth (see docs/PREREGISTRATION.md) ---
+# Test-split ground truth is held back until the sealed run is recorded.
+bench/test/**/ground_truth.jsonl
+bench/test/**/*.sealed
+
+# --- Build / runtime ---
+node_modules/
+dist/
+build/
+.turbo/
+coverage/
+*.tsbuildinfo
+*.sqlite
+*.sqlite-journal
+*.db
+.DS_Store
+
+# --- Run outputs (regenerable) ---
+runs/*
+!runs/.gitkeep
