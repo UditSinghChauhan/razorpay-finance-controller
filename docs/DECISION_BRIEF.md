@@ -1,7 +1,7 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.1.0 · **Date:** 2026-08-23
+**Spec version:** 1.1.1 · **Date:** 2026-08-23
 **Reviewer role:** principal architect / skeptical reviewer
 
 Spec 1.0.0 returned a MODIFY verdict with four blocking corrections. This
@@ -53,6 +53,42 @@ hygiene — the price of being taken seriously, not a reason to be remembered.
 machine-checkable certificate.** Everything else in this specification exists to
 make that single claim believable.
 
+### A.4 Spec 1.1.1 — factual corrections against Razorpay documentation
+
+A narrow verification pass checked every assumption this specification makes about
+Razorpay settlement, fees, GST, payment fields, deductions and reconciliation
+semantics against current official documentation, preferring the most specific
+source available (API entity reference over endpoint reference over product guide
+over pricing page). Twelve corrections were applied **before the seal and before
+any dataset was generated**, which is the only window in which they are free.
+
+**This was a correction pass, not a redesign. Nothing was added to or removed from
+Tier-0, no architecture changed, and no threshold, metric, baseline or ablation
+moved.** `DECISION_BRIEF.md §F` rows F6 and F7 are closed by it.
+
+| # | Correction | Class of error | Where |
+|---|---|---|---|
+| 1 | **Fee/GST convention.** Razorpay documents `fee` as *"Fee (including GST)"* with `tax` the GST component **inside** it. The identity is `credit = amount − fee`, not `credit = amount − fee − tax`, and `fee_ex_gst = fee − tax`. The 1.1.0 claim that the old identity was "taken from the documented recon report schema" was false and is withdrawn. **`credit` is numerically unchanged** — only the value carried in the observable `fee` field, and the identity used to check a line. | Wrong, and over-claimed provenance | `DATA_MODEL.md §6`, `RECONCILIATION_SPEC.md` C5/I3, `THREAT_MODEL.md` T6, `PREREGISTRATION.md §2`, T0-2 |
+| 2 | **`Settlement.fees` / `Settlement.tax` are 0** on a normal settlement — documented verbatim, and shown in the `settlement.processed` webhook sample. They are the instant-settlement service charge, not aggregated constituent fees. Instant settlements are declared outside Tier-0. | Directly contradicted | `DATA_MODEL.md §5` |
+| 3 | **UPI 0 → 200 bps; netbanking 190 → 200 bps.** Zero MDR is a bank/government rate; Razorpay's pricing page states a 2% platform fee still applies to UPI. No source states 1.9% for netbanking. | Wrong constants | `PREREGISTRATION.md §4.2` |
+| 4 | **Settlement constituents** come from the date-scoped recon report, not from `GET /v1/settlements/:id`, which returns 8 fields and no constituent list. The probe was renamed and redefined. | Unsupported capability | `RECONCILIATION_SPEC.md §6.2`, `ARCHITECTURE.md §5` |
+| 5 | **Schema value sets:** `card_network` `"Amex"` → `"American Express"` (plus the other five documented values and `unknown`); `notes` is an **object**, not a string; `posted_at` and `credit_type` are sample-only and their semantics are not claimed; the invented `credit_type` values `refund_credit` / `dispute_credit` are removed. | Invented / wrong values | `DATA_MODEL.md §6`, §10 |
+| 6 | **Refund speeds:** `speed_processed` ∈ {instant, normal}; `optimum` is a `speed_requested` value only. | Wrong value set | `DATA_MODEL.md §4` |
+| 7 | **Dispute status** gains the documented `under_review`. | Incomplete value set | `DATA_MODEL.md §9` |
+| 8 | **Settlement timing:** the documented baseline is **T+2 working days** (domestic), not "T+1 to T+3 for standard merchants". ASSAY's calendar-day simulator and its T+1/T+3 dispersion are labelled as modelling assumptions, and the direction of the resulting bias is stated. **No bank-holiday engine was added.** | Over-claimed provenance | `RECONCILIATION_SPEC.md` C4, `PREREGISTRATION.md §2`, §4.2 |
+| 9 | **`C1` justification:** Razorpay settles in INR *regardless of the currency the customer paid in*, so "cross-currency netting does not occur" was wrong. `C1` now rests on Tier-0 being INR-only by construction. The constraint itself is unchanged. | Wrong justification | `RECONCILIATION_SPEC.md` C1 |
+| 10 | **Payment vs reconciliation fields:** `card_network` / `card_issuer` / `card_type` are settlement-recon columns, not Payment entity fields. Removed from `Payment`; the reconciliation model is untouched. | Wrong object attribution | `DATA_MODEL.md §2` |
+| 11 | **Constructs relabelled, not deleted:** the `Adjustment` entity (`direction`, `reason`, `related_entity_id`) has no public Razorpay counterpart and is now labelled an ASSAY construct; `F07`'s mechanism moves from an unsupported `on_hold` hold/release to the documented dispute **deduction**; `on_hold` is documented as a Route-transfer flag, so `C8` is retained but declared expected-non-binding; and **Route transfers are declared out of Tier-0 scope** rather than partially modelled with an invented identity. | Unsupported mechanism | `DATA_MODEL.md §6`, §9, `PREREGISTRATION.md §4.1`, `RECONCILIATION_SPEC.md` C8 |
+| 12 | **Unsupported product-capability claim removed.** *"Reconciling it is the part Razorpay's own recon report structurally cannot do"* asserted a limit on Razorpay's product that is not verifiable from outside and contradicted this project's own standing rule against vendor-capability claims (`PROJECT_SPEC.md §8`, `§L.4`). Rewritten to the scope framing used everywhere else: the bank statement is not Razorpay's data and was never within the recon report's remit, and detecting multi-source disagreement requires holding more than one source. | Unverifiable vendor claim | `DATA_MODEL.md §7` |
+
+**The discipline this installs.** Every statement about Razorpay now carries one
+of three provenance classes — `[RZP-DOC]`, `[ASSAY-MODEL]`, `[NOT-CLAIMED]` —
+defined in `DATA_MODEL.md §0` rule 6 and registered in full in `DATA_MODEL.md §22`.
+A statement with no class is a defect. This exists because ASSAY's only claim to
+realism is schema and arithmetic fidelity, and a single overstated "verified
+against the API" converts that strength into a liability in front of the one
+audience most able to check it.
+
 ---
 
 ## B. Locked project definition
@@ -85,7 +121,7 @@ never from here. A working Tier-0 beats a half-built Tier-1 by a wide margin.
 | # | Component | Acceptance test |
 |---|---|---|
 | T0-1 | `packages/money` — branded `Paise`, integer-only | Property test: conservation under split/allocate over 10k random cases; float usage is a compile error |
-| T0-2 | `packages/domain` — zod schemas, Razorpay-faithful fee/GST, ID grammars, **`constraints.decl.ts`** | Ingest invariants reject malformed records; `credit = amount − fee − tax` holds on every generated line |
+| T0-2 | `packages/domain` — zod schemas, Razorpay-faithful fee/GST, ID grammars, **`constraints.decl.ts`** | Ingest invariants reject malformed records; `credit = amount − fee` holds on every generated line, with `fee` GST-inclusive and `tax = 18% × (fee − tax)` (`DATA_MODEL.md §6`) |
 | T0-3 | `packages/generator` — forward simulation, families F01–F06 + F08 + F10, seeded | Same seed → byte-identical output; ground truth is a construction byproduct with no `is_ambiguous` field |
 | T0-4 | `packages/engine` S0–S3 — quarantine, anchors, candidates under C1–C8, component decomposition | Component-size distribution printed; `intractable_rate` measured on dev |
 | T0-5 | `packages/engine` S4–S5 — exact solve, **no-good cut, second-best certificate**, materiality test, invariants I1–I9 | The ₹1,00,000 worked example (`RECONCILIATION_SPEC.md §11`) abstains with a correct certificate |
@@ -180,8 +216,8 @@ Two are blocking. The rest are cheap to check and should be closed on day 1.
 | F3 | Submission format is repo + demo video | Unverified | Buildathon rules | A required live deployment breaks the local-first assumption and costs a day |
 | F4 | Solo build | Unverified | — | A second person takes T0-12 in parallel, freeing a day |
 | F5 | Razorpay test-mode settlements stay empty | Verified 2026-08-23 (`count: 0`) | Re-check before the demo | If records appear, use for calibration only, never as benchmark data; update the disclosure |
-| F6 | Fee rates in `PREREGISTRATION.md §4.2` are plausible | Unverified | Razorpay public pricing | Adjust **before the seal**, never after |
-| F7 | GST on gateway fees is 18% | Standard rate; unverified against current notification | Public GST schedule | Adjust the constant; the arithmetic identity is unaffected |
+| ~~F6~~ | Fee rates in `PREREGISTRATION.md §4.2` are plausible | **CLOSED 2026-08-23.** Verified against Razorpay's published pricing. Card and wallet at 200 bps confirmed; **UPI corrected 0 → 200** (zero MDR is not zero fee — the pricing page states a 2% platform fee still applies) and **netbanking corrected 190 → 200** (no source states 1.9%). EMI 300 bps retained on a weaker source tier (official blog), labelled as such. | — | Adjusted before the seal, as required |
+| ~~F7~~ | GST on gateway fees is 18% | **CLOSED 2026-08-23.** Confirmed: the recon endpoint documents `tax` as *"the tax on the fee"*, the pricing page states *"2% + 18% GST"*, and the documented Payment sample (`amount 2100, fee 50, tax 8`) is arithmetically consistent with 18% on a 2% fee. Constant unchanged at 1800 bps. **The related identity was not unaffected** — see §A.4 item 1. | — | — |
 | F8 | `K_max = 22` keeps `intractable_rate` low | Unverified until day 3 | Measure component-size distribution on dev | Raise `K_max` **before the seal only** |
 | F9 | Close policy (0.5% / ₹50,000) produces both `CLOSED` and `OPEN` outcomes across seeds | Unverified | Dev run on day 6 | Adjust before the seal; S12 requires both outcomes to occur |
 | F10 | Judges value measurement discipline over feature count | Inferred from track bar language | — | Strongly implied by "honest metrics" and "one cherry-picked match proves nothing" |
@@ -240,7 +276,7 @@ before a reviewer does.
 | Tier | Item | Value |
 |---|---|---|
 | H1 | LLM role R3 (probe planning) + `abstentions resolved per probe` | Strongest genuine-AI-necessity evidence |
-| H1 | Families `F07` (chargeback hold/release), `F09` (period boundary) | Broadens the held-out adversarial split |
+| H1 | Families `F07` (chargeback deduction and later reversal), `F09` (period boundary) | Broadens the held-out adversarial split |
 | H1 | Calibration: reliability diagram + ECE | Justifies the ε threshold |
 | H2 | LLM role R4 (grounded explanations) with numeral verification | Demo polish with a real control attached |
 | H2 | `anthropic` and `openai-compatible` providers exercised live | Completes the provider matrix; needs F2 resolved |
@@ -249,6 +285,7 @@ before a reviewer does.
 | H2 | 100k-record deterministic throughput run | Answers the scale question |
 | H3 | Analyst resolution workflow feeding back into close | Closes the human half of the loop |
 | H3 | Family `F11` (FX) | **Do not attempt.** Separate truth model. |
+| H3 | Family `F12` (settlement split across two bank credits) | **Do not attempt.** Requires changing invariant `I5` and the ground-truth `bank_mappings` shape. |
 | H3 | Live Razorpay adapter on the one real test payment | Provenance touch, near-zero evaluative value |
 | H3 | Q&A over the ledger with citations | High demo appeal, high LLM-wrapper risk. Last. |
 
@@ -271,7 +308,7 @@ Tier-0 freeze **31 August**. Seal and sealed run **1 September**. Submission
 | **Aug 30** | Eval harness: metrics, bootstrap CIs, B0/B2, A1/A2/A3, multi-seed runner | Full dev benchmark table with CIs, two llm-mode columns |
 | **Aug 31** | UI + API + CLI polish; report generation; **TIER-0 FREEZE** | Demo runs end to end without a terminal; §C fully green |
 | **Sep 1** | **SEAL** (`PREREGISTRATION.md §9`) → sealed test run | Signed tag `bench-v1.0.0`; results recorded whatever they say |
-| **Sep 2** | Write results, threats-to-validity, report page | Report contains all 12 required elements (`EVALUATION_SPEC.md §5.4`) |
+| **Sep 2** | Write results, threats-to-validity, report page | Report contains all 13 required elements (`EVALUATION_SPEC.md §5.4`) |
 | **Sep 3** | H1 stretch items **only if the sealed run is clean** | No Tier-0 regression |
 | **Sep 4** | Demo recording, submission package | Video runs on `--llm=offline` |
 | **Sep 5** | **SUBMISSION.** Buffer only — no new code | — |

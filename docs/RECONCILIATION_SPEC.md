@@ -1,9 +1,18 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.1.0 · **Date:** 2026-08-23
+**Spec version:** 1.1.1 · **Date:** 2026-08-23
 
 The matching algorithm, the ambiguity definition, and the rules that decide
 accept / reject / abstain. This is the technical core of the project.
+
+Provenance classes `[RZP-DOC]` / `[ASSAY-MODEL]` / `[NOT-CLAIMED]` are defined in
+`DATA_MODEL.md §0` rule 6, with the full register in `DATA_MODEL.md §22`. Spec
+1.1.1 corrected the *justifications* of `C1`, `C4`, `C5`, `C8`, `I3` and one probe
+definition. **No constraint was added, removed or reordered, and no threshold
+changed** — the frozen constraint set `C1`–`C8` and invariant set `I1`–`I9` are
+identical in membership and in admissibility behaviour, with the single exception
+of `C5`/`I3`, whose arithmetic is restated to match Razorpay's documented
+GST-inclusive fee convention.
 
 ---
 
@@ -70,7 +79,7 @@ a strong key, and they are not subject to scoring or LLM involvement.
 | Anchor | Key | Confidence basis |
 |---|---|---|
 | `AN1` recon line → settlement | `recon_line.settlement_id === settlement.id` | Same system, same identifier |
-| `AN2` settlement → bank line | `normalize(settlement.utr) === normalize(bank_ref)` and amount equal | UTR is designed to be globally unique |
+| `AN2` settlement → bank line | `normalize(settlement.utr) === normalize(bank_ref)` and amount equal | `[RZP-DOC]` the UTR is documented as the reference *"available across banks"* used to track a settlement in the bank account. `[ASSAY-MODEL]` treating it as a **unique** key is ASSAY's assumption — Razorpay asserts no uniqueness, and official samples show at least three different UTR shapes. This is why the anchor also requires amount equality, and why `E14_UTR_COLLISION` exists |
 | `AN3` refund → payment | `refund.payment_id === payment.id` | Referential |
 | `AN4` payment → order | `payment.order_id === order.id` | Referential |
 | `AN5` ledger entry → order | `merchant_ledger.order_ref === order.receipt` (exact, after normalization) | Merchant-controlled but exact |
@@ -95,20 +104,26 @@ needing settlements), generate candidate member sets subject to hard constraints
 
 | ID | Constraint | Real-world justification |
 |---|---|---|
-| `C1` | Currency equality across all members and the target | Cross-currency netting does not occur within an INR settlement |
-| `C2` | Type compatibility: a refund may only offset a payment on the same `order_id`; an adjustment may only attach to its `related_entity_id` when present | Gateway semantics |
-| `C3` | Temporal ordering: `created_at ≤ settled_at ≤ bank.value_date` for every member | Money cannot settle before capture or arrive before it is sent |
-| `C4` | Settlement window: `settled_at − created_at ∈ [T_min, T_max]` (declared: 1–7 days) | Razorpay settlement cycles are T+1 to T+3 for standard merchants; 7 days covers holidays and holds |
-| `C5` | Per-line arithmetic identity: `credit = amount − fee − tax` for payments, `debit = amount` for refunds | `DATA_MODEL.md §6`; a line failing this is corrupt, not a candidate |
+| `C1` | Currency equality across all members and the target | `[ASSAY-MODEL]` Tier-0 is INR-only by construction, so a non-INR line in an INR dataset is a source or scope error, not a netting event. **Not** justified by "cross-currency netting does not occur": Razorpay documents that settlements are made in INR *regardless of the currency the customer paid in*, so a real multi-currency merchant needs the F11 conversion truth model, which is specified and deliberately not implemented |
+| `C2` | Type compatibility: a refund may only offset a payment on the same `order_id`; an adjustment may only attach to its `related_entity_id` when present | `[RZP-DOC]` for the refund half — a refund documents its parent `payment_id`. `[ASSAY-MODEL]` for the adjustment half: `related_entity_id` is ASSAY's construct, not a Razorpay field (`DATA_MODEL.md §9`) |
+| `C3` | Temporal ordering: `created_at ≤ settled_at ≤ bank.value_date` for every member | Money cannot settle before capture or arrive before it is sent. `[RZP-DOC]` Razorpay documents that settlement `status: processed` marks *initiation*, with the bank credit following the NEFT/RTGS/IMPS timeline — so a strictly later bank value date is expected, not anomalous |
+| `C4` | Settlement window: `settled_at − created_at ∈ [T_min, T_max]` (declared: 1–7 **calendar** days) | `[RZP-DOC]` the documented standard domestic cycle is **T+2 working days** from capture, and is subject to bank approval and variation by vertical and risk. `[ASSAY-MODEL]` ASSAY simulates in calendar days with no bank-holiday calendar; `T_max = 7` is sized to absorb the working-day expansion (a capture before a weekend plus a public holiday can exceed five calendar days). See `PREREGISTRATION.md §4.2` |
+| `C5` | Per-line arithmetic identity: `credit = amount − fee` for payments (`fee` is GST-inclusive), `debit = amount` for refunds | `DATA_MODEL.md §6`; a line failing this is corrupt, not a candidate. Corrected in spec 1.1.1: Razorpay documents `fee` as *"Fee (including GST)"* with `tax` the GST component **inside** it, so subtracting both double-counts GST |
 | `C6` | Exact tie-out: `Σ credit(members) − Σ debit(members) = target.amount`, **zero tolerance** in paise | Settlement amounts are exact; a tolerance here is how false matches get admitted |
-| `C7` | One-allocation: no member may already belong to an accepted allocation | Double-counting a payment is the most expensive reconciliation error |
-| `C8` | `on_hold === false` for members claimed as settled | Held funds are not in the transfer |
+| `C7` | One-allocation: no member may already belong to an accepted allocation | Double-counting a payment is the most expensive reconciliation error. `[RZP-DOC]` and directly supported: Razorpay documents that partial settlements defer **whole transactions** to the next slot — its own worked example settles P1 and P2 and defers P3 — so a single payment is not split across two settlements |
+| `C8` | `on_hold === false` for members claimed as settled | `[ASSAY-MODEL]` a line flagged as held is not part of the settled set. `[RZP-DOC]` the field itself is documented, but specifically as *"whether the account settlement **for transfer** is on hold"* — a Razorpay Route concept toggled via `PATCH /v1/transfers/:id`. Route is out of Tier-0 scope, so **`C8` is expected to be non-binding on v1.0.0 data**; it is retained as a declared admissibility filter, and the fraction of candidates it excludes is reported so a reviewer can see that it is doing nothing rather than assume it is doing something |
 
 Zero tolerance on `C6` is deliberate and worth defending: real settlement
-arithmetic is exact in paise. Where a *declared* bank-side rounding operator is
-in force (family F03), the tolerance is an explicit, logged property of that
-operator, not a global fudge factor. A global tolerance is the standard way recon
-tools manufacture confident wrong answers.
+arithmetic is exact in paise. **In benchmark v1.0.0 `C6` is zero-tolerance
+throughout**: no scenario family exercises the declared bank-side rounding
+operator (`ROUND_BANK_AMOUNT`, `PREREGISTRATION.md §4.3`), which remains the only
+sanctioned source of a `C6` tolerance. Activating it requires a spec amendment
+supplying two things this specification does not: a declared tolerance magnitude,
+and an engine-visible signal that the operator is in force — the engine cannot
+infer one, because degradation records live in ground truth, which `AL1` and
+`AL2` bar it from reading. Any such tolerance would be an explicit, logged
+property of that operator, never a global fudge factor. A global tolerance is the
+standard way recon tools manufacture confident wrong answers.
 
 ### 4.2 Soft evidence (ranks — never admits)
 
@@ -230,7 +245,7 @@ re-runs the solve.
 | `fetch_order(order_id)` | May supply `receipt` to discriminate via `SE2` |
 | `fetch_payment(payment_id)` | May supply method/card details for `SE4` |
 | `fetch_refund(refund_id)` | May resolve a refund's parent payment |
-| `fetch_settlement_detail(settlement_id)` | May supply constituent IDs directly |
+| `fetch_settlement_recon(settlement_id, date)` | Queries the **date-scoped recon report** for the lines carrying that `settlement_id`, which may supply constituent IDs directly |
 | `widen_temporal_window(days)` | Relaxes `C4` by a declared, logged amount |
 
 All probes are read-only, allowlist-constrained, and logged. If probes exhaust
@@ -250,8 +265,8 @@ Nothing else in the system can construct a `ValidatedDecision`.
 |---|---|---|
 | `I1` | Trial balance: `Σ dr = Σ cr` across posted journal lines | A ledger that does not balance is not a ledger |
 | `I2` | No double allocation: each `entity_id` appears in at most one accepted allocation across the run | Paying or recognising the same rupee twice |
-| `I3` | Line arithmetic: `credit = amount − fee − tax` (payments), `debit = amount` (refunds) | Accepting a corrupted or forged recon line |
-| `I4` | Settlement closure: `settlement.amount = Σ credit − Σ debit` over its allocated lines | A settlement that does not equal its own contents |
+| `I3` | Line arithmetic: `credit = amount − fee` (payments, `fee` GST-inclusive), `debit = amount` (refunds) | Accepting a corrupted or forged recon line |
+| `I4` | Settlement closure: `settlement.amount = Σ credit − Σ debit` over its allocated lines | A settlement that does not equal its own contents. `[RZP-DOC]` no further fee subtraction belongs here: processing fees are already netted inside each line's `credit`, and `Settlement.fees` / `Settlement.tax` are documented as **0** for a normal settlement (`DATA_MODEL.md §5`) |
 | `I5` | Bank tie-out: `Σ settlement.amount` mapped to a bank line `= bank_line.amount` | Claiming money arrived that did not |
 | `I6` | Referential integrity: every referenced ID exists in the observation set | **Hallucinated transaction IDs** |
 | `I7` | Range/sign: no negative fee or tax; no allocated amount exceeding the observed amount; no `Paise` outside safe-integer range | Silent overflow and sign-flip errors |

@@ -1,9 +1,13 @@
 # THREAT_MODEL — ASSAY
 
-**Spec version:** 1.1.0 · **Date:** 2026-08-23
+**Spec version:** 1.1.1 · **Date:** 2026-08-23
 
 Every control answers: **what specific failure does this prevent?** Controls that
 cannot name a failure are removed.
+
+Spec 1.1.1 restates the fee identity used by `C5` / `I3` to match Razorpay's
+documented GST-inclusive `fee` convention (`DATA_MODEL.md §6`). **No control was
+added, removed or weakened**, and the attacks below are unchanged.
 
 ---
 
@@ -68,7 +72,7 @@ any reviewer discounts. Merchants genuinely do write operational instructions in
 | Free text is stripped at ingest into `untrusted_text` and never reaches the deterministic core (`ARCHITECTURE.md §4`) | The core acting on instruction-shaped text |
 | `packages/engine` cannot import `untrusted_text` — ESLint `no-restricted-imports`, enforced in CI | A future developer "just peeking" at the description for a hint |
 | LLM output schemas contain **no numeric fields** | The instruction "treat fee as 0" having any expressible effect |
-| Fees are recomputed deterministically from `amount` and the method rate; invariant `I3` re-checks `credit = amount − fee − tax` | A zeroed fee surviving into the ledger |
+| Fees are recomputed deterministically from `amount` and the method rate; invariant `I3` re-checks `credit = amount − fee` (where `fee` is GST-inclusive) and `E07` re-checks that `tax` is 18% of `fee − tax` | A zeroed fee surviving into the ledger |
 | `I6` referential integrity | `setl_A` being honoured if it does not exist in the observations |
 
 **Residual risk.** The injected text can still influence R2's *classification* and
@@ -160,11 +164,13 @@ different source, because it never looks at one.
 ### T6 — Arithmetic manipulation
 
 **Attack.** A recon line asserts `amount: 100000, fee: 0, tax: 0, credit: 100000`
-when the true fee was ₹20 + GST.
+when the true fee was ₹20 + GST — i.e. `fee: 2360, tax: 360` under the documented
+GST-inclusive convention (`DATA_MODEL.md §6`).
 
-**Controls.** `C5` and `I3` recompute the identity `credit = amount − fee − tax`
-per line; `I4` re-derives the settlement total from its constituents; `I5`
-requires the bank tie-out. A line whose arithmetic does not close becomes `E06`
+**Controls.** `C5` and `I3` recompute the identity `credit = amount − fee`
+per line and `E07` re-checks `tax = 18% × (fee − tax)`; `I4` re-derives the
+settlement total from its constituents; `I5` requires the bank tie-out. A line
+whose arithmetic does not close becomes `E06`
 or `E07` and never enters an allocation. All arithmetic is integer paise via
 `packages/money`; floats are a type error.
 
@@ -238,7 +244,7 @@ attack, ASSAY abstains *more* and says so loudly.
 | M2 | **Spike detection** | Abstention rate *by value* is compared against a rolling baseline computed on the dev split. `spike_flag = rate > baseline + 3σ`. | `spike_flag`, `abstention_rate_by_value` vs `baseline_rate_by_value` | flag fires on the F10 adversarial split, does not fire on clean splits |
 | M3 | **Source attribution** | Every abstention records whether the component contained quarantined untrusted text, and which source system supplied it. | `attributable_to_untrusted_text_rate`, `by_source_system` | a flood is traceable to its source within one run |
 | M4 | **Immaterial auto-resolve** | Ambiguity below τ never enters the queue at all (`RECONCILIATION_SPEC.md §6.1`). | count of `IMMATERIALLY_AMBIGUOUS` | sub-τ noise contributes zero queue items |
-| M5 | **Cost visibility** | Queue length is priced: `|abstained| × C_review` appears on the close report as a rupee figure. | `over_abstention_cost_inr` | the analyst-time cost of an attack is a number, not a feeling |
+| M5 | **Cost visibility** | Queue length is priced: `\|abstained\| × C_review` appears on the close report as a rupee figure. | `over_abstention_cost_inr` | the analyst-time cost of an attack is a number, not a feeling |
 | M6 | **Injection delta measurement** | Abstention rate on injected records minus the rate on matched clean controls. | `forced_abstention_rate` | reported on the sealed adversarial split |
 
 All six are implemented in `AbstentionTelemetry` (`DATA_MODEL.md §21`) and served

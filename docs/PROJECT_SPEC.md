@@ -2,8 +2,12 @@
 
 **Track:** 04 — AI Finance Controller
 **Status:** Specification. Frozen scope for implementation.
-**Spec version:** 1.1.0
+**Spec version:** 1.1.1
 **Date:** 2026-08-23
+
+Spec 1.1.1 is a factual-correction release against current official Razorpay
+documentation. **Tier-0 scope, users, the loop, success criteria and non-goals are
+unchanged**; see `DECISION_BRIEF.md §A.4` for the full list of corrections.
 
 ---
 
@@ -25,8 +29,9 @@ A merchant on a payment gateway holds three records of the same rupees, produced
 by three different systems on three different clocks:
 
 1. **The gateway's view.** Razorpay's settlement recon report says: these
-   payments, minus these refunds, minus fees, minus GST on fees, minus
-   adjustments, were settled in batch `setl_X` with UTR `U`.
+   payments, minus these refunds, minus fees (each fee GST-inclusive, with the
+   GST component reported alongside it), minus adjustments, were settled in batch
+   `setl_X` with UTR `U`.
 2. **The bank's view.** A single credit line lands in the current account with a
    truncated narration, a value date one or two days later, and — if the merchant
    is unlucky — a UTR that has been mangled by the bank's own statement export.

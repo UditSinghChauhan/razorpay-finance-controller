@@ -1,6 +1,6 @@
 # RELATED_WORK — ASSAY
 
-**Spec version:** 1.1.0 · **Date:** 2026-08-23
+**Spec version:** 1.1.1 · **Date:** 2026-08-23
 
 Where ASSAY sits, and — more usefully — where it does not. The purpose of this
 document is to pre-empt "this already exists" by naming the things that already
@@ -64,6 +64,13 @@ The dashboard offers settlement listing, UTR search and downloadable reports —
 tooling for a human doing the work directly. Route handles split settlements to
 sub-merchants, which introduces a genuine multi-party allocation problem (an
 interesting extension, out of scope for v1.0.0).
+
+**Route's out-of-scope status is now structural, not just a plan.** Recon rows of
+`type: "transfer"` (`trf_…`) and the `on_hold` / `on_hold_until` transfer flags
+belong to Route, and Razorpay's own sample shows transfer rows following a
+different arithmetic form from payment and refund rows. ASSAY's ingest schema
+therefore does not accept transfer rows at all, rather than modelling them with an
+invented identity (`DATA_MODEL.md §6`).
 
 ### 1.4 The positioning statement, for judging
 
