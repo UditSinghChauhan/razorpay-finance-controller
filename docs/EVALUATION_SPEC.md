@@ -1,0 +1,479 @@
+# EVALUATION_SPEC — ASSAY
+
+**Spec version:** 1.1.0 · **Date:** 2026-08-23
+
+Every metric answers the question: **what decision does this number let someone
+make?** A metric that does not change anyone's behaviour is not reported.
+
+---
+
+## 1. Framing: this is selective prediction, not classification
+
+ASSAY may decline to answer. That makes accuracy alone meaningless — any system
+can reach 100% accuracy on the questions it chooses to answer. The correct
+framework is **selective prediction**: a predictor paired with a gate, evaluated
+on the joint behaviour of both.
+
+The two quantities that matter together:
+
+- **Coverage** — the fraction of the batch on which a decision was committed.
+- **Selective risk** — the error among covered decisions.
+
+Neither is meaningful alone. Reporting one without the other is the standard way
+an abstaining system flatters itself, and it is the first thing a competent
+reviewer will check for.
+
+The headline artifact is therefore the **risk–coverage curve** (`§5.1`) and its
+integral, **AURC**, denominated in rupees.
+
+---
+
+## 2. Test protocol
+
+```
+  for split in {dev, test}:
+    for seed in seeds(split):
+      generate observations + ground truth      (generator, seeded)
+      oracle: enumerate from observations ONLY  -> ambiguity labels
+      oracle completeness gate  (vs ground truth, offline)   MUST PASS
+      oracle consistency gate   (vs engine, differential)    MUST PASS
+      for agent in {ASSAY, B0, B2, A1, A2, A3}   (+ B1 if built):
+        run agent on observations only, --llm=replay --strict-replay
+        attempt period close -> CLOSED | OPEN | BLOCKED
+        score(agent output, ground truth, oracle labels) -> metrics.json
+  aggregate over seeds -> mean ± bootstrap 95% CI -> report.html
+```
+
+Rules:
+
+- **No agent ever sees ground truth or oracle labels.** Enforced structurally
+  (`PREREGISTRATION.md §6.2`, AL1–AL2). The completeness gate runs offline inside
+  the generator's trust zone, before any agent exists.
+- **Every configuration runs on ≥ 5 seeds.** Single-run numbers are banned from
+  the report; a figure without a confidence interval is not a result.
+- **All agents run on byte-identical observation files.** Same input, same
+  scorer, differences attributable to the agent alone.
+- **All scored runs use `--llm=replay --strict-replay`**, so results are
+  bit-reproducible and a cache miss is a hard error rather than a silent live
+  call. The cache is populated by one recorded `--llm=<live provider> --record`
+  pass whose provider, model ID, token counts and cost are reported.
+- **Every configuration is additionally run with `--llm=offline`** and every
+  primary metric is published for both, as metric 24 `offline_parity`. This is
+  how the LLM's contribution is measured rather than asserted.
+- **Every run attempts a period close.** A run that ends `BLOCKED` is a defect
+  and fails the build; the distribution of `CLOSED` vs `OPEN` is a reported
+  result.
+
+## 3. Agents under evaluation
+
+### 3.1 Baselines — what someone would plausibly build instead
+
+These are not strawmen. Each is the honest best version of a real approach, and
+none is presented as a third-party agent that ASSAY "judges." They are reference
+points for our own system.
+
+| ID | Agent | What it represents | Why it is a fair comparison |
+|---|---|---|---|
+| `B0-IDONLY` | Exact join on `settlement_id` and normalized UTR. Everything else → exception. | A competent scripted reconciliation | It is genuinely optimal on clean data; its failure mode is coverage, not error. The honest floor. |
+| `B1-GREEDY` *(stretch — `DECISION_BRIEF.md §H`, tier H2)* | First-fit greedy subset match on amount within a ±3-day window, ties broken by proximity | Spreadsheet / legacy recon tooling | What many finance teams actually run today. Implemented well, not crippled. Omitted from Tier-0 because the ablations carry the argument; its absence weakens breadth, not validity. |
+| `B2-LLM-DIRECT` | The batch is chunked into the context window; the model is asked for the allocation JSON; the output is accepted | **The obvious build under time pressure** | The fair comparison, because it is what a strong team would ship in a week without ASSAY's architecture. Given the same provider, model, prompt-engineering effort and total token budget as ASSAY. |
+
+`B2` is the important one. If ASSAY cannot beat a well-prompted direct LLM on net
+cost, the architecture is not earning its complexity, and the report must say so.
+
+### 3.2 Ablations — the scientific controls
+
+Same system, one component removed. These are what make the evaluation
+non-circular: unlike an agent someone else wrote, an ablation differs from ASSAY
+in exactly one respect, so the difference is attributable.
+
+| ID | Removed | Hypothesis it tests |
+|---|---|---|
+| `A1-NOVALIDATE` | Stage S5 invariants I1–I9 | *The deterministic validator prevents real financial error.* Expected: higher `balance_harm_inr`, hallucinated IDs admitted, trial balance breaks, runs end `BLOCKED`. |
+| `A2-NOABSTAIN` | Abstention; always commits the top candidate | *Abstention is worth its cost.* Expected: coverage 100%, sharply higher harm and net cost, Suspense near zero — the "100% matched, 0 exceptions" failure mode, reproduced deliberately. |
+| `A3-NOLLM` | All four LLM roles → the `offline` provider | *The LLM contributes measurably.* **This may fail, and failing is a legitimate result.** |
+
+**`A3-NOLLM` is exactly `ASSAY --llm=offline`**, which means the `offline_parity`
+comparison for ASSAY (metric 24) and the `A3` ablation are the same measurement
+viewed two ways: parity asks "how much did the model change the numbers," and the
+ablation asks "does the model earn its place." One run answers both. The ablation and the offline
+demo path are the same component (`ARCHITECTURE.md §6.5`), which has three
+consequences worth stating: the deterministic counterparts are built properly
+rather than sabotaged, because the demo depends on them; the ablation is
+exercised by the normal test suite; and a rigged ablation would break the demo,
+so the incentive runs the right way. A rigged ablation is worse than no ablation,
+because it converts a real result into a fabricated one.
+
+## 4. Metric definitions
+
+### 4.1 Coverage
+
+```
+  coverage_by_count = |RECONCILED| / |observations|
+  coverage_by_value = Σ value(RECONCILED) / Σ value(all observations)
+```
+
+**Decision enabled:** "How much of my close is automated?" `coverage_by_value` is
+primary because abstaining on the three largest settlements while reconciling
+9,997 small ones is a bad outcome that the count metric would hide.
+
+### 4.2 Match precision / recall — at the allocation-edge level
+
+The unit is an **edge**: a `(entity_id, target_id)` allocation pair. Records are
+the wrong unit because a settlement with 40 constituents is one record and forty
+independent claims.
+
+```
+  TP = edges present in both agent output and ground truth
+  FP = edges asserted by the agent, absent from ground truth
+  FN = edges in ground truth, not asserted (excluding abstained/excepted)
+
+  match_precision = TP / (TP + FP)
+  match_recall    = TP / (TP + FN)
+```
+
+**Decision enabled:** "When it says matched, how often is it right, and how much
+does it miss?"
+
+### 4.3 Abstention precision / recall — against the oracle
+
+Ground truth for "truly ambiguous" comes from the Ambiguity Oracle
+(`PREREGISTRATION.md §5`), not from the generator and not from a label.
+
+```
+  abstention_precision = |abstained ∩ truly_ambiguous| / |abstained|
+  abstention_recall    = |abstained ∩ truly_ambiguous| / |truly_ambiguous|
+```
+
+**Decision enabled:** "Is abstention a real signal, or is the system dodging work
+it could have done?" Low precision means it abstains on decidable cases and wastes
+analyst time. Low recall means it confidently commits on genuinely undecidable
+cases — the expensive failure.
+
+Two derived diagnostics:
+
+```
+  over_abstention_cost_inr  = |abstained \ truly_ambiguous| × C_review
+  silent_guess_value_inr    = Σ value(truly_ambiguous \ abstained)
+```
+
+`silent_guess_value_inr` is the rupee value of decisions the system made that it
+had no evidential right to make. **This is the number the whole project is
+about.**
+
+### 4.4 Financial harm — two measures, reported separately
+
+Face value of misallocated records is the wrong measure: moving a payment between
+two settlements that both land in the same account on the same day harms nobody.
+Harm is what changes in the books.
+
+**(a) Balance harm — how wrong are the accounts?**
+
+```
+  balance_harm_inr = Σ over AccountCode (excluding Suspense)
+                       | balance_agent(acct) − balance_truth(acct) |
+```
+
+Suspense is excluded because a rupee correctly parked in Suspense is a *correct*
+outcome, and charging it as harm would double-count the abstention cost.
+
+**(b) Misdirected value — how many rupees sit in the wrong place?**
+
+```
+  misdirected_value_inr = Σ over entities where allocated_target ≠ true_target
+                            of entity.amount
+```
+
+Both are reported. They answer different questions — (a) "can I trust the trial
+balance?", (b) "how much money is filed under the wrong settlement?" — and a
+system can be good at one and bad at the other. Collapsing them into a single
+number would hide that.
+
+### 4.5 Net cost — the single comparable figure
+
+```
+  net_cost_inr = balance_harm_inr
+               + |abstained|          × C_review      (₹250)
+               + |open_exceptions|    × C_exception   (₹500)
+```
+
+**Decision enabled:** "Which system costs me less to run?" — the only question a
+controller actually asks.
+
+This is the metric that makes the evaluation honest, because it prices
+abstention. Without a cost on abstention, `A2-NOABSTAIN` is trivially beaten by
+a system that abstains on everything, and the comparison is meaningless.
+
+`C_review` and `C_exception` are assumptions, not measurements. A sensitivity
+sweep at ₹100 / ₹250 / ₹1,000 is mandatory (`§5.3`), and any conclusion that
+flips within that range must be reported as unstable.
+
+### 4.6 Calibration
+
+For the score used by the abstention gate, bin predictions into 10 equal-width
+bins and compute expected calibration error:
+
+```
+  ECE = Σ_bins (n_bin / N) × | accuracy(bin) − mean_score(bin) |
+```
+
+Plus a reliability diagram in the report.
+
+**Decision enabled:** "Does a score of 0.9 mean 90%?" An uncalibrated score
+cannot justify a threshold, and a threshold that cannot be justified is a magic
+number. Note that ASSAY's *primary* abstention path is evidential (the
+second-best certificate), not score-based; calibration is reported for the ε-gap
+component, which is the one place a soft score influences the gate.
+
+### 4.7 Throughput and cost
+
+```
+  throughput_rps_deterministic   records/sec through S0–S5 with --llm=off
+  throughput_rps_llm             records/sec for records that reach the LLM
+  pct_records_needing_llm        share of records touching any LLM role
+  p50_latency_ms, p95_latency_ms per-component decision latency
+  cost_inr_per_1000_records      token cost at published rates
+```
+
+**Decision enabled:** "Can this run on my volume, and what does it cost?"
+Splitting the two paths is the honest presentation: the deterministic path should
+handle 100k records comfortably; the LLM path is small because it only touches
+the residual. Reporting a blended number would hide both facts.
+
+A separate scaling run reports deterministic throughput at 1k / 10k / 100k
+records with `--llm=off`, to demonstrate that the architecture's cost scales with
+*difficulty*, not with volume.
+
+### 4.8 Robustness
+
+```
+  injection_financial_success_rate = |injected cases with balance_harm > 0|
+                                     / |injected cases|
+  forced_abstention_rate           = abstention rate on injected records
+                                     − abstention rate on matched clean controls
+  hallucinated_id_rate             = LLM responses referencing non-existent IDs
+                                     / total LLM responses
+  id_rejection_rate                = hallucinated IDs caught by allowlist + I6
+                                     / hallucinated IDs emitted
+```
+
+`injection_financial_success_rate` should be **structurally zero** for ASSAY — no
+LLM output is numeric and I6 rejects unknown IDs. Measuring it anyway is the
+point: an architectural claim that is asserted is worth much less than one that
+is tested.
+
+`forced_abstention_rate` is the subtle attack and the more interesting number. An
+attacker who cannot move money may still be able to inflate the exception queue
+until the analyst stops reading it — a denial-of-service on human attention. If
+ASSAY is vulnerable here, the report says so.
+
+### 4.9 Close-loop outcome
+
+```
+  period_status_distribution = share of runs ending CLOSED / OPEN / BLOCKED
+  unresolved_value_inr       = value_abstained + value_open_exceptions at close
+  suspense_identity_exact    = (Suspense balance === unresolved_value)  // gate G3
+  close_gate_failures        = per-gate failure counts across all runs
+```
+
+**Decision enabled:** "Did the loop actually terminate, and can I sign the
+period?" `BLOCKED` must be **0 across every run** — it indicates a defect in
+ASSAY, not a property of the data. `OPEN` occurring on adversarial or
+high-ambiguity seeds is the *expected and desired* behaviour, and at least one
+legitimate `OPEN` is required by success criterion S12: a close gate that has
+never refused to close is an untested close gate.
+
+`suspense_identity_exact` must be `true` on every run. It is the arithmetic proof
+that no exception was silently dropped between the queue and the books.
+
+### 4.10 Abstention DoS surface
+
+```
+  abstention_spike_flag              = rate_by_value > baseline + 3σ   (frozen k)
+  attributable_to_untrusted_text_rate= abstentions whose component carried
+                                        quarantined text / all abstentions
+  largest_exception_in_top_n         = is the largest-value exception within the
+                                        20 items the queue surfaces first?
+  over_abstention_cost_inr           = |abstained \ truly_ambiguous| × C_review
+```
+
+**Decision enabled:** "Is someone flooding my queue, where is it coming from, and
+is the item that matters still visible?" These correspond to mitigations M1–M6 in
+`THREAT_MODEL.md §T9`.
+
+`largest_exception_in_top_n` must be `true` on **every** run including the
+adversarial split — that is the guarantee that a flood of small planted items
+cannot bury a large genuine one. `abstention_spike_flag` is expected to fire on
+the F10 adversarial split and not to fire on clean splits; a flag that fires
+everywhere is a broken baseline, and one that fires nowhere is a broken detector.
+
+### 4.11 Provider independence
+
+```
+  offline_parity = for each primary metric M:
+                     { M(--llm=offline), M(--llm=replay), delta, CI overlap }
+```
+
+**Decision enabled:** "How much did the language model actually contribute, and
+does this system work without one?" Reporting both columns side by side is the
+honest form of the AI-necessity claim. If the deltas are within overlapping
+confidence intervals, the correct conclusion — and the one that must be written —
+is that the LLM did not measurably contribute to those metrics on this benchmark.
+
+### 4.12 Determinism
+
+```
+  determinism_check = (ledger_root_hash(run_1) === ledger_root_hash(run_2))
+```
+
+Two runs, same input, `--llm=replay`. **Decision enabled:** "If I re-run the
+close, do I get the same books?" A finance control that is not reproducible is
+not a control. Also directly validates invariant I9.
+
+### 4.13 Gap to oracle
+
+```
+  gap_to_oracle = net_cost_inr(ASSAY) − net_cost_inr(oracle_policy)
+```
+
+Where the oracle policy abstains on exactly the truly-ambiguous set and is
+correct elsewhere. This is the best achievable performance given the
+observations.
+
+**Decision enabled:** "Is the remaining error a solvable engineering problem, or
+is the information simply not present in the data?" A small gap means the
+information limit has been reached and further work should go into acquiring
+better evidence, not better algorithms.
+
+---
+
+## 5. Reporting
+
+### 5.1 Risk–coverage curve — the primary figure
+
+Sweep the abstention aggressiveness (vary ε from 0 to 1 with τ fixed). At each
+point plot **coverage by value** on x and **balance harm in ₹** on y. One line
+per agent. `B0`, `B1`, `B2` and `A2` are single points (they do not abstain, or
+abstain trivially); ASSAY and `A1` are curves.
+
+**AURC** (area under the risk–coverage curve, ₹-denominated) is the scalar
+summary. Lower is better.
+
+This single figure carries the argument: it shows simultaneously that ASSAY
+achieves high coverage, that its harm at that coverage is low, and that the
+alternatives sit above and to the left.
+
+### 5.2 The comparison table
+
+One row per agent, columns: `coverage_by_value`, `balance_harm_inr`,
+`misdirected_value_inr`, `net_cost_inr`, `abstention_precision`,
+`silent_guess_value_inr`, `throughput_rps`. Every cell is `mean ± 95% CI` over 5
+seeds. **Cells whose confidence intervals overlap are explicitly marked as not
+significantly different** — no bolding of a 2% lead over a 15% interval.
+
+### 5.3 Mandatory sensitivity analyses
+
+| Sweep | Range | Why |
+|---|---|---|
+| τ (materiality) | ₹10 / ₹100 / ₹1,000 / ₹10,000 | Prevents τ from being tuned to inflate coverage; shows the `AMBIGUOUS` → `IMMATERIALLY_AMBIGUOUS` shift |
+| ε (evidence margin) | 0 → 1 | Generates the risk–coverage curve |
+| `C_review` | ₹100 / ₹250 / ₹1,000 | Any conclusion that flips must be flagged as unstable |
+| Batch size | 1k / 10k / 100k | Throughput scaling, deterministic path |
+
+### 5.4 What the report must contain
+
+1. The synthetic-data disclosure from `PREREGISTRATION.md §2`, verbatim, first.
+2. The positioning statement from `RELATED_WORK.md §1.4` — ASSAY consumes the
+   Razorpay recon report as authoritative input and claims no gap in it.
+3. The benchmark manifest hashes, the `constraint_set_hash`, and the seal commit SHA.
+4. Oracle gate results: completeness and consistency, both passing, with the
+   sample size used for the differential test.
+5. The full metric table with CIs, including every metric in the frozen list —
+   **including the ones where ASSAY does poorly.**
+6. **Two columns for every primary metric:** `--llm=replay` and `--llm=offline`,
+   with the delta and whether the CIs overlap (metric 24, `offline_parity`).
+7. The risk–coverage figure and reliability diagram.
+8. The close-loop table: `period_status` per seed, `unresolved_value_inr`, and
+   confirmation that `BLOCKED` count is zero and `suspense_identity_exact` is
+   true on every run.
+9. The abstention DoS panel: spike flags by split, source attribution, and
+   `largest_exception_in_top_n` across all runs.
+10. The declared threats to validity (`PREREGISTRATION.md §10`), unedited.
+11. Every `EXPLORATORY`-labelled metric, clearly separated.
+12. A named list of what was **not** tested: FX, real bank formats, multiple
+    merchant profiles, non-INR settlement, production volumes, and any live
+    Razorpay settlement data (none exists in the test account).
+
+### 5.5 Forbidden reporting practices
+
+Listed explicitly because each is a plausible temptation under deadline pressure:
+
+- Reporting a single-seed number without a CI.
+- Reporting accuracy without coverage.
+- Choosing a threshold after seeing test results.
+- Showing one impressive matched record as evidence of quality — the track brief
+  explicitly rejects this ("one cherry-picked match proves nothing").
+- Describing an ablation as a "competitor."
+- Reporting harm in record counts rather than rupees.
+- Any claim of real-data provenance.
+- Any claim that Razorpay's reconciliation has a gap or defect.
+- Any assertion about what a commercial vendor does internally.
+- Reporting only the `--llm=replay` column while omitting `--llm=offline`.
+- Any number in the demo that does not exist in a committed run artifact.
+
+---
+
+## 6. Exception reporting
+
+The track bar asks for "the exceptions it could not resolve." The exception
+report is a deliverable, not a footnote.
+
+For each of the 14 exception classes: count, total rupee value, mean value,
+`owner_role`, and three redacted examples with their analyst questions. Plus:
+
+- **Exception class confusion matrix** — R2's classification against the
+  generator's known cause. Measures whether the triage is trustworthy.
+- **Suspense reconciliation** — proof that
+  `Suspense balance = Σ abstained value + Σ open exception value`, exactly.
+  Confirms nothing was quietly dropped between the queue and the books.
+
+---
+
+## 7. Reproducibility
+
+A third party with the repository must be able to reproduce every number, with
+**no API key and no network**:
+
+```
+  pnpm install
+  pnpm assay generate --split dev --seeds 2000-2004
+  pnpm assay oracle   --split dev                    # gates must pass
+  pnpm assay bench    --split dev --agents all --llm offline
+  pnpm assay bench    --split dev --agents all --llm replay --strict-replay
+  pnpm assay report   --out runs/report.html
+```
+
+The `--llm=offline` line requires nothing external at all. The `--llm=replay`
+line requires only the committed response cache. Neither touches the network.
+
+Guaranteed by: seeded generation with a vendored PRNG; pinned dependencies
+(`pnpm-lock.yaml`); a committed response cache keyed by
+`sha256(provider ‖ model_id ‖ system_prompt_hash ‖ input_hash)`; the engine commit
+SHA in every manifest; and `assay verify --run <id>`, which recomputes the hash
+chain from genesis, re-projects all balances, and re-checks the Suspense
+identity.
+
+**The LLM non-determinism problem, stated honestly:** language models are not
+deterministic even at fixed settings, so live-provider runs are not
+bit-reproducible. This is why every scored run uses `--llm=replay
+--strict-replay`, where a cache miss is a hard error rather than a silent live
+call. The live pass that produced the cache is recorded with provider, model ID
+and per-call hashes, and the report states which mode produced each number.
+Claiming reproducibility without this distinction would be false.
+
+**Provider independence is part of reproducibility.** Because every primary
+metric is also published under `--llm=offline` (metric 24, `offline_parity`), a
+reader who distrusts the recorded cache — or who cannot obtain the same model —
+can still reproduce a complete, fully deterministic result set and see exactly
+how much the model changed.
+
