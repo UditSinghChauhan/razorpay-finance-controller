@@ -2,13 +2,19 @@
 
 **Track:** 04 — AI Finance Controller
 **Status:** Specification. Frozen scope for implementation.
-**Spec version:** 1.2.0
-**Date:** 2026-08-24
+**Spec version:** 1.3.0
+**Date:** 2026-08-25
+
+**At spec 1.3.0** this document is unchanged apart from the version header. S3's
+*"harm on the covered set"* wording is unchanged; what changed is that
+`EVALUATION_SPEC.md §4.4` now computes the quantity S3 already named — see
+`DECISION_BRIEF.md §A.6`. **No success-criterion threshold changed.**
+The paragraphs below describe the earlier **1.2.0** and
+**1.1.1** releases and are retained as history.
 
 **At spec 1.2.0** this document added the `REFERENCE` terminal state (§5) and made
 S1, S2 and S3 name their measurement universe; no success-criterion threshold
-changed — see `DECISION_BRIEF.md §A.5`. The paragraph below describes the earlier
-**1.1.1** release and is retained as history.
+changed — see `DECISION_BRIEF.md §A.5`.
 
 Spec 1.1.1 is a factual-correction release against current official Razorpay
 documentation. **Tier-0 scope, users, the loop, success criteria and non-goals are

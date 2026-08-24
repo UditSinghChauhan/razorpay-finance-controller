@@ -1,15 +1,21 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.2.0 · **Date:** 2026-08-24
+**Spec version:** 1.3.0 · **Date:** 2026-08-25
 
 The matching algorithm, the ambiguity definition, and the rules that decide
 accept / reject / abstain. This is the technical core of the project.
 
+**At spec 1.3.0** this document restated the fourth `EXCEPTION` trigger as an
+evidence condition (§9) and declared `C2`'s adjustment half a generation invariant,
+non-binding agent-side, following the `C8` precedent (§4.1) — see
+`DECISION_BRIEF.md §A.6`. **`C1`–`C8` membership is unchanged and no threshold
+moved.** The paragraphs below describe the earlier **1.2.0** and
+**1.1.1** releases and are retained as history.
+
 **At spec 1.2.0** this document added the `REFERENCE` terminal state and a fourth
 `EXCEPTION` trigger (§9), restated gate G3 in gross per-item form (§10.1),
 replaced the close policy's absolute bound (§10.3), and moved `evidence_score`
-and ε to basis points — see `DECISION_BRIEF.md §A.5`. The paragraph below
-describes the earlier **1.1.1** release and is retained as history.
+and ε to basis points — see `DECISION_BRIEF.md §A.5`.
 
 Provenance classes `[RZP-DOC]` / `[ASSAY-MODEL]` / `[NOT-CLAIMED]` are defined in
 `DATA_MODEL.md §0` rule 6, with the full register in `DATA_MODEL.md §22`. Spec
@@ -111,7 +117,7 @@ needing settlements), generate candidate member sets subject to hard constraints
 | ID | Constraint | Real-world justification |
 |---|---|---|
 | `C1` | Currency equality across all members and the target | `[ASSAY-MODEL]` Tier-0 is INR-only by construction, so a non-INR line in an INR dataset is a source or scope error, not a netting event. **Not** justified by "cross-currency netting does not occur": Razorpay documents that settlements are made in INR *regardless of the currency the customer paid in*, so a real multi-currency merchant needs the F11 conversion truth model, which is specified and deliberately not implemented |
-| `C2` | Type compatibility: a refund may only offset a payment on the same `order_id`; an adjustment may only attach to its `related_entity_id` when present | `[RZP-DOC]` for the refund half — a refund documents its parent `payment_id`. `[ASSAY-MODEL]` for the adjustment half: `related_entity_id` is ASSAY's construct, not a Razorpay field (`DATA_MODEL.md §9`) |
+| `C2` | Type compatibility. **Refund half, binding:** a refund may only offset a payment on the same `order_id`. **Adjustment half, non-binding agent-side:** an adjustment may only attach to its `related_entity_id` when present | `[RZP-DOC]` for the refund half — a refund documents its parent `payment_id`. `[ASSAY-MODEL]` for the adjustment half: `related_entity_id` is ASSAY's construct, not a Razorpay field, and per `DATA_MODEL.md §10` it is **not observable** — it lives on the true-state `Adjustment` entity (`DATA_MODEL.md §9`), which is never an observation. The adjustment half is therefore a **generation invariant**: the generator honours it when constructing the true state, and neither the engine nor the oracle can evaluate it. Following the `C8` precedent, it is retained in the constraint set and declared expected-non-binding on v1.0.0 data, and the fraction of candidates it excludes is reported so a reviewer can see that it is doing nothing rather than assume it is doing something |
 | `C3` | Temporal ordering: `created_at ≤ settled_at ≤ bank.value_date` for every member | Money cannot settle before capture or arrive before it is sent. `[RZP-DOC]` Razorpay documents that settlement `status: processed` marks *initiation*, with the bank credit following the NEFT/RTGS/IMPS timeline — so a strictly later bank value date is expected, not anomalous |
 | `C4` | Settlement window: `settled_at − created_at ∈ [T_min, T_max]` (declared: 1–7 **calendar** days) | `[RZP-DOC]` the documented standard domestic cycle is **T+2 working days** from capture, and is subject to bank approval and variation by vertical and risk. `[ASSAY-MODEL]` ASSAY simulates in calendar days with no bank-holiday calendar; `T_max = 7` is sized to absorb the working-day expansion (a capture before a weekend plus a public holiday can exceed five calendar days). See `PREREGISTRATION.md §4.2` |
 | `C5` | Per-line arithmetic identity: `credit = amount − fee` for payments (`fee` is GST-inclusive), `debit = amount` for refunds | `DATA_MODEL.md §6`; a line failing this is corrupt, not a candidate. Corrected in spec 1.1.1: Razorpay documents `fee` as *"Fee (including GST)"* with `tax` the GST component **inside** it, so subtracting both double-counts GST |
@@ -330,9 +336,10 @@ and nothing is dropped.
                → posts to 9000_SUSPENSE_UNRECONCILED, carries a certificate
 
   EXCEPTION    an ingest invariant failed, an S5 invariant failed, no
-               admissible candidate exists at all, or the allocation is
-               correct but no authoritative non-Suspense posting is defined
-               for it (DATA_MODEL.md §17.2, the conservative fallback)
+               admissible candidate exists at all, or no observable evidence
+               determines the observation's accounting treatment
+               (DATA_MODEL.md §17.2 — every adjustment observation reaches
+               this state, because `Adjustment.reason` is not observable)
                → posts to 9000_SUSPENSE_UNRECONCILED, carries a class + owner
 
   REFERENCE    the observation is of a reference kind (DATA_MODEL.md §10.1:
@@ -348,11 +355,12 @@ retire an observation the engine failed to explain: an unmatched `bank_line`
 becomes `E03`, never `REFERENCE`. This is what keeps the fourth state from
 becoming a drop path.
 
-The fourth `EXCEPTION` trigger is new in spec 1.2.0 and exists so that the
-posting fallback in `DATA_MODEL.md §17.2` has a terminal state to land in. It is
-deliberately an exception rather than a reconciliation: an item whose accounting
-treatment this specification does not define has **not** been reconciled, and
-must not be reported as though it had been.
+The fourth `EXCEPTION` trigger is new in spec 1.2.0, and was restated in spec
+1.3.0 as an evidence condition, so that the posting fallback in
+`DATA_MODEL.md §17.2` has a terminal state to land in. It is deliberately an
+exception rather than a reconciliation: an item whose accounting treatment the
+observable evidence does not determine has **not** been reconciled, and must not
+be reported as though it had been.
 
 The distinction between `ABSTAINED` and `EXCEPTION` is meaningful and must not be
 blurred: an exception says *"something is wrong with this data"*; an abstention

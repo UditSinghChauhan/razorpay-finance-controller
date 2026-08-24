@@ -1,9 +1,10 @@
-# PREREGISTRATION — ASSAY Benchmark v1.0.1
+# PREREGISTRATION — ASSAY Benchmark v1.0.2
 
-**Spec version:** 1.2.0 · **Benchmark version:** 1.0.1
+**Spec version:** 1.3.0 · **Benchmark version:** 1.0.2
 
 **Status: FROZEN on commit. Amendments require a version bump and a new seal.**
-**Date frozen:** 2026-08-23 · **Amended:** 2026-08-24 (benchmark 1.0.1, see below)
+**Date frozen:** 2026-08-23 · **Amended:** 2026-08-24 (benchmark 1.0.1) and
+2026-08-25 (benchmark 1.0.2) — see below
 · **Sealed at:** _(pending — see §9)_
 
 **Amendment 1.1.1 (pre-seal, factual correction).** Applied before the seal and
@@ -32,6 +33,34 @@ and `§6.1`'s split and seed table are **unchanged** — the data-generating pro
 is identical to benchmark v1.0.0. Full enumeration and the post-hoc-optimization
 defence are in `DECISION_BRIEF.md §A.5`.
 
+**Amendment 1.3.0 / benchmark 1.0.2 (pre-seal, observability-seam closure and a
+metric correction).** Applied before the seal, before any code existed, before any
+dataset was generated, and before any number was observed. Six items: the
+`(kind, source_system, payload)` mapping made normative with two `source_system`
+values added (`DATA_MODEL.md §10`, `ARCHITECTURE.md §6`); `C2`'s adjustment half
+declared a generation invariant and non-binding agent-side, with `C1`–`C8`
+membership unchanged (`RECONCILIATION_SPEC.md §4.1`, §5.3 below); the P8 fallback
+corrected to post the non-zero `debit`/`credit` (`DATA_MODEL.md §17.2`); the
+adjustment information boundary formalized, so every adjustment observation
+reaches `EXCEPTION` under P8 while truth retains the five-way `reason` branch
+(`DATA_MODEL.md §9`, §17.2, §22.2 M15, `RECONCILIATION_SPEC.md §9`);
+`GroundTruth.true_journal` added so `true_balances` becomes a recomputable,
+auditable, item-attributable projection (`DATA_MODEL.md §1`, §9 step 5 below); and
+**metric 6 amended** so that `balance_harm_inr` and `misdirected_value_inr` are
+computed over the covered set only (`EVALUATION_SPEC.md §4.4`, §8 below).
+
+**Metric 6 is a formula amendment to a frozen secondary metric, not a
+clarification, and it changes the value of metrics 2, 3 and 8.** It lowers
+`balance_harm_inr` for any abstaining system, ASSAY included, and makes S3 easier
+to pass; it also raises the figure for the `A2-NOABSTAIN` ablation, against which
+ASSAY's headline comparison is drawn. The defect it corrects is stated in §8 and
+in `DECISION_BRIEF.md §A.6`. `§4.1` (families and composition), `§4.2` (generation
+parameters), `§4.3` (degradation operators), `§5.1`/`§5.2`/`§5.4` (the oracle),
+`§6.1`'s split and seed table, `§6.2`'s AL1–AL7 and **every threshold in §7** are
+**unchanged** — the data-generating process is identical to benchmark v1.0.0 and
+v1.0.1. Full enumeration and the post-hoc-optimization defence are in
+`DECISION_BRIEF.md §A.6`.
+
 This document is written **before any test-split result exists**. Its purpose is
 to make post-hoc rationalisation impossible: metrics, thresholds, dataset
 construction and stopping rules are all fixed here, and the git history proves
@@ -53,7 +82,7 @@ seeds, and the stopping rule.
 2. The test-split ground truth is generated and its `sha256` committed **before**
    any agent runs against it. The ground-truth file itself is gitignored and held
    back.
-3. The repository is tagged `bench-v1.0.1` (signed) at seal time.
+3. The repository is tagged `bench-v1.0.2` (signed) at seal time.
 4. After the seal, **no changes to agent code are permitted before the results
    are recorded.** Any change invalidates the seal and requires a new benchmark
    version with fresh seeds.
@@ -336,6 +365,12 @@ engine's admissibility verdict must equal the oracle's, constraint by
 constraint. Catches engine and oracle *diverging* from the shared declaration.
 Any disagreement fails the build and names the constraint.
 
+Constraint halves declared **non-binding agent-side** in `RECONCILIATION_SPEC.md
+§4.1` — `C8` in full, and `C2`'s adjustment half — are excluded from the
+differential test's pass criterion and reported separately as
+*evaluated: non-binding*. A gate that cannot fail on a constraint neither side can
+evaluate would otherwise report agreement it never tested.
+
 ### 5.4 The ambiguity definition
 
 A case is **truly ambiguous** iff the oracle finds ≥ 2 admissible allocations
@@ -514,7 +549,11 @@ claim about ASSAY's performance. Full definitions in `EVALUATION_SPEC.md §4`.
 
 **Secondary:**
 5. `match_precision`, `match_recall`, `match_f1` at allocation-edge level
-6. `balance_harm_inr` and `misdirected_value_inr` (reported separately)
+6. `balance_harm_inr` and `misdirected_value_inr` (reported separately), both
+   computed **over the covered set only** (`EVALUATION_SPEC.md §4.4`). Amended in
+   benchmark v1.0.2. The v1.0.0 and v1.0.1 form summed over the whole run, which
+   made `balance_harm_inr` rise with abstention and inverted the risk–coverage
+   curve that metric 3 integrates. The threshold in S3 is unchanged.
 7. `ece` — expected calibration error of the score used for abstention
 8. `gap_to_oracle`
 9. `coverage_by_count` — restricted to reconcilable kinds on both sides
@@ -613,6 +652,17 @@ v1.0.0 figure exists — no run was ever executed under it — so nothing is
 invalidated by this, but any future re-run must state which benchmark version
 produced each number.
 
+**Benchmark v1.0.2 second-order effects (spec 1.3.0 amendment set).** The
+covered-set restriction on metric 6 changes the **value** of metric 2
+`net_cost_inr`, whose first term is `balance_harm_inr`; metric 3 `aurc_inr`,
+whose y-axis is metric 6 and whose direction it restores; and metric 8
+`gap_to_oracle`, a difference of two `net_cost_inr` figures. **No formula other
+than metric 6's changes.** Scenario C additionally raises metric 12
+`unresolved_value_inr` and metric 2's exception term, and removes the entire
+adjustment class from metric 10 `exception_class_confusion`, since every
+adjustment `E12` is now assigned deterministically by the `DATA_MODEL.md §17.2`
+fallback rather than by R2 triage.
+
 Metric 24 is the pre-registered form of the provider-independence requirement: it
 forces the offline-vs-model comparison to be *published as a number*, so "the LLM
 contributed X" is measured rather than asserted — including the outcome where X
@@ -626,13 +676,15 @@ results are reported, with the reason for the re-run.
 ## 9. Seal procedure
 
 ```
-  1. Freeze code:  git tag -s bench-v1.0.1 -m "ASSAY benchmark v1.0.1 seal"
+  1. Freeze code:  git tag -s bench-v1.0.2 -m "ASSAY benchmark v1.0.2 seal"
   2. Generate:     assay generate --split test --seeds 9000-9004,9100-9104
   3. Oracle:       assay oracle --split test          # completeness gate MUST pass
   4. Hash:         sha256 observations.jsonl ground_truth.jsonl oracle_labels.jsonl
   5. Commit hashes into benchmark_manifest.json      # ground truth itself NOT committed
      # `record_counts` must match the frozen §4.1 composition; a mismatch, or a
      # per-(split,seed) total outside 10,000-20,000, is a SEAL FAILURE
+     # `true_balances` must equal the projection of `true_journal` for every
+     # AccountCode; a mismatch is a SEAL FAILURE (DATA_MODEL.md §1)
   6. Commit + push. Record the commit SHA as the seal point.
   7. Run:          assay bench --sealed --agents all --seeds all
   8. Record results. NO CODE CHANGES BETWEEN 6 AND 8.
@@ -659,7 +711,7 @@ Stated here, before results, so they cannot be presented later as afterthoughts.
 | V7 | LLM non-determinism makes results irreproducible | All scored runs use `--llm=replay` against a committed cache; provider, model ID and per-call hashes recorded | Low |
 | V8 | Only one merchant profile simulated | Single profile in v1.0.0 | **Acknowledged limitation.** Stated in the report. |
 | V9 | Results depend on one model vendor | `LlmProvider` abstraction; `offline_parity` (metric 24) publishes every primary metric under `--llm=offline` alongside the model path | Low — but note the offline path is authored by the same developer |
-| V10 | The close gate never fires, or fires always, so it is untested | Metric 11 requires the distribution of `CLOSED` / `OPEN` / `BLOCKED` across seeds; S12 requires at least one legitimate `OPEN` **and** one legitimate `CLOSED`; a manual `human`-actor close does not by itself satisfy S12. The benchmark v1.0.0 policy `min(0.005 × batch, ₹50,000)` was found before the seal to make `CLOSED` structurally near-unreachable at the batch sizes S1 forces, and was replaced by a scale-invariant ratio (`RECONCILIATION_SPEC.md §10.3`). Both policies are scored per run. | **Moderate.** The corrected policy is defensible on scale-invariance grounds but has still not been observed to produce both outcomes; `DECISION_BRIEF.md §F` F9 is the pre-declared falsification check, and it forbids re-tuning in response to what the check shows. The `DATA_MODEL.md §17.2` posting fallback adds a further, deliberately conservative source of unresolved value. Separately declared: `unresolved_value_paise` spans all reconcilable observation kinds while `batch_value_paise` is based on `recon_line` value alone, so the close ratio is not a like-for-like fraction and effective strictness varies with how many observation views of a break remain unresolved — always in the conservative direction (`RECONCILIATION_SPEC.md §10.3`). |
+| V10 | The close gate never fires, or fires always, so it is untested | Metric 11 requires the distribution of `CLOSED` / `OPEN` / `BLOCKED` across seeds; S12 requires at least one legitimate `OPEN` **and** one legitimate `CLOSED`; a manual `human`-actor close does not by itself satisfy S12. The benchmark v1.0.0 policy `min(0.005 × batch, ₹50,000)` was found before the seal to make `CLOSED` structurally near-unreachable at the batch sizes S1 forces, and was replaced by a scale-invariant ratio (`RECONCILIATION_SPEC.md §10.3`). Both policies are scored per run. | **Moderate.** The corrected policy is defensible on scale-invariance grounds but has still not been observed to produce both outcomes; `DECISION_BRIEF.md §F` F9 is the pre-declared falsification check, and it forbids re-tuning in response to what the check shows. The `DATA_MODEL.md §17.2` posting fallback adds a further, deliberately conservative source of unresolved value. Separately declared: `unresolved_value_paise` spans all reconcilable observation kinds while `batch_value_paise` is based on `recon_line` value alone, so the close ratio is not a like-for-like fraction and effective strictness varies with how many observation views of a break remain unresolved — always in the conservative direction (`RECONCILIATION_SPEC.md §10.3`). Scenario C (spec 1.3.0) adds a third source of unresolved value: every adjustment observation now reaches `EXCEPTION`, and a single large undetermined adjustment can exceed the close threshold on its own. `CLOSED` is correspondingly harder to reach than in benchmark v1.0.1, and the residual is unchanged at **Moderate** for that reason as well as the close-policy one. |
 | V11 | Abstention DoS mitigations are instrumentation, not defence | M1 (value-ranked queue) and M4 (immaterial auto-resolve) change behaviour, not just reporting; M2/M3/M5/M6 are detection and attribution | **Real.** A sub-threshold, source-spread flood evades M2 and M3. Stated in `THREAT_MODEL.md §T9`. |
 
 **The claim ASSAY is entitled to make, and no more:**

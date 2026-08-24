@@ -1,14 +1,21 @@
 # EVALUATION_SPEC — ASSAY
 
-**Spec version:** 1.2.0 · **Date:** 2026-08-24
+**Spec version:** 1.3.0 · **Date:** 2026-08-25
 
 Every metric answers the question: **what decision does this number let someone
 make?** A metric that does not change anyone's behaviour is not reported.
 
+**At spec 1.3.0 / benchmark 1.0.2** this document amended **metric 6**: both
+`balance_harm_inr` and `misdirected_value_inr` are now computed over the covered
+set only (§4.4), and the ε sweep is written in basis points (§5.1, §5.3). Metric 6
+is the package's one formula change; metrics 2, 3 and 8 change in **value** as a
+result, and the direction of effect is disclosed in `PREREGISTRATION.md §8` and
+`DECISION_BRIEF.md §A.6`. The paragraphs below describe the earlier **1.2.0** and
+**1.1.1** releases and are retained as history.
+
 **At spec 1.2.0 / benchmark 1.0.1** this document amended metrics 1, 9 and 13,
 appended metrics 27 and 28, and restated §4.4's ground-truth basis and §4.9's
-close-loop block — see `DECISION_BRIEF.md §A.5`. The paragraph below describes the
-earlier **1.1.1** release and is retained as history.
+close-loop block — see `DECISION_BRIEF.md §A.5`.
 
 Spec 1.1.1 changed **no metric, no baseline, no ablation and no sweep.** It was a
 factual-correction pass over statements about Razorpay behaviour; the frozen
@@ -260,27 +267,71 @@ Face value of misallocated records is the wrong measure: moving a payment betwee
 two settlements that both land in the same account on the same day harms nobody.
 Harm is what changes in the books.
 
-**(a) Balance harm — how wrong are the accounts?**
+**(a) Balance harm — how wrong are the accounts, among the decisions the system
+actually made?**
 
 ```
+  covered   = observations whose component reached RECONCILED
+  abstained = observations whose component reached ABSTAINED
+  excepted  = observations whose component reached EXCEPTION
+  (REFERENCE observations post nothing and enter none of these sets)
+
+  proj_agent(acct) = Σ dr_paise − Σ cr_paise over the agent's journal lines
+                     whose owning decision is RECONCILED
+  proj_truth(acct) = Σ dr_paise − Σ cr_paise over true_journal lines whose
+                     `source_entity_id` belongs to a covered observation
+
   balance_harm_inr = Σ over AccountCode (excluding Suspense)
-                       | balance_agent(acct) − balance_truth(acct) |
+                       | proj_agent(acct) − proj_truth(acct) |
 ```
 
-Suspense is excluded because a rupee correctly parked in Suspense is a *correct*
-outcome, and charging it as harm would double-count the abstention cost.
+**`balance_harm_inr` is selective risk, and selective risk is computed over the
+covered set only.** `PROJECT_SPEC.md §7` S3 states the criterion as *"harm on the
+covered set"*; §1 of this document defines selective risk as *"the error among
+covered decisions"*; §4.5 justifies pricing abstention on the ground that
+*"without a cost on abstention, `A2-NOABSTAIN` is trivially beaten by a system
+that abstains on everything"*, which holds only if abstaining lowers harm; and
+§5.1 plots harm against coverage as a risk–coverage curve, which requires harm to
+fall as coverage falls. Benchmark v1.0.0 and v1.0.1 summed over the whole run
+instead. Under that formula harm **rose** with abstention, the curve sloped
+upward, `aurc_inr` measured the inverse of its stated meaning, and
+`A2-NOABSTAIN` — the ablation built never to abstain — scored the lowest balance
+harm in the field. The restriction to the covered set is what those four sections
+already require.
+
+**Suspense is excluded from the account sum** because a rupee correctly parked
+there is a *correct* outcome, and including it would count the same abstention
+twice within this metric — once on the Suspense side and once on its counterparty.
+
+**Abstention and exception remain priced, once, elsewhere.** An abstained item
+costs `C_review` and an open exception costs `C_exception` in `net_cost_inr`
+(§4.5). Both enter `unresolved_value_inr` (§4.9) and gate G3
+(`RECONCILIATION_SPEC.md §10.1`). Neither is removed by this amendment; what is
+removed is a **fourth** charge for the same item, levied inside a metric that is
+defined to measure the covered set.
+
+**The degenerate case, checked.** An agent that abstains on everything has an
+empty covered set and `balance_harm_inr = 0` — but `net_cost_inr` is
+`N × C_review`, and `coverage_by_value` is 0, which fails S2. Abstaining on
+everything is not rewarded.
 
 **(b) Misdirected value — how many rupees sit in the wrong place?**
 
 ```
-  misdirected_value_inr = Σ over entities where allocated_target ≠ true_target
+  misdirected_value_inr = Σ over COVERED entities where
+                            allocated_target ≠ true_target
                             of entity.amount
 ```
 
+Scoped to the covered set for the same reason as (a): an abstained or excepted
+entity has no allocated target, so it can be neither correctly nor incorrectly
+directed. Stating the scope explicitly prevents an implementation from counting
+an abstention as a misdirection.
+
 Both are reported. They answer different questions — (a) "can I trust the trial
-balance?", (b) "how much money is filed under the wrong settlement?" — and a
-system can be good at one and bad at the other. Collapsing them into a single
-number would hide that.
+balance for what the system decided?", (b) "how much money is filed under the
+wrong settlement?" — and a system can be good at one and bad at the other.
+Collapsing them into a single number would hide that.
 
 ### 4.5 Net cost — the single comparable figure
 
@@ -457,8 +508,8 @@ better evidence, not better algorithms.
 
 ### 5.1 Risk–coverage curve — the primary figure
 
-Sweep the abstention aggressiveness (vary ε from 0 to 1 with τ fixed). At each
-point plot **coverage by value** on x and **balance harm in ₹** on y. One line
+Sweep the abstention aggressiveness (vary ε from 0 to 10_000 bps with τ fixed).
+At each point plot **coverage by value** on x and **balance harm in ₹** on y. One line
 per agent. `B0`, `B1`, `B2` and `A2` are single points (they do not abstain, or
 abstain trivially); ASSAY and `A1` are curves.
 
@@ -484,7 +535,7 @@ significantly different** — no bolding of a 2% lead over a 15% interval.
 | Sweep | Range | Why |
 |---|---|---|
 | τ (materiality) | ₹10 / ₹100 / ₹1,000 / ₹10,000 | Prevents τ from being tuned to inflate coverage; shows the `AMBIGUOUS` → `IMMATERIALLY_AMBIGUOUS` shift |
-| ε (evidence margin) | 0 → 1 | Generates the risk–coverage curve |
+| ε (evidence margin) | 0 → 10_000 bps | Generates the risk–coverage curve |
 | `C_review` | ₹100 / ₹250 / ₹1,000 | Any conclusion that flips must be flagged as unstable |
 | Batch size | 1k / 10k / 100k | Throughput scaling, deterministic path. Measures metrics 21 and 22 only; produces no close-loop metric and does not alter the dataset sizes frozen in `PREREGISTRATION.md §4.1` |
 
