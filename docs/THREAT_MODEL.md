@@ -1,13 +1,19 @@
 # THREAT_MODEL — ASSAY
 
-**Spec version:** 1.2.0 · **Date:** 2026-08-24
+**Spec version:** 1.3.0 · **Date:** 2026-08-25
 
 Every control answers: **what specific failure does this prevent?** Controls that
 cannot name a failure are removed.
 
+**At spec 1.3.0** this document is unchanged apart from the version header. The
+1.3.0 amendment set adds no observable field, no control and no attack surface;
+`GroundTruth.true_journal` is barred from the engine by the same AL1/AL2 controls
+that already bar the rest of `GroundTruth` — see `DECISION_BRIEF.md §A.6`.
+The paragraphs below describe the earlier **1.2.0** and
+**1.1.1** releases and are retained as history.
+
 **At spec 1.2.0** this document updated T10's genesis description and declared the
-timestamp-alteration residual — see `DECISION_BRIEF.md §A.5`. The paragraph below
-describes the earlier **1.1.1** release and is retained as history.
+timestamp-alteration residual — see `DECISION_BRIEF.md §A.5`.
 
 Spec 1.1.1 restates the fee identity used by `C5` / `I3` to match Razorpay's
 documented GST-inclusive `fee` convention (`DATA_MODEL.md §6`). **No control was

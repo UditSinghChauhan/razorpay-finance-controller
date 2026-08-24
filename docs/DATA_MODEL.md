@@ -1,14 +1,22 @@
 # DATA_MODEL — ASSAY
 
-**Spec version:** 1.2.0 · **Date:** 2026-08-24
+**Spec version:** 1.3.0 · **Date:** 2026-08-25
 
 All schemas are normative. The implementation agent must not add, rename or
 retype fields without a spec version bump.
 
+**At spec 1.3.0** this document made the `(kind, source_system, payload)` mapping
+normative and added two `source_system` values (§10), stated the adjustment
+information boundary (§9, §22.2 M15), rewrote §17.2 as a two-sided posting model
+in which every adjustment observation takes P8 on the non-zero `debit`/`credit`,
+and added `GroundTruth.true_journal` with `true_balances` as its projection
+(§1, `gt_version` → 1.1.0) — see `DECISION_BRIEF.md §A.6`. **§16's hashed `body`
+and genesis are unchanged.** The paragraphs below describe the earlier **1.2.0** and
+**1.1.1** releases and are retained as history.
+
 **At spec 1.2.0** this document gained §10.1, §17.1 and §17.2, a normative `body`
 and genesis definition (§16), basis-point encoding for hashed ratios (§0 rule 5),
-and new `CloseReport` fields (§20) — see `DECISION_BRIEF.md §A.5`. The paragraph
-below describes the earlier **1.1.1** release and is retained as history.
+and new `CloseReport` fields (§20) — see `DECISION_BRIEF.md §A.5`.
 
 **Spec 1.1.1 is a factual-correction release.** No feature, architecture or
 Tier-0 scope change. It aligns every statement about Razorpay behaviour with the
@@ -76,7 +84,7 @@ is a *byproduct of construction*, never an annotation and never an LLM output.
 
 ```ts
 interface GroundTruth {
-  gt_version: string;              // "1.0.0"
+  gt_version: string;              // "1.1.0"
   seed: number;
   family_id: FamilyId;             // F01..F12
   // The true allocation. Every edge here actually happened in the simulation.
@@ -99,12 +107,60 @@ interface GroundTruth {
     ledger_entry_id: LedgerEntryId;
     payment_id: PaymentId | null;  // null = merchant booked something spurious
   }>;
-  // True control-account balances at period end, from the simulation itself.
+  // The journal the simulation itself wrote, in the order it wrote it.
+  // Produced by applying DATA_MODEL §17.1–§17.2 (truth side) to the simulated
+  // events at the moment each occurs. Never visible to the engine or the oracle
+  // (PREREGISTRATION.md §6.2 AL1, AL2).
+  true_journal: Array<{
+    seq: number;                     // strictly increasing, gapless, from 0
+    source_entity_id: string;        // pay_… | rfnd_… | adj_… | setl_… | bank_…
+                                     // the JOIN KEY for covered-set projection
+    posting_ref: "P1" | "P2" | "P3" | "P4" | "P5" | "P6" | "P7" | "P8";
+    account: AccountCode;            // the frozen seven; unchanged
+    dr_paise: Paise;                 // exactly one of dr/cr is non-zero
+    cr_paise: Paise;
+  }>;
+  // Projection of true_journal, retained as a redundant checksum.
+  // For every account: Σ dr_paise − Σ cr_paise over true_journal.
   true_balances: Record<AccountCode, Paise>;
   // Degradations applied, for post-hoc analysis only. NOT an ambiguity label.
   degradations: Array<{ op: DegradationOp; target_id: string; params: object }>;
 }
 ```
+
+**Why `true_journal` exists.** `true_balances` was a stored vector with no
+specified derivation from any other field, so it could not be recomputed, could
+not be audited, and could not be projected onto a subset of items — which
+`EVALUATION_SPEC.md §4.4`'s covered-set restriction requires. `true_journal`
+supplies all three. It mirrors the construction `ARCHITECTURE.md §8` already
+applies to the agent, where Layer B is *"a pure projection over Layer A"*: truth
+and agent are now compared structure to structure rather than rule to vector.
+
+**Determinism.** `true_journal` is emitted in a fixed order derived from the
+simulation's own event sequence: `seq` is assigned by a canonical traversal in
+simulated-time order, ties broken by `source_entity_id` ascending, then by
+`account` ascending. It is never ordered by wall-clock time, process ID or
+iteration over an unordered collection. The same seed produces byte-identical
+output, as `PREREGISTRATION.md §7` requires of every generator artifact.
+
+**Relationship to `true_balances`.** `true_balances` is the projection, retained
+as a redundant checksum. A mismatch between the two is a **generator defect and a
+seal failure** (`PREREGISTRATION.md §9` step 5).
+
+**What `true_journal` is not.** It is **not** a `LedgerEvent` stream. It carries
+no `run_id`, no `evt_id`, no `ts`, no `prev_hash`, no `hash`, no `actor`, no
+`subject_ids`, no `evidence_ids`, no `decision_id`, no `inputs_hash` and no
+`certificate`. It is not hash-chained, does not participate in genesis, and does
+not enter any `ledger_root_hash`. The hashed `body` and genesis definitions in
+§16 are **unchanged** — the ledger chain belongs to the agent's run, and truth has
+no run. `true_journal`'s integrity is covered by the `ground_truth.jsonl` SHA-256
+already committed at `PREREGISTRATION.md §9` step 4.
+
+**Exclusion from observation.** `true_journal` is a field of `GroundTruth`. `AL1`
+bars `packages/engine` and `packages/oracle` from importing
+`packages/generator`; `AL2`'s runtime path guard throws on any read matching
+`**/ground_truth*.jsonl`; the file itself is gitignored with only its hash
+committed. No agent, baseline or ablation can reach it.
 
 **There is no `is_ambiguous` field.** Ambiguity is not authored; it is discovered
 by the Ambiguity Oracle from observations alone (`ARCHITECTURE.md §7`).
@@ -503,6 +559,16 @@ dispute, the amount would be deducted from your account."* ASSAY therefore model
 a lost or contested dispute as a **debit adjustment line** and a subsequent win as
 a **credit adjustment line** in a later cycle.
 
+**`Adjustment` is a true-state entity and is never an observation.** It does not
+appear in `Observation.payload` (§10). ASSAY sees an adjustment only as a
+recon-report row — `ReconLine` with `type === "adjustment"` — which carries
+`entity_id`, `debit`, `credit`, `amount`, `settlement_id` and `created_at`, and
+carries **no `reason`, no `direction` field and no `related_entity_id`**.
+`direction` is nevertheless recoverable, since `I3` guarantees exactly one of
+`debit`/`credit` is non-zero on such a row; `reason` and `related_entity_id` are
+not recoverable from anything. This is the information boundary that
+§17.2 and `RECONCILIATION_SPEC.md §4.1` `C2` both rest on.
+
 **Documented Dispute fields ASSAY does not carry `[ASSAY-MODEL]`:**
 `amount_deducted`, `reason_code`, `respond_by`, `phase`
 (`fraud` / `retrieval` / `chargeback` / `pre_arbitration` / `arbitration`),
@@ -522,14 +588,16 @@ Everything entering the system becomes an `Observation`.
 interface Observation {
   obs_id: ObservationId;           // "obs_..."
   source_system: "pg_recon" | "bank_statement" | "merchant_ledger"
-                | "pg_payments" | "pg_orders" | "pg_refunds";
+                | "pg_payments" | "pg_orders" | "pg_refunds"
+                | "pg_settlements" | "pg_disputes";
   source_file: string;
   source_line: number;
   ingest_hash: Sha256;             // canonical JSON hash of the raw record
   ingested_at: UnixSeconds;
   kind: "recon_line" | "bank_line" | "ledger_entry" | "payment"
       | "order" | "refund" | "settlement" | "adjustment" | "dispute";
-  payload: ReconLine | BankStatementLine | /* … */;  // structural fields only
+  payload: ReconLine | BankStatementLine | MerchantLedgerEntry | Payment
+         | Order | Refund | Settlement | Dispute;   // structural fields only
 }
 
 interface UntrustedText {
@@ -557,6 +625,38 @@ inside the quarantined payload.
 ESLint `no-restricted-imports` rule, verified in CI. This is the structural
 prompt-injection defence: it is not that the core *chooses* not to read hostile
 text, it is that it *cannot*.
+
+**Every kind has exactly one source and one payload type.** `ARCHITECTURE.md §6`
+requires that nothing enter the system anonymously; this table is what makes that
+checkable. Ingest rejects any observation whose `(kind, source_system, payload)`
+triple is not a row below.
+
+| `kind` | `source_system` | `payload` |
+|---|---|---|
+| `recon_line` | `pg_recon` | `ReconLine` with `type === "payment"` or `"refund"` |
+| `adjustment` | `pg_recon` | `ReconLine` with `type === "adjustment"` |
+| `bank_line` | `bank_statement` | `BankStatementLine` |
+| `ledger_entry` | `merchant_ledger` | `MerchantLedgerEntry` |
+| `payment` | `pg_payments` | `Payment` |
+| `order` | `pg_orders` | `Order` |
+| `refund` | `pg_refunds` | `Refund` |
+| `settlement` | `pg_settlements` | `Settlement` |
+| `dispute` | `pg_disputes` | `Dispute` |
+
+`pg_settlements` and `pg_disputes` were added in spec 1.3.0. Benchmark v1.0.0 and
+v1.0.1 declared six source systems against nine kinds, so `settlement`,
+`adjustment` and `dispute` observations had no source they could carry — a
+provenance gap, not a behavioural one. **No frozen metric depends on
+`source_system`**: `AbstentionTelemetry.by_source_system` (§21) is typed
+`Record<string, …>` and is not on the frozen metric list, so widening the union
+changes no number.
+
+**`Adjustment` is deliberately absent from the payload union.** An adjustment
+reaches ASSAY as a **recon-report row** — `ReconLine` with `type ===
+"adjustment"`, carrying `entity_id` (`adj_…`), `debit`, `credit`, `amount`,
+`settlement_id` and `created_at`. The `Adjustment` entity of §9, and with it
+`reason`, `direction` and `related_entity_id`, is **true state only** and is never
+an observation. See §9 and §17.2.
 
 ### 10.1 Reconcilable and reference kinds
 
@@ -911,45 +1011,78 @@ to remove.
 P2 balances by construction: `credit + (fee − tax) + tax = amount − fee + fee =
 amount`.
 
-### 17.2 Adjustment postings, and the conservative fallback `[ASSAY-MODEL]`
+### 17.2 Adjustment postings: a two-sided model `[ASSAY-MODEL]`
 
-`Adjustment` (§6) carries five `reason` values. Two have an authoritative mapping
-that follows directly from the account definitions in §17; three do not, and this
-specification **does not invent one for them.**
+The posting model for adjustments is **two-sided**, and stating that plainly is
+the point of this section. Truth posts from omniscience; ASSAY posts from
+evidence. They diverge wherever ASSAY cannot determine the treatment, which is
+also true of the abstention postings P5 and P6 and has always been true of them.
 
-| `reason` | Posting | Basis |
-|---|---|---|
-| `fee_correction` | `direction === "debit"`: `DR 5100_PG_FEE_EXPENSE` / `CR 1200_BANK`. `direction === "credit"`: the reverse | `5100_PG_FEE_EXPENSE` is defined in §17 as *"gateway fees ex-GST"* |
-| `gst_correction` | `direction === "debit"`: `DR 1300_GST_INPUT_CREDIT` / `CR 1200_BANK`. `direction === "credit"`: the reverse | `1300_GST_INPUT_CREDIT` is defined in §17 as *"GST paid on gateway fees, recoverable"* |
-| `chargeback_debit` | **No authoritative mapping. Fallback P8 below.** | No dispute or chargeback account exists among the seven, and Razorpay documents nothing about how a merchant books a deduction |
-| `chargeback_reversal` | **No authoritative mapping. Fallback P8 below.** | As above |
-| `manual` | **No authoritative mapping. Fallback P8 below.** | Undetermined by construction |
+**Truth side — the five-way branch, retained in full.** The simulation knows
+`Adjustment.reason` and `Adjustment.direction` (§9) and books accordingly:
+
+| `reason` | Truth posting |
+|---|---|
+| `fee_correction` | `direction === "debit"`: `DR 5100_PG_FEE_EXPENSE` / `CR 1200_BANK`. `direction === "credit"`: the reverse |
+| `gst_correction` | `direction === "debit"`: `DR 1300_GST_INPUT_CREDIT` / `CR 1200_BANK`. `direction === "credit"`: the reverse |
+| `chargeback_debit` | P8 shape — no account among the seven corresponds to a dispute deduction |
+| `chargeback_reversal` | P8 shape — as above |
+| `manual` | P8 shape — undetermined by construction |
+
+**ASSAY side — P8, for every adjustment.** No documented observable field
+distinguishes `fee_correction` from `gst_correction` from `manual`. `reason` lives
+only on the true-state `Adjustment` entity, which §10 excludes from the payload
+union. `ReconLine` carries no equivalent: it has no `reason`, `I3` declares no
+`fee`/`tax` identity for adjustment rows, and `fee` is GST-inclusive with `tax`
+the component inside it, so the two are non-zero together on any fee-bearing row
+and cannot partition the reasons. **Every adjustment observation therefore takes
+P8.**
 
 | # | Event | Debit | Credit |
 |---|---|---|---|
-| P8 | **Conservative fallback** — an adjustment whose `reason` has no authoritative non-Suspense mapping | `direction === "debit"`: `9000_SUSPENSE_UNRECONCILED` `amount` / `CR 1200_BANK` `amount`. `direction === "credit"`: `DR 1200_BANK` `amount` / `9000_SUSPENSE_UNRECONCILED` `amount` | — |
+| P8 | **Conservative fallback** — any adjustment observation, since its accounting cause is not observable (§10, Scenario C) | Let `M` be the non-zero one of `ReconLine.debit` / `ReconLine.credit`, which `I3` guarantees to exist and be unique for `type === "adjustment"`. If `debit` is the non-zero one: `DR 9000_SUSPENSE_UNRECONCILED` `M` / `CR 1200_BANK` `M`. If `credit` is: `DR 1200_BANK` `M` / `CR 9000_SUSPENSE_UNRECONCILED` `M` | — |
+
+**Why `M` and not `ReconLine.amount`.** `I4` closes a settlement as
+`settlement.amount = Σ credit − Σ debit` over its allocated lines, and `C6` ties
+out an allocation the same way. The rupees that actually move a settlement are
+therefore `debit`/`credit`, and P8 must post the same figure or the ledger would
+carry a number the settlement arithmetic does not recognise.
+`ReconLine.amount` is **deliberately left unconstrained on adjustment rows**: the
+only thing `I3` (§6) says about an adjustment row is that exactly one of
+`debit`/`credit` is non-zero — it declares an `amount` identity for payments and
+refunds and none for adjustments, no rule in this specification reads `amount` on
+an adjustment row, and an out-of-band event that corresponds to no transaction
+has no gross to constrain. **No
+`amount = debit + credit` identity is asserted.**
 
 **P8 is an exception, not a reconciliation.** An observation posted under P8
 reaches the `EXCEPTION` terminal state with class
-`E12_ADJUSTMENT_UNEXPLAINED`, `severity` by τ, an `owner_role`, and an
-`analyst_question`. It is **never** reported as `RECONCILED`, never counted in any
-coverage numerator, and its value enters `unresolved_value_paise` and gate G3 like
-any other open exception. The bank leg posts in its true economic direction so
-that `1200_BANK` continues to match truth, exactly as in P5 and P6.
+`E12_ADJUSTMENT_UNEXPLAINED` — *"Adjustment with no traceable cause"* (§15) —
+`severity` by τ, an `owner_role`, and an `analyst_question`. It is **never**
+reported as `RECONCILED`, never counted in any coverage numerator, and its value
+enters `unresolved_value_paise` and gate G3 like any other open exception. The
+bank leg posts in its true economic direction, so `1200_BANK` agrees with truth
+and contributes no harm.
 
-**Why a fallback rather than an invented mapping.** A chargeback deduction moves
-real money, and mapping it to `4000_REVENUE`, `1100_GATEWAY_RECEIVABLE` or a new
-account would each be a different, unsupported accounting claim. ASSAY's whole
-position is that it does not guess when the evidence does not determine the
-answer, and an undefined accounting semantic is that case exactly. Routing it to
-Suspense with a named exception class makes the gap **safe and audible** rather
-than invented: the money is accounted for, the books balance, the item appears in
-the exception queue with an owner, and the period will not auto-close over it if
-it is material. `E12_ADJUSTMENT_UNEXPLAINED` — *"Adjustment with no traceable
-cause"* (§15) — already exists for precisely this situation.
+**Why the boundary is drawn here.** Two options were investigated and rejected.
+Exposing `reason` as an observable field would give the engine a construct
+Razorpay publishes no counterpart for (§22.2 M9), in a schema whose only claim to
+realism is API fidelity — the same objection that removed the invented
+`credit_type` values in §6. Deriving `reason` from `fee`/`tax` would repurpose two
+`[RZP-DOC]` fields away from their documented meaning and fails arithmetically
+besides. Routing every adjustment to Suspense with a named class, an owner and an
+analyst question is the honest remaining option, and it is the behaviour this
+system exists to exhibit: an out-of-band event that *"corresponds to no
+transaction"* (§9) cannot be booked from the evidence, and saying so is the
+product working rather than failing.
 
 **No eighth `AccountCode` is added.** The seven control accounts in §17 are
 unchanged, so `EVALUATION_SPEC.md §4.4`'s summation universe is unchanged.
+
+**How the two sides are compared.** They are not compared on adjustments at all:
+an adjustment reaches `EXCEPTION`, so it is outside the covered set over which
+`balance_harm_inr` is computed (`EVALUATION_SPEC.md §4.4`). It is priced once, as
+`C_exception` in `net_cost_inr`.
 
 **Any posting not enumerated in §17.1 or §17.2 falls to P8.** There is no
 undefined path: an event ASSAY cannot book authoritatively becomes a named,
@@ -971,7 +1104,7 @@ interface BenchmarkScenario {
 }
 
 interface BenchmarkManifest {
-  benchmark_version: string;       // "1.0.1"
+  benchmark_version: string;       // "1.0.2"
   created_at: UnixSeconds;
   generator_commit: string;
   spec_commit: string;             // commit of PREREGISTRATION.md at seal time
@@ -1234,6 +1367,7 @@ reference beats endpoint reference beats product guide beats pricing page.
 | M12 | `C8` (`on_hold === false`) applied as a general admissibility filter | Documented only in the Route-transfer context (D17) |
 | M13 | Narrowing `ReconLine.type` to exclude `transfer`; excluding `paylater`, Amex and Diners from generation | Scope decisions; the documented value sets are wider |
 | M14 | Quarantining `notes` as one canonical-JSON blob | A design choice about the trust boundary |
+| M15 | The adjustment information boundary: `Adjustment` (`reason`, `direction`, `related_entity_id`) is true-state only and never observed; ASSAY sees an adjustment as a `ReconLine` with `type === "adjustment"` | Razorpay publishes no Adjustments API entity (M9), so there is no documented observable from which a reason could be read. The boundary is ASSAY's modelling decision, not a Razorpay behaviour |
 
 ### 22.3 `[NOT-CLAIMED]` — considered and deliberately not asserted
 

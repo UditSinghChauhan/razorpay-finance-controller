@@ -1,7 +1,7 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.2.0 · **Date:** 2026-08-24
+**Spec version:** 1.3.0 · **Date:** 2026-08-25
 **Reviewer role:** principal architect / skeptical reviewer
 
 Spec 1.0.0 returned a MODIFY verdict with four blocking corrections. This
@@ -132,6 +132,55 @@ concentration bound on unresolved Suspense items. No eighth `AccountCode`. No
 per-family record-count values — the freeze rule is written, the composition
 remains an explicit pre-generation decision. No fixed-point scale other than the
 basis points the specification already used.
+
+### A.6 Spec 1.3.0 / benchmark 1.0.2 — the adjustment observability seam, and the selective-risk measurement defect it exposed
+
+A closure audit over the sealed 1.2.0 specification found that `DATA_MODEL.md
+§17.2` branched the agent's posting on `Adjustment.reason`, a field no observable
+schema carries. Tracing that seam surfaced three further consistency gaps of the
+same root (G-C, G-D, G-E), an unreproducible ground-truth field (F-14), and a
+defect in frozen secondary metric 6 (H-1). All six are corrected here, **before
+any code existed, before any dataset was generated, and before any number was
+observed** — the same window in which the 1.1.1 and 1.2.0 corrections were made.
+
+**One frozen metric formula changes, and its direction of effect is disclosed.**
+H-1 restricts `balance_harm_inr` to the covered set. That **lowers** the metric
+for every abstaining system, ASSAY included, and through metrics 2 and 3 it may
+improve two of the four headline numbers; it also makes S3 easier to pass. It is
+nevertheless required, because `PROJECT_SPEC.md §7` S3, `EVALUATION_SPEC.md §1`,
+§4.5 and §5.1 each independently specify the covered-set form, and the whole-run
+form made harm *rise* with abstention — inverting the risk–coverage curve metric 3
+integrates and giving `A2-NOABSTAIN`, the ablation built never to abstain, the
+best harm score in the field. The correction also **raises** `A2-NOABSTAIN`'s
+harm, which cuts against ASSAY's headline comparison rather than for it. The full
+statement is in `PREREGISTRATION.md §8`.
+
+**The package is not uniformly favourable.** Scenario C makes the benchmark
+harder on four axes simultaneously: every adjustment now becomes an exception, so
+metric 12 rises, metric 2's exception term rises, and `CLOSED` becomes harder to
+reach (`PREREGISTRATION.md §10` V10). No difficult case was removed, no
+distribution altered, no threshold moved.
+
+**No constraint `C1`–`C8` changed in membership, no `AccountCode` was added, no
+soft-evidence weight, seed, split, generation parameter or degradation operator
+changed, the oracle is untouched, and `DATA_MODEL.md §16`'s hashed `body` and
+genesis are unchanged — B2 is not reopened.**
+
+| # | Correction | Class | Where |
+|---|---|---|---|
+| **G-B / Scenario C** | **Adjustment observability.** `§17.2` branched on `Adjustment.reason`, but no documented observable carries it: `Adjustment` is `[ASSAY-MODEL]` in full (§22.2 M9), `ReconLine` has no `reason`, and `fee`/`tax` cannot discriminate because `fee` is GST-inclusive with `tax` inside it, so both are non-zero together. A3's two determinate agent-side mappings were unreachable by the agent while truth could execute them — an information asymmetry `balance_harm_inr` charged to ASSAY. **Every adjustment now takes P8.** Truth retains the five-way branch; `reason` stays true-state only; no field is exposed. | Architecture correction + A3 amendment | `DATA_MODEL.md §9`, §10, §17.2, §22.2 M15, `RECONCILIATION_SPEC.md §9` |
+| **G-C** | Three of nine `Observation.kind` values had no producible `source_system`, contradicting `ARCHITECTURE.md §6`'s anonymity rule, and `payload` was elided. The `(kind, source_system, payload)` mapping is now normative; two source values added; `Adjustment` is deliberately absent from the payload union. | Consistency + minor schema | `DATA_MODEL.md §10`, `ARCHITECTURE.md §6` |
+| **G-D** | `C2`'s adjustment half constrains `related_entity_id`, which no observable schema declares, so neither engine nor oracle could evaluate it and the consistency gate agreed trivially. Declared a generation invariant and non-binding agent-side, following the `C8` precedent. **`C1`–`C8` membership unchanged.** | Consistency correction | `RECONCILIATION_SPEC.md §4.1`, `PREREGISTRATION.md §5.3` |
+| **G-E** | P8 posted `ReconLine.amount`, which is unconstrained on adjustment rows, while `I4` and `C6` move settlements by `debit`/`credit`. P8 now posts the non-zero `debit`/`credit`. **No `amount = debit + credit` identity is asserted.** | Consistency correction | `DATA_MODEL.md §17.2` |
+| **F-14** | `true_balances` was a stored vector with no specified derivation — not recomputable, not auditable, and not projectable onto a subset. `GroundTruth` gains `true_journal` with `source_entity_id` and `posting_ref`; `true_balances` becomes its projection; `gt_version` → 1.1.0. Not hash-chained; §16's `body` and genesis are unchanged. | Architecture correction + schema amendment | `DATA_MODEL.md §1`, `PREREGISTRATION.md §9` |
+| **H-1** | **`balance_harm_inr` restricted to the covered set**, with `misdirected_value_inr` scoped likewise. The v1.0.0 / v1.0.1 whole-run form made harm rise with abstention, inverted the risk–coverage curve metric 3 integrates, and gave `A2-NOABSTAIN` the best harm score in the field. S3, `EVALUATION_SPEC.md §1`, §4.5 and §5.1 each independently require the covered-set form. Thresholds unchanged. **Direction of effect disclosed in `PREREGISTRATION.md §8`.** | **Metric amendment + preregistration amendment** | `EVALUATION_SPEC.md §4.4`, `PREREGISTRATION.md §8`, §10 |
+
+**What this amendment deliberately did not do.** No observable field was added to
+any schema — `reason`, `direction` and `related_entity_id` remain true-state only.
+No eighth `AccountCode`. No constraint added, removed or reordered. No threshold,
+seed, split, family, generation parameter or degradation operator touched. No
+`amount = debit + credit` identity invented for adjustment rows. `DATA_MODEL.md
+§16`'s hashed `body` and genesis were not reopened.
 
 ---
 
@@ -354,7 +403,7 @@ Tier-0 freeze **31 August**. Seal and sealed run **1 September**. Submission
 | **Aug 29** | Oracle + completeness gate + consistency gate | Both gates pass on dev; 20,000-pair differential agrees |
 | **Aug 30** | Eval harness: metrics, bootstrap CIs, B0/B2, A1/A2/A3, multi-seed runner | Full dev benchmark table with CIs, two llm-mode columns |
 | **Aug 31** | UI + API + CLI polish; report generation; **TIER-0 FREEZE** | Demo runs end to end without a terminal; §C fully green |
-| **Sep 1** | **SEAL** (`PREREGISTRATION.md §9`) → sealed test run | Signed tag `bench-v1.0.1`; results recorded whatever they say |
+| **Sep 1** | **SEAL** (`PREREGISTRATION.md §9`) → sealed test run | Signed tag `bench-v1.0.2`; results recorded whatever they say |
 | **Sep 2** | Write results, threats-to-validity, report page | Report contains all 13 required elements (`EVALUATION_SPEC.md §5.4`) |
 | **Sep 3** | H1 stretch items **only if the sealed run is clean** | No Tier-0 regression |
 | **Sep 4** | Demo recording, submission package | Video runs on `--llm=offline` |

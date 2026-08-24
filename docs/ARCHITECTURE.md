@@ -1,11 +1,17 @@
 # ARCHITECTURE — ASSAY
 
-**Spec version:** 1.2.0 · **Date:** 2026-08-24
+**Spec version:** 1.3.0 · **Date:** 2026-08-25
+
+**At spec 1.3.0** this document changed in §6 only: trust-boundary item 3 now
+points at the normative `(kind, source_system, payload)` table in
+`DATA_MODEL.md §10`, which is what makes its anonymity claim checkable — see
+`DECISION_BRIEF.md §A.6`. **No component, boundary, package, interface or data
+flow changed.** The paragraphs below describe the earlier **1.2.0** and
+**1.1.1** releases and are retained as history.
 
 **At spec 1.2.0** this document changed in §5 (the worked trace's ledger posting)
 and §8 (balance sign convention, the hashed `body` and genesis, and the Suspense
-description) — see `DECISION_BRIEF.md §A.5`. The paragraph below describes the
-earlier **1.1.1** release and is retained as history.
+description) — see `DECISION_BRIEF.md §A.5`.
 
 Spec 1.1.1 is a factual-correction release. The only change in this document is
 the name and definition of one probe (§5): settlement constituents come from the
@@ -138,7 +144,9 @@ claims to come from Razorpay. Crossing this boundary requires:
    reads them.** They are reachable only by the LLM adjudicator, and only through
    an envelope that marks them as data.
 3. **Provenance stamping.** Every record carries `source_system`, `source_file`,
-   `source_line`, `ingest_hash`. Nothing enters the system anonymously.
+   `source_line`, `ingest_hash`. Nothing enters the system anonymously. The
+   permitted `(kind, source_system, payload)` triples are enumerated normatively
+   in `DATA_MODEL.md §10`, and ingest rejects any triple not on that table.
 
 *Prevents:* prompt injection reaching the decision path; malformed amounts
 crashing arithmetic; hallucinated or forged IDs entering the candidate space;
