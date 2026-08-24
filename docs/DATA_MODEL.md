@@ -1,9 +1,14 @@
 # DATA_MODEL — ASSAY
 
-**Spec version:** 1.1.1 · **Date:** 2026-08-23
+**Spec version:** 1.2.0 · **Date:** 2026-08-24
 
 All schemas are normative. The implementation agent must not add, rename or
 retype fields without a spec version bump.
+
+**At spec 1.2.0** this document gained §10.1, §17.1 and §17.2, a normative `body`
+and genesis definition (§16), basis-point encoding for hashed ratios (§0 rule 5),
+and new `CloseReport` fields (§20) — see `DECISION_BRIEF.md §A.5`. The paragraph
+below describes the earlier **1.1.1** release and is retained as history.
 
 **Spec 1.1.1 is a factual-correction release.** No feature, architecture or
 Tier-0 scope change. It aligns every statement about Razorpay behaviour with the
@@ -36,6 +41,15 @@ current official documentation and classifies each such statement by provenance
    (§10) and are visible only to the LLM adjudicator.
 5. **Canonical JSON** for hashing: keys sorted lexicographically, no whitespace,
    UTF-8, integers only (no exponent notation). Used for every `*_hash` field.
+   **Every dimensionless ratio that enters a hashed body, or that a gate or
+   invariant compares, is an integer in basis points** — one bp is 1e-4, the same
+   scale already used by `rate_bps` and the `/ 10_000` fee arithmetic (§6), so
+   0.15 is `1500` and a unit score is `10_000`. This covers
+   `evidence_score_bps`, `evidence_score_gap_bps`, `epsilon_bps` and
+   `max_unresolved_ratio_bps`. Ratios that are neither hashed nor compared — the
+   four `coverage_by_value*` figures and `coverage_by_count` in `CloseReport`
+   (§20) — are derived display values computed at render from the authoritative
+   integer paise fields, and are outside this rule.
 6. **Every factual statement about Razorpay carries a provenance class.** This
    applies to claims about Razorpay's entities, fields, value sets, arithmetic,
    pricing, timing and semantics — not to ASSAY's own design prose, which needs
@@ -544,6 +558,34 @@ ESLint `no-restricted-imports` rule, verified in CI. This is the structural
 prompt-injection defence: it is not that the core *chooses* not to read hostile
 text, it is that it *cannot*.
 
+### 10.1 Reconcilable and reference kinds
+
+Every `Observation.kind` is statically classified. The classification is a
+property of the kind alone — it is fixed before any run, identical for every
+agent, and never depends on a decision.
+
+**Normative principle.** A **reconcilable** observation represents an independent
+reconciliation or accounting obligation. A **reference** observation provides
+contextual evidence for another obligation and is not independently counted as a
+reconciliation obligation.
+
+| Class | Kinds | Meaning |
+|---|---|---|
+| **Reconcilable** | `recon_line`, `bank_line`, `ledger_entry`, `settlement`, `refund`, `adjustment`, `dispute` | Carries an independent claim about money that must be tied out. Reaches `RECONCILED`, `ABSTAINED` or `EXCEPTION`. May post to the ledger. |
+| **Reference** | `payment`, `order` | Supporting evidence for matching a reconcilable observation. Reaches `REFERENCE`. Never matched as a target, never posts a journal line, never enters a coverage numerator or denominator, never contributes to `unresolved_value_paise`. |
+
+The classification is consistent with the exception taxonomy (§15): every
+reconcilable kind has at least one exception class that attaches to it —
+`E03` to `bank_line`, `E04` to `settlement`, `E10` to `refund`, `E12` to
+`adjustment`, `E13` to `ledger_entry`, `E05`/`E06`/`E07` to `recon_line`, and
+`F07`'s deduction to `dispute`. Neither `payment` nor `order` has one.
+`E01_MISSING_CAPTURE` is the apparent counter-example and is not one: it attaches
+to the *settlement* that has no capture behind it, not to a `payment` row.
+
+A reference observation still passes ingest validation, is still hashed into the
+dataset, and is still available to stages S1–S4 as evidence. `REFERENCE` means
+*"not a reconciliation target"*, never *"not examined"*.
+
 ---
 
 ## 11. `Candidate` and `Component`
@@ -554,7 +596,8 @@ interface Candidate {
   target_id: string;               // what is being explained (settlement / bank line)
   member_obs_ids: ObservationId[]; // the observations proposed to explain it
   hard_constraints_satisfied: ConstraintId[];   // e.g. ["C1","C2","C4","C7"]
-  evidence_score: number;          // soft score, [0,1]; NEVER used for arithmetic
+  evidence_score_bps: number;      // integer soft score in basis points,
+                                   // 0..10_000; NEVER used for arithmetic on money
   evidence_items: EvidenceId[];
   generated_by: "anchor" | "constraint_search" | "llm_probe";
 }
@@ -569,9 +612,14 @@ interface Component {
 }
 ```
 
-`evidence_score` is a soft ranking signal only. It orders candidates and feeds
+`evidence_score_bps` is a soft ranking signal only. It orders candidates and feeds
 the ε-margin ambiguity test. **It never enters an amount, a balance or an
-invariant.**
+invariant.** It is an integer in basis points rather than a float because the
+ε-margin test is a comparison whose outcome must be identical across two
+executions, and because the score reaches the hashed event body through
+`AmbiguityCertificate.evidence_score_gap_bps` (§13), where §0 rule 5 admits
+integers only. The SE1–SE5 weighted sum is evaluated in integer basis points with
+`round_half_up` applied once, at the end.
 
 ---
 
@@ -601,6 +649,11 @@ manufacturing a match.
 ## 13. `Decision` and `AmbiguityCertificate`
 
 ```ts
+// Per-observation terminal state. Every observation reaches exactly one.
+type ObservationState = "RECONCILED" | "EXCEPTION" | "ABSTAINED" | "REFERENCE";
+
+// Per-decision outcome. A `REFERENCE` observation produces no Decision at all,
+// so `REFERENCE` is deliberately NOT a member of this union.
 type DecisionType = "RECONCILED" | "EXCEPTION" | "ABSTAINED";
 
 interface Decision {
@@ -627,9 +680,11 @@ interface AmbiguityCertificate {
   solution_b: { candidate_id: CandidateId; member_obs_ids: ObservationId[] };
   // Proof that no HARD evidence separates them: identical satisfaction vectors.
   shared_hard_constraints: ConstraintId[];
-  evidence_score_gap: number;      // |score_a - score_b|, below epsilon
-  materiality_paise: Paise;        // max |balance_a - balance_b| over accounts
-  epsilon: number;                 // the pre-registered margin in force
+  evidence_score_gap_bps: number;  // integer |score_a − score_b| in basis points,
+                                   // 0..10_000; strictly below epsilon_bps
+  materiality_paise: Paise;        // max |balance_a − balance_b| over accounts
+  epsilon_bps: number;             // the pre-registered margin in force,
+                                   // 1500 bps == 0.15
   tau_paise: Paise;                // the pre-registered materiality threshold
   probes_attempted: ProbeId[];     // what we tried before giving up
   reason: "EVIDENCE_TIE" | "SEARCH_BOUND_EXCEEDED" | "PROBE_BUDGET_EXHAUSTED";
@@ -703,7 +758,8 @@ interface LedgerEvent {
   run_id: RunId;
   ts: UnixSeconds;
   prev_hash: Sha256;               // seq 0 uses the run's genesis hash
-  hash: Sha256;                    // sha256(canonical_json(body) || prev_hash)
+  hash: Sha256;                    // sha256(canonical_json(body) || prev_hash);
+                                   // `body` is defined normatively below
   actor: {
     type: "deterministic" | "llm" | "human";
     component: string;             // "engine.s5_validate"
@@ -731,9 +787,48 @@ interface JournalLine {
 }
 ```
 
-**Genesis hash** = `sha256(canonical_json({run_id, dataset_hash, engine_commit,
-config_hash, started_at}))`. This binds the chain to the exact inputs, so a
-report cannot be attached to a different dataset after the fact.
+**The hashed `body`.** `body` is the following projection of `LedgerEvent`, and
+nothing else:
+
+```
+  body = { seq, kind, actor, subject_ids, evidence_ids,
+           decision_id, inputs_hash, journal_lines, certificate }
+```
+
+Serialized as canonical JSON (§0 rule 5), with `subject_ids` and `evidence_ids`
+in the order the emitting stage produced them — that order is itself
+deterministic, see below. Excluded and therefore **not** covered by the chain:
+`evt_id`, `run_id`, `prev_hash`, `hash`, and `ts`. Each exclusion has a reason:
+`prev_hash` is concatenated after the digest rather than included in it; `hash`
+cannot cover itself; and `evt_id`, `run_id` and `ts` all vary between two
+executions over identical inputs, which metric 23 (`determinism_check`) requires
+to produce identical root hashes. `actor` is included **in full** — it contains no
+wall-clock field, so no exclusion is needed there.
+
+**Genesis hash** = `sha256(canonical_json({dataset_hash, engine_commit,
+config_hash}))`. This binds the chain to the exact inputs, so a report cannot be
+attached to a different dataset after the fact. `run_id` and `started_at` were
+part of genesis in spec 1.1.1 and are removed: both vary per execution, so
+including them made two runs over identical inputs produce different root hashes
+by construction and made metric 23 unsatisfiable. `run_id` remains a free
+per-execution handle recorded on `Run` (§20) and on every event, outside the
+hashed content — which is what allows two runs over identical inputs to coexist,
+be addressed separately under `runs/<run_id>/`, and be compared.
+
+**Deterministic internal identifiers.** `subject_ids`, `evidence_ids` and
+`decision_id` enter `body`, so ASSAY-internal identifiers (`obs_`, `cand_`,
+`comp_`, `dec_`, `exc_`) must be assigned deterministically: each is derived from
+a canonical traversal of the input in a fixed order, never from a counter seeded
+by wall-clock time, process ID, iteration order over an unordered collection, or
+any other source that can differ between two executions over identical input.
+`evt_id` is excluded from `body` and is unconstrained by this rule.
+
+**Declared residual (`THREAT_MODEL.md §T10`).** Because `ts` is outside `body`,
+altering an event's timestamp does not break the chain. Timestamp alteration is
+therefore **not chain-detectable**. This is an accepted cost of reproducibility:
+`ts` cannot be both wall-clock-accurate and identical across two runs, and the
+value of a verifiable root hash exceeds the value of tamper-evidence on a field
+that no gate, metric or invariant reads.
 
 The `actor` block is what lets a reviewer answer "was a model involved in this
 decision, and which one?" without reading prose. For any `RECONCILE` event,
@@ -772,6 +867,94 @@ every unresolved exception posts here. Its closing balance is the single number
 that says how much of the period ASSAY did not resolve. A system that reports
 "100% matched" has a zero Suspense balance and no way to prove it earned one.
 
+### 17.1 Balance sign convention and posting table `[ASSAY-MODEL]`
+
+**Convention.** For every account,
+
+```
+  balance(acct) = Σ dr_paise(acct) − Σ cr_paise(acct)
+```
+
+computed by projection over the event log, in integer paise, with no per-account
+adjustment. Liability, revenue and credit-balance accounts therefore carry
+negative balances, and that is correct rather than an error to be corrected at
+render.
+
+**Why this convention and not the accounting-normal-balance alternative.**
+`AccountCode` above is a bare string union. It carries **no account-class
+metadata** — nothing in this data model says which accounts are assets and which
+are liabilities — so a normal-balance convention is not computable from the
+specified schema. Only `Σdr − Σcr` and `Σcr − Σdr` are. Between those two,
+`EVALUATION_SPEC.md §4.4` decides: `balance_harm_inr` is the absolute deviation
+from truth per account, and it must charge zero harm for a rupee correctly parked
+in Suspense. That requires the known leg of an abstained item to post in its true
+economic direction. Under `Σdr − Σcr` with the table below, an abstained
+₹1,00,000 bank credit leaves `1200_BANK` at +₹1,00,000, matching truth, and harm
+on that account is zero. Under the inverted posting it would read −₹1,00,000
+against a truth of +₹1,00,000 — ₹2,00,000 of phantom harm on one account, charged
+only to agents that abstain, which reintroduces exactly the confound §4.4 exists
+to remove.
+
+**Posting table.** All amounts are integer paise. `fee` is GST-inclusive and
+`tax` is the GST component inside it (§6), so `fee_ex_gst = fee − tax`.
+
+| # | Event | Debit | Credit |
+|---|---|---|---|
+| P1 | Payment captured at the gateway | `1100_GATEWAY_RECEIVABLE` `amount` | `4000_REVENUE` `amount` |
+| P2 | Settlement reconciled to a bank credit | `1200_BANK` `credit`; `5100_PG_FEE_EXPENSE` `fee − tax`; `1300_GST_INPUT_CREDIT` `tax` | `1100_GATEWAY_RECEIVABLE` `amount` |
+| P3 | Refund initiated | `4000_REVENUE` `refund_amount` | `2200_REFUND_LIABILITY` `refund_amount` |
+| P4 | Refund settled out of the bank | `2200_REFUND_LIABILITY` `refund_amount` | `1200_BANK` `refund_amount` |
+| P5 | Abstention or open exception on an **inbound** item — a bank credit that cannot be attributed (`E03`) | `1200_BANK` `amount` | `9000_SUSPENSE_UNRECONCILED` `amount` |
+| P6 | Abstention or open exception on an **outbound** item — a settlement with no bank credit (`E04`) | `9000_SUSPENSE_UNRECONCILED` `amount` | `1100_GATEWAY_RECEIVABLE` `amount` |
+| P7 | Resolution of a Suspense item | exact reversal of P5 or P6, followed by the correct posting, as **new events** | — |
+
+P2 balances by construction: `credit + (fee − tax) + tax = amount − fee + fee =
+amount`.
+
+### 17.2 Adjustment postings, and the conservative fallback `[ASSAY-MODEL]`
+
+`Adjustment` (§6) carries five `reason` values. Two have an authoritative mapping
+that follows directly from the account definitions in §17; three do not, and this
+specification **does not invent one for them.**
+
+| `reason` | Posting | Basis |
+|---|---|---|
+| `fee_correction` | `direction === "debit"`: `DR 5100_PG_FEE_EXPENSE` / `CR 1200_BANK`. `direction === "credit"`: the reverse | `5100_PG_FEE_EXPENSE` is defined in §17 as *"gateway fees ex-GST"* |
+| `gst_correction` | `direction === "debit"`: `DR 1300_GST_INPUT_CREDIT` / `CR 1200_BANK`. `direction === "credit"`: the reverse | `1300_GST_INPUT_CREDIT` is defined in §17 as *"GST paid on gateway fees, recoverable"* |
+| `chargeback_debit` | **No authoritative mapping. Fallback P8 below.** | No dispute or chargeback account exists among the seven, and Razorpay documents nothing about how a merchant books a deduction |
+| `chargeback_reversal` | **No authoritative mapping. Fallback P8 below.** | As above |
+| `manual` | **No authoritative mapping. Fallback P8 below.** | Undetermined by construction |
+
+| # | Event | Debit | Credit |
+|---|---|---|---|
+| P8 | **Conservative fallback** — an adjustment whose `reason` has no authoritative non-Suspense mapping | `direction === "debit"`: `9000_SUSPENSE_UNRECONCILED` `amount` / `CR 1200_BANK` `amount`. `direction === "credit"`: `DR 1200_BANK` `amount` / `9000_SUSPENSE_UNRECONCILED` `amount` | — |
+
+**P8 is an exception, not a reconciliation.** An observation posted under P8
+reaches the `EXCEPTION` terminal state with class
+`E12_ADJUSTMENT_UNEXPLAINED`, `severity` by τ, an `owner_role`, and an
+`analyst_question`. It is **never** reported as `RECONCILED`, never counted in any
+coverage numerator, and its value enters `unresolved_value_paise` and gate G3 like
+any other open exception. The bank leg posts in its true economic direction so
+that `1200_BANK` continues to match truth, exactly as in P5 and P6.
+
+**Why a fallback rather than an invented mapping.** A chargeback deduction moves
+real money, and mapping it to `4000_REVENUE`, `1100_GATEWAY_RECEIVABLE` or a new
+account would each be a different, unsupported accounting claim. ASSAY's whole
+position is that it does not guess when the evidence does not determine the
+answer, and an undefined accounting semantic is that case exactly. Routing it to
+Suspense with a named exception class makes the gap **safe and audible** rather
+than invented: the money is accounted for, the books balance, the item appears in
+the exception queue with an owner, and the period will not auto-close over it if
+it is material. `E12_ADJUSTMENT_UNEXPLAINED` — *"Adjustment with no traceable
+cause"* (§15) — already exists for precisely this situation.
+
+**No eighth `AccountCode` is added.** The seven control accounts in §17 are
+unchanged, so `EVALUATION_SPEC.md §4.4`'s summation universe is unchanged.
+
+**Any posting not enumerated in §17.1 or §17.2 falls to P8.** There is no
+undefined path: an event ASSAY cannot book authoritatively becomes a named,
+owned, valued exception rather than a silent omission or a guess.
+
 ---
 
 ## 18. `BenchmarkScenario` and `BenchmarkManifest`
@@ -788,7 +971,7 @@ interface BenchmarkScenario {
 }
 
 interface BenchmarkManifest {
-  benchmark_version: string;       // "1.0.0"
+  benchmark_version: string;       // "1.0.1"
   created_at: UnixSeconds;
   generator_commit: string;
   spec_commit: string;             // commit of PREREGISTRATION.md at seal time
@@ -885,22 +1068,38 @@ interface CloseReport {
 
   // --- the close gate ---
   period_status: PeriodStatus;
+  period_status_legacy_policy: PeriodStatus;  // same run scored under the spec
+                                              // 1.1.1 close policy; reported for
+                                              // transparency, never used as a gate
   gate: CloseGateResult;
-  close_policy: { max_unresolved_ratio: number; max_unresolved_abs_paise: Paise };
+  close_policy: { max_unresolved_ratio_bps: number };  // 50 == 0.005
   closed_by: { actor: "system" | "human"; id: string | null } | null;
 
   // --- what was decided ---
   observations_total: number;
+  observations_reference: number;  // count in the REFERENCE terminal state;
+                                   // required because `decisions` is keyed by
+                                   // DecisionType (3 values) and no longer sums
+                                   // to observations_total once REFERENCE exists
   decisions: Record<DecisionType, number>;
+  batch_value_paise: Paise;        // Σ recon_line.amount — the coverage and
+                                   // close-policy denominator (EVALUATION_SPEC §4.1)
   coverage_by_count: number;
-  coverage_by_value: number;       // PRIMARY headline metric
-  value_reconciled_paise: Paise;
+  coverage_by_value: number;       // PRIMARY headline metric (metric 1)
+  coverage_by_value_bank: number;   // metric 27
+  coverage_by_value_ledger: number; // metric 28
+  coverage_by_value_all_observations: number;  // EXPLORATORY audit line only;
+                                   // the spec 1.1.1 definition of metric 1
+  value_reconciled_paise: Paise;   // Σ recon_line.amount where RECONCILED
 
   // --- what was not ---
   unresolved_value_paise: Paise;   // = abstained + open exceptions
   value_abstained_paise: Paise;
   value_exceptions_paise: Paise;
-  value_suspense_paise: Paise;     // MUST equal unresolved_value_paise (G3)
+  value_suspense_paise: Paise;     // NET projected Suspense balance (Σdr − Σcr
+                                   // over 9000_SUSPENSE). NOT the G3 quantity:
+                                   // G3 tests the GROSS Σ |item_net_paise|
+                                   // against unresolved_value_paise. See below.
 
   // --- the books ---
   trial_balance_ok: boolean;
@@ -926,7 +1125,20 @@ then says whether the remaining work is zero or merely quantified.
 records while abstaining on the three largest settlements is a bad outcome that a
 count-based metric would flatter.
 
-`value_suspense_paise` must equal `unresolved_value_paise` exactly — that is gate
+`batch_value_paise` is recorded so that `period_status` is **independently
+recomputable from the close report alone**: the close threshold is
+`round_half_up(batch_value_paise * 5 / 1000)` (`RECONCILIATION_SPEC.md §10.3`). A
+reviewer holding only this artifact can verify the gate outcome without the
+database, the engine or the observation file. The four coverage ratios are derived
+display values computed at render from the integer paise fields; the integers are
+authoritative and no gate compares a ratio.
+
+`value_suspense_paise` is the net projected Suspense balance. `unresolved_value_paise`
+ties to the **gross** `Σ |item_net_paise|` over open Suspense items. The two are
+equal only when every open Suspense item lies on the same side, which a run
+containing both `E03` and `E04` does not satisfy; testing only their equality, as
+benchmark v1.0.0 did, would fail on a structurally healthy run and would be
+satisfiable by two offsetting suppressions. The gross identity is gate
 G3, and it is what makes silent exception suppression arithmetically impossible.
 
 ---

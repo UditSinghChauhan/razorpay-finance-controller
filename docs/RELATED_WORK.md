@@ -1,6 +1,6 @@
 # RELATED_WORK — ASSAY
 
-**Spec version:** 1.1.1 · **Date:** 2026-08-23
+**Spec version:** 1.2.0 · **Date:** 2026-08-24
 
 Where ASSAY sits, and — more usefully — where it does not. The purpose of this
 document is to pre-empt "this already exists" by naming the things that already

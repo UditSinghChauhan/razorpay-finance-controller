@@ -1,7 +1,7 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.1.1 · **Date:** 2026-08-23
+**Spec version:** 1.2.0 · **Date:** 2026-08-24
 **Reviewer role:** principal architect / skeptical reviewer
 
 Spec 1.0.0 returned a MODIFY verdict with four blocking corrections. This
@@ -91,6 +91,50 @@ audience most able to check it.
 
 ---
 
+### A.5 Spec 1.2.0 / benchmark 1.0.1 — contradiction and measurement-validity corrections
+
+A pre-implementation review of the frozen 1.1.1 specification set found four
+blocking contradictions (B1–B4) and one measurement-validity defect (N1). All five
+are corrected here, **before any code existed, before any dataset was generated,
+and before any number was observed**. That window is the only one in which these
+changes are free, and it is the same window in which the 1.1.1 factual corrections
+were made.
+
+**This was a correction pass, not a redesign.** No component was added to or
+removed from the architecture, no constraint C1–C8 changed, no soft-evidence
+weight changed in value, no seed changed, no split changed, no generation
+parameter changed, no degradation operator changed, and the oracle is untouched.
+Tier-0 gains two held-out families it was already required to produce.
+
+| # | Correction | Class | Where |
+|---|---|---|---|
+| **B1** | **Ledger sign convention.** No balance convention was stated, and `AccountCode` carries no account-class metadata, so balances were not computable from the schema. Debit-positive `Σdr − Σcr` adopted, normative posting table added, both worked examples corrected (they posted the known leg backwards, which would have charged ₹2,00,000 of phantom harm to abstaining agents on a ₹1,00,000 item). Gate **G3 restated as a gross per-item identity** because Suspense is structurally two-sided. | Architecture correction + metric amendment (metric 13) | `DATA_MODEL.md §17.1`, `RECONCILIATION_SPEC.md §10.1`, §11, `ARCHITECTURE.md §5`, §8, `EVALUATION_SPEC.md §4.9`, §6, `PREREGISTRATION.md §8`, `§L.1` |
+| **B2** | **Reproducible root hash.** `DATA_MODEL.md §16` wrote `sha256(canonical_json(body) ‖ prev_hash)` and never defined `body`; genesis bound `run_id` and `started_at`, both of which vary per execution, making metric 23 unsatisfiable by construction. `body` defined; genesis reduced to `(dataset_hash, engine_commit, config_hash)`; `run_id` kept outside hashed content; hashed and gate-compared ratios moved to **integer basis points**, the scale the specification already uses for `rate_bps`, resolving a standing conflict between §0 rule 5 and §13; deterministic internal ID assignment required; the timestamp-alteration residual declared in `THREAT_MODEL.md §T10`. **No ratio value changed — only its encoding.** | Architecture correction. **No metric changes.** | `DATA_MODEL.md §0`, §11, §13, §16, `RECONCILIATION_SPEC.md §6`, `ARCHITECTURE.md §8`, `THREAT_MODEL.md §T10`, `PREREGISTRATION.md §7` |
+| **B3** | **Coverage denominator.** `coverage_by_value` was `Σ value(RECONCILED) / Σ value(all observations)` over a universe in which one ₹1,000 payment surfaces as up to six observations, so the ratio was **not bounded by 1.0** and was inflatable by trivially reconciling reference rows. Both sides restricted to the `recon_line` universe; static reconcilable/reference classification by kind; `REFERENCE` terminal state added; bank-view and ledger-view coverages appended as mandatory metrics 27–28; `batch_value_paise` added to `CloseReport`; the 1.1.1 definition retained as an `EXPLORATORY` audit line. | **Metric amendment + preregistration amendment.** Definitions amended: metrics 1 and 9. Values change through altered input populations: metrics 2, 3, 4, 6 (`misdirected_value_inr`), 8, 10, 12, 16, 26 (`c_review_sensitivity`), and S3's absolute bar. Full dependency statement in `PREREGISTRATION.md §8`. | `EVALUATION_SPEC.md §4.1`, §5.2, `DATA_MODEL.md §10.1`, §13, §20, `RECONCILIATION_SPEC.md §9`, §10.1, `PREREGISTRATION.md §8`, `PROJECT_SPEC.md §7`, `§L.1` |
+| **B4** | **Held-out families.** §C declared Tier-0 "binding and complete" while omitting F07 and F09, which §I twice mandates authoring and which `PREREGISTRATION.md §4.1` and §6.1 already declare as sealed test-only families. F07 and F09 promoted into T0-3; the corresponding §H stretch row deleted. | Planning correction. `PREREGISTRATION.md §4.1` and `§6.1` family/seed definitions **untouched**. | `DECISION_BRIEF.md §C`, §H, §I |
+| **N1** | **Close policy scale-dependence.** `min(0.005 × batch, ₹50,000)` crosses over at exactly ₹1 crore. S1 forces every conforming run above ₹2.7 crore, so `max_unresolved_ratio` never bound, the rule permitted exactly three average payments unresolved whether the batch held 600 or 24,000, effective strictness varied 40× across the mandated 1k/10k/100k sweep, and metric 11 would have been constant for ASSAY while `A2-NOABSTAIN` closed on every run. The absolute bound is deleted; the 0.5% ratio is unchanged (`50 bps`); per-family record composition is frozen before generation because the threshold is now a proportion of batch value; both policies are scored and reported per run. Assumption F9 is narrowed so it can no longer authorise result-driven re-tuning. | **Preregistration amendment + benchmark amendment** | `RECONCILIATION_SPEC.md §10.2`, §10.3, `PREREGISTRATION.md §4.1`, §7, §9, §10 V10, `DATA_MODEL.md §18`, §20, `EVALUATION_SPEC.md §4.9`, §5.3, §5.4, `DECISION_BRIEF.md §D.8`, `§F` F9, `§L.1`, `§L.4` |
+| **A3** | **Undefined accounting semantics.** B1's posting table surfaced a pre-existing gap: three of the five `Adjustment.reason` values (`chargeback_debit`, `chargeback_reversal`, `manual`) have no authoritative mapping to any of the seven control accounts, and B4 makes `F07` — which generates the first two — a Tier-0 deliverable. **No mapping was invented and no eighth account was added.** Such an adjustment posts to Suspense under fallback **P8** as an `E12_ADJUSTMENT_UNEXPLAINED` exception with an owner and an analyst question. `fee_correction` and `gst_correction` keep their determinate mappings. | Architecture correction | `DATA_MODEL.md §17.2`, `RECONCILIATION_SPEC.md §9`, `EVALUATION_SPEC.md §4.4`, `PREREGISTRATION.md §8` metric 10, `§L.4` |
+
+**Why these are not post-hoc optimization.** No benchmark result exists, no source
+code exists, no benchmark has been sealed, and no score has been observed — all
+four verifiable from this repository's git history. B3 **removes** an inflation
+vector and tightens S3's absolute bar by roughly 5.9×. A3 makes ASSAY look
+*worse*, not better: more open exceptions raise `net_cost_inr`, lower
+`coverage_by_count`, raise `unresolved_value_inr` and make `CLOSED` harder to
+reach. N1 does not change the 0.5% ratio and is justified by two properties of the
+rule — 40× strictness variance across a mandated sweep, and a metric constant for
+the system under test — neither of which references measured performance. Both the
+old and new close policies are reported for every run, and F9 no longer permits a
+result-driven adjustment.
+
+**What this amendment deliberately did not do.** No optional item-level
+concentration bound on unresolved Suspense items. No eighth `AccountCode`. No
+per-family record-count values — the freeze rule is written, the composition
+remains an explicit pre-generation decision. No fixed-point scale other than the
+basis points the specification already used.
+
+---
+
 ## B. Locked project definition
 
 > **ASSAY is a settlement reconciliation controller for Razorpay-shaped payment
@@ -122,10 +166,10 @@ never from here. A working Tier-0 beats a half-built Tier-1 by a wide margin.
 |---|---|---|
 | T0-1 | `packages/money` — branded `Paise`, integer-only | Property test: conservation under split/allocate over 10k random cases; float usage is a compile error |
 | T0-2 | `packages/domain` — zod schemas, Razorpay-faithful fee/GST, ID grammars, **`constraints.decl.ts`** | Ingest invariants reject malformed records; `credit = amount − fee` holds on every generated line, with `fee` GST-inclusive and `tax = 18% × (fee − tax)` (`DATA_MODEL.md §6`) |
-| T0-3 | `packages/generator` — forward simulation, families F01–F06 + F08 + F10, seeded | Same seed → byte-identical output; ground truth is a construction byproduct with no `is_ambiguous` field |
+| T0-3 | `packages/generator` — forward simulation, families **F01–F10**, seeded | Same seed → byte-identical output; ground truth is a construction byproduct with no `is_ambiguous` field. All four held-out families (`F07`–`F10`) are authored in Tier-0 and held out at family level until the seal (`PREREGISTRATION.md §6.1`) |
 | T0-4 | `packages/engine` S0–S3 — quarantine, anchors, candidates under C1–C8, component decomposition | Component-size distribution printed; `intractable_rate` measured on dev |
 | T0-5 | `packages/engine` S4–S5 — exact solve, **no-good cut, second-best certificate**, materiality test, invariants I1–I9 | The ₹1,00,000 worked example (`RECONCILIATION_SPEC.md §11`) abstains with a correct certificate |
-| T0-6 | `packages/ledger` — Layer A hash chain + Layer B double-entry projection + **close gate G1–G5** | `assay verify` passes; trial balance zero; Suspense identity exact; at least one seed ends `OPEN` and one ends `CLOSED` |
+| T0-6 | `packages/ledger` — Layer A hash chain + Layer B double-entry projection + **close gate G1–G5** | `assay verify` passes; trial balance zero; Suspense identity exact; the close gate emits `CLOSED`, `OPEN` and `BLOCKED` correctly for constructed inputs on each side of the threshold. Whether both `CLOSED` and `OPEN` occur on the DEV seeds is assumption `§F` F9's falsification check — reported as a finding, and **never** grounds for adjusting the close policy (`§L.4`) |
 | T0-7 | `packages/llm` — **`LlmProvider` interface + `offline` + `replay` providers**; roles R1, R2; schema/allowlist/grounding verification | **Full pipeline passes with `--llm=offline`, no network.** Hallucinated IDs rejected and counted. `--llm=replay` reproduces byte-identically |
 | T0-8 | `packages/oracle` — exhaustive enumeration + **completeness gate + consistency gate** | Both gates pass on dev; 20,000-pair differential test agrees with the engine constraint-by-constraint |
 | T0-9 | `packages/eval` — coverage, balance harm, net cost, abstention precision/recall, close-loop metrics, 5 seeds, bootstrap CIs | `metrics.json` per (agent × seed × llm-mode) |
@@ -196,9 +240,13 @@ a choice, cut anything else first.
    including the outcome where the model contributed nothing measurable.
 7. **All scored runs use `--llm=replay --strict-replay`**, where a cache miss is
    a hard error rather than a silent live call.
-8. **Close policy frozen**: auto-close iff unresolved ≤ min(0.5% of batch value,
-   ₹50,000). Two bounds, because a ratio alone lets a large batch auto-close over
-   a large absolute gap, and an absolute bound alone punishes small batches.
+8. **Close policy frozen**: auto-close iff unresolved ≤ 0.5% of `batch_value_paise`
+   (`RECONCILIATION_SPEC.md §10.3`). A single scale-invariant bound, so that
+   `period_status` means the same thing at every batch size in the mandated
+   1k / 10k / 100k sweep. Spec 1.1.1 also carried an absolute ₹50,000 bound under
+   a `min()`; it was deleted before the seal in benchmark v1.0.1 because S1 forces
+   every conforming run above the ₹1 crore crossover, which made the ratio inert
+   and made effective strictness vary 40× across the sweep.
 9. **Threats V9–V11 added** to the declared threats-to-validity table: vendor
    dependence, untested close gate, and DoS mitigations that are partly
    instrumentation rather than defence.
@@ -219,7 +267,7 @@ Two are blocking. The rest are cheap to check and should be closed on day 1.
 | ~~F6~~ | Fee rates in `PREREGISTRATION.md §4.2` are plausible | **CLOSED 2026-08-23.** Verified against Razorpay's published pricing. Card and wallet at 200 bps confirmed; **UPI corrected 0 → 200** (zero MDR is not zero fee — the pricing page states a 2% platform fee still applies) and **netbanking corrected 190 → 200** (no source states 1.9%). EMI 300 bps retained on a weaker source tier (official blog), labelled as such. | — | Adjusted before the seal, as required |
 | ~~F7~~ | GST on gateway fees is 18% | **CLOSED 2026-08-23.** Confirmed: the recon endpoint documents `tax` as *"the tax on the fee"*, the pricing page states *"2% + 18% GST"*, and the documented Payment sample (`amount 2100, fee 50, tax 8`) is arithmetically consistent with 18% on a 2% fee. Constant unchanged at 1800 bps. **The related identity was not unaffected** — see §A.4 item 1. | — | — |
 | F8 | `K_max = 22` keeps `intractable_rate` low | Unverified until day 3 | Measure component-size distribution on dev | Raise `K_max` **before the seal only** |
-| F9 | Close policy (0.5% / ₹50,000) produces both `CLOSED` and `OPEN` outcomes across seeds | Unverified | Dev run on day 6 | Adjust before the seal; S12 requires both outcomes to occur |
+| F9 | The corrected close policy (0.5% of `batch_value_paise`, no absolute bound) produces both `CLOSED` and `OPEN` outcomes across seeds | **Structural defect in the v1.0.0 policy found and corrected pre-seal** (benchmark v1.0.1, `§A.5` N1). The corrected policy is unverified against data. | Dev run on day 6, as a **falsification check with a pre-declared response** | **The threshold may NOT be adjusted in response to what the check shows.** If both outcomes occur, F9 closes. If they do not — all families close, or none does — that is **reported as a finding** in the threats-to-validity section and the run proceeds to the seal unchanged. Any further change to `max_unresolved_ratio_bps` requires a formally opened governance/amendment cycle, a new benchmark version, and a written statement of what was observed before the change was proposed. |
 | F10 | Judges value measurement discipline over feature count | Inferred from track bar language | — | Strongly implied by "honest metrics" and "one cherry-picked match proves nothing" |
 
 ---
@@ -276,7 +324,6 @@ before a reviewer does.
 | Tier | Item | Value |
 |---|---|---|
 | H1 | LLM role R3 (probe planning) + `abstentions resolved per probe` | Strongest genuine-AI-necessity evidence |
-| H1 | Families `F07` (chargeback deduction and later reversal), `F09` (period boundary) | Broadens the held-out adversarial split |
 | H1 | Calibration: reliability diagram + ECE | Justifies the ε threshold |
 | H2 | LLM role R4 (grounded explanations) with numeral verification | Demo polish with a real control attached |
 | H2 | `anthropic` and `openai-compatible` providers exercised live | Completes the provider matrix; needs F2 resolved |
@@ -299,23 +346,33 @@ Tier-0 freeze **31 August**. Seal and sealed run **1 September**. Submission
 | Date | Build | Done when |
 |---|---|---|
 | **Aug 23** | Monorepo, `money`, `domain` (incl. `constraints.decl.ts`), ledger Layer A skeleton | Property tests pass; a hand-built 5-event chain verifies |
-| **Aug 24** | Generator: forward simulation, families F01–F06. **Author F07–F10 now and never run them.** | `assay generate --split dev`; same seed → identical bytes |
+| **Aug 24** | Generator: forward simulation, families **F01–F10** (T0-3). **F07–F10 are authored today and held out at family level until the seal (`PREREGISTRATION.md §6.1`).** | `assay generate --split dev`; same seed → identical bytes; `F07`–`F10` generator functions exist and pass structural property tests under the four conditions in `PREREGISTRATION.md §6.1`, with no `--split test` invocation, no engine involvement, and no payload displayed |
 | **Aug 25** | Engine S0–S3: quarantine, anchors, candidates under C1–C8, decomposition | Component-size distribution printed; F8 assumption checked |
 | **Aug 26** | Engine S4–S5: exact solve, no-good cut, second-best certificate, materiality, I1–I9 | ₹1,00,000 worked example abstains with a correct certificate |
-| **Aug 27** | Ledger Layer B + close gate G1–G5 + three outcomes | Trial balance zero; Suspense identity exact; `OPEN` and `CLOSED` both observed |
+| **Aug 27** | Ledger Layer B + close gate G1–G5 + three outcomes | Trial balance zero; Suspense identity exact; all three close outcomes exercised on constructed inputs. The DEV-seed outcome distribution is recorded for `§F` F9 and is not a completion gate for this day |
 | **Aug 28** | `LlmProvider` interface + `offline` provider (all four roles) + `replay` provider; roles R1, R2 + three verification layers | **Full pipeline green with `--llm=offline`, no network** |
 | **Aug 29** | Oracle + completeness gate + consistency gate | Both gates pass on dev; 20,000-pair differential agrees |
 | **Aug 30** | Eval harness: metrics, bootstrap CIs, B0/B2, A1/A2/A3, multi-seed runner | Full dev benchmark table with CIs, two llm-mode columns |
 | **Aug 31** | UI + API + CLI polish; report generation; **TIER-0 FREEZE** | Demo runs end to end without a terminal; §C fully green |
-| **Sep 1** | **SEAL** (`PREREGISTRATION.md §9`) → sealed test run | Signed tag `bench-v1.0.0`; results recorded whatever they say |
+| **Sep 1** | **SEAL** (`PREREGISTRATION.md §9`) → sealed test run | Signed tag `bench-v1.0.1`; results recorded whatever they say |
 | **Sep 2** | Write results, threats-to-validity, report page | Report contains all 13 required elements (`EVALUATION_SPEC.md §5.4`) |
 | **Sep 3** | H1 stretch items **only if the sealed run is clean** | No Tier-0 regression |
 | **Sep 4** | Demo recording, submission package | Video runs on `--llm=offline` |
 | **Sep 5** | **SUBMISSION.** Buffer only — no new code | — |
 
-Two disciplines that are not negotiable: adversarial families F07–F10 are written
-on 24 Aug and never executed until 1 Sep; and **no agent code changes between the
+Two disciplines that are not negotiable: held-out families F07–F10 are a **Tier-0
+deliverable** (T0-3), authored on 24 Aug and **held out at family level until
+1 Sep under the permitted/forbidden lists in `PREREGISTRATION.md §6.1`** — their
+generator tests execute generator code and are permitted; their output never
+reaches the engine and is never displayed; and **no agent code changes between the
 seal on 1 Sep and the recorded result.**
+
+Authoring the held-out families inside Tier-0 rather than as a stretch item is not
+a scope increase. `PREREGISTRATION.md §4.1` already declares all four as test-only
+families, `§6.1` already assigns them seeds 9100–9104, and the generation
+parameters `F07` needs — adjustment rate 0.8% and dispute rate 0.15% — are already
+frozen in `§4.2`. Deferring them to a stretch tier would have left the sealed test
+split undeliverable by the document that defines it.
 
 Slip plan: if 26 Aug slips, cut R2 and run template triage. If 29 Aug slips,
 restrict the oracle to the dev split and say so in the report. If 30 Aug slips,
@@ -435,9 +492,13 @@ with a version bump, not a judgement call at the keyboard.
 4. Only stage S5 may construct a `ValidatedDecision`; `packages/ledger` exposes
    exactly one write path and accepts only that type.
 5. Every observation reaches exactly one terminal state: `RECONCILED`,
-   `ABSTAINED`, or `EXCEPTION`. No fourth state, no drop path.
-6. `Suspense balance = Σ abstained value + Σ open exception value`, exactly, at
-   close (gate G3).
+   `ABSTAINED`, `EXCEPTION`, or `REFERENCE`. No fifth state, no drop path.
+   `REFERENCE` is assigned statically at ingest from `Observation.kind`
+   (`DATA_MODEL.md §10.1`) and may never be assigned by a decision, so it cannot
+   become a route for retiring an observation the engine failed to explain.
+6. Gate G3 at close, exactly: `Σ |item_net_paise| = Σ abstained value + Σ open
+   exception value` over open Suspense items, in the gross per-item form
+   (`RECONCILIATION_SPEC.md §10.1`, `DATA_MODEL.md §17.1`).
 7. The period ends `CLOSED`, `OPEN` or `BLOCKED`. A close report is emitted for
    the first two and **never** for `BLOCKED`.
 8. Every LLM-referenced entity ID must exist in the observation set (invariant
@@ -447,11 +508,13 @@ with a version bump, not a judgement call at the keyboard.
 10. **The full pipeline must pass every acceptance test under `--llm=offline`.**
 11. All scored benchmark runs use `--llm=replay --strict-replay`. A cache miss is
     a hard error, never a silent live call.
-12. Frozen at seal time and immutable thereafter: `τ = max(₹100, 0.1%)`,
-    `ε = 0.15`, `K_max = 22`, `C_max = 5000`, `P_max = 3`, `C_review = ₹250`,
-    `C_exception = ₹500`, `k_sigma = 3`, `queue_top_n = 20`,
-    `max_unresolved_ratio = 0.005`, `max_unresolved_abs = ₹50,000`, and the
-    SE1–SE5 weights.
+12. Frozen at seal time and immutable thereafter: `τ = max(₹100, 10 bps)`,
+    `ε = 1500 bps (0.15)`, `K_max = 22`, `C_max = 5000`, `P_max = 3`,
+    `C_review = ₹250`, `C_exception = ₹500`, `k_sigma = 3`, `queue_top_n = 20`,
+    `max_unresolved_ratio_bps = 50 (0.005)`, the per-family
+    `target_record_count` schedule in `PREREGISTRATION.md §4.1`, and the SE1–SE5
+    weights (3500 / 2000 / 1500 / 1000 / 2000 bps). `max_unresolved_abs` no
+    longer exists.
 
 ### L.2 Build order (do not reorder)
 
@@ -473,8 +536,14 @@ owns**; a `README.md` stating what it guarantees; and zero imports violating L.1
 
 Adding an LLM call outside roles R1–R4, or outside the `LlmProvider` interface.
 Adding a probe that writes. Adding a tolerance to `C6`. Changing a frozen
-threshold after the seal. Adding a chat interface to the main path. Making any
-acceptance test depend on a live model. Using a consumer AI subscription as an
+threshold after the seal. **Changing any frozen threshold or decision parameter
+listed in `PREREGISTRATION.md §7` on the basis of an observed result** — pre-seal
+adjustment is permitted by `§6.2` AL3 only on an argument that does not reference
+measured performance, and a result-driven adjustment requires a formally opened
+governance/amendment cycle that states what was observed first (`§F` F9).
+Inventing an accounting mapping for an event that `DATA_MODEL.md §17.2` leaves
+unmapped, instead of taking the P8 fallback. Adding a chat interface to the main
+path. Making any acceptance test depend on a live model. Using a consumer AI subscription as an
 API. Reporting a metric not in `PREREGISTRATION.md §8` without labelling it
 `EXPLORATORY`. Reporting any number that does not exist in a committed run
 artifact. Claiming real Razorpay settlement data. Claiming a gap or defect in

@@ -1,9 +1,13 @@
 # THREAT_MODEL — ASSAY
 
-**Spec version:** 1.1.1 · **Date:** 2026-08-23
+**Spec version:** 1.2.0 · **Date:** 2026-08-24
 
 Every control answers: **what specific failure does this prevent?** Controls that
 cannot name a failure are removed.
+
+**At spec 1.2.0** this document updated T10's genesis description and declared the
+timestamp-alteration residual — see `DECISION_BRIEF.md §A.5`. The paragraph below
+describes the earlier **1.1.1** release and is retained as history.
 
 Spec 1.1.1 restates the fee identity used by `C5` / `I3` to match Razorpay's
 documented GST-inclusive `fee` convention (`DATA_MODEL.md §6`). **No control was
@@ -269,17 +273,29 @@ threat model that finds no residual weakness is not a threat model.
 **Attack.** Edit the SQLite file after the close to change a decision.
 
 **Controls.** Append-only event log; each event's hash covers the canonical JSON
-of its body concatenated with `prev_hash`; the genesis hash binds the chain to
-`(run_id, dataset_hash, engine_commit, config_hash)`. `assay verify --run <id>`
+of its `body` — defined normatively in `DATA_MODEL.md §16` — concatenated with
+`prev_hash`; the genesis hash binds the chain to `(dataset_hash, engine_commit,
+config_hash)`. `assay verify --run <id>`
 and `GET /runs/:id/ledger/verify` recompute the chain from genesis. Control
 balances are recomputed by projection from events, never read from cached state,
 so an edited balance without an edited event simply disappears on the next
 projection.
 
-**Prevents.** Undetected retroactive edits. Note the honest limit: this makes
-tampering **evident**, not impossible. An attacker with write access can rewrite
-the entire chain — what they cannot do is rewrite it and match a root hash that
-was already published.
+**Prevents.** Undetected retroactive edits to any decision, its evidence, its
+journal lines or its certificate. Note two honest limits.
+
+First, this makes tampering **evident**, not impossible. An attacker with write
+access can rewrite the entire chain — what they cannot do is rewrite it and match
+a root hash that was already published.
+
+Second, and declared as a residual rather than mitigated: **`ts` is outside the
+hashed `body`, so altering an event's timestamp is not chain-detectable.** The
+exclusion is required for reproducibility — a wall-clock field cannot be identical
+across the two runs that metric 23 compares — and is accepted because no gate,
+metric or invariant reads `ts`; the ordering that matters is `seq`, which *is*
+inside `body`. An attacker who alters timestamps can therefore misrepresent *when*
+a decision was taken, but cannot alter *what* was decided, on what evidence, in
+what order, or with what financial effect.
 
 ---
 

@@ -2,8 +2,13 @@
 
 **Track:** 04 — AI Finance Controller
 **Status:** Specification. Frozen scope for implementation.
-**Spec version:** 1.1.1
-**Date:** 2026-08-23
+**Spec version:** 1.2.0
+**Date:** 2026-08-24
+
+**At spec 1.2.0** this document added the `REFERENCE` terminal state (§5) and made
+S1, S2 and S3 name their measurement universe; no success-criterion threshold
+changed — see `DECISION_BRIEF.md §A.5`. The paragraph below describes the earlier
+**1.1.1** release and is retained as history.
 
 Spec 1.1.1 is a factual-correction release against current official Razorpay
 documentation. **Tier-0 scope, users, the loop, success criteria and non-goals are
@@ -133,7 +138,11 @@ period reaches a **defined terminal state** in which every rupee is accounted fo
 ```
 
 Every observation reaches **exactly one** terminal state — `RECONCILED`,
-`ABSTAINED`, or `EXCEPTION`. There is no fourth state and no drop path.
+`ABSTAINED`, `EXCEPTION`, or `REFERENCE`. There is no fifth state and no drop
+path. `REFERENCE` is assigned statically at ingest from `Observation.kind`
+(`DATA_MODEL.md §10.1`) for kinds that are contextual evidence rather than an
+independent reconciliation obligation; it posts nothing and can never be chosen
+by a decision.
 
 ### 5.1 The period either closes, or stays open with a number attached
 
@@ -218,9 +227,9 @@ inspected**, it can demonstrate all of the following:
 
 | # | Criterion | Threshold |
 |---|-----------|-----------|
-| S1 | Reconciles a batch far beyond the track's 50-record bar | ≥ 10,000 observations per test run |
-| S2 | High coverage by value, not just by count | ≥ 90% of rupee value auto-decided |
-| S3 | Near-zero material error among covered decisions | ₹-harm on covered set ≤ 0.05% of batch value |
+| S1 | Reconciles a batch far beyond the track's 50-record bar | ≥ 10,000 observations per test run, counting **all** observations regardless of terminal state (`REFERENCE` included). A run is one `(split, seed)` dataset per `EVALUATION_SPEC.md §2`; the bound is 10,000–20,000 per §9 below |
+| S2 | High coverage by value, not just by count | `coverage_by_value` ≥ 0.90, measured on the recon-line universe (`EVALUATION_SPEC.md §4.1`) |
+| S3 | Near-zero material error among covered decisions | `balance_harm_inr` on the covered set ≤ 0.05% of `batch_value_paise` (`EVALUATION_SPEC.md §4.1`) |
 | S4 | Abstention is precise, not a dodge | abstention precision ≥ 0.80 against the independent Ambiguity Oracle |
 | S5 | The ledger is internally consistent | trial balance = 0 and Suspense identity exact on every run |
 | S6 | Removing the validator measurably hurts | ablation `A1-NOVALIDATE` shows a statistically significant ₹-harm increase |
