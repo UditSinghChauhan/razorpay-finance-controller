@@ -1,0 +1,12 @@
+# ASSAY workspace layout — DECISION_BRIEF.md §K.
+#
+# packages/  money, domain, generator, oracle, engine, llm, ledger, eval
+# apps/      cli, api, web
+#
+# Both globs are declared before the directories exist. Packages are added in
+# the order fixed by DECISION_BRIEF.md §L.2, which may not be reordered:
+#   money -> domain -> ledger -> generator -> engine S0-S3 -> engine S4-S5
+#   -> llm -> oracle -> eval -> api -> web
+packages:
+  - "packages/*"
+  - "apps/*"
