@@ -1,9 +1,15 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.1.1 · **Date:** 2026-08-23
+**Spec version:** 1.2.0 · **Date:** 2026-08-24
 
 The matching algorithm, the ambiguity definition, and the rules that decide
 accept / reject / abstain. This is the technical core of the project.
+
+**At spec 1.2.0** this document added the `REFERENCE` terminal state and a fourth
+`EXCEPTION` trigger (§9), restated gate G3 in gross per-item form (§10.1),
+replaced the close policy's absolute bound (§10.3), and moved `evidence_score`
+and ε to basis points — see `DECISION_BRIEF.md §A.5`. The paragraph below
+describes the earlier **1.1.1** release and is retained as history.
 
 Provenance classes `[RZP-DOC]` / `[ASSAY-MODEL]` / `[NOT-CLAIMED]` are defined in
 `DATA_MODEL.md §0` rule 6, with the full register in `DATA_MODEL.md §22`. Spec
@@ -127,15 +133,15 @@ standard way recon tools manufacture confident wrong answers.
 
 ### 4.2 Soft evidence (ranks — never admits)
 
-| ID | Signal | Weight |
+| ID | Signal | Weight (bps) |
 |---|---|---|
-| `SE1` | UTR prefix match length | 0.35 |
-| `SE2` | `order_ref` ↔ `receipt` string similarity (Jaro–Winkler) | 0.20 |
-| `SE3` | Temporal proximity to the modal settlement lag | 0.15 |
-| `SE4` | Method / card-network agreement with the merchant memo | 0.10 |
-| `SE5` | Probe result corroboration | 0.20 |
+| `SE1` | UTR prefix match length | 3500 |
+| `SE2` | `order_ref` ↔ `receipt` string similarity (Jaro–Winkler) | 2000 |
+| `SE3` | Temporal proximity to the modal settlement lag | 1500 |
+| `SE4` | Method / card-network agreement with the merchant memo | 1000 |
+| `SE5` | Probe result corroboration | 2000 |
 
-`evidence_score ∈ [0,1]` is a weighted sum, used **only** to order candidates and
+`evidence_score_bps ∈ [0, 10_000]` is a weighted sum, used **only** to order candidates and
 to compute the ε-gap in §6. Weights are frozen in `PREREGISTRATION.md` before the
 sealed run and are **not tuned on the test split**.
 
@@ -185,7 +191,7 @@ Within a component:
    by descending amount, with memoization on `(index, remaining_paise)` and
    pruning when `remaining < 0` or `remaining > Σ(remaining members)`. Bounded by
    `K_max` / `C_max`, so worst case is enumerable and known. Among feasible
-   solutions, the best is the one with the highest `evidence_score`.
+   solutions, the best is the one with the highest `evidence_score_bps`.
 2. **Apply a no-good cut.** Add the constraint "the solution must differ from the
    one just found in at least one member," and re-solve.
 3. **Interpret the second-best result.**
@@ -210,10 +216,15 @@ Where:
   computed by running both allocations through the ledger projection in memory.
   It measures *how much the books would differ*, not how many rupees changed
   hands.
-- **Δs** = `|evidence_score(best) − evidence_score(second)|`.
-- **τ** (materiality threshold) = `max(₹100.00, 0.1% of component value)`,
-  frozen in `PREREGISTRATION.md`.
-- **ε** (evidence margin) = `0.15`, frozen.
+- **Δs** = `|evidence_score_bps(best) − evidence_score_bps(second)|`, an integer
+  in basis points.
+- **τ** (materiality threshold) = `max(₹100.00, 10 bps of component value)`,
+  frozen in `PREREGISTRATION.md` (10 bps == 0.1%; the value is unchanged, only
+  its encoding, per `DATA_MODEL.md §0` rule 5).
+- **ε** (evidence margin) = `1500` basis points (`0.15`), frozen. The comparison
+  `Δs < ε` is an integer comparison; its **value** is unchanged from spec 1.1.1
+  and only its encoding differs, so that the test is bit-identical across runs
+  and the certificate can be hashed under `DATA_MODEL.md §0` rule 5.
 
 The second-best solution, when it exists and forces abstention, **is** the
 `AmbiguityCertificate`. Producing it costs one extra solve and converts the
@@ -307,7 +318,7 @@ is the behaviour that saves money.
 
 ## 9. Final decision rules
 
-Every observation reaches exactly one terminal state. There is no fourth state
+Every observation reaches exactly one terminal state. There is no fifth state
 and nothing is dropped.
 
 ```
@@ -318,10 +329,30 @@ and nothing is dropped.
   ABSTAINED    S4 returned AMBIGUOUS or INTRACTABLE
                → posts to 9000_SUSPENSE_UNRECONCILED, carries a certificate
 
-  EXCEPTION    an ingest invariant failed, an S5 invariant failed, or no
-               admissible candidate exists at all
+  EXCEPTION    an ingest invariant failed, an S5 invariant failed, no
+               admissible candidate exists at all, or the allocation is
+               correct but no authoritative non-Suspense posting is defined
+               for it (DATA_MODEL.md §17.2, the conservative fallback)
                → posts to 9000_SUSPENSE_UNRECONCILED, carries a class + owner
+
+  REFERENCE    the observation is of a reference kind (DATA_MODEL.md §10.1:
+               `payment`, `order`) and is therefore not a reconciliation target
+               → posts nothing; contributes to no coverage ratio and to no
+                 unresolved value; assigned statically at ingest from `kind`
+                 alone, never by a decision
 ```
+
+`REFERENCE` is assigned by table lookup at ingest, before any candidate is
+generated. It is not an outcome the engine can choose, so it cannot be used to
+retire an observation the engine failed to explain: an unmatched `bank_line`
+becomes `E03`, never `REFERENCE`. This is what keeps the fourth state from
+becoming a drop path.
+
+The fourth `EXCEPTION` trigger is new in spec 1.2.0 and exists so that the
+posting fallback in `DATA_MODEL.md §17.2` has a terminal state to land in. It is
+deliberately an exception rather than a reconciliation: an item whose accounting
+treatment this specification does not define has **not** been reconciled, and
+must not be reported as though it had been.
 
 The distinction between `ABSTAINED` and `EXCEPTION` is meaningful and must not be
 blurred: an exception says *"something is wrong with this data"*; an abstention
@@ -338,11 +369,21 @@ closed.**
 
 | Gate | Check | Failure means |
 |---|---|---|
-| **G1** | Every observation has exactly one terminal state (`RECONCILED`, `ABSTAINED`, `EXCEPTION`) | A record was dropped — an ASSAY defect |
+| **G1** | Every observation has exactly one terminal state (`RECONCILED`, `ABSTAINED`, `EXCEPTION`, `REFERENCE`), and every `REFERENCE` assignment matches the static kind classification in `DATA_MODEL.md §10.1` | A record was dropped, or a reconcilable observation was retired as `REFERENCE` — an ASSAY defect |
 | **G2** | Trial balance: `Σ dr = Σ cr` over all posted journal lines, recomputed from the event log | The ledger is incoherent — an ASSAY defect |
-| **G3** | Suspense identity: `balance(9000_SUSPENSE) = Σ abstained value + Σ open exception value`, **exactly, to the paisa** | An exception was suppressed or double-posted — an ASSAY defect |
+| **G3** | Suspense identity, gross per-item, **exactly, to the paisa**. For each open Suspense item *i* (one per abstention and per open exception), `item_net_paise(i) = Σ dr(i, 9000_SUSPENSE) − Σ cr(i, 9000_SUSPENSE)`. Then `Σᵢ |item_net_paise(i)| === unresolved_value_paise` | An exception was suppressed, double-posted, or offset against another — an ASSAY defect |
 | **G4** | Hash chain recomputes from genesis and matches the stored root hash | The audit trail was altered |
 | **G5** | No allocation with a non-empty `invariants_failed` was posted | The validation gate was bypassed |
+
+**Why G3 is gross and not net.** Suspense receives value from both directions:
+an unattributable bank credit credits it (`E03`, posting P5), a settlement with
+no bank credit debits it (`E04`, posting P6), and an adjustment with no
+authoritative mapping posts on either side (`E12`, posting P8) — see
+`DATA_MODEL.md §17.1` and `§17.2`. A purely net identity is therefore satisfiable
+on a structurally healthy run whose two sides happen to cancel, and — more
+seriously — is satisfiable by an attacker who suppresses one item on each side
+(threat `THREAT_MODEL.md §T8`). The gross form makes offsetting suppression
+arithmetically impossible.
 
 Balances at close are **recomputed by projection from the event log**, never read
 from cached state. A corrupted balance that is not backed by an event simply
@@ -351,11 +392,11 @@ disappears on re-projection, which is what makes G2 and G3 meaningful.
 ### 10.2 The three outcomes
 
 ```
-  all gates pass  AND  unresolved_value <= close_policy.max_unresolved
+  all gates pass  AND  unresolved_value_paise <= close_threshold_paise
       → CLOSED
         signed close report, ledger root hash published, period sealed
 
-  all gates pass  AND  unresolved_value >  close_policy.max_unresolved
+  all gates pass  AND  unresolved_value_paise >  close_threshold_paise
       → OPEN
         close report emitted and marked OPEN, carrying:
           unresolved_value_paise, its split across abstentions vs exceptions,
@@ -379,16 +420,72 @@ value, why it is unresolved, and who must act."*
 ### 10.3 Close policy (pre-registered)
 
 ```
-  close_policy.max_unresolved_ratio = 0.005   // 0.5% of total batch value
-  close_policy.max_unresolved_abs   = 5_000_000 paise  (₹50,000)
-  → period may auto-close iff unresolved_value <= min(ratio × batch, abs)
+  close_policy.max_unresolved_ratio_bps = 50            // 0.005 == 0.5%
+
+  batch_value_paise      = Σ recon_line.amount           (EVALUATION_SPEC §4.1)
+  close_threshold_paise  = round_half_up(batch_value_paise * 5 / 1000)
+
+  → period may auto-close iff unresolved_value_paise <= close_threshold_paise
 ```
 
-Both bounds are frozen in `PREREGISTRATION.md §7`. The ratio prevents a large
-batch from auto-closing over a large absolute gap; the absolute bound prevents a
-small batch from auto-closing over a gap that is small in percentage terms but
-material in rupees. An operator may always close manually, which records a
-`human` actor on the `CLOSE` event — the override is permitted, but never silent.
+The ratio is frozen in `PREREGISTRATION.md §7`. It is the whole rule: **the
+threshold is a fixed proportion of period value at every batch size.** An operator
+may always close manually, which records a `human` actor on the `CLOSE` event —
+the override is permitted, but never silent. **A manual close is not an autonomous
+gate outcome and does not by itself satisfy success criterion S12**, which asks
+whether the close gate is real.
+
+**Why the absolute bound was removed before the seal (benchmark v1.0.1).**
+Benchmark v1.0.0 specified `min(0.005 × batch, ₹50,000)`. The two bounds cross at
+exactly ₹1 crore of batch value. Success criterion S1 requires at least 10,000
+observations per test run, which at the frozen amount distribution
+(`PREREGISTRATION.md §4.2`: log-normal, median ₹1,850, p99 ₹2,40,000, mean
+≈ ₹16,482) puts every conforming run above ₹2.7 crore. Three consequences
+followed, all of them properties of the rule rather than of any measured result:
+
+- `max_unresolved_ratio` never bound on any conforming run. One of the two frozen
+  constants was inert.
+- The rule permitted exactly three average payments to remain unresolved whether
+  the batch held 600 payments or 24,000. Across the 1k / 10k / 100k batch sweep
+  that `EVALUATION_SPEC.md §5.3` mandates, effective strictness varied 40×
+  (0.5% → 0.125% → 0.0125%), so `period_status_distribution` was not comparable
+  across the very sweep this specification requires.
+- Because `EVALUATION_SPEC.md §2` has every agent attempt a close, the ablation
+  `A2-NOABSTAIN` — which never abstains — would have closed on every run while
+  ASSAY closed on none. Metric 11 would have been constant for the system under
+  test and therefore uninformative.
+
+The correction is scale-invariance. The 0.5% ratio is unchanged, and the rule is
+unchanged for every batch below ₹1 crore. **Both close policies are scored and
+reported for every seeded run** (`period_status` and `period_status_legacy_policy`,
+`DATA_MODEL.md §20`), so a reader can see the outcome under the v1.0.0 rule
+alongside the outcome under this one.
+
+The justification given in spec 1.1.1 for holding two bounds had the two bounds'
+roles reversed: under `min()`, the absolute bound governed **large** batches and
+the ratio governed **small** ones, not the other way round. That error is recorded
+here rather than quietly dropped.
+
+**A declared residual of this policy: the two sides of the ratio do not span the
+same universe.** `unresolved_value_paise` is summed over **all reconcilable
+observation kinds** (`DATA_MODEL.md §10.1`: `recon_line`, `bank_line`,
+`ledger_entry`, `settlement`, `refund`, `adjustment`, `dispute`), because it must
+tie to gate G3's gross Suspense sum. `batch_value_paise` is summed over
+**`recon_line` observations only** (`EVALUATION_SPEC.md §4.1`). The comparison is
+therefore **not a like-for-like fraction of one universe**, and the sentence above
+should be read accordingly: the threshold is a fixed proportion of *recon-line*
+value, measured against unresolved value drawn from a wider set.
+
+Two consequences follow, and both are declared rather than corrected in benchmark
+v1.0.1. Effective strictness is **tighter** than the stated 0.5%, because a single
+economic break can leave several of its views unresolved and each contributes to
+the numerator while only the recon line contributes to the denominator. And
+effective strictness **varies with how many views of a break remain unresolved**,
+which differs by exception class — an unattributable bank credit (`E03`) may leave
+one view unresolved where a missing capture (`E05`) leaves several. The variation
+is in the conservative direction: the gate is harder to pass than its stated ratio
+suggests, never easier. `PREREGISTRATION.md §10` V10 records it as a threat to
+validity.
 
 ### 10.4 Procedure
 
@@ -420,13 +517,17 @@ The motivating example, run through this spec:
   temporal proximity). No-good cut → second-best `{D,E}`, feasible.
 - Materiality: the two allocations differ by which payments leave
   `1100_GATEWAY_RECEIVABLE`; max account delta = ₹1,00,000 ≫ τ.
-- Δs = 0.04 < ε = 0.15.
+- Δs = 400 bps < ε = 1500 bps.
 - Probes: `fetch_order` on all five returns receipts that match neither set
   distinctively. `PROBE_BUDGET_EXHAUSTED`.
 - **Verdict: `ABSTAINED`.** Certificate records `{A,B,C}` vs `{D,E}`, shared
-  hard constraints `[C1,C2,C3,C4,C5,C7,C8]`, Δs = 0.04, materiality
+  hard constraints `[C1,C2,C3,C4,C5,C7,C8]`, Δs = 400 bps, materiality
   ₹1,00,000, τ, ε, and the three probes attempted.
-- Ledger: `DR 9000_SUSPENSE ₹1,00,000 / CR 1200_BANK ₹1,00,000`.
+- Ledger (posting P6, `DATA_MODEL.md §17.1` — the unexplained item is the
+  outbound settlement, so Suspense takes the debit and the receivable is
+  relieved): `DR 9000_SUSPENSE_UNRECONCILED ₹1,00,000 / CR 1100_GATEWAY_RECEIVABLE
+  ₹1,00,000`. `item_net_paise` for this item is `+10,000,000`, and it enters
+  gate G3 as `|+10,000,000|`.
 
 Contrast: ablation `A2-NOABSTAIN` — ASSAY with the abstention gate removed —
 accepts `{A,B,C}` and reports "matched." When ground truth says the settlement

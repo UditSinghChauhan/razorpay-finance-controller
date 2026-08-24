@@ -1,9 +1,14 @@
 # EVALUATION_SPEC — ASSAY
 
-**Spec version:** 1.1.1 · **Date:** 2026-08-23
+**Spec version:** 1.2.0 · **Date:** 2026-08-24
 
 Every metric answers the question: **what decision does this number let someone
 make?** A metric that does not change anyone's behaviour is not reported.
+
+**At spec 1.2.0 / benchmark 1.0.1** this document amended metrics 1, 9 and 13,
+appended metrics 27 and 28, and restated §4.4's ground-truth basis and §4.9's
+close-loop block — see `DECISION_BRIEF.md §A.5`. The paragraph below describes the
+earlier **1.1.1** release and is retained as history.
 
 Spec 1.1.1 changed **no metric, no baseline, no ablation and no sweep.** It was a
 factual-correction pass over statements about Razorpay behaviour; the frozen
@@ -116,14 +121,94 @@ because it converts a real result into a fabricated one.
 
 ### 4.1 Coverage
 
+Coverage is measured over the **reconcilable** observation universe only
+(`DATA_MODEL.md §10.1`). Reference-kind observations reach the `REFERENCE`
+terminal state, are never matched, never post to the ledger, and appear in no
+coverage numerator or denominator.
+
+**Recon view — the primary value metric (1) and the count metric (9).**
+Numerator and denominator draw on the *same* reconcilable universe, and for
+`coverage_by_value` specifically on `recon_line`:
+
 ```
-  coverage_by_count = |RECONCILED| / |observations|
-  coverage_by_value = Σ value(RECONCILED) / Σ value(all observations)
+  batch_value_paise = Σ over all recon_line observations of payload.amount
+
+  coverage_by_value = Σ recon_line.amount where state = RECONCILED
+                      ───────────────────────────────────────
+                                  batch_value_paise
+
+  coverage_by_count = |RECONCILED over reconcilable kinds|      (metric 9)
+                      ──────────────────────────────────────
+                      |observations of reconcilable kinds|
 ```
+
+**Secondary views (metrics 27 and 28), both mandatory:**
+
+```
+  coverage_by_value_bank   = Σ bank_line.amount   where state = RECONCILED
+                             ────────────────────────────────────────────
+                             Σ bank_line.amount
+
+  coverage_by_value_ledger = Σ ledger_entry.amount where state = RECONCILED
+                             ────────────────────────────────────────────
+                             Σ ledger_entry.amount
+```
+
+**Why the universes must match.** A single ₹1,000 payment surfaces as up to six
+observations across `recon_line`, `payment`, `order`, `ledger_entry` and shares of
+`settlement` and `bank_line`. Under a numerator over all observations and a
+denominator over all observations, one economic rupee is counted several times on
+both sides at inconsistent weights, and the ratio is not bounded by 1.0. A
+quantity that can exceed unity is not a coverage rate.
+
+The same restriction applies to `coverage_by_count` (metric 9), and is forced
+rather than chosen: reference-kind observations reach `REFERENCE` and can never
+reach `RECONCILED`, so leaving them in the denominator would cap the metric
+permanently below 1.0 and make a perfect run indistinguishable from an imperfect
+one. Metric 9's definition is therefore amended alongside metric 1.
+
+**Why `recon_line`.** Four constraints in this specification jointly determine the
+denominator, and exactly one candidate satisfies all four:
+
+1. It must be computable from observations alone — `coverage_by_value` is a field
+   of `CloseReport` (`DATA_MODEL.md §20`), emitted by the running system, and
+   `PREREGISTRATION.md §6.2` AL2 forbids the engine reading ground truth.
+2. It must be agent-independent — §2 requires all agents to run on byte-identical
+   observation files with differences attributable to the agent alone. A
+   denominator requiring cross-kind identity resolution would be agent-dependent,
+   because identity resolution is exactly what `F04` and `F08` attack.
+3. It must carry each economic event once, or the ratio is unbounded.
+4. It must be rupee-denominated (`PROJECT_SPEC.md §7` S2).
+
+`Σ bank_line.amount` fails (3) — `I5` makes bank lines aggregates — and is not
+commensurable with gross payment value because bank amounts are net of fees. A
+ground-truth denominator fails (1). A deduplicated economic-event set derived from
+observations fails (2). `Σ recon_line.amount` satisfies all four.
 
 **Decision enabled:** "How much of my close is automated?" `coverage_by_value` is
 primary because abstaining on the three largest settlements while reconciling
 9,997 small ones is a bad outcome that the count metric would hide.
+
+**What the primary metric does not measure, and why three views are published.**
+Recon-view coverage measures automation of the *payment-gateway-side* workload
+only. Reconciliation is three-sided, and a run can show 99% recon-view coverage
+while the bank statement is largely untied. The bank and ledger views do not solve
+that — they **expose** it. No weighting of three views into one scalar is
+defensible, and any weighting would be tunable, so all three are published
+side by side and none is collapsed into the others.
+
+**Audit line (`EXPLORATORY`).** Every report additionally carries
+
+```
+  coverage_by_value_all_observations = Σ value(RECONCILED over all observations)
+                                    ──────────────────────────────────────────
+                                    Σ value(all observations)
+```
+
+computed under the spec 1.1.1 definition of this metric and labelled
+`EXPLORATORY` per `PREREGISTRATION.md §8`. It supports no claim. It exists so that
+a reviewer can see both definitions and the transition between them without
+re-running anything.
 
 ### 4.2 Match precision / recall — at the allocation-edge level
 
@@ -279,9 +364,20 @@ ASSAY is vulnerable here, the report says so.
 
 ```
   period_status_distribution = share of runs ending CLOSED / OPEN / BLOCKED
-  unresolved_value_inr       = value_abstained + value_open_exceptions at close
-  suspense_identity_exact    = (Suspense balance === unresolved_value)  // gate G3
+  unresolved_value_inr       = value_abstained + value_open_exceptions at close,
+                                 over RECONCILABLE observations only
+                                 (DATA_MODEL §10.1)
+  suspense_identity_exact    = gate G3, gross per-item (RECONCILIATION_SPEC §10.1):
+                                 Σ |item_net_paise| === unresolved_value_paise
   close_gate_failures        = per-gate failure counts across all runs
+  batch_value_paise          = Σ recon_line.amount, the close denominator
+  close_threshold_paise      = round_half_up(batch_value_paise * 5 / 1000)
+  period_status_legacy_policy= the same run's outcome under the benchmark v1.0.0
+                                 policy min(0.005 × batch, ₹50,000). Reported for
+                                 every seeded run. Never a gate. Labelled
+                                 EXPLORATORY per PREREGISTRATION §8, since it is
+                                 not on the frozen metric list and supports no
+                                 claim about ASSAY's performance.
 ```
 
 **Decision enabled:** "Did the loop actually terminate, and can I sign the
@@ -291,8 +387,10 @@ high-ambiguity seeds is the *expected and desired* behaviour, and at least one
 legitimate `OPEN` is required by success criterion S12: a close gate that has
 never refused to close is an untested close gate.
 
-`suspense_identity_exact` must be `true` on every run. It is the arithmetic proof
-that no exception was silently dropped between the queue and the books.
+`suspense_identity_exact` must be `true` on every run. It is the gross per-item
+form of gate G3 (`RECONCILIATION_SPEC.md §10.1`) — the arithmetic proof that no
+exception was silently dropped between the queue and the books, and that two
+offsetting suppressions cannot cancel each other out of the total.
 
 ### 4.10 Abstention DoS surface
 
@@ -373,10 +471,12 @@ alternatives sit above and to the left.
 
 ### 5.2 The comparison table
 
-One row per agent, columns: `coverage_by_value`, `balance_harm_inr`,
-`misdirected_value_inr`, `net_cost_inr`, `abstention_precision`,
-`silent_guess_value_inr`, `throughput_rps`. Every cell is `mean ± 95% CI` over 5
-seeds. **Cells whose confidence intervals overlap are explicitly marked as not
+One row per agent, columns: `coverage_by_value`, `coverage_by_value_bank`,
+`coverage_by_value_ledger`, `balance_harm_inr`, `misdirected_value_inr`,
+`net_cost_inr`, `abstention_precision`, `silent_guess_value_inr`,
+`throughput_rps`. Every cell is `mean ± 95% CI` over 5 seeds. The three coverage
+columns are always shown together; publishing the recon view alone would present
+one side of a three-sided reconciliation as if it were the whole. **Cells whose confidence intervals overlap are explicitly marked as not
 significantly different** — no bolding of a 2% lead over a 15% interval.
 
 ### 5.3 Mandatory sensitivity analyses
@@ -386,7 +486,7 @@ significantly different** — no bolding of a 2% lead over a 15% interval.
 | τ (materiality) | ₹10 / ₹100 / ₹1,000 / ₹10,000 | Prevents τ from being tuned to inflate coverage; shows the `AMBIGUOUS` → `IMMATERIALLY_AMBIGUOUS` shift |
 | ε (evidence margin) | 0 → 1 | Generates the risk–coverage curve |
 | `C_review` | ₹100 / ₹250 / ₹1,000 | Any conclusion that flips must be flagged as unstable |
-| Batch size | 1k / 10k / 100k | Throughput scaling, deterministic path |
+| Batch size | 1k / 10k / 100k | Throughput scaling, deterministic path. Measures metrics 21 and 22 only; produces no close-loop metric and does not alter the dataset sizes frozen in `PREREGISTRATION.md §4.1` |
 
 ### 5.4 What the report must contain
 
@@ -401,9 +501,13 @@ significantly different** — no bolding of a 2% lead over a 15% interval.
 6. **Two columns for every primary metric:** `--llm=replay` and `--llm=offline`,
    with the delta and whether the CIs overlap (metric 24, `offline_parity`).
 7. The risk–coverage figure and reliability diagram.
-8. The close-loop table: `period_status` per seed, `unresolved_value_inr`, and
-   confirmation that `BLOCKED` count is zero and `suspense_identity_exact` is
-   true on every run.
+8. The close-loop table: `period_status` per seed, `unresolved_value_inr`,
+   `batch_value_inr`, `close_threshold_inr`, **`period_status_legacy_policy` in
+   an adjacent column so the benchmark v1.0.0 and v1.0.1 close policies are shown
+   side by side**, and confirmation that `BLOCKED` count is zero and
+   `suspense_identity_exact` is true on every run. Where the two policy columns
+   disagree, the report states the count and says plainly that the v1.0.1 policy
+   is the one in force and why (`RECONCILIATION_SPEC.md §10.3`).
 9. The abstention DoS panel: spike flags by split, source attribution, and
    `largest_exception_in_top_n` across all runs.
 10. The declared threats to validity (`PREREGISTRATION.md §10`), unedited.
@@ -446,8 +550,10 @@ For each of the 14 exception classes: count, total rupee value, mean value,
 
 - **Exception class confusion matrix** — R2's classification against the
   generator's known cause. Measures whether the triage is trustworthy.
-- **Suspense reconciliation** — proof that
-  `Suspense balance = Σ abstained value + Σ open exception value`, exactly.
+- **Suspense reconciliation** — proof of gate G3, exactly:
+  `Σ |item_net_paise| = Σ abstained value + Σ open exception value` over open
+  Suspense items. Reported with the split between debit-side and credit-side
+  Suspense items, since a net-only figure would hide two offsetting suppressions.
   Confirms nothing was quietly dropped between the queue and the books.
 
 ---

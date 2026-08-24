@@ -1,6 +1,11 @@
 # ARCHITECTURE — ASSAY
 
-**Spec version:** 1.1.1 · **Date:** 2026-08-23
+**Spec version:** 1.2.0 · **Date:** 2026-08-24
+
+**At spec 1.2.0** this document changed in §5 (the worked trace's ledger posting)
+and §8 (balance sign convention, the hashed `body` and genesis, and the Suspense
+description) — see `DECISION_BRIEF.md §A.5`. The paragraph below describes the
+earlier **1.1.1** release and is retained as history.
 
 Spec 1.1.1 is a factual-correction release. The only change in this document is
 the name and definition of one probe (§5): settlement constituents come from the
@@ -202,7 +207,7 @@ bank credit line  ₹4,52,310  value_date 2026-08-14  narration "NEFT-RZPX0001�
   │
   ├─ S4 solve      exact: {setl_A} sums to 45231000  ✓
   │                no-good cut → second-best: {setl_B, setl_C} also sums ✓
-  │                materiality = ₹4,52,310 > τ · evidence gap Δs = 0
+  │                materiality = ₹4,52,310 > τ · evidence gap Δs = 0 bps
   │                → ABSTAIN, certificate {A} vs {B,C}
   │
   ├─ R2 LLM        classify_exception → UTR_PREFIX_COLLISION
@@ -212,7 +217,10 @@ bank credit line  ₹4,52,310  value_date 2026-08-14  narration "NEFT-RZPX0001�
   │
   ├─ S5 validate   abstention path: I1,I2,I6 checked; posting to Suspense
   │
-  └─ ledger        DR Suspense 45231000 / CR Bank 45231000
+  └─ ledger        DR 1200_BANK 45231000 / CR 9000_SUSPENSE 45231000
+                   (posting P5, DATA_MODEL.md §17.1 — the unattributable item is
+                    an inbound bank credit, so the bank leg posts in its true
+                    direction and Suspense takes the credit)
                    event {kind: ABSTAIN, certificate, prev_hash, hash}
 ```
 
@@ -424,9 +432,13 @@ jobs and different guarantees, and the separation is what makes it verifiable.
 Append-only, hash-chained, one event per decision or state change. Answers *what
 happened, who did it, on what evidence, and when* (`DATA_MODEL.md §16`).
 
-- `hash = sha256(canonical_json(body) ‖ prev_hash)`; genesis binds the chain to
-  `(run_id, dataset_hash, engine_commit, config_hash)` so a report cannot later
-  be attached to different inputs.
+- `hash = sha256(canonical_json(body) ‖ prev_hash)`, where `body` is defined
+  normatively in `DATA_MODEL.md §16` and excludes `evt_id`, `run_id`, `prev_hash`,
+  `hash` and `ts`; genesis binds the chain to `(dataset_hash, engine_commit,
+  config_hash)` so a report cannot later be attached to different inputs. `run_id`
+  is deliberately outside the hashed content: two runs over identical inputs must
+  produce identical root hashes for metric 23 to be satisfiable, and must remain
+  separately addressable to be compared at all.
 - Every event carries an `actor` block distinguishing `deterministic` from `llm`
   from `human`, with provider, model ID and prompt hash where applicable. For any
   `RECONCILE` event, `actor.type` is `deterministic` by construction.
@@ -441,8 +453,15 @@ balance* (`DATA_MODEL.md §17`).
 - Balances are never mutated in place and never cached authoritatively. An edited
   balance without a corresponding event simply disappears on the next projection.
 - Every posting is balanced journal lines; `Σ dr = Σ cr` continuously (`I1`).
-- `9000_SUSPENSE_UNRECONCILED` receives every abstention and every open
-  exception. Its balance is the rupee value ASSAY declined to guess.
+- **Balances are debit-positive: `balance(acct) = Σ dr_paise − Σ cr_paise`**, with
+  no per-account adjustment. The posting table is normative in
+  `DATA_MODEL.md §17.1`, and `§17.2` defines the conservative fallback for events
+  with no authoritative mapping.
+- `9000_SUSPENSE_UNRECONCILED` receives every abstention and every open exception,
+  **on both sides** — inbound unattributable credits credit it, outbound unmatched
+  settlements debit it. The rupee value ASSAY declined to guess is therefore the
+  **gross** sum `Σ |item_net_paise|` over open Suspense items, which is what gate
+  G3 tests.
 
 **Why two layers rather than one.** They fail differently and so must be checked
 differently. Layer A detects *tampering* — someone changed the record of what
@@ -471,7 +490,12 @@ Tables: `observation`, `untrusted_text`, `candidate`, `component`, `decision`,
 **Reproducibility:** `runs/<run_id>/` holds `manifest.json`, `assay.sqlite`,
 `close_report.json`, `metrics.json`, `ledger_root_hash.txt`. A run is fully
 described by `(dataset_hash, engine_commit, config_hash, llm_provider,
-llm_cache_hash)`.
+llm_cache_hash)`. Of these, the genesis hash binds only
+`(dataset_hash, engine_commit, config_hash)` (`DATA_MODEL.md §16`);
+`llm_provider` and `llm_cache_hash` are recorded on `Run` and distinguish runs
+whose chains diverge at the first event that differs, which is what allows
+metric 24 `offline_parity` to compare an offline run against a replay run over
+the same dataset.
 
 ## 9. APIs
 
