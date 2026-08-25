@@ -1,0 +1,14 @@
+{
+  "name": "@assay/money",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Branded integer-paise money primitives for ASSAY",
+  "license": "UNLICENSED",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  }
+}
