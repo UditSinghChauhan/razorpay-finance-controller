@@ -4,9 +4,9 @@ The shared definition of ASSAY's domain. `ARCHITECTURE.md §3` states its
 purpose: *"One definition of truth for shapes and constraints, shared by
 generator, engine, oracle and eval."*
 
-This milestone delivers the dependency-free half of that: identifiers, control
-accounts, canonical JSON, and the hard-constraint declaration. Entity schemas
-and the observation trust boundary follow in the next milestone.
+It holds the identifiers, control accounts, canonical JSON and hard-constraint
+declaration that every later package shares, and the strict ingest schemas that
+sit on trust boundary 1.
 
 ## What this package guarantees
 
@@ -40,6 +40,15 @@ and the observation trust boundary follow in the next milestone.
 | `HARD_CONSTRAINTS`, `CONSTRAINT_IDS`, `ConstraintDeclaration` | `C1`–`C8` declared as data. |
 | `canonicalConstraintSet()` | The bytes behind `constraint_set_hash`. |
 | `nonBindingClauses()` | The clauses the consistency gate must exclude. |
+| `PaymentSchema` … `DisputeSchema` and their inferred types | The nine entities (`§2`–`§9`), strict. |
+| `ObservationSchema`, `ObservationKind`, `SourceSystem` | The `(kind, source_system, payload)` table (`§10`). |
+| `OBSERVATION_KINDS`, `SOURCE_SYSTEMS`, `KIND_SOURCE_SYSTEM` | The table as data, for checking against `§10` row by row. |
+| `RECONCILABLE_KINDS`, `REFERENCE_KINDS`, `isReconcilableKind`, `isReferenceKind` | `§10.1` classification. |
+| `checkPaymentInvariants` … `checkReconLineInvariants`, `gstIdentityHolds` | `§2`–`§6` ingest invariants. |
+| `UnixSeconds`, `Sha256`, and the zod field types | Shared ingest field primitives. |
+
+Reachable **only** at `@assay/domain/untrusted-text`, never from the root:
+`UntrustedTextSchema`, `UNTRUSTED_TEXT_FIELDS`, `sanitizeForPreview`.
 
 ## Identifiers
 
@@ -106,14 +115,86 @@ Membership and order are frozen. Order matters because `constraint_set_hash`
 (`DATA_MODEL.md §18`) is computed over this structure, so reordering an
 otherwise unchanged set would change the hash.
 
+## Entity schemas
+
+The nine entities of `DATA_MODEL.md §2`–`§9`, transcribed field for field. Every
+schema is **strict**: unknown keys are rejected rather than stripped, per
+`ARCHITECTURE.md §4`. Stripping would let a field ASSAY does not model travel
+silently beside one it does.
+
+Field-level rules follow the specification exactly rather than what would be
+convenient: `Payment.method` omits `paylater`, `Refund.speed_requested` and
+`speed_processed` carry **different** value sets, `Dispute.status` includes
+`under_review`, `card_network` uses `American Express` rather than `Amex`,
+`credit_type` admits only `default`, `Settlement` has exactly eight parameters
+with no `currency` and no `settled_at`, and `ReconLine.type` **rejects Route
+`transfer` rows** rather than modelling a product ASSAY does not cover.
+
+Money is `@assay/money`'s `Paise` throughout, narrowed at ingest to non-negative
+safe integers per `ARCHITECTURE.md §4`. No monetary field accepts a float, a
+numeric string, `NaN`, an infinity or an unsafe integer.
+
+## Observation model and the trust boundary
+
+`ObservationSchema` is the normative `(kind, source_system, payload)` table from
+`§10`, expressed as a discriminated union so an unlisted triple has no branch to
+parse into. A test walks all 9 x 8 pairs and asserts the 63 off-table
+combinations are rejected. `Adjustment` is deliberately absent from the payload
+union: an adjustment reaches ASSAY only as a `ReconLine` with
+`type === "adjustment"`, carrying no `reason`, no `direction` and no
+`related_entity_id`. That information boundary is what `§17.2` and `C2` both
+rest on.
+
+`§10.1`'s classification is a property of the kind alone — seven reconcilable
+kinds and two reference kinds, fixed before any run and never dependent on a
+decision. That is what stops `REFERENCE` becoming a drop path for an observation
+the engine failed to explain.
+
+## The quarantine
+
+`UntrustedText` lives at `src/schemas/untrusted-text.ts` and is reachable **only**
+as `@assay/domain/untrusted-text`. It is deliberately not re-exported from the
+package root, because `packages/engine` imports the rest of this package
+legitimately and a root re-export would make the ban unenforceable.
+
+`DATA_MODEL.md §0` rule 4 keeps free text off every structural record, and strict
+mode is what makes that structural: `description`, `notes`, `narration`, `memo`
+and `order_receipt` appear in no entity schema, so a record carrying one has no
+branch to parse into. The defence is not that the core chooses not to read
+hostile text — it is that it cannot.
+
+`sanitizeForPreview` strips C0/C1 controls, bidirectional overrides and
+zero-width characters for display only, keeping tab, newline and carriage
+return, which are ordinary content in a bank narration. Nothing downstream may
+match, parse or decide on the preview; `raw` keeps the verbatim value.
+
+## Ingest invariants
+
+`§2`–`§6`'s named invariants are checked **separately** from schema parsing,
+because the specification treats the two failures differently.
+`RECONCILIATION_SPEC.md §2` step 2: a record failing an ingest invariant
+"becomes `E05`/`E06`/`E07` immediately", not a parse error. Folding them into
+the schema would leave `E06_FEE_MISMATCH` and `E07_GST_MISMATCH` with nothing to
+classify, so these return violations rather than throwing.
+
+Only **intra-record** invariants are implemented. `§4`'s
+`amount <= payment.amount`, `Σ refunds(payment) <= payment.amount` and
+`refund.created_at >= payment.created_at` each need a second record and belong
+to the stage holding the observation set. Mapping a violation onto an exception
+class is likewise not done here: `ExceptionClass` is not part of this package.
+
+> `DATA_MODEL.md §15` phrases `E07` as `tax != round_half_up(0.18 x (fee - tax))`
+> **"within rounding tolerance"**, and no tolerance magnitude is stated anywhere
+> in the specification. `gstIdentityHolds` implements the identity **exactly**
+> and takes no tolerance. A caller needing one must obtain the magnitude from a
+> spec amendment, following the same rule that governs `C6`, where an
+> unspecified tolerance is refused outright.
+
 ## Deferred to later milestones
 
 Not implemented here, and deliberately not stubbed:
 
-- **Entity schemas and the observation trust boundary**, including the
-  quarantined `UntrustedText` store at `@assay/domain/untrusted-text` — the next
-  milestone.
-- **Soft-evidence weights `SE1`–`SE5` and the frozen numeric thresholds.**
+- **Soft-evidence weights `SE1`-`SE5` and the frozen numeric thresholds.**
   `PREREGISTRATION.md §5.2` scopes `constraints.decl.ts` to the hard
   constraints; the weights are frozen in `PREREGISTRATION.md §7` and belong to
   the stage that ranks candidates.
@@ -122,3 +203,8 @@ Not implemented here, and deliberately not stubbed:
   package that produces it.
 - **Digest computation.** This package produces the bytes to hash; computing
   SHA-256 belongs to the ledger and ingest stages.
+- **The dataset-window bound on timestamps.** `ARCHITECTURE.md §4` requires
+  timestamps to be "plausible Unix seconds **within the dataset window**". The
+  window is a property of the dataset being ingested, not of a schema, so the
+  field type enforces integer Unix seconds and the ingest stage applies the
+  window.

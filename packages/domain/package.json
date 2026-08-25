@@ -9,6 +9,14 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./untrusted-text": {
+      "types": "./src/schemas/untrusted-text.ts",
+      "default": "./src/schemas/untrusted-text.ts"
     }
+  },
+  "dependencies": {
+    "@assay/money": "workspace:*",
+    "zod": "4.4.3"
   }
 }
