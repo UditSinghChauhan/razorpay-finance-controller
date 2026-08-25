@@ -1,12 +1,20 @@
-# `@assay/ledger` — Layer A
+# `@assay/ledger` — Layer A, and Layer B's projection
 
-The shadow ledger's **audit event layer**. `ARCHITECTURE.md §8` states what it
-is for: *"append-only, hash-chained, one event per decision or state change.
-Answers what happened, who did it, on what evidence, and when."*
+The shadow ledger. `ARCHITECTURE.md §8` splits it in two.
 
-`DECISION_BRIEF.md §K` scopes Layer A to `events.ts` and `hash-chain.ts`. Layer
-B — `journal.ts`, `projection.ts` — and the close gate are later milestones and
-are deliberately absent rather than stubbed.
+**Layer A — the audit event layer.** *"Append-only, hash-chained, one event per
+decision or state change. Answers what happened, who did it, on what evidence,
+and when."* `DECISION_BRIEF.md §K` scopes it to `events.ts` and `hash-chain.ts`.
+
+**Layer B — the double-entry ledger.** *"A **pure projection** over Layer A:
+replaying the event log recomputes every control-account balance from scratch.
+Answers what are the books, and do they balance."* `§K` scopes it to
+`journal.ts` and `projection.ts`.
+
+**Only `projection.ts` is present.** `journal.ts` — deciding *which* accounts an
+event posts to — is blocked and is deliberately absent rather than stubbed; see
+[What is deliberately not here](#what-is-deliberately-not-here). `close-gate.ts`
+and `close.ts` are a later milestone.
 
 `ARCHITECTURE.md §8` also explains why the split exists: the two layers *"fail
 differently and so must be checked differently. Layer A detects **tampering** —
@@ -38,6 +46,15 @@ the record is intact but the books do not balance."*
 7. **No floating-point money, ever.** Validity is `@assay/money`'s `isPaise`,
    never a second opinion, and amounts pass through `paise()` so a negative zero
    cannot enter as a second spelling of zero.
+8. **A balance is always recomputed, never remembered.** The projection reads
+   journal lines off events and nothing else. An edited balance that no event
+   backs simply disappears on the next projection, which is the property
+   `THREAT_MODEL.md §T10` rests on. Layer A's running `Σ dr` / `Σ cr` are an
+   append-time guard and `projectChain` does not read them.
+9. **The projection refuses rather than guesses.** It reports what it can state
+   truthfully — an unbalanced but exactly-representable log is
+   `trialBalanceOk: false` — and throws when it cannot, rather than returning a
+   number that looks like a balance and is not.
 
 ## Public API
 
@@ -57,6 +74,12 @@ the record is intact but the books do not balance."*
 | `createChain(genesisHash, runId)`, `appendEvent(chain, draft)` | The chain as an immutable value. |
 | `LedgerChain`, `verifyChain(genesisHash, events, expectedRoot?)` | Gate `G4` and `/ledger/verify`. |
 | `LedgerEventError`, `TrialBalanceError`, `ChainMismatchError` | Three failures that demand three different responses. |
+| `projectLedger(events)` | Replay an event log into the seven control-account balances. |
+| `projectChain(chain)` | The same over a chain's events, reading none of its cached totals. |
+| `projectByDecisionState(events, states, target?)` | `proj_agent` (`EVALUATION_SPEC.md §4.4`) — the covered-set projection, `RECONCILED` by default. |
+| `assertTrialBalance(projection)` | The hard-abort reading of `I1` (`ARCHITECTURE.md §12`). |
+| `LedgerProjection`, `AccountBalances`, `DecisionState`, `DecisionStates` | The projection's result and its caller-supplied inputs. |
+| `ProjectionInputError` | The caller's decision map does not cover a posting event. |
 
 ## The hash chain
 
@@ -98,6 +121,61 @@ into the body.
 *evident*, not impossible. An attacker with write access can rewrite the whole
 chain; what they cannot do is rewrite it and match a root hash already
 published.
+
+## The projection — Layer B
+
+```
+  balance(acct) = Σ dr_paise(acct) − Σ cr_paise(acct)      // DATA_MODEL.md §17.1
+```
+
+Debit-positive, in integer paise, with **no per-account adjustment**. Liability,
+revenue and other credit-balance accounts therefore carry negative balances, and
+`§17.1` is explicit that this *"is correct rather than an error to be corrected
+at render"*. The convention is not arbitrary: `AccountCode` carries no
+account-class metadata, so a normal-balance convention is not computable from
+the schema, and of the two that are, this is the one under which an abstained
+₹1,00,000 bank credit leaves `1200_BANK` at +₹1,00,000 — matching truth, so
+`balance_harm_inr` charges zero for a rupee correctly parked in Suspense.
+
+The result is frozen, its seven keys are in `ACCOUNT_CODES` declaration order on
+every run, and the same events always produce the same vector. Balances are
+never cached: `projectChain` reads a chain's events and **not** its
+`total_dr_paise` / `total_cr_paise`, so an edited total without an edited event
+disappears on the next projection (`ARCHITECTURE.md §8`, `THREAT_MODEL.md §T10`).
+
+### What it refuses, and why each refusal is not redundant
+
+| Refused | Error | Why here and not only in `verifyChain` |
+|---|---|---|
+| A malformed stored record | `LedgerEventError` | Every event is re-admitted through `sealStoredEvent`. A balance is an arithmetic total, and there is no meaningful partial answer over a record that cannot be read. |
+| A duplicated `evt_id` | `ChainMismatchError` | Two copies of one balanced event leave `Σ dr === Σ cr` intact while doubling every account they touch, so `I1` is blind to it. `proj_agent` and `POST /runs/:id/close` both project without running `G4` first. |
+| Events from two runs | `ChainMismatchError` | `§16` makes sequence numbers *"gapless, per run"*. A total over two runs is nobody's balance. |
+| Cumulative totals leaving the safe range | `TrialBalanceError` | Invariant `I7`. Past 2⁵³ two totals that both lost precision can still compare equal, so exactness is tested before equality. |
+
+**An imbalance is reported, not thrown.** `CloseGateResult.g2_trial_balance`
+(`DATA_MODEL.md §20`) is a boolean an analyst is shown, and `ARCHITECTURE.md §9`
+requires the close endpoint to return *"the individual gate results rather than a
+boolean, because 'why won't it close' is the question an analyst actually asks"*.
+`assertTrialBalance` is offered alongside for the hard-abort reading
+(`ARCHITECTURE.md §12`: an unbalanced ledger *"can only indicate a bug in the
+ledger itself"*).
+
+**The covered-set projection.** `projectByDecisionState` is `proj_agent` from
+`EVALUATION_SPEC.md §4.4` — *"`Σ dr_paise − Σ cr_paise` over the agent's journal
+lines whose owning decision is `RECONCILED`"*. The decision → state mapping is
+**the caller's**: `Decision` is the engine's entity (`DATA_MODEL.md §13`) and a
+projection that owned one would be inventing it. A posting event whose decision
+the map does not cover raises `ProjectionInputError` rather than being skipped,
+because silently dropping it would move a frozen metric by an amount nobody
+would see.
+
+### What the projection does not detect
+
+An amount edited in storage to another well-formed amount projects as written,
+and a debit and credit swapped together still balance. **Content tampering is
+gate `G4`'s job**, not this module's, and duplicating the check here would make
+the boundary between the two layers a matter of opinion. Both cases are asserted
+in the suite so the limit is visible rather than assumed.
 
 ## Decisions this package had to make
 
@@ -156,17 +234,45 @@ them.
   Layer A therefore contains **no mutating function and no I/O at all**:
   `appendEvent` returns a new chain and leaves its argument untouched, so the
   count of mutating functions in this package is zero rather than one. The write
-  path arrives with persistence, which is Layer B's SQLite tables.
+  path arrives with persistence. `§K` allocates no storage module to this
+  package and `better-sqlite3` is in no manifest, so the ledger is in-memory at
+  this milestone; the projection is a pure function of an event array and takes
+  no connection.
 - **The posting table `P1`–`P8`.** Deciding which accounts an event posts to is
-  `journal.ts`, on `§K`'s Layer B line. It is also where two open governance
-  questions land — the universal `P8` fallback and the posting-trigger mapping —
-  and Layer A is independent of both.
-- **Balances and the trial-balance projection.** `projection.ts`. This package
-  carries running `Σ dr` / `Σ cr` totals as an append-time `I1` guard only,
-  never as an authoritative balance: `verifyChain` recomputes both from the
-  events and never reads them. Per-account balances are absent entirely.
+  `journal.ts`, on `§K`'s Layer B line, and it is **blocked on governance**.
+  Three questions are open and none may be settled at the keyboard, because
+  `§L.4` makes *"inventing an accounting mapping for an event that
+  `DATA_MODEL.md §17.2` leaves unmapped"* a spec amendment:
+  - **The universal `P8` fallback.** `§17.2` closes with *"any posting not
+    enumerated in `§17.1` or `§17.2` falls to `P8`"*, but `P8` is written only
+    for adjustment observations: its amount `M` is read off
+    `ReconLine.debit`/`credit` and its counter-leg is `1200_BANK`. For an
+    unmapped non-adjustment event there is no `ReconLine`, and posting the
+    counter-leg to `1200_BANK` would assert that money moved through the bank —
+    which is exactly what is not known, and would inject deviation into the one
+    account `§17.1`'s convention exists to keep agreeing with truth.
+  - **The posting-trigger mapping.** `§17.1`'s table is keyed by descriptions of
+    economic events, and nothing maps `EventKind` onto it. Only three of the
+    fourteen exception classes have an enumerated posting (`E03`→`P5`,
+    `E04`→`P6`, `E12`→`P8`); the other eleven have none, while
+    `RECONCILIATION_SPEC.md §9` requires every `EXCEPTION` to post to Suspense.
+  - **`ValidatedDecision`.** `§L.1` rule 4 makes it the sole type the write path
+    accepts. No document defines it, and `§L.2` builds this package three
+    positions before stage S5, which is the only thing permitted to construct
+    one.
+- **The gross per-item Suspense identity, gate `G3`.** `G3` is
+  `Σᵢ |item_net_paise(i)|` over *"each open Suspense item `i`"*
+  (`RECONCILIATION_SPEC.md §10.1`), and the specification never names the key
+  that partitions journal lines into items. `true_journal` was given
+  `source_entity_id` as *"the JOIN KEY"* (`DATA_MODEL.md §1`); the agent side
+  received no counterpart. `LedgerProjection.valueSuspensePaise` is the **net**
+  balance — `CloseReport.value_suspense_paise` — and `DATA_MODEL.md §20` is
+  explicit that the two are different numbers. Reporting the net figure as `G3`
+  would be satisfiable by two offsetting suppressions, which is the attack
+  `THREAT_MODEL.md §T8` exists to make arithmetically impossible.
 - **The close gate `G1`–`G5`.** `close-gate.ts`. `verifyChain` implements the
-  mechanism `G4` runs and nothing else.
+  mechanism `G4` runs; the projection supplies the arithmetic `G2` reads. Nothing
+  here runs a gate.
 - **`gap < epsilon` on a certificate.** `§13` states the relation, and it reads
   naturally for an `EVIDENCE_TIE`. Whether it holds for a
   `SEARCH_BOUND_EXCEEDED` certificate is an open governance question, and
