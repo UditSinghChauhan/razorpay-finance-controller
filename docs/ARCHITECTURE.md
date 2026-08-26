@@ -191,6 +191,65 @@ persist without a corrupted event, and a corrupted event breaks the hash chain.
 *Prevents:* partial writes, out-of-band edits, and the "we fixed it in the
 database" class of audit failure.
 
+#### The `ValidatedDecision` contract `[ASSAY-MODEL]`
+
+Four documents named this type and none defined it. It is defined here, because
+a boundary whose only type is undefined is a boundary no implementation can
+hold. **Nothing below adds an obligation.** Every field is present because some
+already-frozen gate or invariant cannot be evaluated without it, and the source
+of each demand is named.
+
+**Declaration site: `packages/ledger`.** Forced, not preferred. `§L.1` rule 4
+puts the write path in `ledger`; a function signature must name its parameter's
+type; and `ledger` cannot import `engine`, which builds after it (`§L.2`).
+`packages/domain` is the wrong home — its scope is the ingest-boundary entities
+of `DATA_MODEL.md §2`–`§9`, and a post-validation engine artifact does not
+belong in the package the trust-boundary-1 schemas live in.
+
+**Construction authority: `packages/engine/src/s5-validate.ts`, exclusively.**
+Unchanged from `RECONCILIATION_SPEC.md §7` and `§L.1` rule 4.
+
+**Enforcement: an opaque brand plus a path allowlist.** TypeScript is
+structurally typed, so any object with matching fields inhabits a bare
+interface and *"only S5 may construct"* would be a convention rather than a
+property. `ledger` therefore declares the type carrying a **non-exported**
+unique-symbol brand and exports **no constructor**; the single widening
+assertion lives in `engine/src/s5-validate.ts` and is allowlisted by path in an
+ESLint rule. This is the mechanism `§L.1` rule 3 already runs for
+`packages/eval/src/gates/consistency-gate.ts`, the one file permitted to import
+both engine and oracle. Two alternatives are rejected: a constructor exported
+from `ledger` is callable by every package built after position three, and a
+runtime capability token is unenforceable at build time and merely relocates
+the same problem.
+
+**The minimum fields, each with the obligation that demands it:**
+
+| Field | Demanded by | Why the write path cannot proceed without it |
+|---|---|---|
+| brand (non-exported unique symbol) | `§L.1` rule 4 | Nominal identity. Without it the type is structurally inhabitable by anything |
+| `decision_id` | `DATA_MODEL.md §16`; `EVALUATION_SPEC.md §4.4` | The event body's owning-decision link; `proj_agent` partitions on it |
+| `type: DecisionType` | `RECONCILIATION_SPEC.md §9`; `DATA_MODEL.md §20` | Selects the posting family and the terminal state |
+| `journal_lines: JournalLine[]` | `DATA_MODEL.md §16`; `I1`; gate `G2` | The lines S5 validated. The write path must post *these*, never re-derive them |
+| `invariants_checked` / `invariants_failed` | gate **`G5`** | *"No allocation with a non-empty `invariants_failed` was posted."* `G5` is unverifiable unless the validated artifact carries the result. `invariants_failed` is empty by construction — that emptiness is the type's meaning |
+| `subject_obs_ids` / `evidence_ids` | `DATA_MODEL.md §16` | Both enter the hashed `body` in emitting-stage order |
+| `certificate` | `DATA_MODEL.md §13`, `§16` | Non-null exactly when `type === "ABSTAINED"` |
+| `inputs_hash` | `DATA_MODEL.md §16` | *"hash of everything the step read"* — only S5 knows what it read |
+
+**Deliberately not included.** `financial_impact` (`§13` carries one on
+`Decision`; it is derivable from `journal_lines`, and two spellings of one fact
+is how they drift apart). Any timestamp — `ts` is outside the hashed `body` for
+the reason `§16` gives. A re-declaration of `§13`'s full `Decision`, which this
+boundary does not read.
+
+**No cycle, and where the boundary is drawn.** S5 must check `I1` over journal
+lines before it may emit a `ValidatedDecision`, so it needs those lines first.
+`journal.ts` therefore takes a **proposed** allocation and its terminal state —
+never the validated wrapper — and is a pure function with no I/O. This
+paragraph and `§L.1` rule 4 constrain the **mutating write path** and nothing
+else. Read that way the sequence is linear: `journal.ts` → `I1`…`I9` → mint →
+write path. Read the other way it is a cycle, which is why the boundary is
+stated here rather than left to the implementation.
+
 ## 5. Data flow, one observation's journey
 
 ```
