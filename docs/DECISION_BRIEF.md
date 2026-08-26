@@ -539,7 +539,17 @@ with a version bump, not a judgement call at the keyboard.
    import both engine and oracle to compare them; it is allowlisted by path in
    the lint config and may contain no logic other than the differential test.
 4. Only stage S5 may construct a `ValidatedDecision`; `packages/ledger` exposes
-   exactly one write path and accepts only that type.
+   exactly one write path and accepts only that type. The type is **declared**
+   in `packages/ledger` and **constructed** only in
+   `packages/engine/src/s5-validate.ts`; its fields, and the obligation that
+   demands each one, are normative in `ARCHITECTURE.md §4` boundary 3.
+   Enforcement is a non-exported unique-symbol brand with no exported
+   constructor, plus an ESLint path allowlist for the single widening
+   assertion — the mechanism rule 3 already uses for `consistency-gate.ts`,
+   because TypeScript's structural typing cannot express "only S5" on its own.
+   The rule binds the **mutating write path**: `journal.ts` is a pure posting
+   function over a *proposed* allocation and does not take this type, which is
+   what keeps S5 → `I1` → mint → write acyclic.
 5. Every observation reaches exactly one terminal state: `RECONCILED`,
    `ABSTAINED`, `EXCEPTION`, or `REFERENCE`. No fifth state, no drop path.
    `REFERENCE` is assigned statically at ingest from `Observation.kind`
