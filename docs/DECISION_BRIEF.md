@@ -567,13 +567,32 @@ with a version bump, not a judgement call at the keyboard.
 
 ### L.2 Build order (do not reorder)
 
-`money` → `domain` → `ledger` → `generator` → `engine S0–S3` → `engine S4–S5` →
-`llm (provider + offline + replay)` → `oracle` → `eval` → `api` → `web` → seal →
-sealed run.
+`money` → `domain` → `ledger Layer A` → `generator` → `engine S0–S3` →
+`ledger Layer B` → `engine S4–S5` → `llm (provider + offline + replay)` →
+`oracle` → `eval` → `api` → `web` → seal → sealed run.
 
 Each package depends only on those before it, so the dependency graph is acyclic
 in build order and every stage is independently testable. Note `llm` precedes
 `oracle`: the offline provider is on the critical path for the demo guarantee.
+
+**`ledger` occupies two positions, not one, and `§I` already scheduled it that
+way.** `ARCHITECTURE.md §8` splits the package in two — Layer A is the
+hash-chained audit event log (`events.ts`, `hash-chain.ts`), Layer B is the
+double-entry projection and the posting rules (`journal.ts`, `projection.ts`,
+`close-gate.ts`, `close.ts`). `§I` builds "ledger Layer A skeleton" on day 1 and
+"Ledger Layer B + close gate G1–G5" after "Engine S4–S5", while this line named
+`ledger` once, third. The two documents disagreed and this one was wrong.
+
+The split is load-bearing rather than cosmetic. `§L.1` rule 4 makes
+`ValidatedDecision` the only type the ledger's write path accepts, and stage S5
+is the only thing permitted to construct one — so a monolithic `ledger` position
+three places ahead of S5 reads as a dependency cycle. There is none. Layer A is
+pure and needs nothing from S5. Layer B's `journal.ts` is a **pure posting
+function** and is S5's *dependency*, not its dependent: S5 must obtain journal
+lines before it can check `I1` over them and only then mint a
+`ValidatedDecision`. Only the single **mutating write path** — which
+`ARCHITECTURE.md §4` boundary 3 constrains, and which arrives with persistence —
+takes that type. Drawn there, the order above is linear and acyclic.
 
 ### L.3 Definition of done, per package
 
