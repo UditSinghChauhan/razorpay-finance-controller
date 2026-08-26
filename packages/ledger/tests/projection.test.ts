@@ -854,22 +854,41 @@ describe("non-posting events", () => {
 });
 
 describe("the package cannot reach a later phase", () => {
-  it("exports no posting-selection surface", async () => {
+  // The boundary this suite guards moved when journal.ts landed, and it moved
+  // by exactly one file. `journalFor` is now a legitimate export; `closeGate`
+  // and `ValidatedDecision` are not, and neither is any mutating write path.
+  it("exports no close-gate and no ValidatedDecision surface", async () => {
     const ledger: Record<string, unknown> = await import("@assay/ledger");
     for (const name of Object.keys(ledger)) {
-      expect(name).not.toMatch(/posting|journalFor|P8|closeGate|ValidatedDecision/i);
+      expect(name).not.toMatch(/closeGate|closeReport|ValidatedDecision/i);
     }
   });
 
-  it("journal.ts does not exist", async () => {
+  it("projection.ts and journal.ts exist; close-gate.ts and close.ts do not", async () => {
     const { existsSync } = await import("node:fs");
     const { fileURLToPath } = await import("node:url");
     const src = fileURLToPath(new URL("../src/", import.meta.url));
     expect(existsSync(`${src}projection.ts`)).toBe(true);
-    // Blocked on the universal P8 fallback, the posting-trigger mapping and
-    // `ValidatedDecision`. A stub would be a claim that it is decided.
-    expect(existsSync(`${src}journal.ts`)).toBe(false);
+    expect(existsSync(`${src}journal.ts`)).toBe(true);
+    // Still absent. `close-gate.ts` needs `unresolved_value_paise` from the
+    // `Decision` / `Exception` records, and `RECONCILIATION_SPEC.md §10.1` is
+    // explicit that "the two sides are drawn from two stores, which is the
+    // point". This package holds one. A stub would be a claim otherwise.
     expect(existsSync(`${src}close-gate.ts`)).toBe(false);
     expect(existsSync(`${src}close.ts`)).toBe(false);
+  });
+
+  it("projection.ts does not import the posting rules", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { fileURLToPath } = await import("node:url");
+    const source = readFileSync(
+      fileURLToPath(new URL("../src/projection.ts", import.meta.url)),
+      "utf8",
+    );
+    // `ARCHITECTURE.md §8`: Layer B's projection is "a **pure projection** over
+    // Layer A". It reads the `journal_lines` an event already carries and never
+    // decides what they should have been, so it has no business importing the
+    // module that does decide.
+    expect(source).not.toMatch(/from "\.\/journal\.js"/);
   });
 });

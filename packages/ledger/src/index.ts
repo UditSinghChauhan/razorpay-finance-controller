@@ -12,13 +12,17 @@
  * `JournalLine.source_entity_id`, the Suspense item key, to the record this
  * package seals and hashes.
  *
- * Layer B is `journal.ts` and `projection.ts`. **Only `projection.ts` is
- * present.** `journal.ts` — deciding which accounts an event posts to — is the
- * next milestone rather than a blocked one: spec 1.4.0 closed the three
- * questions that held it (`DECISION_BRIEF.md §A.7` G-F narrowed `P8` to
- * adjustment observations, G-G added `§17.1.1`'s trigger table, and C-1 defined
- * `ValidatedDecision`). `close-gate.ts` and `close.ts` follow it. All three are
- * deliberately absent rather than stubbed.
+ * Layer B is `journal.ts` and `projection.ts`, and **both are present**.
+ * `journal.ts` is the posting rules `P1`-`P8` (`DATA_MODEL.md §17.1`, `§17.1.1`,
+ * `§17.2`), selecting which accounts an occasion posts to; `projection.ts`
+ * replays the resulting lines into balances. `journal.ts` is a **pure function
+ * over a proposed allocation** and deliberately does not take a
+ * `ValidatedDecision` — `ARCHITECTURE.md §4` boundary 3 draws the line there so
+ * that S5 -> `I1` -> mint -> write stays acyclic.
+ *
+ * `close-gate.ts` and `close.ts` follow, and are deliberately absent rather
+ * than stubbed. `ValidatedDecision` is declared with the mutating write path it
+ * exists to guard, which arrives with persistence.
  */
 
 export {
@@ -51,6 +55,31 @@ export {
   type ProbeId,
   type RunId,
 } from "./events.js";
+
+export {
+  JournalError,
+  EXCEPTION_CLASSES,
+  NON_POSTING_GROUNDS,
+  OBSERVATION_STATES,
+  POSTING_OCCASIONS,
+  POSTING_REFS,
+  journalFor,
+  type AbstentionRole,
+  type BankEvidencePostingRequest,
+  type BankSideEvidence,
+  type ExceptionClass,
+  type IngestPostingRequest,
+  type JournalDecision,
+  type NonPosting,
+  type NonPostingGround,
+  type ObservationState,
+  type Posting,
+  type PostingOccasion,
+  type PostingRef,
+  type PostingRequest,
+  type ResolutionPostingRequest,
+  type TerminalStatePostingRequest,
+} from "./journal.js";
 
 export {
   ProjectionInputError,
