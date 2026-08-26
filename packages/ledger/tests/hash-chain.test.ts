@@ -21,8 +21,11 @@ import {
 } from "@assay/ledger";
 
 import {
+  BANK_LINE_ID,
   GENESIS_INPUTS,
+  PAYMENT_ID,
   RUN_ID,
+  SETTLEMENT_ID,
   digest,
   id,
   line,
@@ -59,10 +62,10 @@ function fiveEventChain(): LedgerChain {
       kind: "RECONCILE",
       certificate: null,
       journal_lines: [
-        line("1200_BANK", 9_800_000, 0, "P2.bank"),
-        line("5100_PG_FEE_EXPENSE", 169_492, 0, "P2.fee"),
-        line("1300_GST_INPUT_CREDIT", 30_508, 0, "P2.gst"),
-        line("1100_GATEWAY_RECEIVABLE", 0, 10_000_000, "P2.recv"),
+        line("1200_BANK", 9_800_000, 0, "P2.bank", PAYMENT_ID),
+        line("5100_PG_FEE_EXPENSE", 169_492, 0, "P2.fee", PAYMENT_ID),
+        line("1300_GST_INPUT_CREDIT", 30_508, 0, "P2.gst", PAYMENT_ID),
+        line("1100_GATEWAY_RECEIVABLE", 0, 10_000_000, "P2.recv", PAYMENT_ID),
       ],
     }),
     makeDraft({ evt_id: id("evt_", 4) as never, kind: "ABSTAIN" }),
@@ -162,6 +165,24 @@ describe("the hashed body — DATA_MODEL.md §16", () => {
     );
   });
 
+  it("carries each journal line's five fields, and only those", () => {
+    // Spec 1.4.0 widened `JournalLine` from four fields to five. `journal_lines`
+    // enters `body` **whole** (§16), so the fifth is hashed — and nothing else
+    // is: the projection copies by name, and a sixth field on a stored line is
+    // refused by the seal rather than reaching the digest.
+    const lines = body["journal_lines"] as readonly Record<string, unknown>[];
+    expect(lines).toHaveLength(2);
+    for (const journalLine of lines) {
+      expect(Object.keys(journalLine).sort()).toEqual([
+        "account",
+        "cr_paise",
+        "dr_paise",
+        "memo_ref",
+        "source_entity_id",
+      ]);
+    }
+  });
+
   it("is serializable as canonical JSON", () => {
     expect(() => canonicalJson(body)).not.toThrow();
     expect(canonicalJson(body)).not.toMatch(/\s/);
@@ -185,6 +206,7 @@ describe("the event hash — DATA_MODEL.md §16", () => {
       { ...sealDraft(makeDraft({ subject_ids: ["obs_z"] })), seq: 0 },
       { ...sealDraft(makeDraft({ inputs_hash: digest(77) })), seq: 0 },
       { ...sealDraft(makeDraft({ journal_lines: p5Lines(1) })), seq: 0 },
+      { ...sealDraft(makeDraft({ journal_lines: p5Lines(45_231_000, SETTLEMENT_ID) })), seq: 0 },
       { ...sealDraft(makeDraft({ certificate: null })), seq: 0 },
     ];
     const hashes = new Set([
@@ -215,6 +237,46 @@ describe("the event hash — DATA_MODEL.md §16", () => {
     const forward = { ...sealDraft(makeDraft({ subject_ids: ["obs_a", "obs_b"] })), seq: 0 };
     const reversed = { ...sealDraft(makeDraft({ subject_ids: ["obs_b", "obs_a"] })), seq: 0 };
     expect(computeEventHash(forward, prev)).not.toBe(computeEventHash(reversed, prev));
+  });
+
+  it("changes when only the Suspense item key changes", () => {
+    // The §16 consequence stated in full: "This changes every event digest and
+    // reopens nothing." Two events with identical accounts, identical amounts
+    // and identical memos, differing only in which obligation they record, are
+    // two different facts — and G3 partitions on exactly that difference, so a
+    // digest blind to it would leave the item key outside the tamper-evidence
+    // the whole gate rests on.
+    const prev = digest(42);
+    const under = (key: string): string =>
+      computeEventHash(
+        { ...sealDraft(makeDraft({ journal_lines: p5Lines(100, key) })), seq: 0 },
+        prev,
+      );
+    expect(under(BANK_LINE_ID)).not.toBe(under(SETTLEMENT_ID));
+    expect(under(BANK_LINE_ID)).toBe(under(BANK_LINE_ID));
+  });
+
+  it("changes when one leg of a posting is re-keyed", () => {
+    // §16 requires the key on the counter-leg too, "so that an item can be read
+    // whole". Re-keying one leg splits one item into two halves that net equal
+    // and opposite, which no balance check can see.
+    const prev = digest(42);
+    const whole = {
+      ...sealDraft(makeDraft({ journal_lines: p5Lines(100, BANK_LINE_ID) })),
+      seq: 0,
+    };
+    const split = {
+      ...sealDraft(
+        makeDraft({
+          journal_lines: [
+            line("1200_BANK", 100, 0, "P5.dr", BANK_LINE_ID),
+            line("9000_SUSPENSE_UNRECONCILED", 0, 100, "P5.cr", SETTLEMENT_ID),
+          ],
+        }),
+      ),
+      seq: 0,
+    };
+    expect(computeEventHash(split, prev)).not.toBe(computeEventHash(whole, prev));
   });
 
   it("separates the body from prev_hash unambiguously", () => {

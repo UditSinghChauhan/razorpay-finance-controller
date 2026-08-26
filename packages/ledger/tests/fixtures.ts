@@ -46,6 +46,34 @@ export function id(prefix: string, n: number): string {
   return `${prefix}${String(n).padStart(6, "0")}A`;
 }
 
+/**
+ * A business identifier: prefix plus exactly fourteen alphanumerics.
+ *
+ * Separate from `id` above because the two grammars differ. `§0` rule 3 gives
+ * the Razorpay families a fourteen-character suffix and states no length for the
+ * ASSAY-internal ones, so a `pay_` built by `id` would be six characters short
+ * and would be refused as a `source_entity_id` — which is the point of having
+ * one builder per grammar rather than one that satisfies neither.
+ */
+export function entityId(prefix: string, n: number): string {
+  return `${prefix}${String(n).padStart(14, "0")}`;
+}
+
+/**
+ * One `source_entity_id` per family `DATA_MODEL.md §16` admits.
+ *
+ * `§17.1.1` assigns each of them to a posting: a bank line to `P5`, a settlement
+ * to `P6`, a payment or refund recon line to `P1`–`P4`, and an adjustment to
+ * `P8`. Naming them here keeps the Suspense item key visible in the postings
+ * below without any fixture *selecting* a posting, which is `journal.ts`'s job
+ * and a later milestone.
+ */
+export const BANK_LINE_ID = entityId("bnk_", 1);
+export const SETTLEMENT_ID = entityId("setl_", 1);
+export const PAYMENT_ID = entityId("pay_", 1);
+export const REFUND_ID = entityId("rfnd_", 1);
+export const ADJUSTMENT_ID = entityId("adj_", 1);
+
 export const RUN_ID = "run_20260826T000000Z" as RunId;
 
 export const GENESIS_INPUTS = {
@@ -67,17 +95,26 @@ export function makeActor(overrides: Partial<EventActor> = {}): EventActor {
   };
 }
 
+/**
+ * One journal line.
+ *
+ * `sourceEntityId` defaults to the bank line the `P5` posting below is written
+ * against, because that is the posting most of these fixtures carry. Tests that
+ * care about the Suspense item key pass it explicitly.
+ */
 export function line(
   account: JournalLine["account"],
   dr: number,
   cr: number,
   memo = "P5",
+  sourceEntityId: string = BANK_LINE_ID,
 ): JournalLine {
   return {
     account,
     dr_paise: dr as Paise,
     cr_paise: cr as Paise,
     memo_ref: memo,
+    source_entity_id: sourceEntityId,
   };
 }
 
@@ -85,11 +122,18 @@ export function line(
  * Posting `P5` from `DATA_MODEL.md §17.1` — an unattributable inbound bank
  * credit, the worked example in `ARCHITECTURE.md §5`:
  * `DR 1200_BANK 45231000 / CR 9000_SUSPENSE 45231000`.
+ *
+ * Both legs carry the same `bnk_…` key, which is `§17.1.1`'s column for an
+ * inbound `E03` and which `§16` requires "on **every** journal line, including
+ * the counter-leg, so that an item can be read whole".
  */
-export function p5Lines(amount = 45_231_000): readonly JournalLine[] {
+export function p5Lines(
+  amount = 45_231_000,
+  sourceEntityId: string = BANK_LINE_ID,
+): readonly JournalLine[] {
   return [
-    line("1200_BANK", amount, 0, "P5.dr"),
-    line("9000_SUSPENSE_UNRECONCILED", 0, amount, "P5.cr"),
+    line("1200_BANK", amount, 0, "P5.dr", sourceEntityId),
+    line("9000_SUSPENSE_UNRECONCILED", 0, amount, "P5.cr", sourceEntityId),
   ];
 }
 

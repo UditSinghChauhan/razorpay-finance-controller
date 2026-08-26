@@ -6,6 +6,7 @@ import { MAX_PAISE, type Paise } from "@assay/money";
 
 import {
   LedgerEventError,
+  SOURCE_ENTITY_PREFIXES,
   TrialBalanceError,
   appendEvent,
   createChain,
@@ -41,8 +42,26 @@ const GENESIS = computeGenesisHash(GENESIS_INPUTS);
 const amount = fc.integer({ min: 1, max: 10_000_000_000 });
 
 /**
+ * A `source_entity_id` — one of `§16`'s five business families, at the fourteen
+ * alphanumerics `§0` rule 3 states for the four Razorpay ones and `§7`'s `bnk_`
+ * grammar accepts.
+ */
+const sourceEntityId = fc
+  .tuple(
+    fc.constantFrom(...SOURCE_ENTITY_PREFIXES),
+    fc.array(
+      fc.constantFrom(
+        ..."abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+      ),
+      { minLength: 14, maxLength: 14 },
+    ),
+  )
+  .map(([prefix, suffix]) => `${prefix}${suffix.join("")}`);
+
+/**
  * A balanced posting: one or more legs on one side and a single counter-leg
- * carrying their total. Every posting in `§17.1` and `§17.2` has this shape.
+ * carrying their total. Every posting in `§17.1` and `§17.2` has this shape,
+ * and every leg of one posting carries one `source_entity_id` (`§16`, `§17.1.1`).
  */
 const balancedLines = (
   value: fc.Arbitrary<number>,
@@ -55,14 +74,16 @@ const balancedLines = (
       }),
       fc.constantFrom(...ACCOUNT_CODES),
       fc.boolean(),
+      sourceEntityId,
     )
-    .map(([legs, counterAccount, mirrored]) => {
+    .map(([legs, counterAccount, mirrored, entity]) => {
       const total = legs.reduce((acc, [, v]) => acc + v, 0);
       const many = legs.map(([account, v], index): JournalLine => ({
         account,
         dr_paise: (mirrored ? 0 : v) as Paise,
         cr_paise: (mirrored ? v : 0) as Paise,
         memo_ref: `leg${String(index)}`,
+        source_entity_id: entity,
       }));
       return [
         ...many,
@@ -71,6 +92,7 @@ const balancedLines = (
           dr_paise: (mirrored ? total : 0) as Paise,
           cr_paise: (mirrored ? 0 : total) as Paise,
           memo_ref: "counter",
+          source_entity_id: entity,
         },
       ];
     });

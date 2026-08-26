@@ -16,8 +16,11 @@ import {
 } from "@assay/ledger";
 
 import {
+  BANK_LINE_ID,
   GENESIS_INPUTS,
+  PAYMENT_ID,
   RUN_ID,
+  SETTLEMENT_ID,
   asEvents,
   digest,
   id,
@@ -45,8 +48,8 @@ function goodChain(): LedgerChain {
       kind: "RECONCILE",
       certificate: null,
       journal_lines: [
-        line("1200_BANK", 500_000, 0, "P2.bank"),
-        line("1100_GATEWAY_RECEIVABLE", 0, 500_000, "P2.recv"),
+        line("1200_BANK", 500_000, 0, "P2.bank", PAYMENT_ID),
+        line("1100_GATEWAY_RECEIVABLE", 0, 500_000, "P2.recv", PAYMENT_ID),
       ],
     }),
   ]);
@@ -177,6 +180,34 @@ describe("altering the record of what happened", () => {
     expect(checks).toContain("EVENT_HASH");
   });
 
+  it("detects an altered source_entity_id, leaving the books balanced", () => {
+    // The `T8` shape, at the level of one line. Re-keying a posting moves it
+    // from one Suspense item to another: `Σ dr` and `Σ cr` are untouched, every
+    // account balance is untouched, and `G3`'s partition — "the set of
+    // `9000_SUSPENSE` journal lines sharing one `JournalLine.source_entity_id`"
+    // (`RECONCILIATION_SPEC.md §10.1`) — is different. Double-entry cannot see
+    // it; the chain can, because the field is inside the hashed body.
+    const { ok, checks } = tampered((records) => {
+      const lines = records[1]!["journal_lines"] as Record<string, unknown>[];
+      for (const journalLine of lines) journalLine["source_entity_id"] = SETTLEMENT_ID;
+    });
+    expect(ok).toBe(false);
+    expect(checks).toContain("EVENT_HASH");
+    expect(checks).not.toContain("TRIAL_BALANCE");
+  });
+
+  it("detects a re-keyed counter-leg, which would split one item in two", () => {
+    // §16 requires the key "on every journal line, including the counter-leg,
+    // so that an item can be read whole". Re-keying one leg of a balanced pair
+    // leaves two half-items whose net figures are equal and opposite.
+    const { ok, checks } = tampered((records) => {
+      const lines = records[1]!["journal_lines"] as Record<string, unknown>[];
+      lines[1]!["source_entity_id"] = SETTLEMENT_ID;
+    });
+    expect(ok).toBe(false);
+    expect(checks).toContain("EVENT_HASH");
+  });
+
   it("detects a reordered subject list", () => {
     const { ok, checks } = tampered((records) => {
       const subjects = records[1]!["subject_ids"] as string[];
@@ -273,6 +304,58 @@ describe("a record that cannot be hashed is refused, not hashed", () => {
       const lines = records[2]!["journal_lines"] as Record<string, unknown>[];
       lines[0]!["account"] = "1400_INVENTED";
     });
+  });
+
+  it("refuses a line whose source_entity_id was deleted", () => {
+    // §16 makes the field "required and non-null on every journal line". A line
+    // that names no obligation cannot be placed in a Suspense item, so a
+    // deletion here is a record that cannot be hashed rather than one that
+    // hashes to a different value.
+    structural((records) => {
+      const lines = records[1]!["journal_lines"] as Record<string, unknown>[];
+      delete lines[0]!["source_entity_id"];
+    });
+    structural((records) => {
+      const lines = records[1]!["journal_lines"] as Record<string, unknown>[];
+      lines[0]!["source_entity_id"] = null;
+    });
+  });
+
+  it("refuses an ASSAY-internal handle as the item key", () => {
+    // §16: "a business identifier drawn from the observation set, never an
+    // ASSAY-internal handle, so a reviewer holding only the run artifact can
+    // verify G3". An `obs_`, `exc_` or `dec_` key would make the partition
+    // readable only against ASSAY's own tables.
+    for (const forged of ["obs_000001A", "exc_000001A", "dec_000001A", "evt_000001A"]) {
+      structural((records) => {
+        const lines = records[1]!["journal_lines"] as Record<string, unknown>[];
+        lines[0]!["source_entity_id"] = forged;
+      });
+    }
+  });
+
+  it("refuses a key from a kind that posts nothing", () => {
+    // §17.1.1: truth's identical range "admits no `mle_…` or `disp_…`, so truth
+    // posts no line attributable to either kind". A ledger that admitted one
+    // would put `proj_agent ≠ proj_truth` on a correct decision.
+    for (const forged of ["mle_000001A", "disp_00000000000001"]) {
+      structural((records) => {
+        const lines = records[1]!["journal_lines"] as Record<string, unknown>[];
+        lines[0]!["source_entity_id"] = forged;
+      });
+    }
+  });
+
+  it("refuses a business prefix carrying a suffix of the wrong grammar", () => {
+    // §0 rule 3 gives the Razorpay families fourteen alphanumerics. A prefix
+    // check alone would admit `pay_` followed by anything, which is a forged
+    // identifier wearing a real prefix.
+    for (const forged of ["pay_", "pay_short", `pay_${"0".repeat(15)}`, "pay_ABC-DEF00000000"]) {
+      structural((records) => {
+        const lines = records[1]!["journal_lines"] as Record<string, unknown>[];
+        lines[0]!["source_entity_id"] = forged;
+      });
+    }
   });
 
   it("refuses a field the specification does not name", () => {
@@ -382,8 +465,20 @@ describe("regressions", () => {
       prev_hash: digest(0),
       hash: digest(1),
       journal_lines: [
-        { account: "1200_BANK", dr_paise: huge, cr_paise: 0, memo_ref: "a" },
-        { account: "4000_REVENUE", dr_paise: 0, cr_paise: huge, memo_ref: "b" },
+        {
+          account: "1200_BANK",
+          dr_paise: huge,
+          cr_paise: 0,
+          memo_ref: "a",
+          source_entity_id: BANK_LINE_ID,
+        },
+        {
+          account: "4000_REVENUE",
+          dr_paise: 0,
+          cr_paise: huge,
+          memo_ref: "b",
+          source_entity_id: BANK_LINE_ID,
+        },
       ],
     });
 

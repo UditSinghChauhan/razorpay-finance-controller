@@ -186,6 +186,13 @@ export function canonicalEventBody(content: LedgerEventContent): CanonicalValue 
       dr_paise: line.dr_paise as number,
       cr_paise: line.cr_paise as number,
       memo_ref: line.memo_ref,
+      // Spec 1.4.0. §16: `source_entity_id` "enters `body` only because
+      // `journal_lines` already enters `body` whole, so §16's `body`
+      // projection and the genesis definition are textually unchanged" — the
+      // nine named fields above are the same nine. Every digest nevertheless
+      // changes, which §16 states and which reopens nothing: "no run has been
+      // executed and no root hash has been published".
+      source_entity_id: line.source_entity_id,
     })),
     certificate:
       certificate === null

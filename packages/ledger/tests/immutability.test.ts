@@ -10,7 +10,14 @@ import {
   type LedgerEventDraft,
 } from "@assay/ledger";
 
-import { GENESIS_INPUTS, RUN_ID, line, makeDraft, p5Lines } from "./fixtures.js";
+import {
+  BANK_LINE_ID,
+  GENESIS_INPUTS,
+  RUN_ID,
+  line,
+  makeDraft,
+  p5Lines,
+} from "./fixtures.js";
 
 const GENESIS = computeGenesisHash(GENESIS_INPUTS);
 
@@ -43,6 +50,13 @@ describe("a sealed record is frozen at every level", () => {
       expect(() => {
         write(journalLine, "dr_paise", 1);
       }).toThrow(TypeError);
+      // The Suspense item key is frozen with the rest of the line. Re-keying a
+      // posting in place would move it between G3 items without moving a rupee
+      // (`RECONCILIATION_SPEC.md §10.1`, `THREAT_MODEL.md §T8`).
+      expect(() => {
+        write(journalLine, "source_entity_id", "setl_00000000000001");
+      }).toThrow(TypeError);
+      expect(journalLine.source_entity_id).toBe(BANK_LINE_ID);
     }
     expect(() => {
       (sealed.journal_lines as JournalLine[]).push(line("1200_BANK", 1, 0));
@@ -108,12 +122,14 @@ describe("a sealed record shares nothing with the draft it came from", () => {
 
     write(lines[0], "dr_paise", 999_999);
     write(lines[1], "account", "4000_REVENUE");
+    write(lines[1], "source_entity_id", "setl_00000000000001");
     lines.length = 0;
 
     expect(chain.events[0]?.journal_lines[0]?.dr_paise).toBe(100);
     expect(chain.events[0]?.journal_lines[1]?.account).toBe(
       "9000_SUSPENSE_UNRECONCILED",
     );
+    expect(chain.events[0]?.journal_lines[1]?.source_entity_id).toBe(BANK_LINE_ID);
     expect(verifyChain(GENESIS, chain.events, rootBefore).ok).toBe(true);
   });
 });
@@ -132,11 +148,12 @@ describe("every field is read exactly once", () => {
       },
       cr_paise: 0,
       memo_ref: "P5.dr",
+      source_entity_id: BANK_LINE_ID,
     };
     const draft = makeDraft({
       journal_lines: [
         hostile as unknown as JournalLine,
-        line("9000_SUSPENSE_UNRECONCILED", 0, 100, "P5.cr"),
+        line("9000_SUSPENSE_UNRECONCILED", 0, 100, "P5.cr", BANK_LINE_ID),
       ],
     });
 
@@ -144,6 +161,34 @@ describe("every field is read exactly once", () => {
     expect(reads).toBe(1);
     expect(sealed.journal_lines[0]?.dr_paise).toBe(100);
     expect(sealed.journal_lines[0]?.dr_paise).toBe(100);
+  });
+
+  it("cannot be shown one item key and asked to hash another", () => {
+    // The same attack aimed at the field G3 partitions on: show the validator a
+    // legal `bnk_` key, hand the serializer a different one, and the posting is
+    // filed under an item the record does not name.
+    let reads = 0;
+    const hostile = {
+      account: "1200_BANK",
+      dr_paise: 100,
+      cr_paise: 0,
+      memo_ref: "P5.dr",
+      get source_entity_id(): string {
+        reads += 1;
+        return reads === 1 ? BANK_LINE_ID : "setl_00000000000001";
+      },
+    };
+    const sealed = sealDraft(
+      makeDraft({
+        journal_lines: [
+          hostile as unknown as JournalLine,
+          line("9000_SUSPENSE_UNRECONCILED", 0, 100, "P5.cr", BANK_LINE_ID),
+        ],
+      }),
+    );
+    expect(reads).toBe(1);
+    expect(sealed.journal_lines[0]?.source_entity_id).toBe(BANK_LINE_ID);
+    expect(sealed.journal_lines[0]?.source_entity_id).toBe(BANK_LINE_ID);
   });
 
   it("copies out of a proxy rather than retaining it", () => {
@@ -235,6 +280,23 @@ describe("the draft type does not have to be trusted", () => {
       unknown
     >;
     const draft = { ...makeDraft(), ...smuggled } as unknown as LedgerEventDraft;
+    expect(() => sealDraft(draft)).toThrow(/__proto__/);
+  });
+
+  it("refuses an own __proto__ smuggled onto a journal line", () => {
+    // The draft-level case is covered above; a line is a nested record read by
+    // the same strict path, and a posting is where a smuggled key would be
+    // worth having.
+    const smuggled = JSON.parse('{"__proto__": {"polluted": true}}') as Record<
+      string,
+      unknown
+    >;
+    const draft = makeDraft({
+      journal_lines: [
+        { ...line("1200_BANK", 100, 0, "P5.dr"), ...smuggled },
+        line("9000_SUSPENSE_UNRECONCILED", 0, 100, "P5.cr"),
+      ] as unknown as readonly JournalLine[],
+    });
     expect(() => sealDraft(draft)).toThrow(/__proto__/);
   });
 
