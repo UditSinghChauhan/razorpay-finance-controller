@@ -1,4 +1,4 @@
-# `@assay/ledger` — Layer A, and Layer B's projection
+# `@assay/ledger` — Layer A, and Layer B
 
 The shadow ledger. `ARCHITECTURE.md §8` splits it in two.
 
@@ -15,12 +15,12 @@ Answers what are the books, and do they balance."* `§K` scopes it to
 `JournalLine.source_entity_id` — the Suspense item key — to the record this
 package seals and hashes; see [The Suspense item key](#the-suspense-item-key).
 
-**Of Layer B, only `projection.ts` is present.** `journal.ts` — deciding *which*
-accounts an event posts to — is the **next** milestone rather than a blocked
-one: spec 1.4.0 settled the three questions that held it (`DECISION_BRIEF.md
-§A.7` G-F, G-G and C-1). It is deliberately absent rather than stubbed; see
-[What is deliberately not here](#what-is-deliberately-not-here). `close-gate.ts`
-and `close.ts` follow it.
+**Layer B is implemented: `journal.ts` and `projection.ts`.** `journal.ts` is
+the posting rules `P1`–`P8` — deciding *which* accounts an occasion posts to,
+under `DATA_MODEL.md §17.1`, `§17.1.1` and `§17.2`; `projection.ts` replays the
+resulting lines into balances. `close-gate.ts` and `close.ts` follow, and are
+deliberately absent rather than stubbed; see
+[What is deliberately not here](#what-is-deliberately-not-here).
 
 `ARCHITECTURE.md §8` also explains why the split exists: the two layers *"fail
 differently and so must be checked differently. Layer A detects **tampering** —
@@ -86,13 +86,201 @@ the record is intact but the books do not balance."*
 | `hashCanonical(value)` | `sha256(canonical_json(value))`, for `inputs_hash` and any other `*_hash`. |
 | `createChain(genesisHash, runId)`, `appendEvent(chain, draft)` | The chain as an immutable value. |
 | `LedgerChain`, `verifyChain(genesisHash, events, expectedRoot?)` | Gate `G4` and `/ledger/verify`. |
-| `LedgerEventError`, `TrialBalanceError`, `ChainMismatchError` | Three failures that demand three different responses. |
+| `LedgerEventError`, `TrialBalanceError`, `ChainMismatchError`, `ProjectionInputError`, `JournalError` | Five failures that demand five different responses: fix the record, abort the run, these are not one chain, fix the lookup table, this allocation is not postable. |
+| `journalFor(request)` | The posting rules `P1`–`P8` (`§17.1`, `§17.1.1`, `§17.2`): one occasion in, one posting or one named refusal out. |
+| `PostingRequest` and its four members, `BankSideEvidence` | What a *proposed* posting occasion carries. |
+| `Posting`, `NonPosting`, `JournalDecision` | What one occasion yields. |
+| `POSTING_REFS`, `EXCEPTION_CLASSES`, `OBSERVATION_STATES`, `POSTING_OCCASIONS`, `NON_POSTING_GROUNDS` | The closed sets the posting layer selects over, in declaration order. |
+| `PostingRef`, `ExceptionClass`, `ObservationState`, `PostingOccasion`, `NonPostingGround`, `AbstentionRole` | Their types. |
 | `projectLedger(events)` | Replay an event log into the seven control-account balances. |
 | `projectChain(chain)` | The same over a chain's events, reading none of its cached totals. |
 | `projectByDecisionState(events, states, target?)` | `proj_agent` (`EVALUATION_SPEC.md §4.4`) — the covered-set projection, `RECONCILED` by default. |
 | `assertTrialBalance(projection)` | The hard-abort reading of `I1` (`ARCHITECTURE.md §12`). |
 | `LedgerProjection`, `AccountBalances`, `DecisionState`, `DecisionStates` | The projection's result and its caller-supplied inputs. |
-| `ProjectionInputError` | The caller's decision map does not cover a posting event. |
+
+## The posting rules — Layer B
+
+```
+  journalFor(request) -> { posts: true,  rule, source_entity_id, lines }
+                       | { posts: false, rule: null, ground, lines: [] }
+```
+
+One proposed occasion in, one posting or one **named refusal** out. It is a pure
+function: no I/O, no clock, no randomness, no locale, no module-level state, and
+a deep-frozen result that shares no object with its argument.
+
+**It does not take a `ValidatedDecision`, and that is the specification's
+choice, not a shortcut.** `ARCHITECTURE.md §4` boundary 3: *"S5 must check `I1`
+over journal lines before it may emit a `ValidatedDecision`, so it needs those
+lines first. `journal.ts` therefore takes a **proposed** allocation and its
+terminal state — never the validated wrapper — and is a pure function with no
+I/O."* `§L.1` rule 4 says the same and gives the consequence: this is *"what
+keeps S5 → `I1` → mint → write acyclic"*. Read the other way it is a dependency
+cycle. `ValidatedDecision` is declared with the single **mutating write path**
+it exists to guard, which arrives with persistence — see
+[What is deliberately not here](#what-is-deliberately-not-here).
+
+### The four occasions
+
+`§17.1.1` fires a posting at four distinct moments, and each is the
+specification's own word for it. They are four calls rather than one because
+they are four **events**: a capture the recon report asserts, a bank credit that
+arrives days later, a terminal state, and a resolution that `§17.1` says posts
+*"as **new events**"*.
+
+| Occasion | Source | Rules it can reach |
+|---|---|---|
+| `INGEST` | *"`P1` at ingest"*, *"`P3` at ingest"* | `P1`, `P3` |
+| `BANK_EVIDENCE` | *"the settlement it is allocated to is **itself reconciled to a bank credit through real bank-side evidence**"* | `P2`, `P4` |
+| `TERMINAL_STATE` | *"every terminal `ABSTAINED` or `EXCEPTION` state"*, and the rows that post nothing | `P5`, `P6`, `P8` |
+| `RESOLUTION` | `§17.1`'s `P7` row | `P7` |
+
+### The four phases, kept apart
+
+```
+  A. input validation      is this a request at all?          strict, read-once
+  B. posting selection     §17.1.1: which rule, or none?      reads no amount
+  C. journal construction  §17.1 / §17.2: which lines?        re-decides no rule
+  D. invariant validation  §16 shape, I1, one item key        fails closed
+```
+
+**B never reads a rupee figure and C never re-decides a rule.** A selection that
+could inspect the amount it was about to post is a selection that can be talked
+out of posting it, which is the shape of the suppression `THREAT_MODEL.md §T8`
+exists to make arithmetically impossible.
+
+### `P2` and `P4` cannot fire without real bank-side evidence
+
+This is the `E04` guard, and it is structural rather than a check. `§17.1.1`
+conditions both rules on *"`AN2` satisfied against an actual `bank_line`, and
+`I5` therefore defined and satisfied"*, and states that **`I5` is undefined —
+not satisfied — when no bank-line mapping exists**. So the `BANK_EVIDENCE`
+occasion carries a `bnk_…` identifier, a `setl_…` identifier checked against the
+line's own `settlement_id` (that is `AN1`), and two attestations typed `true`
+rather than `boolean` — an anchor that did not hold is expressed by **omitting
+the occasion**, not by attesting to it.
+
+A line reaching `RECONCILED` posts nothing. `AN1` alone is *"a gateway-internal
+identity match that carries no bank-side information"*, so the terminal-state
+occasion returns `NO_TRIGGER_AT_THIS_OCCASION` for a recon line and `1200_BANK`
+is never touched. An `E04` settlement has no bank line to name, so it cannot
+reach `P2` at all; it takes `P6` under `setl_…`.
+
+### `P8` is narrowed, and there is no catch-all
+
+`P8` applies to **adjustment observations and to nothing else** (`§17.2`, spec
+1.4.0). It is reached only through `E12_ADJUSTMENT_UNEXPLAINED`, which is bound
+to the `adjustment` kind, and `buildLegs` refuses any other kind a second time.
+No path falls through to it. It posts `M` — the non-zero one of `debit`/`credit`
+— and never `ReconLine.amount`, which `§17.2` leaves *"deliberately
+unconstrained"* on adjustment rows; a row on which `M` is not unique is refused
+rather than guessed, because such a row is an `E05`/`E06`/`E07` and posts
+nothing.
+
+### `P7` reverses, exactly
+
+Every leg keeps its account and its amount and swaps its side, under the **same**
+`source_entity_id`. That is what makes *open* arithmetic: `§16` says a resolved
+item *"nets to zero and leaves `Σ |item_net_paise|` by arithmetic rather than by
+a flag someone must remember to set."* Only a `P5` or a `P6` opening is
+accepted — those are the two `§17.1`'s `P7` row names — so a `P8` opening, a
+`P1` opening, and a reversal of a reversal are all refused rather than extended
+by analogy.
+
+**Whether the item *should* be resolved is the caller's**, not this module's:
+`Exception.status` (`§14`) belongs to the engine. What is guaranteed here is
+that the reversal is exact and lands under the same key.
+
+### Non-posting is explicit and named
+
+Seven of the fourteen exception classes post and seven do not, and several kinds
+post nothing in any state. Every such case returns a **named ground**, not an
+empty array, because *"explicitly non-posting"* has to be inspectable to be
+worth anything: an implementation that returned nothing for every silent case
+would be indistinguishable from one that had lost a posting.
+
+| Ground | `§17.1.1`'s clause |
+|---|---|
+| `INGEST_VALIDATION_FAILED` | *"A line that fails ingest validation posts nothing at all, in either direction."* |
+| `REFERENCE_KIND` | `payment`, `order` — *"Reference kinds; §10.1"* |
+| `NO_ATTRIBUTABLE_KEY` | `ledger_entry`, `dispute` — *"truth posts no line attributable to either kind"* |
+| `AGGREGATE_VIEW` | `settlement`, `bank_line` on the reconciled path — `I4`/`I5` make them aggregates |
+| `NO_TRIGGER_AT_THIS_OCCASION` | this kind's postings fire elsewhere; the `E04` guard lives here |
+| `NON_TARGET_MEMBER` | *"a second posting for each member would relieve `1100_GATEWAY_RECEIVABLE` again for one break"* |
+| `INGEST_INVARIANT_FAILURE` | `E05`, `E06`, `E07` |
+| `DUPLICATE_OBSERVATION` | `E08` — *"A duplicate is not a second economic event."* |
+| `REFERENTIAL_FAILURE` | `E10` — an `I6` failure |
+| `TIMING_DEFERRAL` | `E11` — *"deferred, not an error"* |
+| `UNTRUSTED_LEDGER_SOURCE` | `E13` — either leg *"would let an attacker-controlled ERP row move a PG-side control account"* (`§T5`) |
+| `NO_CONSTRUCTIBLE_RULE` | the `refund`-kind seam; see below |
+
+`§17.1.1` is emphatic that these are not gaps: *"An exception that posts nothing
+is still an exception ... It cannot be suppressed either: close gate `G1`
+requires every observation to hold exactly one terminal state, with no drop
+path."*
+
+### The `E14` residual is preserved, not optimised away
+
+`§17.1.1` discloses it: where a bank credit exists but its attribution does not,
+*"the settlement takes `P6` under its own key and the unattributable `bank_line`
+takes `P5` under its own key. **One economic event therefore opens two Suspense
+items and is counted twice in `unresolved_value_paise`.**"* A test asserts both
+items and the doubled gross figure, so the disclosure fails loudly if anyone
+later "fixes" it. Netting them would be exactly the offsetting suppression the
+**gross** form of `G3` exists to make impossible.
+
+### Decisions this module had to make
+
+Three things the specification leaves open, stated as this module's contract:
+
+- **Lines are ordered by ascending account code.** No line order is stated for
+  the agent's `journal_lines`, and one has to be chosen, because the field
+  enters `LedgerEvent.body` and two orders are two digests for one posting.
+  The rule reuses the one the specification *does* state for the counterpart
+  journal: `§1`'s `true_journal` is emitted *"ties broken by `source_entity_id`
+  ascending, then by `account` ascending"*, and within one posting the first two
+  keys are constant. It is a total order because no rule among `P1`–`P8` touches
+  one account twice, and that is asserted rather than assumed. Ordering is by
+  `ACCOUNT_CODES` index rather than string comparison, so no collation can
+  reorder it. No gate reads line order — `G2`, `G3`, `proj_agent` and
+  `proj_truth` are all sums — so this fixes a digest, not an accounting outcome.
+- **A zero leg is dropped; a posting of zero paise is refused.** `§16` requires
+  *"exactly one of dr/cr is non-zero"*, so a zero line is not expressible. `P2`
+  on a zero-fee line is the case that matters: two of its four legs are zero and
+  `credit + 0 + 0 = amount` still balances. When *every* leg is zero the trigger
+  table says the observation posts and `§16` says it cannot, so the posting is
+  refused rather than silently dropped — dropping it would remove an item the
+  queue still counts, which breaks `G3` in the direction `§T8` names.
+- **`memo_ref` is the posting reference**, `"P1"`–`"P8"`, identical in spelling
+  to `GroundTruth.true_journal.posting_ref` (`§1`) so the two journals carry the
+  same token for the same rule. `§16` requires only that it be *"reference only,
+  never free text from input"*, which this satisfies by carrying no input at all.
+
+### Two specification seams, refused rather than resolved
+
+Both are reported rather than patched, because `DECISION_BRIEF.md §L.4` makes
+inventing a mapping the trigger table does not enumerate a spec amendment.
+
+- **An unmatched bank line whose `direction` is `"debit"`.** Every source for
+  `P5` describes a **credit**: `§17.1`'s row is *"value has arrived in the
+  bank"*, `§17.1.1`'s Direction column reads `inbound`, `§14.1` values a bank
+  line at *"the credit that actually arrived"*, and the canonical class is
+  `E03_BANK_CREDIT_UNMATCHED`. None predicates on
+  `BankStatementLine.direction` (`§7`), which is a real field with a real
+  `"debit"` value — a refund settled out of the bank under `P4` is one. Posting
+  `DR 1200_BANK` for an unmatched bank *debit* would assert money arrived when
+  it left, and would break the single property `§17.1` chose the sign convention
+  to preserve. It is refused.
+- **`Observation.kind === "refund"` on the reconciled path.** The `pg_refunds`
+  view appears in neither `§17.1.1`'s reconciled-path table nor `§14.1`'s
+  `value(observation)` table, though `§10.1` classes it reconcilable. It is
+  treated as non-posting under `NO_CONSTRUCTIBLE_RULE`, on the ground `§A.7`
+  G-F used to withdraw the universal `P8` fallback: **no rule among `P1`–`P8` is
+  constructible over a `Refund` payload.** Its abstained and excepted paths *are*
+  enumerated — the non-target-member row and `E10` — and both are likewise
+  silent, so this is the answer every enumerated neighbour gives. It carries its
+  own ground so the seam stays visible rather than folded into a row that does
+  cover it.
 
 ## The hash chain
 
@@ -319,35 +507,48 @@ them.
 ## What is deliberately not here
 
 Everything below is **absent by scope**, not blocked. Spec 1.4.0 closed the
-three governance questions an earlier revision of this file recorded here: the
-universal `P8` fallback was withdrawn and `P8` narrowed to adjustment
-observations (`DECISION_BRIEF.md §A.7` G-F), the posting-trigger mapping was
-added as `DATA_MODEL.md §17.1.1` and is total over kind × terminal state ×
-exception class (G-G), and `ValidatedDecision` was defined field by field in
-`ARCHITECTURE.md §4` boundary 3 (C-1). What remains is ordering, in the sequence
-`§L.2` fixes.
+three governance questions an earlier revision of this file recorded here, and
+`journal.ts` was written against them: the universal `P8` fallback was withdrawn
+and `P8` narrowed to adjustment observations (`DECISION_BRIEF.md §A.7` G-F), the
+posting-trigger mapping was added as `DATA_MODEL.md §17.1.1` (G-G), and
+`ValidatedDecision` was defined field by field in `ARCHITECTURE.md §4`
+boundary 3 (C-1). What remains is ordering, in the sequence `§L.2` fixes.
 
 - **The single `ValidatedDecision` write path** (`§L.1` rule 4, boundary 3).
   The type is now defined — `ARCHITECTURE.md §4` gives its fields, its
   declaration site (this package) and its enforcement (a non-exported
   unique-symbol brand plus an ESLint path allowlist) — and it is **declared with
   the write path it exists to guard**, not ahead of it. Only
-  `engine/src/s5-validate.ts` may mint one, and S5 does not yet exist. Layer A
-  therefore contains **no mutating function and no I/O at all**: `appendEvent`
-  returns a new chain and leaves its argument untouched, so the count of
-  mutating functions in this package is zero rather than one. The write path
+  `engine/src/s5-validate.ts` may mint one, and S5 does not yet exist — the
+  ESLint path allowlist that enforces *"only S5 may construct"* cannot be
+  written against a file that is not there, and a branded type with no consumer
+  and no enforcement is a claim rather than a control. `journal.ts` does not
+  need it either: `ARCHITECTURE.md §4` boundary 3 is explicit that the posting
+  function takes a **proposed** allocation and *"never the validated wrapper"*.
+  This package therefore contains **no mutating function and no I/O at all**:
+  `appendEvent` returns a new chain and leaves its argument untouched and
+  `journalFor` is pure, so the count of mutating functions here is zero rather
+  than one. The write path
   arrives with persistence. `§K` allocates no storage module to this package and
   `better-sqlite3` is in no manifest, so the ledger is in-memory at this
   milestone; the projection is a pure function of an event array and takes no
   connection.
-- **The posting table `P1`–`P8`.** Deciding which accounts an event posts to is
-  `journal.ts`, on `§K`'s Layer B line, and it is the **next** milestone.
-  `§17.1.1` now maps `Observation.kind` × terminal state × `ExceptionClass` onto
-  `P1`–`P8` and onto the `source_entity_id` each posting carries; `§L.4` makes
-  inventing a row in that table a spec amendment, and the table is total, so
-  there is nothing left to invent. Nothing in this package anticipates it: Layer
-  A admits the `journal_lines` a caller supplies and never decides what they
-  should have been, and `projection.ts` reads the lines an event already carries.
+- **A second implementation of the posting table.** `journal.ts` is the system
+  under test, not an oracle (`ARCHITECTURE.md §7.2`). It carries no shadow copy
+  of `§17.1.1` to check itself against, and its test fixtures build observations
+  rather than expected postings — a fixture that encoded the expected rule would
+  be a second implementation grading the first, and a later engine/oracle
+  differential test would then be comparing the engine with itself.
+- **Any judgement about whether a request's facts are true.** Whether `AN2`
+  really matched, whether `I5` really held, whether the named observation exists
+  (`I6`), whether an allocation is unique (`I2`/`C7`), whether an exception is
+  genuinely resolved (`Exception.status`, `§14`) — all belong to stages S1–S5,
+  which hold the observation set. This package holds none, and says so by
+  requiring the caller to state those facts rather than inferring them.
+- **Deduplication.** `journalFor` is a pure function of one occasion. `I2` and
+  `C7` are stage S5's and `§8`'s three duplicate mechanisms are the engine's;
+  what this module guarantees instead is that it never silently *merges* two
+  occasions, because one posting is one item under one key.
 - **The gross per-item Suspense identity, gate `G3`.** The key that partitions
   journal lines into items is defined as of spec 1.4.0 and Layer A now carries
   and hashes it, so the partition is computable — but `G3` compares

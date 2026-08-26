@@ -13,11 +13,10 @@
  * of the first.
  *
  * **Scope.** `DECISION_BRIEF.md §K` places `journal.ts` and `projection.ts` on
- * the Layer B line. This milestone is `projection.ts` alone. `journal.ts` —
- * deciding *which* accounts an event posts to — is the next milestone, now that
- * spec 1.4.0 has settled the questions that held it (`§A.7` G-F, G-G, C-1).
- * Nothing here anticipates it: this module reads the `journal_lines` an event
- * already carries and never decides what they should have been.
+ * the Layer B line, and both are now present. The split between them is strict
+ * and this module holds the passive half: it reads the `journal_lines` an event
+ * already carries and never decides what they should have been. `journal.ts`
+ * decides; nothing here imports it, and a test asserts that.
  *
  * **What this module refuses, and where that work lives instead.**
  *

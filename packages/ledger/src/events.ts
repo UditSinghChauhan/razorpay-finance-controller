@@ -254,6 +254,13 @@ export interface LedgerEvent extends LedgerEventContent {
 // Each reads its argument exactly once and returns a value that is either a
 // primitive or a frozen structure. Nothing here mutates, and nothing retains a
 // reference to anything the caller passed in.
+//
+// Several are `export`ed for `hash-chain.ts` and `journal.ts` and are NOT
+// re-exported from `index.ts`. The reason is drift: `journal.ts` builds journal
+// lines and must admit them under exactly the rules `sealDraft` will apply when
+// the same lines reach the chain. Two copies of "what a valid line is" would be
+// two copies that can disagree, and the one that disagreed would be the one
+// inside the digest.
 // ---------------------------------------------------------------------------
 
 /**
@@ -415,7 +422,7 @@ export function readSha256(value: unknown, path: string): Sha256 {
   return value as Sha256;
 }
 
-function readMember<T extends string>(
+export function readMember<T extends string>(
   value: unknown,
   path: string,
   allowed: readonly T[],
@@ -476,7 +483,7 @@ function readBoundedInteger(
 }
 
 /** A plain object, and nothing else. Class instances and proxied exotics are refused. */
-function readObject(value: unknown, path: string): Record<string, unknown> {
+export function readObject(value: unknown, path: string): Record<string, unknown> {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw new LedgerEventError(
       path,
@@ -494,7 +501,7 @@ function readObject(value: unknown, path: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function readArray(value: unknown, path: string): readonly unknown[] {
+export function readArray(value: unknown, path: string): readonly unknown[] {
   if (!Array.isArray(value)) {
     throw new LedgerEventError(path, `expected an array, received ${describe(value)}`);
   }
@@ -510,7 +517,7 @@ function readArray(value: unknown, path: string): readonly unknown[] {
  * copied into the hashed body by nothing and would therefore be invisible to
  * the chain, which is precisely the gap a hash chain exists to close.
  */
-function rejectUnknownKeys(
+export function rejectUnknownKeys(
   record: Record<string, unknown>,
   path: string,
   known: readonly string[],
@@ -550,7 +557,7 @@ function readNullable<T>(
  * in the suite, because `LedgerEventError` extends `TypeError` and every
  * assertion of the form `toThrow(TypeError)` passed either way.
  */
-function describe(value: unknown): string {
+export function describe(value: unknown): string {
   if (value === null) return "null";
   if (Array.isArray(value)) return "an array";
   if (typeof value === "object") {
@@ -577,7 +584,7 @@ const JOURNAL_LINE_KEYS = [
   "source_entity_id",
 ] as const;
 
-function sealJournalLine(value: unknown, path: string): JournalLine {
+export function sealJournalLine(value: unknown, path: string): JournalLine {
   const record = readObject(value, path);
   rejectUnknownKeys(record, path, JOURNAL_LINE_KEYS);
 

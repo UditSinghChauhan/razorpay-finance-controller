@@ -17,6 +17,17 @@ export default defineConfig({
       "tests/**/*.test.ts",
     ],
 
+    // Property suites run 2,000 cases each (DECISION_BRIEF.md §J fixes
+    // fast-check; §L.3 makes property tests on every invariant a completeness
+    // condition), and vitest runs test FILES in parallel. The heaviest single
+    // property in packages/ledger takes ~2.6s alone and 3-6x that when several
+    // workers are competing for the CPU, so the 5s default is not a real
+    // budget — it is a machine-speed test wearing a correctness test's clothes,
+    // and it failed on a green tree the first time a fourth property file was
+    // added. The bound below is generous enough that only a genuine hang trips
+    // it. It relaxes no assertion: a property that fails still fails.
+    testTimeout: 30_000,
+
     // Type-level tests. T0-1's acceptance criterion is that "float usage is a
     // compile error", which is only assertable by a test that fails when an
     // illegal assignment starts compiling.
