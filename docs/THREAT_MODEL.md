@@ -214,10 +214,21 @@ systems this is the *easiest* attack, because dropped records are invisible.
 - **Every observation must reach exactly one terminal state.** Close gate **G1**
   asserts this; failure ends the period `BLOCKED` with no close report emitted.
   There is no drop path.
-- **The Suspense reconciliation identity** (close gate **G3**):
-  `Suspense balance = Σ abstained value + Σ open exception value`, checked
-  exactly, to the paisa. A suppressed exception breaks this identity and the
-  period cannot close.
+- **The Suspense reconciliation identity** (close gate **G3**), in the **gross
+  per-item** form: `Σ |item_net_paise(i)|` over each open Suspense item *i*
+  `=== unresolved_value_paise`, checked exactly, to the paisa
+  (`RECONCILIATION_SPEC.md §10.1`). A suppressed exception breaks this identity
+  and the period cannot close.
+
+  **The gross form is what defeats this attack, and the net form does not.**
+  Suspense receives value from both directions — an unattributable bank credit
+  credits it (`P5`), a settlement with no bank credit debits it (`P6`), an
+  adjustment posts on either side (`P8`). Against a net identity an attacker
+  suppresses one item on each side and the two cancel, leaving the balance
+  correct and the queue two items short. The gross form makes offsetting
+  suppression arithmetically impossible. `DATA_MODEL.md §20` is explicit that
+  the net projected Suspense balance (`value_suspense_paise`) is a **different
+  number** from the G3 quantity and is not what this control tests.
 - The trial balance (`I1`, close gate **G2**) must be zero: a vanished rupee
   unbalances the ledger.
 - Because balances are re-projected from the event log at close rather than read
