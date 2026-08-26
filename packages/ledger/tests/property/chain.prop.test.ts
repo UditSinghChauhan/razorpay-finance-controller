@@ -9,6 +9,7 @@ import {
   CERTIFICATE_REASONS,
   EVENT_KINDS,
   LLM_PROVIDER_IDS,
+  SOURCE_ENTITY_PREFIXES,
   TrialBalanceError,
   appendEvent,
   canonicalEventBody,
@@ -59,9 +60,29 @@ const sha256Like = fc.nat({ max: 1_000_000 }).map(digest);
 const amount = fc.integer({ min: 1, max: 10_000_000_000 });
 
 /**
+ * A `source_entity_id` — one of `§16`'s five business families at `§0` rule 3's
+ * grammar.
+ *
+ * Fourteen alphanumerics satisfies both grammars at once: it is exactly what the
+ * four Razorpay families require, and `bnk_` accepts any non-empty alphanumeric
+ * suffix, so one generator covers all five without inventing a length for the
+ * family the specification states none for.
+ */
+const sourceEntityId = fc
+  .tuple(
+    fc.constantFrom(...SOURCE_ENTITY_PREFIXES),
+    fc.array(fc.constantFrom(...TOKEN_CHARS), { minLength: 14, maxLength: 14 }),
+  )
+  .map(([prefix, suffix]) => `${prefix}${suffix.join("")}`);
+
+/**
  * A balanced posting: one or more debit legs and a single credit leg carrying
  * their total, or the mirror image. Every posting in `§17.1` and `§17.2` has
  * this shape.
+ *
+ * Every leg carries the **same** `source_entity_id`, which is the shape
+ * `§17.1.1` assigns — one key per posting — and which `§16` requires of the
+ * counter-leg "so that an item can be read whole".
  */
 const journalLines = fc
   .tuple(
@@ -71,20 +92,23 @@ const journalLines = fc
     }),
     fc.constantFrom(...ACCOUNT_CODES),
     fc.boolean(),
+    sourceEntityId,
   )
-  .map(([legs, counterAccount, mirrored]): readonly JournalLine[] => {
+  .map(([legs, counterAccount, mirrored, entity]): readonly JournalLine[] => {
     const total = legs.reduce((sum, [, value]) => sum + value, 0);
     const many = legs.map(([account, value], index): JournalLine => ({
       account,
       dr_paise: (mirrored ? 0 : value) as Paise,
       cr_paise: (mirrored ? value : 0) as Paise,
       memo_ref: `leg${String(index)}`,
+      source_entity_id: entity,
     }));
     const counter: JournalLine = {
       account: counterAccount,
       dr_paise: (mirrored ? total : 0) as Paise,
       cr_paise: (mirrored ? 0 : total) as Paise,
       memo_ref: "counter",
+      source_entity_id: entity,
     };
     return [...many, counter];
   });
@@ -242,6 +266,31 @@ describe("the root hash is a function of the hashed content alone", () => {
     );
   });
 
+  it("depends on every line's source_entity_id", () => {
+    // §16 states the consequence of the 1.4.0 amendment — "this changes every
+    // event digest" — and G3 partitions Suspense on this field alone, so a
+    // digest that ignored it would leave the item key outside tamper-evidence.
+    fc.assert(
+      fc.property(draft, sourceEntityId, sha256Like, (one, otherKey, prev) => {
+        const lines = one.journal_lines;
+        if (lines.length === 0) return true;
+        const first = lines[0];
+        if (first === undefined || first.source_entity_id === otherKey) return true;
+        const rekeyed = sealDraft({
+          ...one,
+          journal_lines: lines.map((journalLine, index) =>
+            index === 0 ? { ...journalLine, source_entity_id: otherKey } : journalLine,
+          ),
+        });
+        return (
+          computeEventHash({ ...sealDraft(one), seq: 0 }, prev) !==
+          computeEventHash({ ...rekeyed, seq: 0 }, prev)
+        );
+      }),
+      { numRuns: CHEAP_RUNS, seed: SEED },
+    );
+  });
+
   it("depends on seq, so two events cannot be transposed", () => {
     fc.assert(
       fc.property(draft, sha256Like, fc.nat({ max: 500 }), (one, prev, seq) => {
@@ -258,6 +307,28 @@ describe("the root hash is a function of the hashed content alone", () => {
 });
 
 describe("the hashed body is §16's projection, for every event", () => {
+  it("carries five fields on every journal line and no sixth", () => {
+    fc.assert(
+      fc.property(draft, (one) => {
+        const body = canonicalEventBody({ ...sealDraft(one), seq: 0 }) as Record<
+          string,
+          unknown
+        >;
+        for (const journalLine of body["journal_lines"] as Record<string, unknown>[]) {
+          expect(Object.keys(journalLine).sort()).toEqual([
+            "account",
+            "cr_paise",
+            "dr_paise",
+            "memo_ref",
+            "source_entity_id",
+          ]);
+        }
+        return true;
+      }),
+      { numRuns: CHEAP_RUNS, seed: SEED },
+    );
+  });
+
   it("carries exactly the nine named fields and none of the five excluded ones", () => {
     fc.assert(
       fc.property(draft, fc.nat({ max: 1000 }), (one, seq) => {
@@ -360,6 +431,7 @@ describe("a chain is gapless, linked and balanced by construction", () => {
             dr_paise: (debit ? value : 0) as Paise,
             cr_paise: (debit ? 0 : value) as Paise,
             memo_ref: "unbalanced",
+            source_entity_id: `setl_${"0".repeat(14)}`,
           };
           expect(() =>
             appendEvent(
@@ -399,6 +471,18 @@ describe("a chain is gapless, linked and balanced by construction", () => {
 });
 
 describe("any change to hashed content is detected", () => {
+  /**
+   * A digest no generated record can already be carrying.
+   *
+   * `sha256Like` draws its seed from `fc.nat({ max: 1_000_000 })`, so a seed
+   * above that bound is unreachable by construction. Writing a *reachable*
+   * digest is how a mutation becomes a silent no-op: `digest(999_999)` was in
+   * range, so on the one draft that had drawn it the edit changed nothing and
+   * the property passed for the wrong reason. The `changed` assertion below is
+   * the general guard; this constant removes the case it would catch.
+   */
+  const unreachableDigest = (n: number): string => digest(1_000_001 + n);
+
   /** Single-field edits to a stored record, all of them inside the body. */
   const MUTATIONS: readonly ((record: Record<string, unknown>) => void)[] = [
     (record) => {
@@ -408,7 +492,7 @@ describe("any change to hashed content is detected", () => {
       record["kind"] = record["kind"] === "INGEST" ? "CLOSE" : "INGEST";
     },
     (record) => {
-      record["inputs_hash"] = digest(999_999);
+      record["inputs_hash"] = unreachableDigest(1);
     },
     (record) => {
       record["decision_id"] = record["decision_id"] === null ? "dec_x" : null;
@@ -423,10 +507,24 @@ describe("any change to hashed content is detected", () => {
       (record["actor"] as Record<string, unknown>)["component"] = "manual.override";
     },
     (record) => {
-      record["prev_hash"] = digest(888_888);
+      // Re-key every posting on the event. Balances and the trial balance are
+      // untouched; G3's partition is not (`RECONCILIATION_SPEC.md §10.1`). An
+      // event carrying no posting has no key to move, so it takes the digest
+      // edit instead and the mutation still changes exactly one hashed field.
+      const lines = record["journal_lines"] as Record<string, unknown>[];
+      if (lines.length === 0) {
+        record["inputs_hash"] = unreachableDigest(2);
+        return;
+      }
+      for (const journalLine of lines) {
+        journalLine["source_entity_id"] = `setl_${"9".repeat(14)}`;
+      }
     },
     (record) => {
-      record["hash"] = digest(777_777);
+      record["prev_hash"] = unreachableDigest(3);
+    },
+    (record) => {
+      record["hash"] = unreachableDigest(4);
     },
   ];
 
@@ -443,7 +541,11 @@ describe("any change to hashed content is detected", () => {
           const mutate = MUTATIONS[mutationSeed % MUTATIONS.length];
           const target = records[index];
           if (mutate === undefined || target === undefined) return true;
+          const before = JSON.stringify(target);
           mutate(target);
+          // An edit that changed nothing would let this property pass without
+          // testing anything, which is how the `digest(999_999)` collision hid.
+          expect(JSON.stringify(target)).not.toBe(before);
           return !verifyChain(GENESIS, asEvents(records), chain.root_hash).ok;
         },
       ),

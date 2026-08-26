@@ -1,10 +1,11 @@
 /**
  * Layer B's balance projection — `ARCHITECTURE.md §8`, `DATA_MODEL.md §17.1`.
  *
- * The postings used as data below are transcribed from `§17.1` so the
- * arithmetic is checkable against the specification by eye. Nothing here
- * *selects* a posting: choosing which accounts an event posts to is
- * `journal.ts`, which is blocked on governance and is not implemented.
+ * The postings used as data below are transcribed from `§17.1`, and their
+ * `source_entity_id` values from `§17.1.1`'s own column, so the arithmetic and
+ * the item key are both checkable against the specification by eye. Nothing
+ * here *selects* a posting: choosing which accounts an event posts to is
+ * `journal.ts`, the next milestone, and not implemented.
  */
 
 import { describe, expect, it } from "vitest";
@@ -31,8 +32,12 @@ import {
 } from "@assay/ledger";
 
 import {
+  BANK_LINE_ID,
   GENESIS_INPUTS,
+  PAYMENT_ID,
+  REFUND_ID,
   RUN_ID,
+  SETTLEMENT_ID,
   asEvents,
   digest,
   id,
@@ -92,42 +97,49 @@ function storedEvent(
   } as unknown as Record<string, unknown>;
 }
 
+// The postings below carry the `source_entity_id` that `§17.1.1`'s trigger table
+// puts in its own column for each: the recon line's `entity_id` for `P1`–`P4`
+// ("the recon line itself", §16), the bank line for `P5` and the settlement for
+// `P6`. That is test data, not a rule — selecting a posting is `journal.ts`'s
+// job and a later milestone. What it buys is that the item key is legible in
+// every fixture, and identical on both legs, as `§16` requires.
+
 // `§17.1` P1 — payment captured at the gateway.
 const p1 = (amount: number) => [
-  line("1100_GATEWAY_RECEIVABLE", amount, 0, "P1.dr"),
-  line("4000_REVENUE", 0, amount, "P1.cr"),
+  line("1100_GATEWAY_RECEIVABLE", amount, 0, "P1.dr", PAYMENT_ID),
+  line("4000_REVENUE", 0, amount, "P1.cr", PAYMENT_ID),
 ];
 
 // `§17.1` P2 — settlement reconciled to a bank credit. `fee` is GST-inclusive.
 const p2 = (amount: number, fee: number, tax: number) => [
-  line("1200_BANK", amount - fee, 0, "P2.dr"),
-  line("5100_PG_FEE_EXPENSE", fee - tax, 0, "P2.dr"),
-  line("1300_GST_INPUT_CREDIT", tax, 0, "P2.dr"),
-  line("1100_GATEWAY_RECEIVABLE", 0, amount, "P2.cr"),
+  line("1200_BANK", amount - fee, 0, "P2.dr", PAYMENT_ID),
+  line("5100_PG_FEE_EXPENSE", fee - tax, 0, "P2.dr", PAYMENT_ID),
+  line("1300_GST_INPUT_CREDIT", tax, 0, "P2.dr", PAYMENT_ID),
+  line("1100_GATEWAY_RECEIVABLE", 0, amount, "P2.cr", PAYMENT_ID),
 ];
 
 // `§17.1` P3 — refund initiated.
 const p3 = (amount: number) => [
-  line("4000_REVENUE", amount, 0, "P3.dr"),
-  line("2200_REFUND_LIABILITY", 0, amount, "P3.cr"),
+  line("4000_REVENUE", amount, 0, "P3.dr", REFUND_ID),
+  line("2200_REFUND_LIABILITY", 0, amount, "P3.cr", REFUND_ID),
 ];
 
 // `§17.1` P4 — refund settled out of the bank.
 const p4 = (amount: number) => [
-  line("2200_REFUND_LIABILITY", amount, 0, "P4.dr"),
-  line("1200_BANK", 0, amount, "P4.cr"),
+  line("2200_REFUND_LIABILITY", amount, 0, "P4.dr", REFUND_ID),
+  line("1200_BANK", 0, amount, "P4.cr", REFUND_ID),
 ];
 
 // `§17.1` P5 — an inbound item ASSAY declined to attribute (`E03`).
-const p5 = (amount: number) => [
-  line("1200_BANK", amount, 0, "P5.dr"),
-  line(SUSPENSE_ACCOUNT, 0, amount, "P5.cr"),
+const p5 = (amount: number, key: string = BANK_LINE_ID) => [
+  line("1200_BANK", amount, 0, "P5.dr", key),
+  line(SUSPENSE_ACCOUNT, 0, amount, "P5.cr", key),
 ];
 
 // `§17.1` P6 — an outbound settlement with no bank credit (`E04`).
-const p6 = (amount: number) => [
-  line(SUSPENSE_ACCOUNT, amount, 0, "P6.dr"),
-  line("1100_GATEWAY_RECEIVABLE", 0, amount, "P6.cr"),
+const p6 = (amount: number, key: string = SETTLEMENT_ID) => [
+  line(SUSPENSE_ACCOUNT, amount, 0, "P6.dr", key),
+  line("1100_GATEWAY_RECEIVABLE", 0, amount, "P6.cr", key),
 ];
 
 const ZERO_VECTOR: Record<AccountCode, number> = {

@@ -7,14 +7,18 @@
  * the record is intact but the books do not balance."
  *
  * Layer A is the append-only hash-chained audit event (`DATA_MODEL.md §16`),
- * scoped by `DECISION_BRIEF.md §K` to `events.ts` and `hash-chain.ts`.
+ * scoped by `DECISION_BRIEF.md §K` to `events.ts` and `hash-chain.ts`. It is
+ * **implemented**, at specification 1.4.0 — which added
+ * `JournalLine.source_entity_id`, the Suspense item key, to the record this
+ * package seals and hashes.
  *
  * Layer B is `journal.ts` and `projection.ts`. **Only `projection.ts` is
- * present.** `journal.ts` — deciding which accounts an event posts to — is
- * blocked on two open governance questions (the universal `P8` fallback and the
- * posting-trigger mapping) and on `ValidatedDecision`, a type `§L.1` rule 4
- * names and no document defines. `close-gate.ts` and `close.ts` are a later
- * milestone. All three are deliberately absent rather than stubbed.
+ * present.** `journal.ts` — deciding which accounts an event posts to — is the
+ * next milestone rather than a blocked one: spec 1.4.0 closed the three
+ * questions that held it (`DECISION_BRIEF.md §A.7` G-F narrowed `P8` to
+ * adjustment observations, G-G added `§17.1.1`'s trigger table, and C-1 defined
+ * `ValidatedDecision`). `close-gate.ts` and `close.ts` follow it. All three are
+ * deliberately absent rather than stubbed.
  */
 
 export {
@@ -23,6 +27,7 @@ export {
   CERTIFICATE_REASONS,
   EVENT_KINDS,
   LLM_PROVIDER_IDS,
+  SOURCE_ENTITY_PREFIXES,
   journalTotals,
   sealDraft,
   sealStoredEvent,

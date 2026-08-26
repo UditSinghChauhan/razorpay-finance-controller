@@ -11,10 +11,16 @@ replaying the event log recomputes every control-account balance from scratch.
 Answers what are the books, and do they balance."* `§K` scopes it to
 `journal.ts` and `projection.ts`.
 
-**Only `projection.ts` is present.** `journal.ts` — deciding *which* accounts an
-event posts to — is blocked and is deliberately absent rather than stubbed; see
+**Layer A is implemented, at specification 1.4.0.** That release added
+`JournalLine.source_entity_id` — the Suspense item key — to the record this
+package seals and hashes; see [The Suspense item key](#the-suspense-item-key).
+
+**Of Layer B, only `projection.ts` is present.** `journal.ts` — deciding *which*
+accounts an event posts to — is the **next** milestone rather than a blocked
+one: spec 1.4.0 settled the three questions that held it (`DECISION_BRIEF.md
+§A.7` G-F, G-G and C-1). It is deliberately absent rather than stubbed; see
 [What is deliberately not here](#what-is-deliberately-not-here). `close-gate.ts`
-and `close.ts` are a later milestone.
+and `close.ts` follow it.
 
 `ARCHITECTURE.md §8` also explains why the split exists: the two layers *"fail
 differently and so must be checked differently. Layer A detects **tampering** —
@@ -31,30 +37,36 @@ the record is intact but the books do not balance."*
    differently on a second read cannot show one value to the validator and hand
    another to the serializer.
 3. **The hashed body is `DATA_MODEL.md §16`'s projection and nothing else.**
-   Nine fields in, five excluded. Every field is copied out by name, so a field
-   added to `LedgerEvent` later cannot reach the digest by accident.
-4. **Two runs over identical inputs produce identical root hashes.** This is
+   Nine fields in, five excluded; five fields on every journal line. Every field
+   is copied out by name, so a field added to `LedgerEvent` later cannot reach
+   the digest by accident.
+4. **Every posting names the obligation it records.** `source_entity_id` is
+   required and non-null on every line including the counter-leg, is drawn from
+   the five business families `§16` names, and is inside the hashed body — so
+   re-keying a posting, which moves it between gate `G3` items without moving a
+   single rupee, breaks the chain.
+5. **Two runs over identical inputs produce identical root hashes.** This is
    metric 23 (`determinism_check`) and invariant `I9`. No clock, no randomness,
    no locale, no environment access, no module-level mutable state.
-5. **Any change to hashed content is detected.** Verification recomputes the
+6. **Any change to hashed content is detected.** Verification recomputes the
    chain from genesis and reports each failed check by name rather than
    throwing, because `GET /runs/:id/ledger/verify` *"returns pass/fail per
    check"*.
-6. **Invariant `I1` holds at every point in the log.** `ARCHITECTURE.md §3`
+7. **Invariant `I1` holds at every point in the log.** `ARCHITECTURE.md §3`
    makes the trial balance *"a property of this package, not a convention its
    callers must remember"*, so an append that would break it is refused.
-7. **No floating-point money, ever.** Validity is `@assay/money`'s `isPaise`,
+8. **No floating-point money, ever.** Validity is `@assay/money`'s `isPaise`,
    never a second opinion, and amounts pass through `paise()` so a negative zero
    cannot enter as a second spelling of zero.
-8. **A balance is always recomputed, never remembered.** The projection reads
+9. **A balance is always recomputed, never remembered.** The projection reads
    journal lines off events and nothing else. An edited balance that no event
    backs simply disappears on the next projection, which is the property
    `THREAT_MODEL.md §T10` rests on. Layer A's running `Σ dr` / `Σ cr` are an
    append-time guard and `projectChain` does not read them.
-9. **The projection refuses rather than guesses.** It reports what it can state
-   truthfully — an unbalanced but exactly-representable log is
-   `trialBalanceOk: false` — and throws when it cannot, rather than returning a
-   number that looks like a balance and is not.
+10. **The projection refuses rather than guesses.** It reports what it can
+    state truthfully — an unbalanced but exactly-representable log is
+    `trialBalanceOk: false` — and throws when it cannot, rather than returning a
+    number that looks like a balance and is not.
 
 ## Public API
 
@@ -63,6 +75,7 @@ the record is intact but the books do not balance."*
 | `LedgerEvent`, `LedgerEventContent`, `LedgerEventDraft` | `§16`'s record, in three stages: what the caller supplies, that plus its position, and the whole thing. |
 | `JournalLine`, `EventActor`, `AmbiguityCertificate`, `CertificateSolution` | The nested structures of `§16` and `§13`. |
 | `EVENT_KINDS`, `ACTOR_TYPES`, `LLM_PROVIDER_IDS`, `CERTIFICATE_REASONS` | The closed sets, in declaration order. |
+| `SOURCE_ENTITY_PREFIXES` | The five identifier families `§16` admits on `JournalLine.source_entity_id`, in declaration order. |
 | `EventId`, `RunId`, `DecisionId`, `EvidenceId`, `LlmCallId`, `CandidateId`, `ComponentId`, `ProbeId` | Branded identifiers that appear in `LedgerEvent`. |
 | `sealDraft(draft)` | Validate, copy and freeze a caller's draft. |
 | `sealStoredEvent(value)` | The same for a record read back from storage, which carries its position. |
@@ -107,6 +120,18 @@ wording exactly — *"at every point in the event log"*. Because the check runs
 after every append it is equivalent to requiring each event to balance on its
 own, which every posting in `§17.1` and `§17.2` does by construction.
 
+**Spec 1.4.0 changed every digest and no line of the formula above.**
+`source_entity_id` reaches `body` because `journal_lines` "already enters `body`
+whole", so the nine named fields and the genesis definition are textually
+unchanged and `DECISION_BRIEF.md §A.5` B2 is not reopened — but a journal line
+now serializes five fields rather than four, so no digest computed under an
+earlier specification matches one computed now. `§16` records why that reopens
+nothing: *"no run has been executed and no root hash has been published, so no
+committed digest is invalidated."* This package stores no expected digest to
+update: every hash assertion in its suite is computed either from an independent
+transcription of `§16`'s formula or by comparing two computed values, so there
+was no golden constant to revise and none was revised.
+
 ### The declared residual
 
 `ts` is outside `body`, so **altering an event's timestamp is not
@@ -121,6 +146,61 @@ into the body.
 *evident*, not impossible. An attacker with write access can rewrite the whole
 chain; what they cannot do is rewrite it and match a root hash already
 published.
+
+## The Suspense item key
+
+```
+  source_entity_id ∈ { pay_… , rfnd_… , adj_… , setl_… , bnk_… }   // DATA_MODEL.md §16
+  item(k)          = { journal lines with source_entity_id === k }
+  item_net_paise(k)= Σ dr(k, 9000_SUSPENSE) − Σ cr(k, 9000_SUSPENSE)
+  open(k)          ⟺ item_net_paise(k) ≠ 0
+```
+
+Added to `JournalLine` at spec 1.4.0. It is the JOIN key against
+`GroundTruth.true_journal` — named identically *"so that the two journals join
+structure to structure"* — and the field close gate `G3` partitions on:
+`Σᵢ |item_net_paise(i)|` over open items, checked to the paisa against
+`unresolved_value_paise` (`RECONCILIATION_SPEC.md §10.1`). Through spec 1.3.0
+`G3` quantified over items **no field defined**, and each of the four available
+readings gave a different partition and therefore a different value of frozen
+metric 13.
+
+*Open* is arithmetic, not a status flag: a `P7` resolution reverses the opening
+posting under the **same** key, so a resolved item nets to zero and leaves the
+sum on its own.
+
+**What this package enforces.** The field is required and non-null on every
+line, the counter-leg included, *"so that an item can be read whole"*; it must
+carry one of the five families above, at `§0` rule 3's grammar — fourteen
+alphanumerics for the four Razorpay families, a non-empty alphanumeric suffix
+for `bnk_`, checked with `@assay/domain`'s own predicate for each so the two
+packages cannot drift; and it is inside the hashed body, so a re-key is
+chain-detectable. `obs_`, `evt_`, `dec_`, `cand_`, `comp_` and `exc_` are
+refused because `§16` requires *"a business identifier drawn from the
+observation set, **never an ASSAY-internal handle**, so a reviewer holding only
+the run artifact can verify `G3`"*. `mle_` and `disp_` are refused because
+`§17.1.1` posts nothing for a `ledger_entry` or a `dispute` in **any** state,
+and `order_` because `§10.1` makes an order a reference kind that *"never posts
+a journal line"*.
+
+**What it does not enforce, and where that lives.** Whether the named
+observation *exists* is invariant `I6` — *"every referenced ID exists in the
+observation set"*, *"the structural answer to hallucinated transaction IDs"*
+(`RECONCILIATION_SPEC.md §7`) — and belongs to stage S5, because this package
+holds no observation set to test against. A well-formed `pay_` identifier naming
+nothing is exactly what `I6` exists to reject.
+
+Nor is one key per event required: `§17.1.1` assigns one key per *posting* and
+states nothing about how many postings an event carries — an `E14` break opens
+two Suspense items — so a one-key-per-event rule would be policy this package
+does not own.
+
+Nor is the **selection** of the key checkable here. `§16` binds
+`source_entity_id` to the deterministic-identifier rule: *"the observation it
+names is selected by a rule (`§17.1.1`'s trigger table), never by iteration
+order over an unordered collection."* That is an obligation on the stage that
+chooses the key, which is `journal.ts`; Layer A can see that a key is
+well-formed and that it is inside the digest, and cannot see how it was picked.
 
 ## The projection — Layer B
 
@@ -179,7 +259,7 @@ in the suite so the limit is visible rather than assumed.
 
 ## Decisions this package had to make
 
-The specification leaves four things open that an implementation cannot leave
+The specification leaves five things open that an implementation cannot leave
 open. Each is this package's contract, stated here rather than presented as a
 quotation.
 
@@ -207,6 +287,15 @@ quotation.
   a bank narration, which is why that function keeps them, and are not ordinary
   content in an account reference. No length limit and no character allowlist is
   imposed, because the specification states neither.
+- **`source_entity_id`'s five families are an admission rule, checked here.**
+  `§16` types the field `string` and names its domain in the same declaration,
+  and states the prohibition in prose: *"never an ASSAY-internal handle"*. This
+  package reads that as a rule rather than a description, because an unenforced
+  prohibition on the one field that partitions Suspense into items is a
+  convention, and `G3` is an identity exact to the paisa. The **type** stays
+  `string` — narrowing it would retype a normative field — so the union is a
+  runtime check. The alternative reading, admitting any reference token as
+  `memo_ref` does, would let `obs_`, `mle_` or a bare `"x"` key a Suspense item.
 
 ## Identifiers
 
@@ -229,43 +318,44 @@ them.
 
 ## What is deliberately not here
 
+Everything below is **absent by scope**, not blocked. Spec 1.4.0 closed the
+three governance questions an earlier revision of this file recorded here: the
+universal `P8` fallback was withdrawn and `P8` narrowed to adjustment
+observations (`DECISION_BRIEF.md §A.7` G-F), the posting-trigger mapping was
+added as `DATA_MODEL.md §17.1.1` and is total over kind × terminal state ×
+exception class (G-G), and `ValidatedDecision` was defined field by field in
+`ARCHITECTURE.md §4` boundary 3 (C-1). What remains is ordering, in the sequence
+`§L.2` fixes.
+
 - **The single `ValidatedDecision` write path** (`§L.1` rule 4, boundary 3).
-  Only stage S5 may construct a `ValidatedDecision`, and S5 does not yet exist.
-  Layer A therefore contains **no mutating function and no I/O at all**:
-  `appendEvent` returns a new chain and leaves its argument untouched, so the
-  count of mutating functions in this package is zero rather than one. The write
-  path arrives with persistence. `§K` allocates no storage module to this
-  package and `better-sqlite3` is in no manifest, so the ledger is in-memory at
-  this milestone; the projection is a pure function of an event array and takes
-  no connection.
+  The type is now defined — `ARCHITECTURE.md §4` gives its fields, its
+  declaration site (this package) and its enforcement (a non-exported
+  unique-symbol brand plus an ESLint path allowlist) — and it is **declared with
+  the write path it exists to guard**, not ahead of it. Only
+  `engine/src/s5-validate.ts` may mint one, and S5 does not yet exist. Layer A
+  therefore contains **no mutating function and no I/O at all**: `appendEvent`
+  returns a new chain and leaves its argument untouched, so the count of
+  mutating functions in this package is zero rather than one. The write path
+  arrives with persistence. `§K` allocates no storage module to this package and
+  `better-sqlite3` is in no manifest, so the ledger is in-memory at this
+  milestone; the projection is a pure function of an event array and takes no
+  connection.
 - **The posting table `P1`–`P8`.** Deciding which accounts an event posts to is
-  `journal.ts`, on `§K`'s Layer B line, and it is **blocked on governance**.
-  Three questions are open and none may be settled at the keyboard, because
-  `§L.4` makes *"inventing an accounting mapping for an event that
-  `DATA_MODEL.md §17.2` leaves unmapped"* a spec amendment:
-  - **The universal `P8` fallback.** `§17.2` closes with *"any posting not
-    enumerated in `§17.1` or `§17.2` falls to `P8`"*, but `P8` is written only
-    for adjustment observations: its amount `M` is read off
-    `ReconLine.debit`/`credit` and its counter-leg is `1200_BANK`. For an
-    unmapped non-adjustment event there is no `ReconLine`, and posting the
-    counter-leg to `1200_BANK` would assert that money moved through the bank —
-    which is exactly what is not known, and would inject deviation into the one
-    account `§17.1`'s convention exists to keep agreeing with truth.
-  - **The posting-trigger mapping.** `§17.1`'s table is keyed by descriptions of
-    economic events, and nothing maps `EventKind` onto it. Only three of the
-    fourteen exception classes have an enumerated posting (`E03`→`P5`,
-    `E04`→`P6`, `E12`→`P8`); the other eleven have none, while
-    `RECONCILIATION_SPEC.md §9` requires every `EXCEPTION` to post to Suspense.
-  - **`ValidatedDecision`.** `§L.1` rule 4 makes it the sole type the write path
-    accepts. No document defines it, and `§L.2` builds this package three
-    positions before stage S5, which is the only thing permitted to construct
-    one.
-- **The gross per-item Suspense identity, gate `G3`.** `G3` is
-  `Σᵢ |item_net_paise(i)|` over *"each open Suspense item `i`"*
-  (`RECONCILIATION_SPEC.md §10.1`), and the specification never names the key
-  that partitions journal lines into items. `true_journal` was given
-  `source_entity_id` as *"the JOIN KEY"* (`DATA_MODEL.md §1`); the agent side
-  received no counterpart. `LedgerProjection.valueSuspensePaise` is the **net**
+  `journal.ts`, on `§K`'s Layer B line, and it is the **next** milestone.
+  `§17.1.1` now maps `Observation.kind` × terminal state × `ExceptionClass` onto
+  `P1`–`P8` and onto the `source_entity_id` each posting carries; `§L.4` makes
+  inventing a row in that table a spec amendment, and the table is total, so
+  there is nothing left to invent. Nothing in this package anticipates it: Layer
+  A admits the `journal_lines` a caller supplies and never decides what they
+  should have been, and `projection.ts` reads the lines an event already carries.
+- **The gross per-item Suspense identity, gate `G3`.** The key that partitions
+  journal lines into items is defined as of spec 1.4.0 and Layer A now carries
+  and hashes it, so the partition is computable — but `G3` compares
+  `Σᵢ |item_net_paise(i)|` against `unresolved_value_paise` summed from the
+  `Decision` / `Exception` records, and `RECONCILIATION_SPEC.md §10.1` is
+  explicit that *"the two sides are drawn from two stores, which is the point"*.
+  This package holds one of them. The gate is `close-gate.ts`.
+  `LedgerProjection.valueSuspensePaise` remains the **net**
   balance — `CloseReport.value_suspense_paise` — and `DATA_MODEL.md §20` is
   explicit that the two are different numbers. Reporting the net figure as `G3`
   would be satisfiable by two offsetting suppressions, which is the attack

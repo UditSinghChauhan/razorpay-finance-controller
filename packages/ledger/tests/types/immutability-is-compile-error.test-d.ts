@@ -109,6 +109,7 @@ describe("money in a journal line is Paise, never a bare number", () => {
       dr_paise: 100,
       cr_paise: 0 as Paise,
       memo_ref: "x",
+      source_entity_id: "bnk_00000000000001",
     };
     expectTypeOf<JournalLine["dr_paise"]>().toEqualTypeOf<Paise>();
     expectTypeOf(bad).toEqualTypeOf<JournalLine>();
@@ -121,6 +122,7 @@ describe("money in a journal line is Paise, never a bare number", () => {
       dr_paise: 12.5,
       cr_paise: 0 as Paise,
       memo_ref: "x",
+      source_entity_id: "bnk_00000000000001",
     };
     expectTypeOf(bad).toEqualTypeOf<JournalLine>();
   });
@@ -132,8 +134,54 @@ describe("money in a journal line is Paise, never a bare number", () => {
       dr_paise: 1 as Paise,
       cr_paise: 0 as Paise,
       memo_ref: "x",
+      source_entity_id: "bnk_00000000000001",
     };
     expectTypeOf(bad).toEqualTypeOf<JournalLine>();
+  });
+});
+
+describe("a journal line always names the obligation it records", () => {
+  it("types source_entity_id as the string §16 declares", () => {
+    // §16 types the field `string` and states its five families in the same
+    // declaration. Narrowing the type to a union here would **retype** a
+    // normative field, which `§0`'s preamble forbids without a version bump —
+    // so the families are a runtime admission rule, not a type.
+    expectTypeOf<JournalLine["source_entity_id"]>().toEqualTypeOf<string>();
+  });
+
+  it("rejects a line that omits it", () => {
+    // §16: "required and non-null on **every** journal line, including the
+    // counter-leg". A four-field line was legal through spec 1.3.0 and must
+    // now fail to compile, or the widening is advisory.
+    // @ts-expect-error — source_entity_id is required (DATA_MODEL.md §16)
+    const bad: JournalLine = {
+      account: "1200_BANK",
+      dr_paise: 1 as Paise,
+      cr_paise: 0 as Paise,
+      memo_ref: "x",
+    };
+    expectTypeOf(bad).toEqualTypeOf<JournalLine>();
+  });
+
+  it("rejects a null key", () => {
+    const bad: JournalLine = {
+      account: "1200_BANK",
+      dr_paise: 1 as Paise,
+      cr_paise: 0 as Paise,
+      memo_ref: "x",
+      // @ts-expect-error — non-null on every line (DATA_MODEL.md §16)
+      source_entity_id: null,
+    };
+    expectTypeOf(bad).toEqualTypeOf<JournalLine>();
+  });
+
+  it("rejects assignment after the line is sealed", () => {
+    // @ts-expect-error — source_entity_id is readonly
+    journalLine.source_entity_id = "bnk_00000000000002";
+    if (event.journal_lines[0] !== undefined) {
+      // @ts-expect-error — the line inside a sealed event is readonly too
+      event.journal_lines[0].source_entity_id = "bnk_00000000000002";
+    }
   });
 });
 

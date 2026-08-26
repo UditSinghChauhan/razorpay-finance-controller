@@ -23,7 +23,12 @@
 import {
   CONSTRAINT_IDS,
   isAccountCode,
+  isAdjustmentId,
+  isBankLineId,
   isObservationId,
+  isPaymentId,
+  isRefundId,
+  isSettlementId,
   type AccountCode,
   type ConstraintId,
   type ObservationId,
@@ -146,12 +151,22 @@ const UNIT_SCORE_BPS = 10_000;
  *
  * `§16`: "exactly one of dr/cr is non-zero", and `memo_ref` is "reference only,
  * never free text from input".
+ *
+ * `source_entity_id` was added at spec 1.4.0 and is "required and non-null on
+ * **every** journal line, including the counter-leg, so that an item can be read
+ * whole". It is the JOIN key against `GroundTruth.true_journal` (`§1`) and the
+ * key that partitions Suspense lines into items for close gate `G3`
+ * (`RECONCILIATION_SPEC.md §10.1`): an item is the set of `9000_SUSPENSE` lines
+ * sharing one value, and it is *open* while that set nets to a non-zero figure.
+ * Its type is `string` because `§16` types it `string`; the five families it may
+ * carry are enforced by `readSourceEntityId` below.
  */
 export interface JournalLine {
   readonly account: AccountCode;
   readonly dr_paise: Paise;
   readonly cr_paise: Paise;
   readonly memo_ref: string;
+  readonly source_entity_id: string;
 }
 
 /**
@@ -313,6 +328,81 @@ function readPrefixedId<T extends string>(
     );
   }
   return token as T;
+}
+
+/**
+ * The five identifier families `§16` admits on `JournalLine.source_entity_id`.
+ *
+ * Transcribed from the field's own declaration — `pay_… | rfnd_… | adj_… |
+ * setl_… | bnk_…` — and closed, for the reason `§17.1.1` gives when it derives
+ * a posting rule from truth's identical range: it "admits no `mle_…` or
+ * `disp_…`, so **truth posts no line attributable to either kind**". An agent
+ * that posted one "would put `proj_agent ≠ proj_truth` on a *correct* decision".
+ */
+export const SOURCE_ENTITY_PREFIXES = Object.freeze([
+  "pay_",
+  "rfnd_",
+  "adj_",
+  "setl_",
+  "bnk_",
+] as const);
+
+/**
+ * One predicate per family, in `SOURCE_ENTITY_PREFIXES` order.
+ *
+ * Each is `@assay/domain`'s validator for that identifier rather than a second
+ * regular expression written here, so the grammar this package admits on the
+ * Suspense item key cannot drift from the one the ingest schemas admit on the
+ * observation the key names. Four carry `§0` rule 3's Razorpay grammar (prefix
+ * plus fourteen alphanumerics); `bnk_` carries the ASSAY grammar of `§7`
+ * (prefix plus a non-empty alphanumeric suffix), because no length is stated
+ * for it.
+ */
+const SOURCE_ENTITY_PREDICATES: readonly ((value: string) => boolean)[] = [
+  isPaymentId,
+  isRefundId,
+  isAdjustmentId,
+  isSettlementId,
+  isBankLineId,
+];
+
+/**
+ * `JournalLine.source_entity_id` — the Suspense item key (`§16`, spec 1.4.0).
+ *
+ * `§16` types the field `string` and states its domain in the same breath: it
+ * "carries **the identifier of the observation whose obligation the posting
+ * records**", and is "a business identifier drawn from the observation set,
+ * **never an ASSAY-internal handle**, so a reviewer holding only the run
+ * artifact can verify `G3`". That sentence is a prohibition, and an unenforced
+ * prohibition on the one field that partitions Suspense into items is a
+ * convention rather than a property — `G3` is an identity exact to the paisa
+ * (`RECONCILIATION_SPEC.md §10.1`) and every reading of the key gives a
+ * different partition and therefore a different value of frozen metric 13.
+ *
+ * `obs_`, `evt_`, `dec_`, `cand_`, `comp_` and `exc_` are ASSAY-internal
+ * (`§0` rule 3) and are refused by that sentence. `mle_` and `disp_` are
+ * refused by `§17.1.1`, which posts nothing for a `ledger_entry` or a `dispute`
+ * in any state.
+ *
+ * **What this cannot check, and where that check lives.** Whether the named
+ * observation exists is invariant `I6` — "every referenced ID exists in the
+ * observation set", "the structural answer to hallucinated transaction IDs"
+ * (`RECONCILIATION_SPEC.md §7`) — and it is stage S5's, because this package
+ * holds no observation set to test against. A well-formed `pay_` identifier
+ * naming nothing is exactly what `I6` exists to reject. The grammar is the part
+ * that is checkable here.
+ */
+function readSourceEntityId(value: unknown, path: string): string {
+  const token = readToken(value, path);
+  if (!SOURCE_ENTITY_PREDICATES.some((admits) => admits(token))) {
+    throw new LedgerEventError(
+      path,
+      `expected a business identifier from the observation set — one of ` +
+        `${SOURCE_ENTITY_PREFIXES.join(" | ")} (DATA_MODEL.md §16) — ` +
+        `received ${JSON.stringify(token)}`,
+    );
+  }
+  return token;
 }
 
 export function readSha256(value: unknown, path: string): Sha256 {
@@ -479,7 +569,13 @@ function describe(value: unknown): string {
 // The sealing constructor
 // ---------------------------------------------------------------------------
 
-const JOURNAL_LINE_KEYS = ["account", "dr_paise", "cr_paise", "memo_ref"] as const;
+const JOURNAL_LINE_KEYS = [
+  "account",
+  "dr_paise",
+  "cr_paise",
+  "memo_ref",
+  "source_entity_id",
+] as const;
 
 function sealJournalLine(value: unknown, path: string): JournalLine {
   const record = readObject(value, path);
@@ -519,6 +615,14 @@ function sealJournalLine(value: unknown, path: string): JournalLine {
     dr_paise: dr,
     cr_paise: cr,
     memo_ref: readToken(record["memo_ref"], `${path}.memo_ref`),
+    // §16: "required and non-null on every journal line, including the
+    // counter-leg, so that an item can be read whole". There is no default and
+    // no omission path: a line that does not name its obligation cannot be
+    // placed in a Suspense item, and G3 quantifies over that partition.
+    source_entity_id: readSourceEntityId(
+      record["source_entity_id"],
+      `${path}.source_entity_id`,
+    ),
   });
 }
 

@@ -9,6 +9,7 @@ import {
   EVENT_KINDS,
   LLM_PROVIDER_IDS,
   LedgerEventError,
+  SOURCE_ENTITY_PREFIXES,
   journalTotals,
   sealDraft,
   sealStoredEvent,
@@ -16,7 +17,13 @@ import {
 } from "@assay/ledger";
 
 import {
+  ADJUSTMENT_ID,
+  BANK_LINE_ID,
+  PAYMENT_ID,
+  REFUND_ID,
+  SETTLEMENT_ID,
   digest,
+  entityId,
   id,
   line,
   makeActor,
@@ -362,6 +369,163 @@ describe("JournalLine — DATA_MODEL.md §16 and §17", () => {
     expect(totals.dr).toBe(45_231_000);
     expect(totals.cr).toBe(45_231_000);
     expect(journalTotals([])).toEqual({ dr: 0, cr: 0 });
+  });
+});
+
+describe("JournalLine.source_entity_id — DATA_MODEL.md §16, spec 1.4.0", () => {
+  /** One journal line with `source_entity_id` replaced by an arbitrary value. */
+  function withKey(value: unknown): LedgerEventDraft {
+    const [dr, cr] = p5Lines(100) as [Record<string, unknown>, unknown];
+    return makeDraft({
+      journal_lines: [
+        { ...dr, source_entity_id: value },
+        cr,
+      ] as unknown as LedgerEventDraft["journal_lines"],
+    });
+  }
+
+  it("admits a five-field line and carries the key through the seal", () => {
+    const sealed = sealDraft(makeDraft({ journal_lines: p5Lines(100, BANK_LINE_ID) }));
+    expect(sealed.journal_lines).toHaveLength(2);
+    for (const journalLine of sealed.journal_lines) {
+      expect(journalLine.source_entity_id).toBe(BANK_LINE_ID);
+    }
+  });
+
+  it("declares the five families §16 names, in that order", () => {
+    expect([...SOURCE_ENTITY_PREFIXES]).toEqual([
+      "pay_",
+      "rfnd_",
+      "adj_",
+      "setl_",
+      "bnk_",
+    ]);
+  });
+
+  it("draws its prefixes from the registry @assay/domain owns", () => {
+    // The same argument §0 rule 3 makes for the ASSAY prefixes: the separation
+    // is only checkable against one registry. Four are Razorpay-owned and
+    // `bnk_` is ASSAY-owned, and no sixth prefix is invented here.
+    for (const prefix of SOURCE_ENTITY_PREFIXES) {
+      const registered =
+        (ID_PREFIXES.razorpay as readonly string[]).includes(prefix) ||
+        (ID_PREFIXES.assay as readonly string[]).includes(prefix);
+      expect(registered).toBe(true);
+    }
+  });
+
+  it("accepts one identifier from each of the five families", () => {
+    for (const key of [PAYMENT_ID, REFUND_ID, ADJUSTMENT_ID, SETTLEMENT_ID, BANK_LINE_ID]) {
+      expect(() => sealDraft(withKey(key))).not.toThrow();
+    }
+  });
+
+  it("requires the field on every line, with no default and no null", () => {
+    // §16: "required and non-null on **every** journal line, including the
+    // counter-leg, so that an item can be read whole".
+    for (const missing of [undefined, null]) {
+      expect(() => sealDraft(withKey(missing))).toThrow(LedgerEventError);
+      expect(() => sealDraft(withKey(missing))).toThrow(/source_entity_id/);
+    }
+    const stripped = makeDraft({
+      journal_lines: [
+        { account: "1200_BANK", dr_paise: 100, cr_paise: 0, memo_ref: "P5.dr" },
+      ] as unknown as LedgerEventDraft["journal_lines"],
+    });
+    expect(() => sealDraft(stripped)).toThrow(/source_entity_id/);
+  });
+
+  it("refuses an ASSAY-internal handle", () => {
+    // §16: "a business identifier drawn from the observation set, **never an
+    // ASSAY-internal handle**, so a reviewer holding only the run artifact can
+    // verify G3".
+    for (const prefix of ID_PREFIXES.assay) {
+      if (prefix === "bnk_") continue;
+      expect(() => sealDraft(withKey(`${prefix}00000000000001`))).toThrow(
+        LedgerEventError,
+      );
+    }
+  });
+
+  it("refuses a kind that §17.1.1 posts nothing for", () => {
+    // `mle_` and `disp_`. §17.1.1 derives from truth's identical range
+    // "admitting no `mle_…` or `disp_…`" that a `ledger_entry` or `dispute`
+    // observation posts no line whatever its state.
+    expect(() => sealDraft(withKey(entityId("mle_", 1)))).toThrow(LedgerEventError);
+    expect(() => sealDraft(withKey(entityId("disp_", 1)))).toThrow(LedgerEventError);
+  });
+
+  it("refuses an order id, which is a reference kind", () => {
+    // §10.1: `order` is a reference observation and "never posts a journal
+    // line", so no posting can be attributable to one.
+    expect(() => sealDraft(withKey(entityId("order_", 1)))).toThrow(LedgerEventError);
+  });
+
+  it("enforces the grammar and not only the prefix", () => {
+    // §0 rule 3 gives the four Razorpay families a fourteen-character
+    // alphanumeric suffix. A prefix-only check would admit a forged identifier
+    // wearing a real prefix.
+    for (const bad of [
+      "pay_",
+      "pay_short",
+      `pay_${"0".repeat(13)}`,
+      `pay_${"0".repeat(15)}`,
+      "pay_ABCDEFGH-12345",
+      "setl_00000000000_01",
+    ]) {
+      expect(() => sealDraft(withKey(bad))).toThrow(LedgerEventError);
+    }
+    // `bnk_` states no length, and none is invented for it.
+    expect(() => sealDraft(withKey("bnk_1"))).not.toThrow();
+  });
+
+  it("refuses a key that is not a string, or is empty", () => {
+    for (const bad of [1, true, [], {}, ""]) {
+      expect(() => sealDraft(withKey(bad))).toThrow(LedgerEventError);
+    }
+  });
+
+  it("refuses a key carrying control or text-spoofing code points", () => {
+    for (const value of HOSTILE_TOKENS) {
+      expect(() => sealDraft(withKey(value))).toThrow(LedgerEventError);
+    }
+  });
+
+  it("names the offending line and field in the error path", () => {
+    expect(() => sealDraft(withKey("nope"))).toThrow(
+      /\$\.journal_lines\[0\]\.source_entity_id/,
+    );
+  });
+
+  it("leaves an event free to carry lines under different keys", () => {
+    // §17.1.1 assigns one key per posting and states no rule about how many
+    // postings an event carries — an `E14` break opens two Suspense items. A
+    // one-key-per-event rule would be policy this package does not own.
+    expect(() =>
+      sealDraft(
+        makeDraft({
+          journal_lines: [
+            line("9000_SUSPENSE_UNRECONCILED", 100, 0, "P6.dr", SETTLEMENT_ID),
+            line("1100_GATEWAY_RECEIVABLE", 0, 100, "P6.cr", BANK_LINE_ID),
+          ],
+        }),
+      ),
+    ).not.toThrow();
+  });
+
+  it("still refuses a sixth field on a journal line", () => {
+    // The record stayed strict when it widened: adding one named field is not
+    // an invitation for a second, unnamed one.
+    expect(() =>
+      sealDraft(
+        makeDraft({
+          journal_lines: [
+            { ...line("1200_BANK", 100, 0), posting_ref: "P5" },
+            line("9000_SUSPENSE_UNRECONCILED", 0, 100),
+          ] as unknown as LedgerEventDraft["journal_lines"],
+        }),
+      ),
+    ).toThrow(/posting_ref/);
   });
 });
 

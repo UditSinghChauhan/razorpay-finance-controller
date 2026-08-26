@@ -14,23 +14,25 @@
  *
  * **Scope.** `DECISION_BRIEF.md §K` places `journal.ts` and `projection.ts` on
  * the Layer B line. This milestone is `projection.ts` alone. `journal.ts` —
- * deciding *which* accounts an event posts to — is blocked on two open
- * governance questions (the universal `P8` fallback and the posting-trigger
- * mapping) and on `ValidatedDecision`, a type `§L.1` rule 4 names and no
- * document defines. Nothing here anticipates any of them: this module reads the
- * `journal_lines` an event already carries and never decides what they should
- * have been.
+ * deciding *which* accounts an event posts to — is the next milestone, now that
+ * spec 1.4.0 has settled the questions that held it (`§A.7` G-F, G-G, C-1).
+ * Nothing here anticipates it: this module reads the `journal_lines` an event
+ * already carries and never decides what they should have been.
  *
  * **What this module refuses, and where that work lives instead.**
  *
- * - Gate `G3`'s gross per-item Suspense identity is **not** implemented. `G3`
- *   is `Σᵢ |item_net_paise(i)|` over "each open Suspense item *i*"
- *   (`RECONCILIATION_SPEC.md §10.1`), and the specification never names the key
- *   that partitions journal lines into items — `true_journal` was given
- *   `source_entity_id` as "the JOIN KEY" (`DATA_MODEL.md §1`) and the agent side
- *   received no counterpart. `valueSuspensePaise` below is the **net** balance
- *   and is not that identity; `DATA_MODEL.md §20` is explicit that the two are
- *   different numbers.
+ * - Gate `G3`'s gross per-item Suspense identity is **not** implemented here.
+ *   `G3` is `Σᵢ |item_net_paise(i)|` over "each open Suspense item *i*", where
+ *   an item is "the set of `9000_SUSPENSE` journal lines sharing one
+ *   `JournalLine.source_entity_id`" and is *open* while that set nets to a
+ *   non-zero figure (`RECONCILIATION_SPEC.md §10.1`, spec 1.4.0). Layer A now
+ *   carries and hashes that key, so the partition is computable — but the gate
+ *   that computes it is `close-gate.ts`, and its right-hand side is summed from
+ *   the `Decision` / `Exception` records, which this package does not hold.
+ *   `§10.1` is explicit that the two sides "are drawn from two stores, which is
+ *   the point". `valueSuspensePaise` below is the **net** balance and is not
+ *   that identity; `DATA_MODEL.md §20` is explicit that the two are different
+ *   numbers.
  * - The close gates themselves are `close-gate.ts`, a later milestone. This
  *   module supplies the arithmetic `G2` runs and does not run it.
  * - Content tampering is `verifyChain`'s job, not this one. An amount edited in
@@ -151,8 +153,10 @@ export interface LedgerProjection {
    * side, which a run containing both `E03` and `E04` does not satisfy".
    * Reporting this number as the Suspense identity would be satisfiable by two
    * offsetting suppressions, which is the attack `THREAT_MODEL.md §T8` exists to
-   * make arithmetically impossible. The gross form needs a per-item partition
-   * key the specification does not define, so it is not computed here.
+   * make arithmetically impossible. The gross form partitions on
+   * `JournalLine.source_entity_id` (`§16`, spec 1.4.0) and compares against the
+   * `Decision` / `Exception` records; it belongs to `close-gate.ts`, which holds
+   * both stores.
    */
   readonly valueSuspensePaise: Paise;
 }
