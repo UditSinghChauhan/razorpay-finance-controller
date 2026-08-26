@@ -156,10 +156,19 @@ Numerator and denominator draw on the *same* reconcilable universe, and for
                              ────────────────────────────────────────────
                              Σ bank_line.amount
 
-  coverage_by_value_ledger = Σ ledger_entry.amount where state = RECONCILED
+  coverage_by_value_ledger = Σ ledger_entry.gross_paise where state = RECONCILED
                              ────────────────────────────────────────────
-                             Σ ledger_entry.amount
+                             Σ ledger_entry.gross_paise
 ```
+
+**`gross_paise`, corrected.** `MerchantLedgerEntry` (`DATA_MODEL.md §8`) carries
+`gross_paise`, `expected_net_paise` and `gl_account`, and declares **no `amount`
+field**; the formula named one that does not exist. `gross_paise` is the only
+field on the entity that is a gross rupee figure, so the correction is forced
+rather than chosen: `expected_net_paise` is the merchant's *guess* at the
+post-fee net and is nullable, which fails both as a denominator and as a
+like-for-like counterpart to `bank_line.amount`. `BankStatementLine` does
+declare `amount`, so metric 27 above is unaffected.
 
 **Why the universes must match.** A single ₹1,000 payment surfaces as up to six
 observations across `recon_line`, `payment`, `order`, `ledger_entry` and shares of
