@@ -1,9 +1,18 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.3.0 · **Date:** 2026-08-25
+**Spec version:** 1.4.0 · **Date:** 2026-08-26
 
 The matching algorithm, the ambiguity definition, and the rules that decide
 accept / reject / abstain. This is the technical core of the project.
+
+**At spec 1.4.0** this document defined gate G3's item partition and amended its
+right-hand side's universe (§10.1), restated §9's terminal-state postings against
+`DATA_MODEL.md §17.1.1` (seven of fourteen exception classes open a Suspense
+item and seven do not), restated the close-policy residual (§10.3), and verified
+G3 arithmetically on the §11 worked example. **`C1`–`C8` membership is unchanged,
+`I1`–`I9` are unchanged, and no threshold moved** — `max_unresolved_ratio_bps`
+remains 50. The G3 amendment **lowers `unresolved_value_paise` and makes
+`CLOSED` easier to reach**; see `DECISION_BRIEF.md §A.7`.
 
 **At spec 1.3.0** this document restated the fourth `EXCEPTION` trigger as an
 evidence condition (§9) and declared `C2`'s adjustment half a generation invariant,
@@ -333,14 +342,16 @@ and nothing is dropped.
                → posts to the real control accounts
 
   ABSTAINED    S4 returned AMBIGUOUS or INTRACTABLE
-               → posts to 9000_SUSPENSE_UNRECONCILED, carries a certificate
+               → opens a Suspense item under DATA_MODEL.md §17.1.1,
+                 carries a certificate
 
   EXCEPTION    an ingest invariant failed, an S5 invariant failed, no
                admissible candidate exists at all, or no observable evidence
                determines the observation's accounting treatment
                (DATA_MODEL.md §17.2 — every adjustment observation reaches
                this state, because `Adjustment.reason` is not observable)
-               → posts to 9000_SUSPENSE_UNRECONCILED, carries a class + owner
+               → carries a class + owner; opens a Suspense item where
+                 DATA_MODEL.md §17.1.1 gives its class a posting
 
   REFERENCE    the observation is of a reference kind (DATA_MODEL.md §10.1:
                `payment`, `order`) and is therefore not a reconciliation target
@@ -354,6 +365,20 @@ generated. It is not an outcome the engine can choose, so it cannot be used to
 retire an observation the engine failed to explain: an unmatched `bank_line`
 becomes `E03`, never `REFERENCE`. This is what keeps the fourth state from
 becoming a drop path.
+
+**Not every exception posts, and spec 1.4.0 says so plainly.** Through spec 1.3.0
+this section read *"posts to `9000_SUSPENSE_UNRECONCILED`"* for every
+`EXCEPTION`, while `DATA_MODEL.md §17.1`/`§17.2` enumerated a posting for only
+three of the fourteen classes. The trigger table at `DATA_MODEL.md §17.1.1`
+closes that gap in the direction the evidence supports: seven classes open a
+Suspense item and seven do not, because a record that failed ingest validation,
+duplicates another record, is a deferral this specification refuses to call an
+error, or would require an untrusted source to move a control account, cannot be
+posted without asserting a rupee movement nothing establishes. A class with no
+posting still carries an owner and an analyst question, still appears in the
+value-ranked queue and in `exceptions_by_class`, and is still priced once at
+`C_exception`. It cannot be dropped: gate `G1` requires exactly one terminal
+state per observation and there is no drop path.
 
 The fourth `EXCEPTION` trigger is new in spec 1.2.0, and was restated in spec
 1.3.0 as an evidence condition, so that the posting fallback in
@@ -379,9 +404,46 @@ closed.**
 |---|---|---|
 | **G1** | Every observation has exactly one terminal state (`RECONCILED`, `ABSTAINED`, `EXCEPTION`, `REFERENCE`), and every `REFERENCE` assignment matches the static kind classification in `DATA_MODEL.md §10.1` | A record was dropped, or a reconcilable observation was retired as `REFERENCE` — an ASSAY defect |
 | **G2** | Trial balance: `Σ dr = Σ cr` over all posted journal lines, recomputed from the event log | The ledger is incoherent — an ASSAY defect |
-| **G3** | Suspense identity, gross per-item, **exactly, to the paisa**. For each open Suspense item *i* (one per abstention and per open exception), `item_net_paise(i) = Σ dr(i, 9000_SUSPENSE) − Σ cr(i, 9000_SUSPENSE)`. Then `Σᵢ |item_net_paise(i)| === unresolved_value_paise` | An exception was suppressed, double-posted, or offset against another — an ASSAY defect |
+| **G3** | Suspense identity, gross per-item, **exactly, to the paisa**. An open Suspense item *i* is the set of `9000_SUSPENSE` journal lines sharing one `JournalLine.source_entity_id` (`DATA_MODEL.md §16`), where `item_net_paise(i) = Σ dr(i, 9000_SUSPENSE) − Σ cr(i, 9000_SUSPENSE) ≠ 0`. Then `Σᵢ |item_net_paise(i)| === unresolved_value_paise`, the latter summed over the same items from the `Decision` / `Exception` records | An exception was suppressed, double-posted, or offset against another — an ASSAY defect |
 | **G4** | Hash chain recomputes from genesis and matches the stored root hash | The audit trail was altered |
 | **G5** | No allocation with a non-empty `invariants_failed` was posted | The validation gate was bypassed |
+
+**What identifies an item, added at spec 1.4.0.** Through spec 1.3.0 this gate
+quantified over *"each open Suspense item `i`"* and **named no field that
+partitioned journal lines into items**. `true_journal` had `source_entity_id` as
+*"the JOIN KEY"* (`DATA_MODEL.md §1`) and the agent side had no counterpart, so
+at least four mutually inconsistent readings were available — `decision_id`,
+which is per *component* and collapses several items into one; `Exception.exc_id`,
+which never appears on a `LedgerEvent` at all; `subject_ids[0]`; and one item per
+posting event, keyed on an `evt_id` that §16 excludes from the hashed body. Each
+gives a different partition and therefore a different value of frozen metric 13.
+`JournalLine.source_entity_id` is the counterpart, and *open* is arithmetic
+rather than a status flag: a `P7` resolution reverses under the same key, so a
+resolved item nets to zero and drops out of the gross sum on its own.
+
+**The two sides are drawn from two stores, which is the point.**
+`Σᵢ |item_net_paise(i)|` is computed from the **journal lines** — the books.
+`unresolved_value_paise` is computed from the **`Decision` and `Exception`
+records** — the queue — at `value(observation)` per `DATA_MODEL.md §14.1`. They
+span one universe and are maintained independently, so a suppression on either
+side breaks the identity. An exception whose class opens no Suspense item
+(`DATA_MODEL.md §17.1.1`) is in neither sum; it cannot be suppressed either,
+because `G1` still requires it to hold a terminal state.
+
+**Why the universe was amended, and what it cost.** Through benchmark v1.0.2 the
+right-hand side was summed over every reconcilable observation in a non-resolved
+state — several *views* of one economic break, as §10.3 records. **No set of
+postings satisfies an exact identity against that sum.** The worked example in
+§11 posts ₹1,00,000 for a break whose multi-view total is ₹3,00,000; posting each
+view separately would relieve `1100_GATEWAY_RECEIVABLE` twice for one break. The
+gate was therefore unsatisfiable, which ends every run `BLOCKED` and violates
+metric 14 by construction. §11 was written against the amended semantics already
+— it computes `item_net_paise` for the settlement alone — so this amendment makes
+the definitions agree with the worked example rather than the reverse. It
+**lowers `unresolved_value_paise` and makes `CLOSED` easier to reach**; the
+superseded quantity is retained and reported every run as
+`unresolved_value_paise_multiview` (`DATA_MODEL.md §20`), and the disclosure is
+in `PREREGISTRATION.md §8` and `DECISION_BRIEF.md §A.7`.
 
 **Why G3 is gross and not net.** Suspense receives value from both directions:
 an unattributable bank credit credits it (`E03`, posting P5), a settlement with
@@ -475,25 +537,42 @@ the ratio governed **small** ones, not the other way round. That error is record
 here rather than quietly dropped.
 
 **A declared residual of this policy: the two sides of the ratio do not span the
-same universe.** `unresolved_value_paise` is summed over **all reconcilable
-observation kinds** (`DATA_MODEL.md §10.1`: `recon_line`, `bank_line`,
-`ledger_entry`, `settlement`, `refund`, `adjustment`, `dispute`), because it must
-tie to gate G3's gross Suspense sum. `batch_value_paise` is summed over
+same universe.** `unresolved_value_paise` is summed over **open Suspense items**
+(`§10.1`, `DATA_MODEL.md §20`), whose keys range over settlements, bank lines,
+payment recon lines and adjustments. `batch_value_paise` is summed over
 **`recon_line` observations only** (`EVALUATION_SPEC.md §4.1`). The comparison is
 therefore **not a like-for-like fraction of one universe**, and the sentence above
 should be read accordingly: the threshold is a fixed proportion of *recon-line*
-value, measured against unresolved value drawn from a wider set.
+value, measured against unresolved value drawn from a different set.
 
-Two consequences follow, and both are declared rather than corrected in benchmark
-v1.0.1. Effective strictness is **tighter** than the stated 0.5%, because a single
-economic break can leave several of its views unresolved and each contributes to
-the numerator while only the recon line contributes to the denominator. And
-effective strictness **varies with how many views of a break remain unresolved**,
-which differs by exception class — an unattributable bank credit (`E03`) may leave
-one view unresolved where a missing capture (`E05`) leaves several. The variation
-is in the conservative direction: the gate is harder to pass than its stated ratio
-suggests, never easier. `PREREGISTRATION.md §10` V10 records it as a threat to
-validity.
+**Restated at benchmark v1.0.3, and the direction of the residual reverses.**
+Through v1.0.2 this paragraph described the numerator as summed over *"all
+reconcilable observation kinds"*, so that *"a single economic break can leave
+several of its views unresolved and each contributes to the numerator while only
+the recon line contributes to the denominator"* — making effective strictness
+**tighter** than the stated 0.5% and variable by exception class. That universe
+made gate `G3` unsatisfiable (`§10.1`, `§11`) and is amended. Under the item
+universe each break contributes **once**, so the multi-view inflation is gone and
+**effective strictness is no longer tighter than 0.5% on that account** — the
+gate is easier to pass than it was under the v1.0.2 text.
+
+**A second, separate easing applies to the same numerator**, and it is not the
+view collapse: `DATA_MODEL.md §17.1.1` gives seven of the fourteen exception
+classes no Suspense item, so ledger-side, duplicate, ingest-failure,
+orphan-refund and timing value leaves `unresolved_value_paise` altogether. A
+third effect pushes the other way — the remaining seven classes open items no
+implementation was opening before. All three are enumerated, with their
+consequences for the close gate, in `PREREGISTRATION.md §8`; no net direction is
+claimed there or here.
+
+A residual remains and is smaller: an unresolved bank-side item is denominated in
+a *net-of-fee* bank credit while the denominator is gross recon-line value, and an
+unresolved settlement aggregates lines that each also appear in the denominator.
+The numerator and denominator are still not one universe. The direction is no
+longer uniformly conservative, which is a change from the v1.0.2 declaration and
+is disclosed as such. `PREREGISTRATION.md §10` V10 records it as a threat to
+validity, and `unresolved_value_paise_multiview` is reported on every run so the
+v1.0.2 figure remains visible alongside the amended one.
 
 ### 10.4 Procedure
 
@@ -534,8 +613,48 @@ The motivating example, run through this spec:
 - Ledger (posting P6, `DATA_MODEL.md §17.1` — the unexplained item is the
   outbound settlement, so Suspense takes the debit and the receivable is
   relieved): `DR 9000_SUSPENSE_UNRECONCILED ₹1,00,000 / CR 1100_GATEWAY_RECEIVABLE
-  ₹1,00,000`. `item_net_paise` for this item is `+10,000,000`, and it enters
-  gate G3 as `|+10,000,000|`.
+  ₹1,00,000`, with `source_entity_id = setl_A` on both legs.
+  `item_net_paise(setl_A)` is `+10,000,000`, and it enters gate G3 as
+  `|+10,000,000|`.
+- Terminal states: **six** observations, one state each (`G1`). The settlement is
+  `ABSTAINED` and carries the item; the five recon lines are `ABSTAINED` and are
+  **attached to that item**, posting no Suspense leg of their own — `§17.1.1`
+  gives an abstained payment line `P6` only when it is itself the allocation
+  target, and here the target is `setl_A`.
+
+**Gate G3 on this example, computed both ways.**
+
+```
+  books   Σᵢ |item_net_paise(i)|   over one item, key setl_A   = 10,000,000
+  queue   unresolved_value_paise = value(setl_A) = Settlement.amount
+                                                                = 10,000,000
+                                                       G3 holds, exactly ✓
+
+  EXPLORATORY, reported alongside (DATA_MODEL.md §20):
+  unresolved_value_paise_multiview = 10,000,000                  (the settlement)
+                                   +  4,000,000 + 3,500,000 + 2,500,000
+                                   +  6,000,000 + 4,000,000     (the five lines)
+                                   = 30,000,000
+```
+
+Under the benchmark v1.0.2 universe the right-hand side was the ₹3,00,000
+multi-view figure while the books posted ₹1,00,000, so **G3 failed by ₹2,00,000
+on this very example**, the period ended `BLOCKED`, and metric 14's requirement
+that `BLOCKED` be zero on every run was unsatisfiable by construction. Posting
+each view separately does not rescue it: the five lines' `P1` postings already
+recognised ₹2,00,000 in `1100_GATEWAY_RECEIVABLE`, and relieving both the lines
+and their settlement would credit that account twice for one break. This is the
+worked example that forced the v1.0.3 amendment, and the bullet above is
+unchanged from spec 1.2.0 — the definitions were amended to agree with it, not
+the reverse.
+
+**The books, in full, so the trial balance is checkable.** Five `P1` captures
+(`DR 1100 ₹2,00,000 / CR 4000 ₹2,00,000`) and one `P6` (`DR 9000 ₹1,00,000 /
+CR 1100 ₹1,00,000`): `Σ dr = Σ cr = ₹3,00,000`, so `I1` and gate `G2` hold, and
+`1100_GATEWAY_RECEIVABLE` closes at `+₹1,00,000` — the three captures ASSAY could
+not place. Truth books the same five captures and settles `{D,E}` under `P2`,
+closing `1100` at `+₹1,00,000` as well. The two agree on the account, which is
+what `DATA_MODEL.md §17.1`'s sign convention exists to preserve.
 
 Contrast: ablation `A2-NOABSTAIN` — ASSAY with the abstention gate removed —
 accepts `{A,B,C}` and reports "matched." When ground truth says the settlement

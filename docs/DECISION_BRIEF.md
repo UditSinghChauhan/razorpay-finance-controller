@@ -1,7 +1,7 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.3.0 · **Date:** 2026-08-25
+**Spec version:** 1.4.0 · **Date:** 2026-08-26
 **Reviewer role:** principal architect / skeptical reviewer
 
 Spec 1.0.0 returned a MODIFY verdict with four blocking corrections. This
@@ -181,6 +181,107 @@ No eighth `AccountCode`. No constraint added, removed or reordered. No threshold
 seed, split, family, generation parameter or degradation operator touched. No
 `amount = debit + credit` identity invented for adjustment rows. `DATA_MODEL.md
 §16`'s hashed `body` and genesis were not reopened.
+
+### A.7 Spec 1.4.0 / benchmark 1.0.3 — the posting layer, and the gate that could not be satisfied
+
+A governance review held **before `journal.ts` was written** found that the
+posting layer could not be implemented from the frozen text without inventing
+accounting semantics, which `§L.4` prohibits. Three defects were structural and
+interlocking: `P8`'s universal fallback was not constructible outside
+adjustments; nothing mapped observations onto the posting table, leaving eleven
+of fourteen exception classes and all of `P1`–`P4` without a trigger; and gate
+`G3` quantified over an item partition no field defined, against a right-hand
+side that made the identity **unsatisfiable on this specification's own worked
+example**. Four further gaps of the same root are corrected with them.
+
+Applied **before any code for the affected layer existed, before any dataset was
+generated, and before any number was observed** — the same window in which the
+1.1.1, 1.2.0 and 1.3.0 corrections were made, and, because the next step after
+it is `assay generate --split test`, **the last amendment that can claim it.**
+
+**One frozen metric's universe changes, and it is the favourable direction.**
+`H-2` restricts `unresolved_value_inr` to open Suspense items. That **lowers**
+metric 12 and makes `CLOSED` easier to reach, which is the opposite of `§A.6`'s
+Scenario C. It is nevertheless forced rather than chosen: `G3` is an identity
+exact to the paisa, `RECONCILIATION_SPEC.md §11` posts ₹1,00,000 against a
+multi-view total of ₹3,00,000, and the only alternative remedy — posting every
+view — credits `1100_GATEWAY_RECEIVABLE` twice for one economic break. Under the
+v1.0.2 universe every conforming run ends `BLOCKED`, which violates metric 14 by
+construction and makes success criteria S5 and S12 unreachable. **Replacing a
+gate no implementation can pass is not the same as relaxing a hard one**, and
+the superseded quantity is retained and reported on every run as
+`unresolved_value_inr_multiview`. Full statement in `PREREGISTRATION.md §8`.
+
+**`unresolved_value_paise` falls through two channels, not one, and both are
+disclosed.** The first is `H-2`: several views of one economic break now count
+once. The second is `G-G`: **seven of the fourteen exception classes open no
+Suspense item, so their value leaves the close numerator entirely** — `E05`,
+`E06`, `E07`, `E08`, `E10`, `E11` and `E13`. Through v1.0.2 the specification
+nominally counted them (it required every `EXCEPTION` to post, without saying
+how); under v1.0.3 they are named, owned, priced at `C_exception` and reported,
+but they are outside the close gate. **A period can therefore close while the
+merchant ledger is substantially untied**, which is the failure mode
+`EVALUATION_SPEC.md §4.1` warns about when it publishes three coverage views
+instead of one. Three things bound it and none of them is the close gate: metric
+28 `coverage_by_value_ledger` scores zero for exactly that behaviour, every such
+exception costs ₹500 in `net_cost_inr`, and `EVALUATION_SPEC.md §6` now requires
+the count and value of non-posting exceptions to be reported separately.
+
+**`G-G` pushes both ways and its net is not claimed.** Seven other classes —
+`E01`, `E02`, `E03`, `E04`, `E09`, `E12`, `E14` — open Suspense items that no
+implementation was opening before, *raising* `Σ |item_net_paise|` and
+`unresolved_value_paise`. Whether the seven that leave outweigh the seven that
+arrive depends on the value distribution across classes, which no seeded run has
+produced. **This section claims no net direction for `G-G` and no net direction
+for the package on metric 11**; the dev falsification check (`§F` F9) is where
+that is observed, and F9 forbids re-tuning in response to it.
+
+**Metric 2 is unaffected by `G-G`**: its exception term is a count, and all
+fourteen classes produced an `Exception` record before the amendment and produce
+one after. `G-F` removes a fallback that would have posted *something* for every
+unmapped event and replaces it, for seven classes, with an honest refusal to
+post.
+
+**No constraint `C1`–`C8` changed in membership, no `AccountCode` was added, no
+posting rule `P1`–`P8` was added or altered in its debit/credit shape, no
+soft-evidence weight, threshold, seed, split, family, generation parameter or
+degradation operator changed, the oracle is untouched, and `DATA_MODEL.md §16`'s
+hashed `body` projection and genesis definition are unchanged — `§A.5` B2 is not
+reopened.**
+
+| # | Correction | Class | Where |
+|---|---|---|---|
+| **G-F** | **The universal `P8` fallback.** `§17.2` closed with *"any posting not enumerated in §17.1 or §17.2 falls to P8"* and `§L.4` made departing from it an amendment, but `P8`'s amount `M` is read off `ReconLine.debit`/`credit` under a guarantee `I3` gives for `type === "adjustment"` only. Outside that domain no `M` exists (`bank_line`, `ledger_entry`, `settlement`, `dispute` carry no `ReconLine`); `M` is not unique on `E05`/`E06`/`E07`, which are raised *because* `I3` failed; and where `M` is unique it is the wrong figure — on a well-formed card line at frozen §4.2 parameters it posts `97_640` against a value of `100_000`, failing `G3` by the fee. **`P8` narrowed to adjustment observations; the catch-all deleted; `§L.4` amended.** | Architecture correction | `DATA_MODEL.md §17.2`, `§L.4` |
+| **G-G** | **The posting-trigger mapping.** `§17.1`'s table was keyed by prose descriptions of economic events; nothing mapped `Observation.kind`, terminal state or `ExceptionClass` onto it. Three of fourteen exception classes had a posting and eleven had none, while `RECONCILIATION_SPEC.md §9` required all fourteen to post; `P1`–`P4` and `P7` had no trigger. **`§17.1.1` added, total over kind × state × class.** Seven classes open a Suspense item by direction of the item; seven post nothing, because they failed ingest validation, duplicate another record, are a deferral §15 refuses to call an error, or would let an untrusted source move a control account. **No account and no posting rule added.** | Architecture correction | `DATA_MODEL.md §17.1`, `RECONCILIATION_SPEC.md §9`, `THREAT_MODEL.md §T5` |
+| **G-G.1** | **Two corrections to `§17.1.1` found in pre-commit review of this amendment, before it was committed.** *(B2)* A drafting error gave the Suspense table a row for *"`ABSTAINED`, target is a payment `recon_line`"*. **No `recon_line` is ever a target** — `RECONCILIATION_SPEC.md §4` and `Candidate.target_id` (§11) both enumerate the target universe as settlement or bank line, and `PREREGISTRATION.md §8` records it as a frozen dependency of the Ambiguity Oracle. The row was unreachable, and the non-target-member row already governs abstained recon lines, so it is **removed**; the target universe is restated in §17.1.1 and is **not widened**. *(B3)* The draft triggered `P2`/`P4` on *"its allocation reaches `RECONCILED`"*, which `AN1` alone can satisfy — a gateway-internal identifier match carrying no bank-side information. That would debit `1200_BANK` (*"actual bank credits"*, §17) for a settlement whose credit has not arrived, which is the failure `I5` names in its own purpose column. **`P2`/`P4` now require the settlement to be reconciled to a bank credit against an actual `bank_line`**, and §17.1.1 states that `I5` is **undefined, not satisfied**, when no mapping exists. `P2`'s own row has read *"Settlement reconciled to a bank credit"* since spec 1.2.0, so this restores its stated trigger rather than adding one. **No posting rule, amount, account, threshold or metric definition changed**, terminal states are unaffected, and metric 1 is unaffected because the line still reaches `RECONCILED` on `AN1`. A residual is disclosed in §17.1.1: an `E14` break opens two Suspense items for one economic event. | Consistency correction *(within this amendment, pre-commit)* | `DATA_MODEL.md §17.1.1` |
+| **G-H** | **The Suspense item key.** `G3` quantified over *"each open Suspense item `i`"* and no field partitioned journal lines into items; `true_journal` had `source_entity_id` as *"the JOIN KEY"* (§1) and the agent side had no counterpart, leaving at least four inconsistent readings each giving a different value of frozen metric 13. **`JournalLine.source_entity_id` added**, named identically to truth's. *Open* is arithmetic — a `P7` reversal under the same key nets the item to zero. Every digest changes; §16's `body` projection and genesis do not. | Architecture correction + schema amendment | `DATA_MODEL.md §16`, `RECONCILIATION_SPEC.md §10.1`, `ARCHITECTURE.md §8`, `§L.1` r6 |
+| **G-I** | **`value(observation)`.** `Exception.value_paise`, `value_abstained_paise`, `exceptions_by_class` and `G3`'s right-hand side all read an observation's rupee value and **no document derived it for any kind.** `§14.1` states one rule per reconcilable kind. An adjustment is valued at `M`, not `ReconLine.amount`, which `I3` leaves unconstrained on adjustment rows. | Consistency correction | `DATA_MODEL.md §14`, `§20`, `EVALUATION_SPEC.md §4.9` |
+| **H-2** | **`unresolved_value_paise` restricted to open Suspense items**, read from the `Decision`/`Exception` records so `G3` compares the queue against the books — two independently maintained stores over one universe, which is all `THREAT_MODEL.md §T8` requires. The v1.0.2 multi-view universe made `G3` unsatisfiable. **Direction of effect disclosed: metric 12 falls, `CLOSED` becomes easier.** The v1.0.2 quantity is retained as `unresolved_value_inr_multiview`, `EXPLORATORY`, on every run. | **Metric amendment + preregistration amendment** | `RECONCILIATION_SPEC.md §10.1`, `§10.3`, `§11`, `EVALUATION_SPEC.md §4.9`, `§6`, `DATA_MODEL.md §20`, `PREREGISTRATION.md §8`, `§L.1` r6 |
+| **C-1** | **`ValidatedDecision` defined.** Named at five sites, defined at none — no fields, no declaration site, no enforcement of *"only S5 may construct"*. Declared in `packages/ledger`, minted only in `engine/src/s5-validate.ts`, enforced by a non-exported unique-symbol brand plus an ESLint path allowlist reusing `§L.1` rule 3's mechanism. Every field traced to the gate or invariant that demands it. Records that `journal.ts` is a pure function and is S5's dependency, so there is no cycle. | Implementation-contract clarification | `ARCHITECTURE.md §4`, `§L.1` r4, `§L.2` |
+| **C-2** | `THREAT_MODEL.md §T8` still stated `G3` in the **net** form spec 1.2.0 amended away from, in the section that motivates the gate. Restated gross per-item. | Consistency correction | `THREAT_MODEL.md §T8` |
+| **C-3** | `§L.2` named `ledger` once, third, while `§I` already scheduled Layer A on day 1 and Layer B after engine S4–S5 — which read as a dependency cycle around `ValidatedDecision`. Split to match `§I`. | Consistency correction | `§L.2` |
+| **C-4** | Metric 28 read `Σ ledger_entry.amount`; `MerchantLedgerEntry` declares `gross_paise` and no `amount`, so the metric was not computable. Corrected. | Consistency correction | `EVALUATION_SPEC.md §4.1` |
+| **I-1** | `vitest.config.ts` carried an unactioned review note four commits past its trigger, and nothing detected a per-package suite deletion — vitest decides a run from the aggregate module list against the root config, so `passWithNoTests` and per-project overrides both miss it. `passWithNoTests: false`; `tests/workspace-suite-floor.test.ts` makes `§L.3` executable. | Infrastructure correction | `vitest.config.ts`, `tsconfig.json`, `tests/` |
+
+**What this amendment deliberately did not do.** No eighth `AccountCode`. No
+ninth posting rule, and no change to the debit/credit shape of `P1`–`P8`. No
+observable field added to any *entity* schema — `reason`, `direction` and
+`related_entity_id` remain true-state only, and `source_entity_id` is added to a
+journal line, not to an observation. No threshold, seed, split, family,
+generation parameter or degradation operator touched. No change to `§16`'s `body`
+projection or genesis. No new close policy — `max_unresolved_ratio_bps` remains
+50. No success-criterion threshold moved. No item-level concentration bound on
+unresolved Suspense. No `journal.ts`.
+
+**The honest reading of the cadence.** This is the third amendment cycle on a
+specification `PREREGISTRATION.md` describes as frozen, and the first whose net
+effect on a close-loop metric favours the system under test. That pattern is a
+fair question independent of any single item's merits, and the answer is checkable
+rather than asserted: `git log` and `git tag -l` show no seal, no dataset, no
+benchmark manifest and no executed run at the point of amendment, and
+`RECONCILIATION_SPEC.md §11` — unchanged since spec 1.2.0 — demonstrates the
+defect inside the frozen text without reference to any result. The mitigation is
+a number, not a paragraph: both universes are reported on every run.
 
 ---
 
@@ -403,7 +504,7 @@ Tier-0 freeze **31 August**. Seal and sealed run **1 September**. Submission
 | **Aug 29** | Oracle + completeness gate + consistency gate | Both gates pass on dev; 20,000-pair differential agrees |
 | **Aug 30** | Eval harness: metrics, bootstrap CIs, B0/B2, A1/A2/A3, multi-seed runner | Full dev benchmark table with CIs, two llm-mode columns |
 | **Aug 31** | UI + API + CLI polish; report generation; **TIER-0 FREEZE** | Demo runs end to end without a terminal; §C fully green |
-| **Sep 1** | **SEAL** (`PREREGISTRATION.md §9`) → sealed test run | Signed tag `bench-v1.0.2`; results recorded whatever they say |
+| **Sep 1** | **SEAL** (`PREREGISTRATION.md §9`) → sealed test run | Signed tag `bench-v1.0.3`; results recorded whatever they say |
 | **Sep 2** | Write results, threats-to-validity, report page | Report contains all 13 required elements (`EVALUATION_SPEC.md §5.4`) |
 | **Sep 3** | H1 stretch items **only if the sealed run is clean** | No Tier-0 regression |
 | **Sep 4** | Demo recording, submission package | Video runs on `--llm=offline` |
@@ -557,7 +658,12 @@ with a version bump, not a judgement call at the keyboard.
    become a route for retiring an observation the engine failed to explain.
 6. Gate G3 at close, exactly: `Σ |item_net_paise| = Σ abstained value + Σ open
    exception value` over open Suspense items, in the gross per-item form
-   (`RECONCILIATION_SPEC.md §10.1`, `DATA_MODEL.md §17.1`).
+   (`RECONCILIATION_SPEC.md §10.1`, `DATA_MODEL.md §17.1`). An item is the set of
+   `9000_SUSPENSE` journal lines sharing one `JournalLine.source_entity_id`
+   (`DATA_MODEL.md §16`) and is **open** while that set nets to a non-zero
+   figure. The left side is computed from the journal lines and the right side
+   from the `Decision` / `Exception` records at `value(observation)`
+   (`DATA_MODEL.md §14.1`), over the same universe — two stores, one identity.
 7. The period ends `CLOSED`, `OPEN` or `BLOCKED`. A close report is emitted for
    the first two and **never** for `BLOCKED`.
 8. Every LLM-referenced entity ID must exist in the observation set (invariant
@@ -619,8 +725,12 @@ listed in `PREREGISTRATION.md §7` on the basis of an observed result** — pre-
 adjustment is permitted by `§6.2` AL3 only on an argument that does not reference
 measured performance, and a result-driven adjustment requires a formally opened
 governance/amendment cycle that states what was observed first (`§F` F9).
-Inventing an accounting mapping for an event that `DATA_MODEL.md §17.2` leaves
-unmapped, instead of taking the P8 fallback. Adding a chat interface to the main
+Inventing an accounting mapping for an observation, terminal state or exception
+class that `DATA_MODEL.md §17.1.1`'s trigger table does not enumerate. That table
+is total, so there is nothing to invent; adding an account, a posting rule, or a
+row to it is a spec amendment. **Superseded at spec 1.4.0:** this rule previously
+read *"instead of taking the P8 fallback"*, which mandated a fallback that could
+not be constructed outside adjustment observations (`§A.7` G-F). Adding a chat interface to the main
 path. Making any acceptance test depend on a live model. Using a consumer AI subscription as an
 API. Reporting a metric not in `PREREGISTRATION.md §8` without labelling it
 `EXPLORATORY`. Reporting any number that does not exist in a committed run

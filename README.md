@@ -3,13 +3,24 @@
 A settlement reconciliation controller for Razorpay-shaped payment data.
 Razorpay AI Buildathon 2026 — **Track 04: AI Finance Controller**.
 
-> **Status: SPECIFICATION PHASE. No application code exists yet.**
-> **Spec version 1.3.0 · Benchmark version 1.0.2. Not sealed.** A pre-seal
-> correction release closing the adjustment-observability seam and the
-> selective-risk measurement defect it exposed (`docs/DECISION_BRIEF.md §A.6`),
-> on top of the 1.2.0 contradiction and measurement-validity corrections
-> (`§A.5`) and the 1.1.1 factual corrections verified against current official
-> Razorpay documentation (`§A.4`).
+> **Status: IMPLEMENTATION UNDER WAY, BENCHMARK NOT SEALED.** Three packages are
+> committed — `packages/money`, `packages/domain`, and `packages/ledger`'s Layer A
+> hash chain plus its balance projection. The posting layer (`journal.ts`), the
+> close gate, and everything after them in the `docs/DECISION_BRIEF.md §L.2` build
+> order are not yet written. **No benchmark dataset has been generated and no
+> evaluation result exists.**
+>
+> **Spec version 1.4.0 · Benchmark version 1.0.3. Not sealed.** A pre-seal
+> correction release defining the posting layer: the trigger table mapping
+> observations onto postings `P1`–`P8`, the withdrawal of `P8`'s universal
+> fallback, gate `G3`'s Suspense item key, and an amendment to gate `G3`'s
+> unresolved-value universe that **lowers metric 12 and makes `CLOSED` easier to
+> reach** — disclosed as such, with the superseded quantity still reported on
+> every run (`docs/DECISION_BRIEF.md §A.7`, `docs/PREREGISTRATION.md §8`). On top
+> of the 1.3.0 adjustment-observability and selective-risk corrections (`§A.6`),
+> the 1.2.0 contradiction and measurement-validity corrections (`§A.5`), and the
+> 1.1.1 factual corrections verified against current official Razorpay
+> documentation (`§A.4`).
 
 ASSAY reconciles three independent views of the same money — the payment
 gateway's recon report, the bank statement, and the merchant's own ledger —

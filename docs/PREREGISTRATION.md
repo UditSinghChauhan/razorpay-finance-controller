@@ -1,10 +1,10 @@
-# PREREGISTRATION — ASSAY Benchmark v1.0.2
+# PREREGISTRATION — ASSAY Benchmark v1.0.3
 
-**Spec version:** 1.3.0 · **Benchmark version:** 1.0.2
+**Spec version:** 1.4.0 · **Benchmark version:** 1.0.3
 
 **Status: FROZEN on commit. Amendments require a version bump and a new seal.**
-**Date frozen:** 2026-08-23 · **Amended:** 2026-08-24 (benchmark 1.0.1) and
-2026-08-25 (benchmark 1.0.2) — see below
+**Date frozen:** 2026-08-23 · **Amended:** 2026-08-24 (benchmark 1.0.1),
+2026-08-25 (benchmark 1.0.2) and 2026-08-26 (benchmark 1.0.3) — see below
 · **Sealed at:** _(pending — see §9)_
 
 **Amendment 1.1.1 (pre-seal, factual correction).** Applied before the seal and
@@ -61,6 +61,51 @@ parameters), `§4.3` (degradation operators), `§5.1`/`§5.2`/`§5.4` (the oracl
 v1.0.1. Full enumeration and the post-hoc-optimization defence are in
 `DECISION_BRIEF.md §A.6`.
 
+**Amendment 1.4.0 / benchmark 1.0.3 (pre-seal, posting-layer definition and one
+unsatisfiable gate).** Applied before the seal, before any code for the posting
+layer existed, before any dataset was generated, and before any number was
+observed. Because the next step after it is `assay generate --split test`, it is
+**the last amendment that can make that claim**. Ten items: the universal `P8`
+fallback narrowed to adjustment observations, which is the only domain in which
+its amount `M` is constructible (`DATA_MODEL.md §17.2`); a normative
+posting-trigger table over `Observation.kind` × terminal state ×
+`ExceptionClass`, closing eleven unmapped exception classes and supplying
+triggers for `P1`–`P4` and `P7` (`DATA_MODEL.md §17.1.1`); the Suspense item key
+`JournalLine.source_entity_id`, without which gate G3 quantified over an
+undefined partition (`DATA_MODEL.md §16`); `value(observation)` derived per
+reconcilable kind (`DATA_MODEL.md §14.1`); **metric 12's universe restricted to
+open Suspense items** (§8 below); the `ValidatedDecision` contract
+(`ARCHITECTURE.md §4`); three consistency corrections — `THREAT_MODEL.md §T8`,
+`DECISION_BRIEF.md §L.2`, and metric 28's denominator field name; and one
+infrastructure correction to the workspace test runner. `THREAT_MODEL.md §T5`'s
+claim that `E13_LEDGER_ONLY` *"posts to Suspense"* is corrected as part of the
+trigger-table item rather than counted separately. The ten are enumerated with
+their classifications in `DECISION_BRIEF.md §A.7`, whose row identifiers this
+list follows.
+
+**Metric 12 is a universe amendment to a frozen close-loop metric, not a
+clarification, and it is the favourable direction.** It **lowers**
+`unresolved_value_inr` and makes `CLOSED` easier to reach, and through metric 12
+it moves metrics 11 and 14. A **second** channel lowers the same metric: the
+trigger table gives seven of the fourteen exception classes no Suspense item, so
+their value leaves the close numerator as well. Both channels, and the third that
+pushes the other way, are enumerated in §8. It is nevertheless forced: gate G3 is an identity
+exact to the paisa, and under the v1.0.2 universe it fails by ₹2,00,000 on
+`RECONCILIATION_SPEC.md §11`'s own worked example, so **every conforming run ends
+`BLOCKED`**, metric 14's requirement that `BLOCKED` be zero is violated by
+construction, and success criteria S5 and S12 are unreachable. The only
+alternative remedy — posting every unresolved view of a break — credits
+`1100_GATEWAY_RECEIVABLE` twice for one break. The v1.0.2 quantity is **retained
+and reported on every run** as `unresolved_value_inr_multiview`, labelled
+`EXPLORATORY`. The defect and the full dependency statement are in §8 and in
+`DECISION_BRIEF.md §A.7`.
+
+`§4.1` (families and composition), `§4.2` (generation parameters), `§4.3`
+(degradation operators), `§5` (the oracle), `§6.1`'s split and seed table,
+`§6.2`'s AL1–AL7 and **every threshold in §7** are **unchanged** — the
+data-generating process is identical to benchmark v1.0.0, v1.0.1 and v1.0.2, and
+no `AccountCode`, constraint or posting rule was added.
+
 This document is written **before any test-split result exists**. Its purpose is
 to make post-hoc rationalisation impossible: metrics, thresholds, dataset
 construction and stopping rules are all fixed here, and the git history proves
@@ -82,7 +127,7 @@ seeds, and the stopping rule.
 2. The test-split ground truth is generated and its `sha256` committed **before**
    any agent runs against it. The ground-truth file itself is gitignored and held
    back.
-3. The repository is tagged `bench-v1.0.2` (signed) at seal time.
+3. The repository is tagged `bench-v1.0.3` (signed) at seal time.
 4. After the seal, **no changes to agent code are permitted before the results
    are recorded.** Any change invalidates the seal and requires a new benchmark
    version with fresh seeds.
@@ -572,11 +617,25 @@ claim about ASSAY's performance. Full definitions in `EVALUATION_SPEC.md §4`.
 
 **Close-loop (added in spec 1.1 — the loop must be shown to terminate):**
 11. `period_status_distribution` — share of seeded runs ending `CLOSED` / `OPEN` / `BLOCKED`
-12. `unresolved_value_inr` at close, split into abstained vs open exceptions
+12. `unresolved_value_inr` at close, split into abstained vs open exceptions.
+    **Amended in benchmark v1.0.3:** summed over **open Suspense items** rather
+    than over every reconcilable observation in a non-resolved state. The v1.0.2
+    universe made metric 13 unsatisfiable — see below — and is retained and
+    reported every run as `unresolved_value_inr_multiview`, labelled
+    `EXPLORATORY`. **This amendment lowers metric 12 and makes `CLOSED` easier
+    to reach.**
 13. `suspense_identity_exact` — must be `true` on every run (gate G3, gross
     per-item form `Σ |item_net_paise|`). Restated in benchmark v1.0.1; the
     v1.0.0 net-only form was unsatisfiable on structurally healthy runs because
-    Suspense is two-sided, and was weaker against threat T8.
+    Suspense is two-sided, and was weaker against threat T8. **Amended again in
+    benchmark v1.0.3**, which supplies the two things the v1.0.1 form left
+    undefined: the item partition — the set of `9000_SUSPENSE` journal lines
+    sharing one `JournalLine.source_entity_id` (`DATA_MODEL.md §16`) — and the
+    right-hand side's universe. Through v1.0.2 the metric quantified over *"each
+    open Suspense item"* with **no field defining an item**, so it was not
+    computable; and its right-hand side spanned a multi-view observation sum
+    against which the identity was **unsatisfiable**, so every run ended
+    `BLOCKED` (`RECONCILIATION_SPEC.md §11`). Both are corrected.
 14. `close_gate_failures` — per-gate failure counts across all runs; `BLOCKED` must be 0
 
 **Robustness and the DoS surface:**
@@ -663,6 +722,90 @@ adjustment class from metric 10 `exception_class_confusion`, since every
 adjustment `E12` is now assigned deterministically by the `DATA_MODEL.md §17.2`
 fallback rather than by R2 triage.
 
+**Benchmark v1.0.3 dependency statement (spec 1.4.0 amendment set).** Every
+affected quantity is listed here so that no reader has to infer which numbers
+moved.
+
+**Definition amended:** metric **12** (universe restricted to open Suspense
+items) and metric **13** (item partition supplied; right-hand side's universe
+follows metric 12). No other metric's formula changes.
+
+**Formula unchanged, becomes computable where it previously was not:** metric
+**6** `balance_harm_inr` and, through it, metrics **2** and **3** and **8**.
+`proj_agent` sums *"journal lines whose owning decision is `RECONCILED`"*, and
+through spec 1.3.0 no rule said which observations posted — `P1`–`P4` had no
+trigger at all. `DATA_MODEL.md §17.1.1` supplies it. Stating that metric 6 is
+"unaffected" would be false: it had no determinate value, and it has one now. The
+direction cannot be predicted from the amendment, because an agent that omitted
+`P1` would have carried harm of roughly `batch_value_paise` against S3's 0.05%
+bar — that is a defect the trigger table prevents, not a score it improves.
+
+**Formula unchanged, value changes because the input universe changed:** metric
+**11** `period_status_distribution` — a lower metric 12 crosses the close
+threshold more often, so `CLOSED` is more likely and `OPEN` less likely — and
+metric **14** `close_gate_failures`, whose `G3` column was 100% under the v1.0.2
+universe and is expected to be zero.
+
+**Metric 12 falls through two channels and rises through a third. All three are
+named here.** (1) **View collapse** — several views of one break count once
+instead of severally; this is the `H-2` amendment and it lowers the metric. (2)
+**Non-posting classes** — `DATA_MODEL.md §17.1.1` gives seven of the fourteen
+exception classes no Suspense item, so `E05`, `E06`, `E07`, `E08`, `E10`, `E11`
+and `E13` leave the close numerator entirely; this also lowers the metric, and it
+is a **separate** effect from (1) that the v1.0.2 text nominally included. (3)
+**Newly posting classes** — the other seven, `E01`, `E02`, `E03`, `E04`, `E09`,
+`E12`, `E14`, open Suspense items no implementation was opening before, which
+raises the metric. **The net of the three cannot be stated before the dev
+falsification check** (`DECISION_BRIEF.md §F` F9), and this specification does
+not state one.
+
+Channel (2) has a consequence worth naming on its own: **the close gate no longer
+sees ledger-side, duplicate, ingest-failure, orphan-refund or timing value.** A
+period can close while the merchant ledger is substantially untied. That is
+bounded outside the close gate — metric 28 `coverage_by_value_ledger` scores zero
+for it, `C_exception` prices each such exception at ₹500, and
+`EVALUATION_SPEC.md §6` requires the count and value of non-posting exceptions to
+be reported separately on every run — but it is **not** bounded by `G3`, and a
+reader comparing v1.0.2 with v1.0.3 is entitled to know that.
+
+**Explicitly unaffected, with the reason:** metric **1** `coverage_by_value` and
+metric **9** `coverage_by_count` — their universes are `recon_line` and
+reconcilable kinds respectively, and no observation changes terminal state.
+Metric **2**'s abstention and exception **terms** — both are counts, and every
+one of the fourteen classes still produces an `Exception` record whether or not
+it opens a Suspense item. Metric **4** `abstention_precision` / `_recall` — its
+population is unchanged and its comparison is against the oracle. Metric **10**
+`exception_class_confusion` — `E12` remains the only deterministically assigned
+class and its exclusion is unchanged; `§17.1.1` selects a *posting* from a class,
+never a class from a posting. Metric **23** `determinism_check` — every digest
+changes because `JournalLine` gains a field, but two runs over identical inputs
+still agree, which is what the metric asserts; no root hash has been published.
+Metrics **27** and **28**. Every threshold in §7. `§4.1`–`§4.3`, `§5`, `§6.1` and
+`§6.2` — **the data-generating process is identical to benchmark v1.0.0, v1.0.1
+and v1.0.2.**
+
+**Success criteria.** No threshold moves. **S5** — *"trial balance = 0 and
+Suspense identity exact on every run"* — was **unsatisfiable** under the v1.0.2
+universe and becomes satisfiable. **S12** requires at least one seeded run to end
+`OPEN` and one `CLOSED`; under v1.0.2 every run ended `BLOCKED`, so neither half
+was reachable. **S3**'s quantity becomes computable. S1, S2, S4, S6–S11 are
+untouched.
+
+**Direction of effect, stated plainly.** Metric 12 falls through two independent
+channels — view collapse and the seven non-posting exception classes — and rises
+through one. The expected net on metric 12 is **downward** and `CLOSED` becomes
+easier, but the magnitude is not predictable and no net is claimed for metric 11.
+This amendment is **not** uniformly unfavourable to ASSAY, and it is the third
+consecutive pre-seal amendment cycle. Two things bound the concern and
+neither is rhetorical. It applies identically to ASSAY, `B0`, `B2` and the
+`A1`/`A2`/`A3` ablations, so no comparison between agents shifts. And the bar it
+replaces is not one any conforming system was clearing: `RECONCILIATION_SPEC.md
+§11`'s own worked example fails the v1.0.2 identity by ₹2,00,000, so metric 14's
+requirement that `BLOCKED` be zero could not be met by any implementation. The
+superseded quantity is reported on every run as
+`unresolved_value_inr_multiview`, labelled `EXPLORATORY`, so both universes stay
+visible. Full record in `DECISION_BRIEF.md §A.7`.
+
 Metric 24 is the pre-registered form of the provider-independence requirement: it
 forces the offline-vs-model comparison to be *published as a number*, so "the LLM
 contributed X" is measured rather than asserted — including the outcome where X
@@ -676,11 +819,12 @@ results are reported, with the reason for the re-run.
 ## 9. Seal procedure
 
 ```
-  1. Freeze code:  git tag -s bench-v1.0.2 -m "ASSAY benchmark v1.0.2 seal"
+  1. Freeze code:  git tag -s bench-v1.0.3 -m "ASSAY benchmark v1.0.3 seal"
   2. Generate:     assay generate --split test --seeds 9000-9004,9100-9104
   3. Oracle:       assay oracle --split test          # completeness gate MUST pass
   4. Hash:         sha256 observations.jsonl ground_truth.jsonl oracle_labels.jsonl
   5. Commit hashes into benchmark_manifest.json      # ground truth itself NOT committed
+     # `benchmark_version` must read "1.0.3" (DATA_MODEL.md §18)
      # `record_counts` must match the frozen §4.1 composition; a mismatch, or a
      # per-(split,seed) total outside 10,000-20,000, is a SEAL FAILURE
      # `true_balances` must equal the projection of `true_journal` for every
@@ -711,7 +855,7 @@ Stated here, before results, so they cannot be presented later as afterthoughts.
 | V7 | LLM non-determinism makes results irreproducible | All scored runs use `--llm=replay` against a committed cache; provider, model ID and per-call hashes recorded | Low |
 | V8 | Only one merchant profile simulated | Single profile in v1.0.0 | **Acknowledged limitation.** Stated in the report. |
 | V9 | Results depend on one model vendor | `LlmProvider` abstraction; `offline_parity` (metric 24) publishes every primary metric under `--llm=offline` alongside the model path | Low — but note the offline path is authored by the same developer |
-| V10 | The close gate never fires, or fires always, so it is untested | Metric 11 requires the distribution of `CLOSED` / `OPEN` / `BLOCKED` across seeds; S12 requires at least one legitimate `OPEN` **and** one legitimate `CLOSED`; a manual `human`-actor close does not by itself satisfy S12. The benchmark v1.0.0 policy `min(0.005 × batch, ₹50,000)` was found before the seal to make `CLOSED` structurally near-unreachable at the batch sizes S1 forces, and was replaced by a scale-invariant ratio (`RECONCILIATION_SPEC.md §10.3`). Both policies are scored per run. | **Moderate.** The corrected policy is defensible on scale-invariance grounds but has still not been observed to produce both outcomes; `DECISION_BRIEF.md §F` F9 is the pre-declared falsification check, and it forbids re-tuning in response to what the check shows. The `DATA_MODEL.md §17.2` posting fallback adds a further, deliberately conservative source of unresolved value. Separately declared: `unresolved_value_paise` spans all reconcilable observation kinds while `batch_value_paise` is based on `recon_line` value alone, so the close ratio is not a like-for-like fraction and effective strictness varies with how many observation views of a break remain unresolved — always in the conservative direction (`RECONCILIATION_SPEC.md §10.3`). Scenario C (spec 1.3.0) adds a third source of unresolved value: every adjustment observation now reaches `EXCEPTION`, and a single large undetermined adjustment can exceed the close threshold on its own. `CLOSED` is correspondingly harder to reach than in benchmark v1.0.1, and the residual is unchanged at **Moderate** for that reason as well as the close-policy one. |
+| V10 | The close gate never fires, or fires always, so it is untested | Metric 11 requires the distribution of `CLOSED` / `OPEN` / `BLOCKED` across seeds; S12 requires at least one legitimate `OPEN` **and** one legitimate `CLOSED`; a manual `human`-actor close does not by itself satisfy S12. The benchmark v1.0.0 policy `min(0.005 × batch, ₹50,000)` was found before the seal to make `CLOSED` structurally near-unreachable at the batch sizes S1 forces, and was replaced by a scale-invariant ratio (`RECONCILIATION_SPEC.md §10.3`). Both policies are scored per run. | **Moderate.** The corrected policy is defensible on scale-invariance grounds but has still not been observed to produce both outcomes; `DECISION_BRIEF.md §F` F9 is the pre-declared falsification check, and it forbids re-tuning in response to what the check shows. The `DATA_MODEL.md §17.2` posting fallback adds a further, deliberately conservative source of unresolved value. Separately declared, and **restated at benchmark v1.0.3**: `unresolved_value_paise` is summed over open Suspense items while `batch_value_paise` is based on `recon_line` value alone, so the close ratio is still not a like-for-like fraction — but the multi-view inflation that made effective strictness *"always in the conservative direction"* through v1.0.2 is gone, because each break now contributes once (`RECONCILIATION_SPEC.md §10.3`). **`CLOSED` is easier to reach under v1.0.3 than the v1.0.2 text implied**, and the residual's direction is no longer uniformly conservative. A second and separate easing compounds it: the seven exception classes that `DATA_MODEL.md §17.1.1` gives no Suspense item leave the numerator entirely, so the close gate no longer sees ledger-side, duplicate, ingest-failure, orphan-refund or timing value — bounded by metric 28, `C_exception` and `EVALUATION_SPEC.md §6`, but not by `G3` (§8). Two effects push the other way: the remaining seven classes open items no implementation was opening before, and Scenario C (spec 1.3.0) still applies — every adjustment observation reaches `EXCEPTION`, and a single large undetermined adjustment can exceed the close threshold on its own. The net direction across the two is **not predictable before the dev falsification check** (`DECISION_BRIEF.md §F` F9), which is why the residual stays at **Moderate** and why `unresolved_value_inr_multiview` is reported on every run. |
 | V11 | Abstention DoS mitigations are instrumentation, not defence | M1 (value-ranked queue) and M4 (immaterial auto-resolve) change behaviour, not just reporting; M2/M3/M5/M6 are detection and attribution | **Real.** A sub-threshold, source-spread flood evades M2 and M3. Stated in `THREAT_MODEL.md §T9`. |
 
 **The claim ASSAY is entitled to make, and no more:**

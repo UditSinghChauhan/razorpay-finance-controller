@@ -1,9 +1,18 @@
 # THREAT_MODEL — ASSAY
 
-**Spec version:** 1.3.0 · **Date:** 2026-08-25
+**Spec version:** 1.4.0 · **Date:** 2026-08-26
 
 Every control answers: **what specific failure does this prevent?** Controls that
 cannot name a failure are removed.
+
+**At spec 1.4.0** this document restated gate G3 in §T8 in the gross per-item
+form spec 1.2.0 adopted everywhere else, and corrected §T5's claim that
+`E13_LEDGER_ONLY` *"posts to Suspense"* — no rule among `P1`–`P8` can post it
+without letting a fabricated ERP row move a PG-side control account, which is the
+attack §T5 prevents. **No control was added, removed or weakened**: T5's
+protection is the allocation ban, which is untouched, and the loss of G3 coverage
+for that class is disclosed and offset by a reporting requirement
+(`EVALUATION_SPEC.md §6`) — see `DECISION_BRIEF.md §A.7`.
 
 **At spec 1.3.0** this document is unchanged apart from the version header. The
 1.3.0 amendment set adds no observable field, no control and no attack surface;
@@ -159,9 +168,22 @@ existed, to make a theft reconcile.
 
 **Controls.** The merchant ledger is treated as **just as untrusted as any other
 source** — it is one of three views, never a source of truth. An entry with no PG
-counterpart becomes `E13_LEDGER_ONLY` and posts to Suspense. It can never create
-a PG-side allocation, because candidates are generated from PG observations and
-the ledger only contributes *soft* evidence (`SE2`).
+counterpart becomes `E13_LEDGER_ONLY`, with an owner and an analyst question, and
+enters the value-ranked queue. It can never create a PG-side allocation, because
+candidates are generated from PG observations and the ledger only contributes
+*soft* evidence (`SE2`).
+
+**`E13` posts no journal line, corrected at spec 1.4.0.** This paragraph
+previously said it *"posts to Suspense"*, and no rule among `P1`–`P8` can do that
+safely: `P6` would credit `1100_GATEWAY_RECEIVABLE` and `P5` would debit
+`1200_BANK`, so **either would let a fabricated ERP row move a PG-side control
+account** — the attack this section exists to prevent. The control that prevents
+it is the sentence above about allocation, and that is unweakened. What is lost
+is `G3`'s coverage of this class: an `E13` is visible in the exception report and
+in gate `G1`, which admits no drop path, but not in the Suspense identity. See
+`DATA_MODEL.md §17.1.1` and `EVALUATION_SPEC.md §6`, which requires the count and
+value of non-posting exceptions to be reported separately for exactly this
+reason.
 
 **Prevents.** Fabricated bookkeeping laundering a discrepancy into "reconciled."
 
