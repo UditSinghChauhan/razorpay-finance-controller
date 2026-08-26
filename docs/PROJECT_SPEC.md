@@ -2,8 +2,17 @@
 
 **Track:** 04 — AI Finance Controller
 **Status:** Specification. Frozen scope for implementation.
-**Spec version:** 1.3.0
-**Date:** 2026-08-25
+**Spec version:** 1.4.0
+**Date:** 2026-08-26
+
+**At spec 1.4.0** this document is unchanged apart from the version header, and
+**no success-criterion threshold changed.** Two criteria change in
+*reachability* rather than in wording: S5's Suspense identity and S12's
+`OPEN`/`CLOSED` requirement were **unsatisfiable** under the benchmark v1.0.2
+unresolved-value universe, which ended every conforming run `BLOCKED`, and are
+satisfiable under v1.0.3. S3's quantity becomes computable once
+`DATA_MODEL.md §17.1.1` supplies the posting triggers it was always summing over.
+See `DECISION_BRIEF.md §A.7` and `PREREGISTRATION.md §8`.
 
 **At spec 1.3.0** this document is unchanged apart from the version header. S3's
 *"harm on the covered set"* wording is unchanged; what changed is that

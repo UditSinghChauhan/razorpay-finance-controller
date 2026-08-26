@@ -1,9 +1,20 @@
 # DATA_MODEL — ASSAY
 
-**Spec version:** 1.3.0 · **Date:** 2026-08-25
+**Spec version:** 1.4.0 · **Date:** 2026-08-26
 
 All schemas are normative. The implementation agent must not add, rename or
 retype fields without a spec version bump.
+
+**At spec 1.4.0** this document added `§17.1.1`, the normative posting-trigger
+table over `Observation.kind` × terminal state × `ExceptionClass`; narrowed `P8`
+to adjustment observations and deleted the universal fallback (§17.2); added
+`JournalLine.source_entity_id` as the Suspense item key (§16); stated
+`value(observation)` per reconcilable kind (§14.1); and restricted
+`unresolved_value_paise` to open Suspense items with the v1.0.2 universe retained
+as `unresolved_value_paise_multiview` (§20) — see `DECISION_BRIEF.md §A.7`. **No
+`AccountCode` and no posting rule was added, and §16's hashed `body` projection
+and genesis are unchanged**, though every digest changes because `journal_lines`
+carries a new field.
 
 **At spec 1.3.0** this document made the `(kind, source_system, payload)` mapping
 normative and added two `source_system` values (§10), stated the adjustment
@@ -806,7 +817,7 @@ interface Exception {
   decision_id: DecisionId;
   class: ExceptionClass;           // the 14-member closed taxonomy, §15
   severity: "material" | "immaterial";  // by tau
-  value_paise: Paise;
+  value_paise: Paise;              // = value(observation), §14.1
   owner_role: "analyst" | "controller" | "engineering" | "pg_support";
   analyst_question: string;        // R2 output: what a human must determine
   suggested_probe: string | null;
@@ -819,6 +830,35 @@ interface Exception {
 An exception with no `owner_role` and no `analyst_question` is not an exception,
 it is a shrug. The track bar asks for an *honest exception list*; honest means
 actionable.
+
+### 14.1 `value(observation)` — the rupee figure an unresolved item carries `[ASSAY-MODEL]`
+
+`Exception.value_paise`, `CloseReport.value_abstained_paise`,
+`value_exceptions_paise`, `exceptions_by_class` and gate `G3`'s right-hand side
+all read the rupee value of an observation, and through spec 1.3.0 **no document
+stated how it was derived for any kind.** It is stated here. One rule per
+reconcilable kind, all integer paise, all read from fields the observation
+already carries:
+
+| `kind` | `value(observation)` | Why this field |
+|---|---|---|
+| `recon_line` (`payment`) | `payload.amount` | The gross the `P1` receivable was recognised at, so relieving it takes the same figure. It is also `batch_value_paise`'s summand (`EVALUATION_SPEC.md §4.1`), which keeps the close ratio's numerator and denominator commensurable on this kind |
+| `recon_line` (`refund`) | `payload.amount` | `I3` fixes `debit = amount` on a refund row, so the two agree by construction |
+| `adjustment` | `M` — the non-zero one of `debit`/`credit` | **Not `amount`.** `I3` declares no `amount` identity for adjustment rows and §17.2 leaves the field deliberately unconstrained on them; `M` is what `P8` posts and what `I4`/`C6` move a settlement by. Using `amount` here would put a number in `unresolved_value_paise` that the ledger never posted and break `G3` on every adjustment |
+| `bank_line` | `payload.amount` | The credit that actually arrived |
+| `settlement` | `payload.amount` | `I4` closes a settlement at exactly this figure |
+| `ledger_entry` | `payload.gross_paise` | The only gross figure the entity carries; `expected_net_paise` is the merchant's *guess* and is nullable |
+| `dispute` | `payload.amount` | The documented deduction amount |
+
+Reference kinds (`payment`, `order`) have no value under this definition: §10.1
+gives them no terminal state that carries one, and they *"contribute to no
+unresolved value"*.
+
+**`value(observation)` is a queue-side quantity.** It is recorded on the
+`Decision` or `Exception` record. Gate `G3` compares it against the **books** —
+the Suspense journal lines — which is what makes the identity a cross-check
+between two independently maintained stores rather than a restatement of one
+(`RECONCILIATION_SPEC.md §10.1`, `THREAT_MODEL.md §T8`).
 
 ---
 
@@ -884,8 +924,44 @@ interface JournalLine {
   dr_paise: Paise;                 // exactly one of dr/cr is non-zero
   cr_paise: Paise;
   memo_ref: string;                // reference only, never free text from input
+  source_entity_id: string;        // pay_… | rfnd_… | adj_… | setl_… | bnk_…
+                                   // the JOIN KEY, and the Suspense item key
+                                   // (§10.1 G3). Added at spec 1.4.0 — see below
 }
 ```
+
+**`source_entity_id`, added at spec 1.4.0 `[ASSAY-MODEL]`.** `true_journal` (§1)
+was given this field as *"the JOIN KEY for covered-set projection"* at spec
+1.3.0 and the agent side received no counterpart, which left
+`RECONCILIATION_SPEC.md §10.1`'s gate `G3` — `Σᵢ |item_net_paise(i)|` over *"each
+open Suspense item `i`"* — quantifying over a partition no field defined. The
+field is the counterpart, named identically so that the two journals join
+structure to structure.
+
+It carries **the identifier of the observation whose obligation the posting
+records**: the allocation target for an abstention, the excepted observation for
+an exception, and the recon line itself for `P1`–`P4`. It is a business
+identifier drawn from the observation set, never an ASSAY-internal handle, so a
+reviewer holding only the run artifact can verify `G3` — the standard §20 already
+sets for `period_status`. It is required and non-null on **every** journal line,
+including the counter-leg, so that an item can be read whole.
+
+**An open Suspense item is defined arithmetically, and needs no status field.**
+For key *k*, `item_net_paise(k) = Σ dr(k, 9000_SUSPENSE) − Σ cr(k, 9000_SUSPENSE)`
+over the whole event log. A `P7` resolution reverses the opening posting under
+the **same** key, so a resolved item nets to zero and leaves `Σ |item_net_paise|`
+by arithmetic rather than by a flag someone must remember to set. *Open* means
+`item_net_paise(k) ≠ 0`. Two genuinely open items cannot cancel each other,
+because one key is one obligation; offsetting suppression across *different*
+keys is what the gross form catches, and it still does.
+
+**This changes every event digest and reopens nothing.** `source_entity_id`
+enters `body` only because `journal_lines` already enters `body` whole, so §16's
+`body` **projection** and the genesis definition are textually unchanged and
+`DECISION_BRIEF.md §A.5` B2 is not reopened. No run has been executed and no root
+hash has been published, so no committed digest is invalidated. The field is
+derived from the observation set by a canonical traversal and is subject to the
+deterministic-identifier rule below.
 
 **The hashed `body`.** `body` is the following projection of `LedgerEvent`, and
 nothing else:
@@ -922,6 +998,11 @@ a canonical traversal of the input in a fixed order, never from a counter seeded
 by wall-clock time, process ID, iteration order over an unordered collection, or
 any other source that can differ between two executions over identical input.
 `evt_id` is excluded from `body` and is unconstrained by this rule.
+`JournalLine.source_entity_id` is **not** an ASSAY-internal identifier — it is
+copied from the observation set — but it enters `body` and is therefore bound by
+the same requirement: the observation it names is selected by a rule
+(§17.1.1's trigger table), never by iteration order over an unordered
+collection.
 
 **Declared residual (`THREAT_MODEL.md §T10`).** Because `ts` is outside `body`,
 altering an event's timestamp does not break the chain. Timestamp alteration is
@@ -1004,12 +1085,137 @@ to remove.
 | P2 | Settlement reconciled to a bank credit | `1200_BANK` `credit`; `5100_PG_FEE_EXPENSE` `fee − tax`; `1300_GST_INPUT_CREDIT` `tax` | `1100_GATEWAY_RECEIVABLE` `amount` |
 | P3 | Refund initiated | `4000_REVENUE` `refund_amount` | `2200_REFUND_LIABILITY` `refund_amount` |
 | P4 | Refund settled out of the bank | `2200_REFUND_LIABILITY` `refund_amount` | `1200_BANK` `refund_amount` |
-| P5 | Abstention or open exception on an **inbound** item — a bank credit that cannot be attributed (`E03`) | `1200_BANK` `amount` | `9000_SUSPENSE_UNRECONCILED` `amount` |
-| P6 | Abstention or open exception on an **outbound** item — a settlement with no bank credit (`E04`) | `9000_SUSPENSE_UNRECONCILED` `amount` | `1100_GATEWAY_RECEIVABLE` `amount` |
-| P7 | Resolution of a Suspense item | exact reversal of P5 or P6, followed by the correct posting, as **new events** | — |
+| P5 | Abstention or open exception on an **inbound** item — value has arrived in the bank and cannot be attributed (canonically `E03`) | `1200_BANK` `amount` | `9000_SUSPENSE_UNRECONCILED` `amount` |
+| P6 | Abstention or open exception on an **outbound** item — an obligation recognised at the gateway whose disposition is unknown (canonically `E04`) | `9000_SUSPENSE_UNRECONCILED` `amount` | `1100_GATEWAY_RECEIVABLE` `amount` |
+| P7 | Resolution of a Suspense item | exact reversal of P5 or P6 under the **same** `source_entity_id`, followed by the correct posting, as **new events** | — |
 
 P2 balances by construction: `credit + (fee − tax) + tax = amount − fee + fee =
 amount`.
+
+**`P5` and `P6` are selected by the direction of the item, not by its exception
+class.** The class in each row is the canonical instance, not the trigger. The
+specification already relies on this: `RECONCILIATION_SPEC.md §11` applies `P6`
+to an abstention that is not `E04`, and `§8` holds the later of two duplicate
+bank credits *"in Suspense rather than netted"*, which is `P5`'s shape on `E09`.
+The trigger table below states the rule the two rows were always being read
+under.
+
+### 17.1.1 Posting triggers `[ASSAY-MODEL]`
+
+Through spec 1.3.0 §17.1's table was keyed by prose descriptions of economic
+events and **nothing mapped `Observation.kind`, terminal state or
+`ExceptionClass` onto it.** Three of the fourteen exception classes had an
+enumerated posting and eleven had none, while `RECONCILIATION_SPEC.md §9`
+required every `EXCEPTION` to post. `P1`–`P4` had no observation trigger at all.
+The table below is that mapping. **It adds no account and no posting rule** — it
+selects among `P1`–`P8`, which are unchanged.
+
+**Reconciled and unconditional path.**
+
+| Observation | Trigger | Posting |
+|---|---|---|
+| `recon_line`, `type === "payment"` | passes ingest validation | **`P1`** at ingest, on `amount`. A capture is a fact the recon report asserts; it does not wait on ASSAY being able to settle it |
+| `recon_line`, `type === "payment"` | the settlement it is allocated to is **itself reconciled to a bank credit through real bank-side evidence** — `AN2` satisfied against an actual `bank_line`, and `I5` therefore defined and satisfied | **`P2`** |
+| `recon_line`, `type === "refund"` | passes ingest validation | **`P3`** at ingest, on `amount` |
+| `recon_line`, `type === "refund"` | the settlement it is allocated to is **itself reconciled to a bank credit through real bank-side evidence**, as for `P2` above | **`P4`** |
+| `settlement`, `bank_line` | reaches `RECONCILED` | **none on the reconciled path** — their unresolved states do post, under `P6` and `P5` respectively; see the Suspense table below. `I4` closes a settlement as the sum of its allocated lines and `I5` makes a bank line a sum of settlements — `EVALUATION_SPEC.md §4.1` states the same thing when it rejects `Σ bank_line.amount` as a denominator because *"`I5` makes bank lines aggregates"*. `P2` already posts the bank leg per line, so a second posting on the aggregate view would double every account it touches |
+| `ledger_entry`, `dispute` | **any state, including `ABSTAINED` and `EXCEPTION`** | **none.** `true_journal.source_entity_id` (§1) ranges over `pay_… \| rfnd_… \| adj_… \| setl_… \| bnk_…` and admits no `mle_…` or `disp_…`, so **truth posts no line attributable to either kind**. An agent that posted one would put `proj_agent ≠ proj_truth` on a *correct* decision and charge itself `balance_harm_inr` for it — the confound `EVALUATION_SPEC.md §4.4` exists to remove |
+| `payment`, `order` | — | **none.** Reference kinds; §10.1 |
+
+A line that **fails ingest validation posts nothing at all**, in either
+direction. `RECONCILIATION_SPEC.md §2` step 2 already states that such a record
+*"becomes `E05`/`E06`/`E07` immediately and never enters the candidate space"*,
+and §7 makes an invariant failure *"never partially posted, never repaired"*.
+Posting the `amount` of a line whose own arithmetic identity fails would assert a
+figure the line is an exception *for* failing to substantiate.
+
+**`I5` is undefined — not satisfied — when no bank-line mapping exists, and
+`P2`/`P4` require it defined `[ASSAY-MODEL]`.** `I5` reads *"`Σ settlement.amount`
+mapped to a bank line `= bank_line.amount`"* (`RECONCILIATION_SPEC.md §7`). With
+no mapping there is no right-hand side, so the comparison has no truth value;
+`§7` rejects an allocation on *"**any** invariant failure"*, and an invariant with
+no truth value has not been satisfied. This is stated because the permissive
+reading is available on the literal text and produces exactly the failure `I5`
+names in its own purpose column — *"Claiming money arrived that did not."*
+
+The consequence is the trigger stated above. `AN1` is
+*"`recon_line.settlement_id === settlement.id`"* on the basis *"Same system, same
+identifier"* (`§3`) — a **gateway-internal identity match that carries no
+bank-side information**. It is sufficient to reconcile a line to its settlement;
+it is not sufficient to debit `1200_BANK`, which §17 types as *"actual bank
+credits"* and which `P2`'s own row conditions on a *"Settlement reconciled to a
+**bank credit**"*. `DATA_MODEL.md §5` is the documentary basis: *"`status:
+"processed"` is not 'money has arrived'"*, which is why
+`E04_SETTLEMENT_NOT_IN_BANK` is *"a genuine timing state rather than an error"*.
+
+**This does not depress recon-view coverage.** The line still reaches
+`RECONCILED` on `AN1`, so it stays in metric 1's numerator; what waits on bank
+evidence is the bank leg, not the terminal state. That preserves
+`EVALUATION_SPEC.md §4.1`'s design exactly — *"a run can show 99% recon-view
+coverage while the bank statement is largely untied. The bank and ledger views do
+not solve that — they **expose** it"* — with metric 27 `coverage_by_value_bank`
+carrying the exposure.
+
+**A disclosed residual on `E14_UTR_COLLISION`.** Where a bank credit exists but
+its attribution does not (`E14`), the settlement takes `P6` under its own key and
+the unattributable `bank_line` takes `P5` under its own key. **One economic event
+therefore opens two Suspense items and is counted twice in
+`unresolved_value_paise`.** The two obligations are genuinely distinct — a
+settlement whose disposition is unknown, and a credit whose attribution is
+unknown — and their keys differ, so `G3` holds; but this is a partial
+reinstatement of the multi-view counting that the benchmark v1.0.3 universe
+amendment removed elsewhere, and it is recorded here rather than netted away.
+
+**Suspense path — every terminal `ABSTAINED` or `EXCEPTION` state.**
+
+**How the two tables compose.** The kind rows above govern the `RECONCILED` path
+and, for `ledger_entry`, `dispute`, `payment` and `order`, every state — those
+four post nothing whatever their class, and no row below overrides that. Every
+other observation in a terminal `ABSTAINED` or `EXCEPTION` state is governed by
+the table below. An `adjustment` observation cannot appear as an `ABSTAINED` row
+because §17.2 sends every one of them to `EXCEPTION`.
+
+**The target universe is settlements and bank lines, and this table does not
+widen it.** `RECONCILIATION_SPEC.md §4` enumerates a target as *"a settlement
+needing constituents, or a bank line needing settlements"*; `Candidate.target_id`
+(§11) is *"what is being explained (settlement / bank line)"*; and
+`PREREGISTRATION.md §8` records as a frozen dependency that the Ambiguity
+Oracle's *"targets are settlements and bank lines"*. A `recon_line` is therefore
+never a target — it reaches an abstained component as a **member**, and the
+non-target row below governs it.
+
+| Class / state | Direction | Posting | `source_entity_id` |
+|---|---|---|---|
+| `ABSTAINED`, target is a `bank_line` | inbound | **`P5`** | `bnk_…` |
+| `ABSTAINED`, target is a `settlement` | outbound | **`P6`** | `setl_…` |
+| `ABSTAINED`, observation is a **non-target member** of the abstained component | — | **none.** The obligation is the target's and is carried whole by the target's item; a second posting for each member would relieve `1100_GATEWAY_RECEIVABLE` again for one break. The member is *attached* to that item and reaches its own terminal state, so `G1` still sees it | the **target's** key, carried on no line of its own |
+| `E01_MISSING_CAPTURE` | outbound | **`P6`** | `setl_…` — the settlement with no capture behind it (§15) |
+| `E02_MISSING_SETTLEMENT` | outbound | **`P6`** | `pay_…` — `P1` recognised the receivable; its disposition is unknown |
+| `E03_BANK_CREDIT_UNMATCHED` | inbound | **`P5`** | `bnk_…` |
+| `E04_SETTLEMENT_NOT_IN_BANK` | outbound | **`P6`** | `setl_…` |
+| `E09_DUPLICATE_BANK_CREDIT` | inbound | **`P5`** | `bnk_…` — the **later** credit, *"held in Suspense rather than netted"* (`RECONCILIATION_SPEC.md §8`) |
+| `E12_ADJUSTMENT_UNEXPLAINED` | either, by `M`'s side | **`P8`** | `adj_…` |
+| `E14_UTR_COLLISION` | outbound | **`P6`** | `setl_…` — one item per settlement whose credit cannot be attributed |
+| `E05_AMOUNT_MISMATCH`, `E06_FEE_MISMATCH`, `E07_GST_MISMATCH` | — | **none** — ingest-invariant failures, above | — |
+| `E08_DUPLICATE_OBSERVATION` | — | **none.** A duplicate is not a second economic event. Posting it would book one fact twice, which is the error `E08` exists to detect; the retained copy posts under its own class | — |
+| `E10_REFUND_ORPHAN` | — | **none.** An `I6` referential failure — *"every referenced ID exists in the observation set"* — so §7's rejection applies and the line never posts | — |
+| `E11_TIMING_BOUNDARY` | — | **none.** §15 is explicit that this is *"deliberately not an error class — timing differences… deferred, not an error"*. The event belongs to the next period. Posting it to Suspense would book a healthy deferral as unresolved value and charge it `C_exception` | — |
+| `E13_LEDGER_ONLY` | — | **none.** Neither leg is establishable: `P6` would credit `1100_GATEWAY_RECEIVABLE` and `P5` would debit `1200_BANK`, so **either would let an attacker-controlled ERP row move a PG-side control account** — precisely the attack `THREAT_MODEL.md §T5` exists to prevent. The control that prevents it is *"it can never create a PG-side allocation"*, which is unaffected | — |
+
+**An exception that posts nothing is still an exception.** It carries a class, a
+`severity`, an `owner_role` and an `analyst_question`; it appears in
+`exceptions_by_class` at its `value(observation)` (§14.1); it is ranked in the
+value-ordered queue that metric 19 protects; and it is priced once at
+`C_exception` in `net_cost_inr`. What it does not do is open a Suspense item,
+because no rule among `P1`–`P8` can post it without asserting a rupee movement
+the evidence does not support. It cannot be suppressed either: close gate `G1`
+requires every observation to hold exactly one terminal state, with no drop path.
+
+**Seven of the fourteen classes post and seven do not**, and that split is the
+honest reading of the evidence rather than a gap: four of the seven silent
+classes are records that failed validation or duplicate another record, one is a
+deferral the specification refuses to call an error, and two would require a
+control account to be moved by an untrusted source.
 
 ### 17.2 Adjustment postings: a two-sided model `[ASSAY-MODEL]`
 
@@ -1084,9 +1290,39 @@ an adjustment reaches `EXCEPTION`, so it is outside the covered set over which
 `balance_harm_inr` is computed (`EVALUATION_SPEC.md §4.4`). It is priced once, as
 `C_exception` in `net_cost_inr`.
 
-**Any posting not enumerated in §17.1 or §17.2 falls to P8.** There is no
-undefined path: an event ASSAY cannot book authoritatively becomes a named,
-owned, valued exception rather than a silent omission or a guess.
+**`P8` applies to adjustment observations and to nothing else `[ASSAY-MODEL]`.**
+Spec 1.2.0 through 1.3.0 closed this section with *"any posting not enumerated in
+§17.1 or §17.2 falls to P8"*, and `DECISION_BRIEF.md §L.4` made departing from
+that fallback a spec amendment. **The universal reading was not constructible**
+and is withdrawn at spec 1.4.0. `P8`'s amount `M` is read off
+`ReconLine.debit`/`credit` under a guarantee `I3` gives *"for `type ===
+"adjustment"`"* only, and it fails three ways outside that domain:
+
+- **No `M` exists.** A `bank_line`, `ledger_entry`, `settlement` or `dispute`
+  observation carries no `ReconLine`. `BankStatementLine` has `amount` and
+  `direction`; `MerchantLedgerEntry` has `gross_paise` and `gl_account`. Neither
+  has `debit`/`credit`.
+- **`M` is not unique on exactly the rows that reached the fallback.** `E05`,
+  `E06` and `E07` are raised *because* `I3` failed (`RECONCILIATION_SPEC.md §2`
+  step 2), so a row with `debit = 500` and `credit = 97_000` has two candidates
+  for *"the non-zero one"*.
+- **`M` is the wrong figure even where it is unique.** On a well-formed card
+  payment line at the frozen `PREREGISTRATION.md §4.2` parameters —
+  `amount = 100_000`, `fee = 2_360`, `tax = 360`, `credit = 97_640` — the
+  fallback posts `97_640` while the item's `value(observation)` is `100_000`
+  (§14.1), so gate `G3` fails by `2_360` paise, exactly the fee, and every run
+  ends `BLOCKED`.
+
+The counter-leg fails as well: `1200_BANK` is right for an adjustment, which *is*
+a settlement-account movement, and asserts an unevidenced bank movement for
+anything else.
+
+**There is still no undefined path.** §17.1.1's trigger table is total over
+`Observation.kind` × terminal state × `ExceptionClass`, so nothing reaches this
+section that is not an adjustment. An event ASSAY cannot book authoritatively
+becomes a named, owned, valued exception rather than a silent omission or a
+guess — which for seven of the fourteen classes means an exception with an owner
+and no journal line, not an invented posting.
 
 ---
 
@@ -1104,7 +1340,7 @@ interface BenchmarkScenario {
 }
 
 interface BenchmarkManifest {
-  benchmark_version: string;       // "1.0.2"
+  benchmark_version: string;       // "1.0.3"
   created_at: UnixSeconds;
   generator_commit: string;
   spec_commit: string;             // commit of PREREGISTRATION.md at seal time
@@ -1226,9 +1462,17 @@ interface CloseReport {
   value_reconciled_paise: Paise;   // Σ recon_line.amount where RECONCILED
 
   // --- what was not ---
-  unresolved_value_paise: Paise;   // = abstained + open exceptions
-  value_abstained_paise: Paise;
-  value_exceptions_paise: Paise;
+  unresolved_value_paise: Paise;   // Σ value(item) over OPEN SUSPENSE ITEMS,
+                                   // read from the Decision / Exception records.
+                                   // The G3 right-hand side. Amended at
+                                   // benchmark v1.0.3 — see below.
+  value_abstained_paise: Paise;    // its abstention half
+  value_exceptions_paise: Paise;   // its open-exception half
+  unresolved_value_paise_multiview: Paise;  // the benchmark v1.0.2 universe:
+                                   // Σ value(observation) over EVERY reconcilable
+                                   // observation in ABSTAINED or EXCEPTION.
+                                   // EXPLORATORY, reported every run, never a
+                                   // gate and never a close-policy input.
   value_suspense_paise: Paise;     // NET projected Suspense balance (Σdr − Σcr
                                    // over 9000_SUSPENSE). NOT the G3 quantity:
                                    // G3 tests the GROSS Σ |item_net_paise|
@@ -1273,6 +1517,34 @@ containing both `E03` and `E04` does not satisfy; testing only their equality, a
 benchmark v1.0.0 did, would fail on a structurally healthy run and would be
 satisfiable by two offsetting suppressions. The gross identity is gate
 G3, and it is what makes silent exception suppression arithmetically impossible.
+
+**`unresolved_value_paise`'s universe, amended at benchmark v1.0.3.** It is
+summed over **open Suspense items** — one per **abstained target** and per open
+exception whose class posts, keyed by `JournalLine.source_entity_id` (§16) — and
+its per-item figure is read from the owning `Decision` or `Exception` record.
+Gate `G3` therefore compares the **queue** against the **books**: the two sums
+are drawn from two independently maintained stores over one universe, and a
+suppression on either side breaks the identity. That is the whole of what
+`THREAT_MODEL.md §T8` asks for, and it is unchanged.
+
+Through benchmark v1.0.2 this field was summed over **every** reconcilable
+observation in a non-resolved state, which `RECONCILIATION_SPEC.md §10.3` records
+as counting *"several views"* of one economic break. `G3` is an identity **exact
+to the paisa**, and no set of postings satisfies it against a multi-view sum: the
+worked example at `RECONCILIATION_SPEC.md §11` posts ₹1,00,000 for a break whose
+multi-view total is ₹3,00,000, and posting each view separately would relieve
+`1100_GATEWAY_RECEIVABLE` twice for one break. The v1.0.2 universe made `G3`
+unsatisfiable, which ends every run `BLOCKED` and violates metric 14 by
+construction.
+
+**The v1.0.2 quantity is retained, not replaced.**
+`unresolved_value_paise_multiview` carries it on every run, labelled
+`EXPLORATORY` per `PREREGISTRATION.md §8`, in the same way
+`period_status_legacy_policy` carries the superseded close policy. It supports no
+claim and gates nothing; it exists so a reader can see both universes and the
+transition between them without re-running anything. **This amendment lowers
+`unresolved_value_paise` and makes `CLOSED` easier to reach**; the disclosure is
+in `PREREGISTRATION.md §8` and `DECISION_BRIEF.md §A.7`.
 
 ---
 

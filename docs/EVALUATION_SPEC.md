@@ -1,9 +1,24 @@
 # EVALUATION_SPEC — ASSAY
 
-**Spec version:** 1.3.0 · **Date:** 2026-08-25
+**Spec version:** 1.4.0 · **Date:** 2026-08-26
 
 Every metric answers the question: **what decision does this number let someone
 make?** A metric that does not change anyone's behaviour is not reported.
+
+**At spec 1.4.0 / benchmark 1.0.3** this document amended **metric 12**'s
+universe — `unresolved_value_inr` is summed over open Suspense items rather than
+over every reconcilable observation in a non-resolved state (§4.9) — and restated
+**metric 13** against the item key now defined in `DATA_MODEL.md §16`. The v1.0.2
+universe is retained and reported every run as `unresolved_value_inr_multiview`,
+labelled `EXPLORATORY`. **This lowers metric 12 and makes `CLOSED` easier to
+reach** — through two separate channels, the view collapse and the seven
+exception classes that §17.1.1 gives no Suspense item — and it is nevertheless
+required: under the v1.0.2 universe gate G3 was unsatisfiable and every run ended
+`BLOCKED`. Metric 28's denominator field name
+was corrected to `gross_paise` (§4.1), and §6 now requires exceptions that open
+no Suspense item to be reported separately. Direction of effect and the full
+dependency statement are in `PREREGISTRATION.md §8` and `DECISION_BRIEF.md §A.7`.
+The paragraphs below describe the earlier releases and are retained as history.
 
 **At spec 1.3.0 / benchmark 1.0.2** this document amended **metric 6**: both
 `balance_harm_inr` and `misdirected_value_inr` are now computed over the covered
@@ -425,10 +440,25 @@ ASSAY is vulnerable here, the report says so.
 ```
   period_status_distribution = share of runs ending CLOSED / OPEN / BLOCKED
   unresolved_value_inr       = value_abstained + value_open_exceptions at close,
-                                 over RECONCILABLE observations only
-                                 (DATA_MODEL §10.1)
+                                 summed over OPEN SUSPENSE ITEMS — one per
+                                 ABSTAINED TARGET and per open exception whose
+                                 class posts (DATA_MODEL §17.1.1), keyed by
+                                 JournalLine.source_entity_id, valued at
+                                 value(observation) (DATA_MODEL §14.1) and read
+                                 from the Decision / Exception records.
+                                 Amended at benchmark v1.0.3.
+  unresolved_value_inr_multiview
+                             = the benchmark v1.0.2 universe: value(observation)
+                                 over EVERY reconcilable observation in ABSTAINED
+                                 or EXCEPTION. EXPLORATORY per PREREGISTRATION §8,
+                                 reported for every seeded run, never a gate and
+                                 never a close-policy input. Retained so both
+                                 universes and the transition between them are
+                                 visible without re-running anything.
   suspense_identity_exact    = gate G3, gross per-item (RECONCILIATION_SPEC §10.1):
-                                 Σ |item_net_paise| === unresolved_value_paise
+                                 Σ |item_net_paise| === unresolved_value_paise,
+                                 the left side from the journal lines and the
+                                 right side from the Decision / Exception records
   close_gate_failures        = per-gate failure counts across all runs
   batch_value_paise          = Σ recon_line.amount, the close denominator
   close_threshold_paise      = round_half_up(batch_value_paise * 5 / 1000)
@@ -450,7 +480,32 @@ never refused to close is an untested close gate.
 `suspense_identity_exact` must be `true` on every run. It is the gross per-item
 form of gate G3 (`RECONCILIATION_SPEC.md §10.1`) — the arithmetic proof that no
 exception was silently dropped between the queue and the books, and that two
-offsetting suppressions cannot cancel each other out of the total.
+offsetting suppressions cannot cancel each other out of the total. Its two sides
+are drawn from two independently maintained stores over one universe, which is
+what makes it a cross-check rather than a restatement.
+
+**Metric 12's universe was amended at benchmark v1.0.3, and the direction is
+disclosed.** Through v1.0.2 it summed every reconcilable observation in a
+non-resolved state — several *views* of one economic break — against which G3's
+exact identity was **unsatisfiable**: `RECONCILIATION_SPEC.md §11`'s worked
+example posts ₹1,00,000 against a multi-view total of ₹3,00,000, so every run
+ended `BLOCKED` and metric 14 was violated by construction. Collapsing onto the
+item universe **lowers this metric and makes `CLOSED` easier to reach**. It
+applies identically to ASSAY, both baselines and all three ablations, so no
+comparison between agents shifts. `unresolved_value_inr_multiview` carries the
+superseded figure on every run.
+
+**A second, separate channel lowers it as well.** `DATA_MODEL.md §17.1.1` gives
+seven of the fourteen exception classes no Suspense item, so `E05`, `E06`, `E07`,
+`E08`, `E10`, `E11` and `E13` leave this metric entirely. The close gate
+therefore no longer sees ledger-side, duplicate, ingest-failure, orphan-refund or
+timing value, and a period can close while the merchant ledger is substantially
+untied — the failure mode §4.1 publishes three coverage views to expose. Metric
+28 scores zero for it, `C_exception` prices it, and §6 requires the count and
+value of non-posting exceptions on every run; `G3` does not cover it. A third
+channel pushes the other way: the remaining seven classes open items no
+implementation was opening before. **The net is not claimed here** — see
+`PREREGISTRATION.md §8`.
 
 ### 4.10 Abstention DoS surface
 
@@ -612,9 +667,19 @@ For each of the 14 exception classes: count, total rupee value, mean value,
   generator's known cause. Measures whether the triage is trustworthy.
 - **Suspense reconciliation** — proof of gate G3, exactly:
   `Σ |item_net_paise| = Σ abstained value + Σ open exception value` over open
-  Suspense items. Reported with the split between debit-side and credit-side
-  Suspense items, since a net-only figure would hide two offsetting suppressions.
-  Confirms nothing was quietly dropped between the queue and the books.
+  Suspense items, keyed by `JournalLine.source_entity_id`. Reported with the
+  split between debit-side and credit-side Suspense items, since a net-only
+  figure would hide two offsetting suppressions. Confirms nothing was quietly
+  dropped between the queue and the books.
+- **Exceptions that open no Suspense item** — `DATA_MODEL.md §17.1.1` gives
+  seven of the fourteen classes no posting, so they carry an owner and a value
+  but no journal line and enter neither side of G3. Their count and rupee value
+  are reported **separately and explicitly**, because an exception outside the
+  Suspense identity is one the identity cannot vouch for, and a reader is
+  entitled to see how much of the exception queue that is. They remain covered
+  by gate G1, which admits no drop path.
+- **`unresolved_value_inr_multiview`** — the benchmark v1.0.2 universe, labelled
+  `EXPLORATORY`, printed beside the amended figure.
 
 ---
 

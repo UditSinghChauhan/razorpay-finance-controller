@@ -1,6 +1,11 @@
 # RELATED_WORK — ASSAY
 
-**Spec version:** 1.3.0 · **Date:** 2026-08-25
+**Spec version:** 1.4.0 · **Date:** 2026-08-26
+
+**At spec 1.4.0** this document is unchanged apart from the version header. §7's
+statement that the ledger package *"exposes exactly one write path and it accepts
+only a validated decision"* is unaffected by the contract now defined in
+`ARCHITECTURE.md §4` — see `DECISION_BRIEF.md §A.7`.
 
 Where ASSAY sits, and — more usefully — where it does not. The purpose of this
 document is to pre-empt "this already exists" by naming the things that already

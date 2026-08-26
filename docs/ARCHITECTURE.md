@@ -1,6 +1,13 @@
 # ARCHITECTURE — ASSAY
 
-**Spec version:** 1.3.0 · **Date:** 2026-08-25
+**Spec version:** 1.4.0 · **Date:** 2026-08-26
+
+**At spec 1.4.0** this document defined the `ValidatedDecision` contract, its
+declaration site, its construction authority and the mechanism enforcing *"only
+S5 may construct"* (§4, boundary 3), and restated §8's Suspense paragraph against
+the item key and the posting-trigger table — see `DECISION_BRIEF.md §A.7`. **No
+component, package, interface or data flow changed**, and the two-layer split is
+unchanged.
 
 **At spec 1.3.0** this document changed in §6 only: trust-boundary item 3 now
 points at the normative `(kind, source_system, payload)` table in
@@ -524,11 +531,18 @@ balance* (`DATA_MODEL.md §17`).
   no per-account adjustment. The posting table is normative in
   `DATA_MODEL.md §17.1`, and `§17.2` defines the conservative fallback for events
   with no authoritative mapping.
-- `9000_SUSPENSE_UNRECONCILED` receives every abstention and every open exception,
-  **on both sides** — inbound unattributable credits credit it, outbound unmatched
+- `9000_SUSPENSE_UNRECONCILED` receives abstentions and open exceptions **on both
+  sides** — inbound unattributable credits credit it, outbound unmatched
   settlements debit it. The rupee value ASSAY declined to guess is therefore the
   **gross** sum `Σ |item_net_paise|` over open Suspense items, which is what gate
-  G3 tests.
+  G3 tests. An item is the set of Suspense lines sharing one
+  `JournalLine.source_entity_id` (`DATA_MODEL.md §16`); it is *open* while that
+  set nets to a non-zero figure, because a `P7` resolution reverses under the
+  same key. Which observations post at all is `DATA_MODEL.md §17.1.1`'s trigger
+  table: seven exception classes open an item and seven do not, the latter
+  because no rule among `P1`–`P8` can post them without asserting a rupee
+  movement the evidence does not establish. Those still carry an owner, a value
+  and a queue position, and gate G1 still admits no drop path.
 
 **Why two layers rather than one.** They fail differently and so must be checked
 differently. Layer A detects *tampering* — someone changed the record of what
