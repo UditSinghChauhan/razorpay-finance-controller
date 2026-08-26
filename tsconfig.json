@@ -4,6 +4,7 @@
     "vitest.config.ts",
     "packages/*/src/**/*.ts",
     "packages/*/tests/**/*.ts",
+    "tests/**/*.ts",
     "apps/*/src/**/*.ts",
     "apps/*/tests/**/*.ts"
   ]

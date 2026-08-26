@@ -8,10 +8,13 @@ export default defineConfig({
   test: {
     environment: "node",
 
-    // §K places each package's tests under packages/<name>/tests/.
+    // §K places each package's tests under packages/<name>/tests/. The
+    // workspace-level tests/ directory holds checks that belong to no single
+    // package — currently the §L.3 suite floor.
     include: [
       "packages/*/tests/**/*.test.ts",
       "apps/*/tests/**/*.test.ts",
+      "tests/**/*.test.ts",
     ],
 
     // Type-level tests. T0-1's acceptance criterion is that "float usage is a
@@ -25,11 +28,18 @@ export default defineConfig({
       ],
     },
 
-    // The workspace is being built one package at a time (§L.2) and currently
-    // holds no packages, so `vitest run` must exit 0 on an empty match rather
-    // than fail the verification path. REVIEW THIS at Commit 2: once
-    // packages/money lands with its tests, this should be set back to false so
-    // that a vanished suite is a build failure.
-    passWithNoTests: true,
+    // `packages/money` landed with its tests, so the review this flag asked
+    // for is due: a vanished suite is a build failure.
+    //
+    // What the flag guards is narrower than it looks, and the difference is
+    // why tests/workspace-suite-floor.test.ts exists alongside it. Vitest
+    // computes the run's outcome from the AGGREGATE module list against the
+    // ROOT config — `hasFailed(modules) { if (!modules.length) return
+    // !config.passWithNoTests; ... }` — so this setting only decides the case
+    // where nothing matched anywhere. Delete one package's tests/ and another
+    // package still matches, the module list is non-empty, and the run exits 0
+    // whatever this flag says. Declaring per-project `passWithNoTests` does
+    // not change that either: the check reads the root config.
+    passWithNoTests: false,
   },
 });
