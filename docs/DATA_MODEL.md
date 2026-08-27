@@ -1,9 +1,26 @@
 # DATA_MODEL — ASSAY
 
-**Spec version:** 1.4.0 · **Date:** 2026-08-26
+**Spec version:** 1.4.2 · **Date:** 2026-08-27
 
 All schemas are normative. The implementation agent must not add, rename or
 retype fields without a spec version bump.
+
+**At spec 1.4.2** this document extends `E11_TIMING_BOUNDARY` in §15 to a refund
+`recon_line` left unsettled by `PREREGISTRATION.md §4.2`'s batch-composition rule
+— a **semantic addition**, recorded as such — and adds the missing `refund` row to
+§17.1.1's kind table, a **contradiction repair** of §17.2's totality claim. **No
+posting rule, no `AccountCode`, no exception class and no metric definition was
+added or changed**, both additions are non-posting, and `§17.1.1` already
+determined the unsettled refund's own postings: `P3` at ingest and `P4` only
+where its settlement is reconciled to a bank credit, so truth and agent agree.
+`E02` is untouched and still owns the unsettled *capture*. See
+`DECISION_BRIEF.md §A.9` and `PREREGISTRATION.md §10` V15.
+
+**At spec 1.4.1** this document withdrew §3's claim that `receipt`'s documented
+uniqueness *"makes anchor `AN5` legitimate"* — the anchor is retired in
+`RECONCILIATION_SPEC.md §3` — and added §22.2 rows M16 and M17. **No schema,
+field, account, posting rule, invariant or metric changed**, `receipt` remains
+quarantined, and the trust boundary is untouched. See `DECISION_BRIEF.md §A.8`.
 
 **At spec 1.4.0** this document added `§17.1.1`, the normative posting-trigger
 table over `Observation.kind` × terminal state × `ExceptionClass`; narrowed `P8`
@@ -253,8 +270,17 @@ them as its own.
 
 Orders matter to reconciliation because they are the join key to the merchant's
 ERP: the merchant books receivables against orders, not payments. `[RZP-DOC]`
-`receipt` is documented as at most 40 characters and required to be unique — that
-documented uniqueness is what makes anchor `AN5` legitimate rather than a guess.
+`receipt` is documented as at most 40 characters and required to be unique. Spec
+1.2.0 through 1.4.0 added that *"that documented uniqueness is what makes anchor
+`AN5` legitimate rather than a guess."* **That sentence is withdrawn at spec
+1.4.1.** Documented uniqueness would have made `AN5` *well-keyed*; it never made
+it *admissible*. `receipt` is quarantined by §0 rule 4 and is therefore not
+available to the deterministic core that would have to evaluate the anchor, and
+`THREAT_MODEL.md §T5` holds that the merchant ledger contributes soft evidence
+only — so a hard anchor on a merchant-controlled reference is excluded on trust
+grounds as well as on availability. `AN5` is retired in
+`RECONCILIATION_SPEC.md §3`; `receipt` remains quarantined and is reachable only
+through the `fetch_order` probe, where it feeds `SE2` as soft evidence.
 
 ---
 
@@ -878,7 +904,7 @@ Fourteen classes. Closed set; `classify_exception` cannot emit anything else.
 | `E08_DUPLICATE_OBSERVATION` | Same entity observed twice from one source |
 | `E09_DUPLICATE_BANK_CREDIT` | Same UTR credited twice |
 | `E10_REFUND_ORPHAN` | Refund references a payment not in the dataset |
-| `E11_TIMING_BOUNDARY` | Event falls outside the period; deferred, not an error |
+| `E11_TIMING_BOUNDARY` | Event falls outside the period — or a `recon_line` with `type === "refund"` that is in period and carries no settlement, because the settlement that would relieve it falls outside the period (`PREREGISTRATION.md §4.2`); deferred, not an error |
 | `E12_ADJUSTMENT_UNEXPLAINED` | Adjustment with no traceable cause |
 | `E13_LEDGER_ONLY` | Merchant booked an entry with no PG counterpart |
 | `E14_UTR_COLLISION` | Multiple settlements share a UTR prefix after truncation |
@@ -886,6 +912,29 @@ Fourteen classes. Closed set; `classify_exception` cannot emit anything else.
 `E11` is deliberately *not* an error class — timing differences are the most
 common false positive in real reconciliation, and calling them errors is how
 recon tools lose analyst trust.
+
+**The refund clause is a semantic addition at spec 1.4.2, not a clarification
+`[ASSAY-MODEL]`.** Through spec 1.4.1 `E11` fired only where an observation's
+**own** membership clock lay outside the period, and it still does:
+`PREREGISTRATION.md §4.2` defines membership as *"IN PERIOD iff the observation's
+OWN clock lies in `[from, to]`"*, and `F09`'s late `settlement` and `bank_line`
+rows carry out-of-period clocks of their own, so the original trigger is
+unchanged and remains reachable. The clause is added because `§4.2`'s
+batch-composition rule leaves a refund **in** period whose settlement is not
+assignable within it, and `§14` types `Exception.class` as one of the fourteen
+with no null admitted — so a class must be assigned and no other member of the
+closed set fits.
+
+**It is confined to refund recon lines, and the boundary is load-bearing.** An
+unsettled *capture* remains `E02`, whose `P6` relieves the
+`1100_GATEWAY_RECEIVABLE` that `P1` recognised. A refund recognised a
+`2200_REFUND_LIABILITY` under `P3`, which neither `P5` nor `P6` can touch, so the
+correct posting is none and only a non-posting class fits — which is why `E02`
+cannot simply be stretched across. Widening the clause beyond refund recon lines
+would move `F06`'s unsettled capture out of Suspense and change metrics 12, 13
+and 14 and gate `G3`. **`E11` becomes exercisable on DEV data through `F02`**,
+whose *"settled in batch N+2"* mechanism strands a refund raised in the final two
+days of the period; `PREREGISTRATION.md §10` V14 records the consequence.
 
 ---
 
@@ -1120,7 +1169,20 @@ selects among `P1`–`P8`, which are unchanged.
 | `recon_line`, `type === "refund"` | the settlement it is allocated to is **itself reconciled to a bank credit through real bank-side evidence**, as for `P2` above | **`P4`** |
 | `settlement`, `bank_line` | reaches `RECONCILED` | **none on the reconciled path** — their unresolved states do post, under `P6` and `P5` respectively; see the Suspense table below. `I4` closes a settlement as the sum of its allocated lines and `I5` makes a bank line a sum of settlements — `EVALUATION_SPEC.md §4.1` states the same thing when it rejects `Σ bank_line.amount` as a denominator because *"`I5` makes bank lines aggregates"*. `P2` already posts the bank leg per line, so a second posting on the aggregate view would double every account it touches |
 | `ledger_entry`, `dispute` | **any state, including `ABSTAINED` and `EXCEPTION`** | **none.** `true_journal.source_entity_id` (§1) ranges over `pay_… \| rfnd_… \| adj_… \| setl_… \| bnk_…` and admits no `mle_…` or `disp_…`, so **truth posts no line attributable to either kind**. An agent that posted one would put `proj_agent ≠ proj_truth` on a *correct* decision and charge itself `balance_harm_inr` for it — the confound `EVALUATION_SPEC.md §4.4` exists to remove |
+| `refund` | **any state, including `ABSTAINED` and `EXCEPTION`** | **none.** No rule among `P1`–`P8` is constructible over a `Refund` payload: `P1`–`P4` read `ReconLine` fields the entity does not carry, `P5`/`P6` require the observation to be an allocation target and the target universe is settlements and bank lines (`RECONCILIATION_SPEC.md §4`), and `P8` is adjustment observations only (§17.2). The obligation is already posted by the refund's `recon_line` (`type === "refund"`) under `P3` and `P4`; a second posting on the `pg_refunds` view would book one economic event twice, which the `settlement` / `bank_line` row above refuses on the same ground |
 | `payment`, `order` | — | **none.** Reference kinds; §10.1 |
+
+**The `refund` row is a contradiction repair, added at spec 1.4.2
+`[ASSAY-MODEL]`.** §17.2 states that this table is *"total over `Observation.kind`
+× terminal state × `ExceptionClass`"*, and through spec 1.4.2 it was not:
+`Observation.kind === "refund"` — the `pg_refunds` view of §10 — had no row,
+though §10.1 classes it reconcilable. The row above **adds no posting rule, no
+account and no exception class**; the non-posting it declares was already forced
+by exhaustion over `P1`–`P8`, which is why it repairs the totality claim rather
+than deciding anything. Note that §14.1's `value(observation)` table omits the
+same kind, so a `refund`-kind observation that reached `EXCEPTION` would carry no
+defined `value_paise`; that is recorded rather than resolved here, and the only
+class §10.1 attaches to the kind is `E10`, which requires an orphan.
 
 A line that **fails ingest validation posts nothing at all**, in either
 direction. `RECONCILIATION_SPEC.md §2` step 2 already states that such a record
@@ -1640,6 +1702,8 @@ reference beats endpoint reference beats product guide beats pricing page.
 | M13 | Narrowing `ReconLine.type` to exclude `transfer`; excluding `paylater`, Amex and Diners from generation | Scope decisions; the documented value sets are wider |
 | M14 | Quarantining `notes` as one canonical-JSON blob | A design choice about the trust boundary |
 | M15 | The adjustment information boundary: `Adjustment` (`reason`, `direction`, `related_entity_id`) is true-state only and never observed; ASSAY sees an adjustment as a `ReconLine` with `type === "adjustment"` | Razorpay publishes no Adjustments API entity (M9), so there is no documented observable from which a reason could be read. The boundary is ASSAY's modelling decision, not a Razorpay behaviour |
+| M16 | `AN5` is not exercised, and the merchant ledger is soft evidence only | Retiring the anchor is ASSAY's decision, taken at spec 1.4.1 on two grounds internal to this specification — `order.receipt`'s quarantine (§0 rule 4) and `THREAT_MODEL.md §T5`'s soft-evidence doctrine. Razorpay documents nothing about how a merchant's ERP references its own orders, and asserts no anchor either way |
+| M17 | The `order.receipt` → `MerchantLedgerEntry.order_ref` lossy re-encoding, and its retention band | §8 states that the mapping is lossy; the *form* of the transform and how much shape it retains are ASSAY's, and are a declared governance convention with no documentary basis (`PREREGISTRATION.md §4.2`) |
 
 ### 22.3 `[NOT-CLAIMED]` — considered and deliberately not asserted
 

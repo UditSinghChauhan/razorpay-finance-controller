@@ -2,8 +2,21 @@
 
 **Track:** 04 — AI Finance Controller
 **Status:** Specification. Frozen scope for implementation.
-**Spec version:** 1.4.0
-**Date:** 2026-08-26
+**Spec version:** 1.4.2
+**Date:** 2026-08-27
+
+**At spec 1.4.2** this document is unchanged apart from the version header. **No
+success-criterion threshold changed and no criterion was added, removed or
+weakened** — S1–S12 stand as written. `PREREGISTRATION.md §4.2`'s
+batch-composition rule moves realized metric values, not definitions; §9's
+10,000–20,000 bound is unaffected because no observation is added or removed.
+
+**At spec 1.4.1** §1 restates what *"reconciles against two views"* means now that
+anchor `AN5` is retired (`RECONCILIATION_SPEC.md §3`): the recon report and the
+bank statement are tied out against each other, and the merchant ledger is held as
+soft evidence and flagged wholesale. §9's Track-04 row follows. **No
+success-criterion threshold changed and no criterion was added, removed or
+weakened** — S1–S12 stand as written.
 
 **At spec 1.4.0** this document is unchanged apart from the version header, and
 **no success-criterion threshold changed.** Two criteria change in
@@ -42,6 +55,18 @@ whenever the evidence admits more than one materially different allocation, and
 closes the period only when the books balance and Suspense reconciles exactly.
 
 It runs end to end with no language model at all.
+
+**What "reconciles against two views" means precisely, restated at spec 1.4.1.**
+The recon report and the bank statement are **tied out against each other**: both
+carry anchors the deterministic core can evaluate, and both reach `RECONCILED`.
+The merchant ledger is **held as soft evidence and flagged wholesale**: its only
+anchor, `AN5`, is retired in `RECONCILIATION_SPEC.md §3` because it would have
+required a hard reconciliation decision on merchant-controlled ERP data, which
+`THREAT_MODEL.md §T5` excludes. Every ledger entry therefore reaches
+`E13_LEDGER_ONLY` with an owner and an analyst question, and `coverage_by_value_ledger`
+(metric 28) reads `0.0` by construction. ASSAY consumes three sources and ties out
+two of them; the third bounds nothing and is not claimed to. Saying so here is
+cheaper than letting a reader infer it from a zero.
 
 ## 2. The problem, stated precisely
 
@@ -286,7 +311,7 @@ Explicitly out of scope. Each is listed because it is a plausible temptation.
 
 | Track 04 requirement | How ASSAY satisfies it | Where measured |
 |---|---|---|
-| "Closes one finance-ops loop" | Three-way settlement reconciliation terminating in a period close that passes five gates and reaches `CLOSED` or `OPEN` (§5, §5.1) | `close_report.json`, `EVALUATION_SPEC.md §4.9` |
+| "Closes one finance-ops loop" | Settlement reconciliation across three sources — recon report and bank statement tied out against each other, merchant ledger held as soft evidence (§1) — terminating in a period close that passes five gates and reaches `CLOSED` or `OPEN` (§5, §5.1) | `close_report.json`, `EVALUATION_SPEC.md §4.9` |
 | "50+ record batch of synthetic data" | 500-record demo slice; 10,000–20,000 per benchmark run | `benchmark_manifest.json` |
 | "Reporting its match rate" | Coverage and match precision/recall by count **and by rupee value** | `EVALUATION_SPEC.md §4` |
 | "The exceptions it could not resolve" | Typed exception queue + abstentions, each with a certificate, all posted to Suspense | `EVALUATION_SPEC.md §6` |

@@ -1,6 +1,18 @@
 # ARCHITECTURE — ASSAY
 
-**Spec version:** 1.4.0 · **Date:** 2026-08-26
+**Spec version:** 1.4.2 · **Date:** 2026-08-27
+
+**At spec 1.4.2** this document is unchanged apart from the version header.
+Boundary 1's requirement that amounts be non-negative safe integers is one of the
+four frozen rules whose collision `PREREGISTRATION.md §4.2` resolves, and it is
+**unchanged and unweakened** — the unrepresentable batch was the inconsistent
+element, not the boundary. See `DECISION_BRIEF.md §A.9`.
+
+**At spec 1.4.1** this document is unchanged apart from the version header.
+Boundary 1's text quarantine is one of the two grounds on which anchor `AN5` was
+retired (`RECONCILIATION_SPEC.md §3`), and it is **unchanged and unweakened** —
+the anchor was the inconsistent element, not the boundary. No component,
+boundary, package, interface or data flow changed.
 
 **At spec 1.4.0** this document defined the `ValidatedDecision` contract, its
 declaration site, its construction authority and the mechanism enforcing *"only

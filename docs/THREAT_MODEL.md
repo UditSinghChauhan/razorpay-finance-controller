@@ -1,9 +1,20 @@
 # THREAT_MODEL — ASSAY
 
-**Spec version:** 1.4.0 · **Date:** 2026-08-26
+**Spec version:** 1.4.2 · **Date:** 2026-08-27
 
 Every control answers: **what specific failure does this prevent?** Controls that
 cannot name a failure are removed.
+
+**At spec 1.4.2** this document is unchanged apart from the version header. **No
+control, threat or mitigation was added, removed or weakened.**
+
+**At spec 1.4.1** §T5 records that anchor `AN5` is retired, and that this section
+is one of the two independent reasons why: an anchor on merchant-controlled
+`order_ref` would have been a hard determination on the source §1.1 rates *"the
+highest-value surface"*, forgeable by the insider §T5 models. §T5's **prevention
+is strengthened** and its **detection loses discrimination**; both are stated
+there. **No control, threat or mitigation was removed.** See
+`DECISION_BRIEF.md §A.8`.
 
 **At spec 1.4.0** this document restated gate G3 in §T8 in the gross per-item
 form spec 1.2.0 adopted everywhere else, and corrected §T5's claim that
@@ -187,9 +198,33 @@ reason.
 
 **Prevents.** Fabricated bookkeeping laundering a discrepancy into "reconciled."
 
-**This is the strongest argument for three-way reconciliation over the PG's own
-recon report:** a single-source report cannot detect a fabricated entry in a
-different source, because it never looks at one.
+**`AN5` retired at spec 1.4.1, and this section is why.** The controls above say
+the ledger *"only contributes **soft** evidence (`SE2`)"*, while
+`RECONCILIATION_SPEC.md §3`'s `AN5` made merchant-controlled `order_ref` a **hard**
+anchor — and an anchor removes a record from the search space. An insider who
+controls `order_ref` and knows the merchant's receipt scheme could set it equal to
+a real order's `receipt`, anchor the fabricated entry, and retire it from the
+exception queue: **the attack this section models, succeeding through the
+mechanism meant to catch it.** `AN5` is therefore not exercised, on this ground
+independently of the fact that `order.receipt` is quarantined and the anchor was
+never implementable. Hashing the key would not have helped — the preimage is
+guessable by construction.
+
+**What that costs, stated plainly.** Prevention is **strengthened**: with no
+anchor available, a fabricated entry cannot reach `RECONCILED` at all, posts no
+journal line, and moves no control account. Detection is **weakened**: every
+merchant ledger entry now reaches `E13_LEDGER_ONLY`, so the fabricated one is
+flagged among all of them rather than among a few, and the class carries no
+discriminating signal. It still carries an owner, an analyst question and a
+queue position, and gate `G1` still admits no drop path. The evaluation
+consequences are at `EVALUATION_SPEC.md §4.1`, `§4.5` and `§6`, and the residual
+is recorded at `PREREGISTRATION.md §10`.
+
+**This is the strongest argument for reconciling against sources the PG does not
+hold:** a single-source report cannot detect a fabricated entry in a different
+source, because it never looks at one. The argument is unchanged in kind and
+weaker in demonstration — ASSAY looks at the merchant ledger and refuses to tie
+it out, which is a narrower claim than tying it out and catching the forgery.
 
 ---
 

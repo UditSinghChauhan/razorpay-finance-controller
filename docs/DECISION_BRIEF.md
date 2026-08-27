@@ -1,8 +1,31 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.0 · **Date:** 2026-08-26
+**Spec version:** 1.4.2 · **Date:** 2026-08-27
 **Reviewer role:** principal architect / skeptical reviewer
+
+**At spec 1.4.2** §A.9 records one further resolution, taken at a governance gate
+held **after `packages/generator` was written and before any dataset was
+generated**: a capture-day batch whose refund debits exceed its credits had no
+representation under the frozen rules, and `PREREGISTRATION.md §4.2` now states
+that such a member is emitted **unsettled** rather than allocated or deferred.
+The rule supplies a value where the specification stated none; **no declared
+value changes**, benchmark v1.0.3 is unchanged, and two consequences it does not
+determine were traced in a further governance pass and closed in the same
+release — `E11`'s refund clause, `§17.1.1`'s missing `refund` row, and `C3`/`C4`
+against a null `settled_at` — with `PREREGISTRATION.md §10` V15 separating what
+the specification already determined from what was newly ratified.
+
+**At spec 1.4.1** §A.8 records one further correction: anchor `AN5` is retired as
+both unimplementable and, independently, inconsistent with `THREAT_MODEL.md §T5`.
+The same release supplies `PREREGISTRATION.md §4.1`'s reserved composition table —
+a uniform driver of `P = 659` payments per family, with `target_record_count`
+derived rather than chosen — transcribes the remainder of the generator contract
+into `§4.2`, `§4.3` and `§6.2`, and records three exception classes as
+DEV-unexercisable (`§10` V12–V14). Every transcribed value supplies one the
+specification previously left unstated; none changes a declared value. Benchmark
+v1.0.3 is unchanged. The GO verdict below stands, and §F's two
+unresolved assumptions are untouched.
 
 Spec 1.0.0 returned a MODIFY verdict with four blocking corrections. This
 revision applies them, plus nine further corrections raised in review. §A records
@@ -282,6 +305,150 @@ benchmark manifest and no executed run at the point of amendment, and
 `RECONCILIATION_SPEC.md §11` — unchanged since spec 1.2.0 — demonstrates the
 defect inside the frozen text without reference to any result. The mitigation is
 a number, not a paragraph: both universes are reported on every run.
+
+### A.8 Spec 1.4.1 / benchmark 1.0.3 — the anchor that could not be built, and should not have been
+
+A governance gate held **before `packages/generator` was written** asked what
+terminal state a `ledger_entry` can attain, and found that it can attain only one.
+`AN5` — the merchant ledger's sole anchor — compares `merchant_ledger.order_ref`
+against `order.receipt`, and `order.receipt` is quarantined by `DATA_MODEL.md §0`
+rule 4, unreadable by the deterministic core under `ARCHITECTURE.md §4` boundary
+1, and undelegatable because `RECONCILIATION_SPEC.md §3` bars anchors from LLM
+involvement. The shipped `OrderSchema` already carried no `receipt` field, which
+is what made the contradiction concrete rather than arguable: `packages/domain`
+implemented the quarantine correctly and thereby demonstrated that an anchor the
+reconciliation spec declares cannot be built.
+
+**The second reason is the one that decided it.** `THREAT_MODEL.md §T5` holds
+that the merchant ledger *"only contributes **soft** evidence (`SE2`)"* and
+`DATA_MODEL.md §12` that *"soft evidence can only rank, never admit."* `AN5` made
+a merchant-controlled field a **hard** anchor, and `§3` removes everything
+anchored from the search space — so an insider controlling `order_ref` could set
+it equal to a real `receipt`, anchor a fabricated entry, and retire it from the
+exception queue. **That is `§T5`'s own attack, succeeding through the mechanism
+meant to catch it.** A derived digest key was considered and rejected: it hides
+the plaintext from the core but the preimage is guessable by construction, so it
+changes nothing about forgeability while adding a carve-out to §0 rule 4. `AN5` is
+therefore retired rather than repaired, and the quarantine and `§T5`'s doctrine
+are left as the single consistent principle they always were — `AN5` was the
+outlier.
+
+**Consequences are published, not compensated.** Every `ledger_entry` now reaches
+`E13_LEDGER_ONLY`, so metric 28 reads `0.0`, metric 9 is depressed, and metric 2
+carries one `C_exception` per ledger entry. **No metric definition was amended and
+no threshold or composition was adjusted** in either direction; three disclosures
+and one `EXPLORATORY` companion line carry the effect instead. `PROJECT_SPEC.md
+§1` restates the claim honestly: three sources consumed, two tied out against each
+other, the third held as soft evidence and flagged wholesale. Reclassifying
+`ledger_entry` as a reference kind was rejected for the opposite reason to the
+digest key — it would delete `E13` and with it `§T5`'s detection entirely, paying
+a benchmark version bump to reach a weaker security position.
+
+**Benchmark v1.0.3 is unchanged, and the reason is precise:** no metric
+definition, threshold, family, split, baseline, ablation, seed count or stopping
+rule moves, and no measured quantity moves relative to any *conforming*
+implementation — because no conforming implementation could ever have executed
+`AN5`. Applied **before any dataset was generated and before any number was
+observed**, on an analytical finding rather than an observed result. `§F` F9's
+prohibition is untouched: nothing here adjusts the close policy, and `§L.4`'s ban
+on result-driven parameter changes is unaffected because no result exists.
+
+**What this cost and what it bought.** The project loses the ability to
+demonstrate three-way tie-out and must say so in its own words. It gains a
+threat-model control that holds unconditionally, and a governance record showing
+that the specification's own anchor was tested against the specification's own
+threat model and removed. `§G` item 4 already conceded that three-way
+reconciliation over a synthetic bank statement *"isn't really three-way"*; this is
+a sharper version of a concession already on the record, and it is a design
+rationale rather than an admission of synthetic weakness.
+
+### A.9 Spec 1.4.2 / benchmark 1.0.3 — the batch that could not be represented
+
+A governance gate held **after `packages/generator` was written and before any
+dataset was generated** asked what a capture-day batch does when its refund
+debits exceed its credits. The answer was that it cannot do anything: four frozen
+rules are jointly unsatisfiable there, and the specification had never said so.
+
+`ARCHITECTURE.md §4` requires `Settlement.amount` to be a non-negative amount.
+`I4` fixes `settlement.amount = Σ credit − Σ debit` over the allocated lines.
+`I3` enters a refund into that sum as a **debit**. And `PREREGISTRATION.md §4.1`
+allocates **one batch per capture-day** against `§4.2`'s 4.5% refund rate and its
+log-normal amount distribution, whose p99 is ₹2,40,000 against an expected daily
+gross of roughly ₹3,04,000. The generator surfaced it rather than absorbing it:
+its default was to refuse, name the family, seed, day and shortfall, and call the
+case a specification seam.
+
+**The frequency is what made it blocking.** Over 2,000 family instances at the
+frozen parameters, **22.15%** contain at least one such batch — every family,
+17.0% (`F09`) to 30.0% (`F02`) — with shortfalls from ₹46 to ₹25,97,694.
+Estimated under independence, the probability that all five seeds of the
+`F01`–`F06` range generate is **0.039%**, and **0.88%** for the held-out
+`F07`–`F10` range. This was not an edge case to be documented; the benchmark
+could not be produced.
+
+**Two resolutions were traced in full, and the smaller one was taken.** The
+rejected alternative was to defer the refund to a later batch on the shape of
+`DATA_MODEL.md §22.1` D23, *"Partial settlements defer whole transactions to the
+next slot"*. Three findings decided against it, **none of them a metric**:
+
+1. **The documentary claim does not survive.** D23 is documented for *payments*
+   deferred **out of** a settlement that cannot carry them, which lowers that
+   settlement's amount. Deferring a *refund* **in order to raise** a settlement
+   out of negative territory inverts both the item type and the direction.
+   Asserting it would promote an `[ASSAY-MODEL]` decision to `[RZP-DOC]`, the
+   move `DATA_MODEL.md §0` rule 6 forbids and spec 1.1.1 was released to correct.
+   Both options are ASSAY's own; deferral simply carries more machinery.
+2. **It does not terminate on its own.** Over 6,480 refunds, deferral reaches a
+   depth of 22 slots, carries 2 in 60 past `C4`'s `T_max = 7` calendar days —
+   making the *true* allocation inadmissible, failing the completeness gate, and
+   invalidating the benchmark under `PREREGISTRATION.md §5.3` — and leaves 12 in
+   60 with no slot before the period ends. **Deferral still needs the unsettled
+   state as its residue**, so it is an additional mechanism on top of the adopted
+   rule rather than an alternative to it.
+3. **It is the option that flatters the headline metric.** Refunds fail to fit
+   precisely *because they are large*. Deferral settles exactly those, raising
+   metric 1 `coverage_by_value`, on which `PROJECT_SPEC.md §7` S2 sets a ≥ 0.90
+   threshold. Choosing the metric-improving option at a governance gate is the
+   shape of decision pre-registration exists to prevent, and it is recorded here
+   so that the choice cannot be read as having been made on those grounds.
+
+**The adopted rule makes an already-reachable state explicit.** `§4.1`'s `F02`
+mechanism settles a refund *"in batch N+2"*, which leaves the 31-day grid for a
+refund raised in the final two days; measured under the pre-amendment default,
+198 of 207 completing `F02` instances already contained unsettled refunds. `F06`
+already declares that a capture *"remains unsettled within the period"*. Truth
+and agent both post `P3` at ingest and neither posts `P4`, exactly as
+`DATA_MODEL.md §17.1.1` already conditions them, so the two journals agree and
+`balance_harm_inr` is unaffected. No posting rule, account or exception class is
+added.
+
+**What the batch-composition rule did not itself decide, and how it was closed.**
+Three questions survived it, and each was traced against the existing text before
+anything was written. **The `§15` class an unsettled refund reaches:** `E02` could
+not be stretched to it — `§17.1.1` keys `E02` to `pay_…` and posts `P6`, crediting
+`1100_GATEWAY_RECEIVABLE`, an account a refund never debited, so applying it would
+put `proj_agent ≠ proj_truth` on a *correct* decision. `E11` was the only member of
+the closed fourteen whose meaning and absent posting both fit, but its stated
+trigger is the observation's **own** clock, which `PREREGISTRATION.md §4.2` makes
+explicit — so extending it is a **semantic addition** and is labelled one rather
+than passed off as reading. **`§17.1.1`'s totality claim:** `§17.2` asserted the
+trigger table was total over `Observation.kind` while the `refund` kind had no
+row; the row added is a **contradiction repair**, because non-posting was already
+forced by exhaustion over `P1`–`P8` — `packages/ledger` had reached the same
+conclusion independently and named the seam rather than papering over it.
+**`C3`/`C4` against a null `settled_at`:** the specification does not determine
+it, and the choice was put to the human rather than taken at the keyboard. What
+the text *did* settle was ruled out first — `C8`'s unique *"for members claimed as
+settled"* scoping shows the silence of `C3` and `C4` is deliberate, so they are
+unconditional and cannot merely "not apply" — and the ratified reading is that
+neither is satisfied and the member is excluded from every candidate.
+
+**None of the three moved a frozen quantity**, all three are recorded at
+`PREREGISTRATION.md §10` V15, and the one consequence left open — the terminal
+state an ordinary `refund`-kind observation reaches under `G1`, and that kind's
+absence from `§14.1` — binds the engine phase rather than generation.
+
+---
 
 ---
 

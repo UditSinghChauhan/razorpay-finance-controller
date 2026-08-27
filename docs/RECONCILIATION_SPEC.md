@@ -1,9 +1,30 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.4.0 · **Date:** 2026-08-26
+**Spec version:** 1.4.2 · **Date:** 2026-08-27
 
 The matching algorithm, the ambiguity definition, and the rules that decide
 accept / reject / abstain. This is the technical core of the project.
+
+**At spec 1.4.2** this document fixes the truth value of `C3` and `C4` against a
+null `settled_at` (§4.1): a candidate member whose `settled_at` is null satisfies
+neither, and is excluded from every candidate. **`C1`–`C8` membership is
+unchanged, `I1`–`I9` are unchanged, no threshold moved and no metric definition
+changed**, and benchmark v1.0.3 is unchanged. The rule is confined to a case the
+specification previously left undetermined; every true allocation contains only
+settled members, so `PREREGISTRATION.md §5.3`'s completeness gate is unaffected.
+It is **not** an application of `DATA_MODEL.md §17.1.1`'s *"undefined — not
+satisfied"* principle, which is stated for **invariant** `I5` at a different
+stage; the grounds are `C4`'s own bounded quantity and `C8`'s unique
+settled-only scoping, both given at §4.1. See `DECISION_BRIEF.md §A.9`.
+
+**At spec 1.4.1** this document **retired anchor `AN5`** (§3) and annotated `SE2`
+as a post-probe signal (§4.2). `AN5` was never implementable — `order.receipt` is
+quarantined by `DATA_MODEL.md §0` rule 4 — and, independently, a hard anchor on
+merchant-controlled ERP data contradicts `THREAT_MODEL.md §T5`'s soft-evidence
+doctrine and is forgeable by the insider that section models. **No constraint,
+invariant, threshold or metric changed**, and benchmark v1.0.3 is unchanged. The
+consequence — every `ledger_entry` reaches `E13_LEDGER_ONLY` — is disclosed at
+§3 and in `EVALUATION_SPEC.md §4.1`. See `DECISION_BRIEF.md §A.8`.
 
 **At spec 1.4.0** this document defined gate G3's item partition and amended its
 right-hand side's universe (§10.1), restated §9's terminal-state postings against
@@ -103,11 +124,51 @@ a strong key, and they are not subject to scoring or LLM involvement.
 | `AN2` settlement → bank line | `normalize(settlement.utr) === normalize(bank_ref)` and amount equal | `[RZP-DOC]` the UTR is documented as the reference *"available across banks"* used to track a settlement in the bank account. `[ASSAY-MODEL]` treating it as a **unique** key is ASSAY's assumption — Razorpay asserts no uniqueness, and official samples show at least three different UTR shapes. This is why the anchor also requires amount equality, and why `E14_UTR_COLLISION` exists |
 | `AN3` refund → payment | `refund.payment_id === payment.id` | Referential |
 | `AN4` payment → order | `payment.order_id === order.id` | Referential |
-| `AN5` ledger entry → order | `merchant_ledger.order_ref === order.receipt` (exact, after normalization) | Merchant-controlled but exact |
+| ~~`AN5` ledger entry → order~~ | ~~`merchant_ledger.order_ref === order.receipt`~~ | **NOT EXERCISED at spec 1.4.1 — see below.** The anchor set is `AN1`–`AN4` |
 
 An anchor is **rejected** if it would violate the one-allocation invariant (I2) —
 i.e. if the target is already anchored to a different source. A rejected anchor
 becomes `E08`/`E09`/`E14`, never a silent overwrite.
+
+**`AN5` is not exercised, for two independent reasons `[ASSAY-MODEL]`.** It is
+declared here and retired here; the row above is struck through rather than
+deleted so that the anchor's history stays legible.
+
+*It is not implementable.* `AN5` compares `merchant_ledger.order_ref` against
+`order.receipt`, and `order.receipt` is quarantined: `DATA_MODEL.md §0` rule 4
+places it *"only in `untrusted_text` … visible only to the LLM adjudicator"*,
+`DATA_MODEL.md §10` makes the ban structural — *"it is not that the core
+*chooses* not to read hostile text, it is that it *cannot*"* — and
+`ARCHITECTURE.md §4` boundary 1 states that *"the deterministic core never reads
+them."* The shipped `OrderSchema` accordingly carries no `receipt` field. Nor may
+the comparison be delegated: this section requires anchors to be *"not subject to
+scoring or LLM involvement."*
+
+*It should not be implemented.* `THREAT_MODEL.md §T5` holds that the merchant
+ledger *"only contributes **soft** evidence (`SE2`)"*, and `DATA_MODEL.md §12`
+holds that *"soft evidence can only rank, never admit."* An anchor is hard
+evidence, and this section removes everything anchored from the search space — so
+`AN5` would make a **hard, scrutiny-retiring** determination out of a field
+`THREAT_MODEL.md §1.1` classes as merchant-controlled, on the source it rates
+*"the highest-value surface."* It is also forgeable by the adversary `§T5`
+models: an insider who controls `order_ref` and knows the merchant's receipt
+scheme can set the two equal, anchor a fabricated entry to a real order, and
+retire it from the exception queue — defeating the control `§T5` exists to
+provide. Hashing the key would not change this, because the preimage is
+guessable by construction.
+
+**The consequence is stated rather than mitigated.** A `ledger_entry` is a
+reconcilable kind (`DATA_MODEL.md §10.1`), is never a target (§4) and cannot be a
+candidate member (`C6` requires `credit`/`debit`, which `MerchantLedgerEntry` does
+not carry), so with `AN5` retired it has no route to `RECONCILED` and reaches
+`EXCEPTION` under §9's *"no admissible candidate exists at all"*, with class
+`E13_LEDGER_ONLY`. **Every merchant ledger entry therefore reaches `E13`.**
+`§T5`'s *prevention* is unaffected and in fact strengthened — a fabricated entry
+cannot reach `RECONCILED`, posts no journal line (`DATA_MODEL.md §17.1.1`) and
+moves no control account — but its *detection* loses discrimination, because the
+fabricated entry is flagged among all of them rather than among a few. The
+evaluation consequences are disclosed at `EVALUATION_SPEC.md §4.1` and `§6` and
+recorded as a threat to validity at `PREREGISTRATION.md §10`.
 
 **Everything anchored is removed from the search space.** In a realistic batch
 this is 85–95% of records, and it is what makes the residual tractable. The
@@ -134,6 +195,47 @@ needing settlements), generate candidate member sets subject to hard constraints
 | `C7` | One-allocation: no member may already belong to an accepted allocation | Double-counting a payment is the most expensive reconciliation error. `[RZP-DOC]` and directly supported: Razorpay documents that partial settlements defer **whole transactions** to the next slot — its own worked example settles P1 and P2 and defers P3 — so a single payment is not split across two settlements |
 | `C8` | `on_hold === false` for members claimed as settled | `[ASSAY-MODEL]` a line flagged as held is not part of the settled set. `[RZP-DOC]` the field itself is documented, but specifically as *"whether the account settlement **for transfer** is on hold"* — a Razorpay Route concept toggled via `PATCH /v1/transfers/:id`. Route is out of Tier-0 scope, so **`C8` is expected to be non-binding on v1.0.0 data**; it is retained as a declared admissibility filter, and the fraction of candidates it excludes is reported so a reviewer can see that it is doing nothing rather than assume it is doing something |
 
+**`C3` and `C4` against a null `settled_at`, ratified at spec 1.4.2
+`[ASSAY-MODEL]`.** `PREREGISTRATION.md §4.2`'s batch-composition rule emits a
+member the batch cannot carry with `settled_at: null`, and both constraints read
+that field. Their truth value there was undetermined, and it is fixed here.
+
+```
+  rule      a candidate member whose settled_at is null does NOT satisfy C3,
+            and does NOT satisfy C4. It is excluded from every candidate.
+
+  applies   identically to both. They sit in one table, are both unqualified
+            over members, read the same field and are evaluated at the same
+            stage on the same candidate; §5.2 has the engine and the oracle
+            implement one shared declaration that §5.3's consistency gate
+            compares constraint by constraint, so a split treatment would make
+            one null admissible under C3 and not under C4 with nothing to
+            justify the difference.
+
+  scope     the member's OWN settled_at. No constraint is re-based onto the
+            target's settlement clock, and none is given a settled-only scope:
+            C8 alone is written "for members claimed as settled", so the
+            silence of C3 and C4 on that point is deliberate and they remain
+            unconditional over members.
+
+  effect    exclusion, never admission. A filter "admits or excludes, never
+            ranks" (above), and an unconditional filter whose bounded quantity
+            does not exist cannot report that it is within bounds: C4 bounds a
+            settlement window an unsettled member does not have, and C3's
+            ordering chain has a missing link.
+```
+
+**This changes nothing about the true allocation, and that is the point.** Every
+allocation the generator records contains only settled members, each carrying a
+`settled_at`, so `C3` and `C4` evaluate normally on it and
+`PREREGISTRATION.md §5.3`'s completeness gate is unaffected. What the rule
+removes is the engine's and the oracle's freedom to propose an **unsettled**
+member as part of an allocation — a proposal that contradicts the row's own
+`settled: false` and that `C6` would otherwise be the only filter against. It
+therefore narrows enumeration rather than widening it, and it leaves `E02`'s
+unsettled capture and `E11`'s unsettled refund to reach their terminal states by
+the route `§9` already gives them: no admissible candidate exists at all.
+
 Zero tolerance on `C6` is deliberate and worth defending: real settlement
 arithmetic is exact in paise. **In benchmark v1.0.0 `C6` is zero-tolerance
 throughout**: no scenario family exercises the declared bank-side rounding
@@ -151,7 +253,7 @@ standard way recon tools manufacture confident wrong answers.
 | ID | Signal | Weight (bps) |
 |---|---|---|
 | `SE1` | UTR prefix match length | 3500 |
-| `SE2` | `order_ref` ↔ `receipt` string similarity (Jaro–Winkler) | 2000 |
+| `SE2` | `order_ref` ↔ `receipt` string similarity (Jaro–Winkler). **Post-probe only** — `receipt` is quarantined, so this signal is computable solely from a `fetch_order` probe result (§6.2), as `SE5` is. It scores 0 for every candidate on which no probe has run | 2000 |
 | `SE3` | Temporal proximity to the modal settlement lag | 1500 |
 | `SE4` | Method / card-network agreement with the merchant memo | 1000 |
 | `SE5` | Probe result corroboration | 2000 |

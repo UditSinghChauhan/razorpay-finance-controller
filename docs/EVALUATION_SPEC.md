@@ -1,9 +1,26 @@
 # EVALUATION_SPEC — ASSAY
 
-**Spec version:** 1.4.0 · **Date:** 2026-08-26
+**Spec version:** 1.4.2 · **Date:** 2026-08-27
 
 Every metric answers the question: **what decision does this number let someone
 make?** A metric that does not change anyone's behaviour is not reported.
+
+**At spec 1.4.2 / benchmark 1.0.3** this document is unchanged apart from the
+version header. **No metric formula, universe or threshold was amended.**
+`PREREGISTRATION.md §4.2`'s batch-composition rule moves realized values only —
+metrics 1 and 9 downward, metric 2 upward by one `C_exception` per unsettled
+refund — with `batch_value_paise` and every §4.1 denominator unchanged. The full
+dependency statement is at `PREREGISTRATION.md §8`.
+
+**At spec 1.4.1 / benchmark 1.0.3** this document disclosed the consequences of
+retiring anchor `AN5` (`RECONCILIATION_SPEC.md §3`): metric 28
+`coverage_by_value_ledger` reads `0.0` by construction, metric 9 is depressed by a
+denominator its ledger-entry members cannot leave, and metric 2 carries one
+`C_exception` per ledger entry — identical across every agent, so no comparison
+shifts (§4.1, §4.5, §6). **No metric formula, universe or threshold was amended**;
+the effects are published with their explanations and one `EXPLORATORY` companion
+line. Benchmark v1.0.3 is unchanged. See `PREREGISTRATION.md §8` and
+`DECISION_BRIEF.md §A.8`.
 
 **At spec 1.4.0 / benchmark 1.0.3** this document amended **metric 12**'s
 universe — `unresolved_value_inr` is summed over open Suspense items rather than
@@ -185,6 +202,27 @@ post-fee net and is nullable, which fails both as a denominator and as a
 like-for-like counterpart to `bank_line.amount`. `BankStatementLine` does
 declare `amount`, so metric 27 above is unaffected.
 
+**Metric 28 reads `0.0` by construction at spec 1.4.1, and this is a scope
+statement rather than a performance figure.** `AN5` — the merchant ledger's only
+anchor — is retired in `RECONCILIATION_SPEC.md §3`, because evaluating it would
+require `order.receipt`, which `DATA_MODEL.md §0` rule 4 quarantines, and because
+`THREAT_MODEL.md §T5` holds the ledger to soft evidence only. A `ledger_entry` is
+never a target and cannot be a candidate member, so with `AN5` retired it has no
+route to `RECONCILED`: the numerator is structurally empty on every run, for every
+agent, on every seed. **The figure is published unchanged and this paragraph is
+published with it.** Its definition is not amended to compensate, and no threshold
+or composition is adjusted to move it — the quantity is honest and the
+explanation belongs beside it. Metric 27 `coverage_by_value_bank` is unaffected:
+`AN2` reads `settlement.utr` and `bank_ref`, both structural.
+
+**Metric 9 `coverage_by_count` is depressed by the same cause, and is likewise
+not amended.** `ledger_entry` is a reconcilable kind (`DATA_MODEL.md §10.1`), so
+it sits in metric 9's denominator and can never leave it — the precise shape of
+the defect this section corrected for reference kinds at benchmark v1.0.1. It is
+**not** corrected the same way here: reclassifying `ledger_entry` as a reference
+kind would delete `E13_LEDGER_ONLY` and with it `THREAT_MODEL.md §T5`'s detection,
+which is a worse trade than a depressed rate. Reported with this note attached.
+
 **Why the universes must match.** A single ₹1,000 payment surfaces as up to six
 observations across `recon_line`, `payment`, `order`, `ledger_entry` and shares of
 `settlement` and `bank_line`. Under a numerator over all observations and a
@@ -223,8 +261,12 @@ primary because abstaining on the three largest settlements while reconciling
 **What the primary metric does not measure, and why three views are published.**
 Recon-view coverage measures automation of the *payment-gateway-side* workload
 only. Reconciliation is three-sided, and a run can show 99% recon-view coverage
-while the bank statement is largely untied. The bank and ledger views do not solve
-that — they **expose** it. No weighting of three views into one scalar is
+while the bank statement is largely untied. The bank view does not solve that — it
+**exposes** it. **The ledger view does not, at spec 1.4.1**: metric 28 is
+structurally `0.0` because `AN5` is retired, so it bounds nothing and exposes
+nothing about reconciliation quality. Two views are tied out against each other
+and the third is held as soft evidence — `PROJECT_SPEC.md §1` states it in those
+terms. No weighting of three views into one scalar is
 defensible, and any weighting would be tunable, so all three are published
 side by side and none is collapsed into the others.
 
@@ -367,6 +409,25 @@ Collapsing them into a single number would hide that.
 
 **Decision enabled:** "Which system costs me less to run?" — the only question a
 controller actually asks.
+
+**A constant term entered this metric at spec 1.4.1 and is disclosed rather than
+removed.** With `AN5` retired (`RECONCILIATION_SPEC.md §3`) every `ledger_entry`
+reaches `E13_LEDGER_ONLY`, so `net_cost_inr` carries one `C_exception` per ledger
+entry in the dataset — **identical for ASSAY, `B0`, `B2`, `A1`, `A2` and `A3`**.
+It therefore inflates every *absolute* figure and cancels in every *comparison*,
+including metric 8 `gap_to_oracle`, which is a difference of two `net_cost_inr`
+values. The formula is **not** amended to exclude it. Instead every report carries
+a companion line, labelled `EXPLORATORY` per `PREREGISTRATION.md §8`:
+
+```
+  net_cost_inr_excluding_e13 = net_cost_inr − (|E13| × C_exception)
+```
+
+reported beside the authoritative figure — the pattern §4.9 already uses for
+`unresolved_value_inr_multiview`. It supports no claim; it exists so a reader can
+see the comparison without the constant. Note also that metric 26's cost sweep
+scales this term with `C_exception`, so the two move together and the sweep is
+read accordingly.
 
 This is the metric that makes the evaluation honest, because it prices
 abstention. Without a cost on abstention, `A2-NOABSTAIN` is trivially beaten by
@@ -678,8 +739,19 @@ For each of the 14 exception classes: count, total rupee value, mean value,
   Suspense identity is one the identity cannot vouch for, and a reader is
   entitled to see how much of the exception queue that is. They remain covered
   by gate G1, which admits no drop path.
+- **`E13_LEDGER_ONLY`, reported apart from the other thirteen classes** — with
+  `AN5` retired (`RECONCILIATION_SPEC.md §3`) every merchant ledger entry reaches
+  this class, so its count is the ledger-entry count and carries no information
+  about which entries are anomalous. It is reported with that statement attached,
+  and the confusion matrix above is read without it, because a class every record
+  reaches measures no triage judgement — the same ground on which `E12` is
+  excluded. `THREAT_MODEL.md §T5`'s *prevention* is unaffected: an `E13` posts no
+  journal line and can move no control account. Its *detection* is
+  non-discriminating, and saying so is the point of this line.
 - **`unresolved_value_inr_multiview`** — the benchmark v1.0.2 universe, labelled
   `EXPLORATORY`, printed beside the amended figure.
+- **`net_cost_inr_excluding_e13`** — the §4.5 companion line, labelled
+  `EXPLORATORY`, printed beside metric 2.
 
 ---
 
