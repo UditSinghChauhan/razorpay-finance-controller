@@ -1,9 +1,14 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.4.3 · **Date:** 2026-08-28
+**Spec version:** 1.4.4 · **Date:** 2026-08-28
 
 The matching algorithm, the ambiguity definition, and the rules that decide
 accept / reject / abstain. This is the technical core of the project.
+
+**At spec 1.4.4** this document is unchanged apart from the version header.
+`C1`–`C8` membership, order and clauses are untouched and `constraint_set_hash`
+does not move; `DATA_MODEL.md §11.1` supplies the terms the eight rows read
+rather than altering any of them. See `DECISION_BRIEF.md §A.11`.
 
 **At spec 1.4.3** this document **splits `C3` into two declared halves** (§4.1)
 and states **co-settlement coherence** as a consequence of `DATA_MODEL.md §6`'s

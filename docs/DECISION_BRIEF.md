@@ -1,8 +1,16 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.3 · **Date:** 2026-08-28
+**Spec version:** 1.4.4 · **Date:** 2026-08-28
 **Reviewer role:** principal architect / skeptical reviewer
+
+**At spec 1.4.4** §A.11 records one further resolution, taken at a governance gate
+held **after spec 1.4.3 and before any dataset was generated**: the specification
+had never said which observation kinds may be candidate members, and contradicted
+itself on the answer. Eligibility is now **derived** from `RECONCILIATION_SPEC.md
+§4.1`'s existing ratification rather than declared. **No declared value changes**;
+`C1`–`C8` are untouched so `constraint_set_hash` does not move, and benchmark
+v1.0.3 is unchanged.
 
 **At spec 1.4.3** §A.10 records one further resolution, taken at a governance gate
 held **after the `packages/oracle` design audit and before any dataset was
@@ -522,6 +530,62 @@ induces no classes there and that pool is still unbounded. That gap is recorded
 and left open rather than closed by analogy, because the only available link runs
 through a `§4.2` generation parameter and would repeat the mistake this amendment
 refused.
+
+---
+
+### A.11 Spec 1.4.4 / benchmark 1.0.3 — the candidate universe, and the option that was refused
+
+A governance gate held after spec 1.4.3 and before any dataset was generated
+asked which observation kinds may be candidate members. The specification had
+never said, and it contradicted itself on the answer: `RECONCILIATION_SPEC.md §3`,
+`EVALUATION_SPEC.md §4.1` and `PREREGISTRATION.md §10` V15 each bar a kind from
+membership because it carries no `credit`/`debit`, while `PREREGISTRATION.md §8`
+asserted that reference observations *"remain candidate members"*. A `Payment`
+carries no `credit`. Both could not hold.
+
+**What was proposed and rejected.** The earlier audit recommended admitting
+`settlement` as a member kind, on the ground that `I5` already names
+`Σ settlement.amount` as the bank-line tie-out figure. That option would have made
+a `bank_line` target solvable and metric 27 reach ≈ 1.0. **It was refused.**
+Verified against the nine entity schemas, only `ReconLine` carries `settled_at`;
+`DATA_MODEL.md §5` states that `Settlement` has none. `RECONCILIATION_SPEC.md
+§4.1`, ratified at spec 1.4.2 and untouched since, holds that `C3` and `C4`
+*"remain unconditional over members"* and that a member whose bounded quantity
+does not exist is *"excluded from every candidate"*. Admitting a settlement member
+would therefore require declaring `C3` and `C4` **conditional** against that
+ratification's explicit words, and inventing five quantities the entity does not
+carry — `currency`, `settled_at`, `on_hold`, `credit` and `debit`. That is the
+same fault spec 1.4.3 refused when it declined to read `Settlement.created_at` as
+a transfer instant, and it is refused again here for the same reason.
+
+**What was adopted.** Eligibility is **derived, not declared**: the 1.4.2
+ratification applied to the frozen schemas admits exactly `recon_line` and
+`adjustment`, and the independent `C6` credit/debit test returns the same verdict
+for all nine kinds. The universe is over-determined by frozen text rather than
+chosen, which is why `§11.1` adds no constraint and `constraint_set_hash` does not
+move. One genuine declaration was unavoidable and is marked as such: `C1` names
+the target explicitly, and neither target kind carries a `currency`, so
+`currency(target) := "INR"` is registered at `§22.2` M19 rather than inferred.
+
+**The completeness gate's quantifier moved, and the reason it does not weaken.**
+`§4.2`'s `F05` withholds a constituent `recon_line` at emission while
+`GroundTruth.allocations` is built from the true state, so `C6`'s term for that
+member exists in no observation — the surviving `payment` row carries no `credit`
+and no `fee`. No constraint excluded that allocation; it was never expressible.
+`§5.3` now quantifies over **expressible** targets, where expressibility is
+decided from observation existence and kind alone and reads no constraint, so a
+constraint set that wrongly excludes a genuinely expressible allocation still
+fails the gate. Scoping instead by whether the oracle enumerated anything would
+have been circular and is refused in the text.
+
+**Consequences are published rather than compensated.** A `bank_line` target has
+no admissible member, so `AN2` is its only route to `RECONCILED` and metric 27 is
+bounded by it; no `bank_line` target is expressible, so the completeness gate
+never covers the bank side. Both are recorded at `§10` V18, with metric 27's
+definition unchanged — the treatment `V12` already gave metric 28. **A larger
+consequence is deliberately not addressed in this amendment:** the close gate is
+unreachable under these rules, and that is reported separately and unrepaired as
+blocker `B8` rather than folded in here.
 
 ---
 

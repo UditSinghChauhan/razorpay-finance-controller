@@ -1,9 +1,15 @@
 # EVALUATION_SPEC — ASSAY
 
-**Spec version:** 1.4.3 · **Date:** 2026-08-28
+**Spec version:** 1.4.4 · **Date:** 2026-08-28
 
 Every metric answers the question: **what decision does this number let someone
 make?** A metric that does not change anyone's behaviour is not reported.
+
+**At spec 1.4.4** this document is unchanged apart from the version header. **No
+metric definition changes.** Metric 27 `coverage_by_value_bank` is bounded by
+`AN2` alone under `DATA_MODEL.md §11.1`; the figure is published unchanged with
+its explanation, as metric 28 already is (`PREREGISTRATION.md §10` V18). See
+`DECISION_BRIEF.md §A.11`.
 
 **At spec 1.4.3** this document is unchanged apart from the version header. **No
 metric formula, universe or threshold changes.** `§5.4`'s oracle-gate report line

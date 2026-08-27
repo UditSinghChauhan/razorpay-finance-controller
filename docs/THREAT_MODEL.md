@@ -1,9 +1,13 @@
 # THREAT_MODEL — ASSAY
 
-**Spec version:** 1.4.3 · **Date:** 2026-08-28
+**Spec version:** 1.4.4 · **Date:** 2026-08-28
 
 Every control answers: **what specific failure does this prevent?** Controls that
 cannot name a failure are removed.
+
+**At spec 1.4.4** this document is unchanged apart from the version header. `§T5`
+is unaffected: `DATA_MODEL.md §11.1` keeps `ledger_entry` outside the candidate
+universe, on a second and independent ground. See `DECISION_BRIEF.md §A.11`.
 
 **At spec 1.4.3** this document is unchanged apart from the version header. `§T5`'s
 soft-evidence doctrine is untouched: spec 1.4.3 defines `ReconLine.settled_at` and

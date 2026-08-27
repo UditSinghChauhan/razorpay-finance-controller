@@ -1,9 +1,18 @@
 # DATA_MODEL — ASSAY
 
-**Spec version:** 1.4.3 · **Date:** 2026-08-28
+**Spec version:** 1.4.4 · **Date:** 2026-08-28
 
 All schemas are normative. The implementation agent must not add, rename or
 retype fields without a spec version bump.
+
+**At spec 1.4.4** this document gains **§11.1, the candidate universe** — the
+member and target contributions `C1`–`C8` read — and register row **M19**
+(§22.2). Member eligibility is **derived** from `RECONCILIATION_SPEC.md §4.1`'s
+spec-1.4.2 ratification rather than declared, and resolves to `recon_line` and
+`adjustment`. **No field, entity, account, posting rule, exception class,
+invariant or metric definition changes**, `C1`–`C8` are untouched so
+`constraint_set_hash` does not move, and benchmark v1.0.3 is unchanged. See
+`DECISION_BRIEF.md §A.11`.
 
 **At spec 1.4.3** this document **defines `ReconLine.settled_at`** (§6) and
 registers the semantics as `[ASSAY-MODEL]` M18 (§22.2). Through spec 1.4.2 the
@@ -802,6 +811,82 @@ executions, and because the score reaches the hashed event body through
 `AmbiguityCertificate.evidence_score_gap_bps` (§13), where §0 rule 5 admits
 integers only. The SE1–SE5 weighted sum is evaluated in integer basis points with
 `round_half_up` applied once, at the end.
+
+---
+
+### 11.1 The candidate universe `[ASSAY-MODEL]`
+
+`C1`–`C8` read five quantities off "members" and two off "the target", and
+through spec 1.4.3 **no section said which observation kinds can supply them**.
+`Candidate.member_obs_ids` (§11) is typed `ObservationId[]` with no kind
+restriction, so the type system does not decide it either. This section supplies
+the mapping. **It adds no field, no constraint and no account**, and it changes no
+`C1`–`C8` clause; where it states an eligibility it is **derived** from text
+already frozen, and the one place it declares rather than derives is marked.
+
+**Member contribution.** A candidate member must supply, from its own observation
+payload and from no other source:
+
+```
+  currency · created_at · settled_at · credit · debit · on_hold
+```
+
+`C2`'s and `C5`'s remaining terms are already kind-typed in their own text and
+need nothing added here.
+
+**Member eligibility is derived, not declared.** `RECONCILIATION_SPEC.md §4.1`
+ratified at spec 1.4.2 that a member whose `settled_at` is null *"does NOT
+satisfy"* `C3` and `C4` and *"is excluded from every candidate"*, and that `C3`
+and `C4` *"remain unconditional over members"*. A kind that carries **no
+`settled_at` field at all** cannot satisfy them a fortiori: the bounded quantity
+does not exist, and `§4.1`'s own reasoning is that *"an unconditional filter whose
+bounded quantity does not exist cannot report that it is within bounds"*. Of the
+nine kinds in §10, only `recon_line` and `adjustment` carry `settled_at` — both as
+a `ReconLine` payload (§10's table). **The member-eligible kinds are therefore
+`recon_line` and `adjustment`, and every other kind is excluded by frozen text.**
+
+**Two independent routes agree, kind for kind.** The specification already applies
+a second test three times — `RECONCILIATION_SPEC.md §3` and
+`EVALUATION_SPEC.md §4.1` bar a `ledger_entry` because *"`C6` requires
+`credit`/`debit`, which `MerchantLedgerEntry` does not carry"*, and
+`PREREGISTRATION.md §10` V15 bars the `refund` kind on the same ground. That test
+and the `settled_at` test above return the same verdict for all nine kinds. The
+universe is over-determined rather than chosen.
+
+**Target contribution.** A target must supply `amount`, and `currency` for `C1`.
+`§17.1.1` fixes the target universe as `settlement` and `bank_line` and states
+that its table *"does not widen it"*.
+
+```
+  amount      Settlement.amount · BankStatementLine.amount
+  currency    "INR" for both target kinds -- DECLARED, see below
+  value_date  BankStatementLine.value_date, for C3's bank-arrival half
+              (§7: "date-granular; bank clock, not PG clock")
+```
+
+**`currency(target) := "INR"` is a declaration, not a derivation `[ASSAY-MODEL]`,
+registered at §22.2 M19.** Neither target kind carries a `currency` field — §5
+says so of `Settlement` explicitly. `C1` is not silent about the target the way
+`C3` and `C4` are silent about scope: it names it, requiring *"currency equality
+across all members **and the target**"*. Applying `§4.1`'s absence rule to the
+target role would therefore make `C1` unsatisfiable for **every** candidate and
+admit nothing at all, which is a reductio rather than a reading. The declared
+value asserts nothing beyond what the frozen schema already forces: `currency` is
+a literal `"INR"` on every observation that carries the field, so no conforming
+dataset contains another value, and `C1`'s own justification states that *"Tier-0
+is INR-only by construction"*.
+
+**What this section does not do.** It does not make a `settlement` a candidate
+member. Doing so would require declaring `C3` and `C4` **conditional**, which
+`§4.1` forecloses in terms — *"the silence of `C3` and `C4` on that point is
+deliberate and they remain unconditional over members"* — and would require
+inventing five quantities the entity does not carry (`currency`, `settled_at`,
+`on_hold`, `credit`, `debit`). It follows that a `bank_line` target has **no
+admissible member**, that `RECONCILIATION_SPEC.md §4`'s *"a bank line needing
+settlements"* yields the empty candidate set, and that such a target reaches
+`EXCEPTION` by `§9`'s *"no admissible candidate exists at all"*, with class `E03`.
+That consequence is disclosed at `PREREGISTRATION.md §10` V18 and is **not**
+compensated here.
 
 ---
 
@@ -1750,6 +1835,7 @@ reference beats endpoint reference beats product guide beats pricing page.
 | M16 | `AN5` is not exercised, and the merchant ledger is soft evidence only | Retiring the anchor is ASSAY's decision, taken at spec 1.4.1 on two grounds internal to this specification — `order.receipt`'s quarantine (§0 rule 4) and `THREAT_MODEL.md §T5`'s soft-evidence doctrine. Razorpay documents nothing about how a merchant's ERP references its own orders, and asserts no anchor either way |
 | M17 | The `order.receipt` → `MerchantLedgerEntry.order_ref` lossy re-encoding, and its retention band | §8 states that the mapping is lossy; the *form* of the transform and how much shape it retains are ASSAY's, and are a declared governance convention with no documentary basis (`PREREGISTRATION.md §4.2`) |
 | M18 | `ReconLine.settled_at` is **settlement-scoped**: the instant the carrying settlement transferred, identical across every line that settlement carried (§6, spec 1.4.3) | The field's name, type and unit are documented; its **semantics** are not, and no source states the scope or relates it to `Settlement.created_at`. `C3`, `C4` and §7 already read the term this way; the definition states what they assume. The refusal is part of the row: no relationship to `Settlement.created_at` is asserted, and the condition is necessary rather than sufficient |
+| M19 | `currency(target) := "INR"` for both target kinds (§11.1, spec 1.4.4) | Neither `Settlement` nor `BankStatementLine` carries a `currency` field, and `C1` names the target explicitly rather than being silent about it, so a target contribution must be declared or `C1` admits nothing. The value asserts nothing beyond the frozen schema, where `currency` is a literal `"INR"` on every observation carrying the field, and matches `C1`'s own *"Tier-0 is INR-only by construction"*. It is ASSAY's declaration, not a documented Razorpay fact about either entity |
 
 ### 22.3 `[NOT-CLAIMED]` — considered and deliberately not asserted
 

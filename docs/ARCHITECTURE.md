@@ -1,6 +1,11 @@
 # ARCHITECTURE — ASSAY
 
-**Spec version:** 1.4.3 · **Date:** 2026-08-28
+**Spec version:** 1.4.4 · **Date:** 2026-08-28
+
+**At spec 1.4.4** this document is unchanged apart from the version header. §7.3's
+completeness gate is scoped to expressible targets by `PREREGISTRATION.md §5.3`;
+its purpose — catching a constraint set that excludes reality — is unchanged, and
+expressibility is decided without reading `C1`–`C8`. See `DECISION_BRIEF.md §A.11`.
 
 **At spec 1.4.3** this document is unchanged apart from the version header.
 §7.2's description of the oracle as running "naive per-candidate boolean checks

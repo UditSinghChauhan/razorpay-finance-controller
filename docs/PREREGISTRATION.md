@@ -1,6 +1,6 @@
 # PREREGISTRATION — ASSAY Benchmark v1.0.3
 
-**Spec version:** 1.4.3 · **Benchmark version:** 1.0.3
+**Spec version:** 1.4.4 · **Benchmark version:** 1.0.3
 
 **Status: FROZEN on commit. Amendments require a version bump and a new seal.**
 **Date frozen:** 2026-08-23 · **Amended:** 2026-08-24 (benchmark 1.0.1),
@@ -137,25 +137,6 @@ downward, metric 2 upward by one `C_exception` per ledger entry. **No definition
 was amended to compensate and no threshold or composition was adjusted.** Full
 enumeration in §8 and in `DECISION_BRIEF.md §A.8`.
 
-**Amendment 1.4.3 / benchmark 1.0.3 (pre-seal, one undefined field and one
-overloaded constraint).** Applied before the seal, before any dataset was
-generated and before any number was observed. **Three items. Two supply a
-definition where this specification stated none; the third records an
-inconsistency rather than repairing it. No declared value changes.** *(1)*
-`DATA_MODEL.md §6` **defines `ReconLine.settled_at`** as settlement-scoped, with
-register row M18 (§22.2); the field previously carried no semantics at all while
-`C3`, `C4` and `§7` read it. *(2)* `RECONCILIATION_SPEC.md §4.1` **splits `C3`**
-into an ordering half (binding) and a bank-arrival half (binding-when-in-scope),
-and states **co-settlement coherence** as a consequence of (1) rather than as a
-ninth constraint. *(3)* `§5.2` records that *"a fully enumerated space"* under
-`C_oracle` implies a 20-member ceiling, so `K_oracle = 30` is inert as written;
-neither constant is changed. `§5.3`'s differential-test exclusion becomes
-**conditional** for `C3`'s bank-arrival half, and `§10` gains threats `V16` and
-`V17`. **`C1`–`C8` membership and order, `I1`–`I9`, every threshold in `§7`,
-`§4.1`'s composition, `§4.2`'s rates, `§4.3`, `§6.1` and `§6.2` are untouched**,
-and no seed, split, family or `target_record_count` moves. `constraint_set_hash`
-moves for the `C3` split alone.
-
 **Amendment 1.4.2 / benchmark 1.0.3 (pre-seal, one unrepresentable state
 resolved).** Applied before the seal, before any dataset was generated and before
 any number was observed. **Four items, and every one supplies a value where this
@@ -221,6 +202,48 @@ This document is written **before any test-split result exists**. Its purpose is
 to make post-hoc rationalisation impossible: metrics, thresholds, dataset
 construction and stopping rules are all fixed here, and the git history proves
 when.
+
+**Amendment 1.4.3 / benchmark 1.0.3 (pre-seal, one undefined field and one
+overloaded constraint).** Applied before the seal, before any dataset was
+generated and before any number was observed. **Three items. Two supply a
+definition where this specification stated none; the third records an
+inconsistency rather than repairing it. No declared value changes.** *(1)*
+`DATA_MODEL.md §6` **defines `ReconLine.settled_at`** as settlement-scoped, with
+register row M18 (§22.2); the field previously carried no semantics at all while
+`C3`, `C4` and `§7` read it. *(2)* `RECONCILIATION_SPEC.md §4.1` **splits `C3`**
+into an ordering half (binding) and a bank-arrival half (binding-when-in-scope),
+and states **co-settlement coherence** as a consequence of (1) rather than as a
+ninth constraint. *(3)* `§5.2` records that *"a fully enumerated space"* under
+`C_oracle` implies a 20-member ceiling, so `K_oracle = 30` is inert as written;
+neither constant is changed. `§5.3`'s differential-test exclusion becomes
+**conditional** for `C3`'s bank-arrival half, and `§10` gains threats `V16` and
+`V17`. **`C1`–`C8` membership and order, `I1`–`I9`, every threshold in `§7`,
+`§4.1`'s composition, `§4.2`'s rates, `§4.3`, `§6.1` and `§6.2` are untouched**,
+and no seed, split, family or `target_record_count` moves. `constraint_set_hash`
+moves for the `C3` split alone.
+
+**Amendment 1.4.4 / benchmark 1.0.3 (pre-seal, the candidate universe).**
+Applied before the seal, before any dataset was generated and before any number
+was observed. **Four items. Three record what frozen text already determines; the
+fourth is a declaration and is marked as one. No declared value changes.** *(1)*
+`DATA_MODEL.md §11.1` supplies the **candidate universe** — the member and target
+contributions `C1`–`C8` read — and **derives** member eligibility from `§4.1`'s
+spec-1.4.2 ratification rather than declaring it: only `recon_line` and
+`adjustment` carry `settled_at`, so only they can satisfy `C3` and `C4`, and the
+`C6` credit/debit test the specification already applies three times returns the
+same verdict for all nine kinds. *(2)* `DATA_MODEL.md §22.2` gains **M19**,
+`currency(target) := "INR"`, the one genuine declaration: `C1` names the target
+explicitly, so applying `§4.1`'s absence rule to the target role would make `C1`
+admit nothing at all. *(3)* `§8`'s dependency statement is **corrected** — it said
+reference observations *"remain candidate members"*, which `§11.1` shows to be
+false; metric 25's definition and value are untouched. *(4)* `§5.3`'s completeness
+gate is **scoped to expressible targets**, because `§4.2`'s `F05` withholds a
+constituent whose `credit` no observation carries; expressibility is decided
+without reading `C1`–`C8`, so the gate can still fail on a too-strict constraint
+set. **`C1`–`C8` membership, order and clauses are untouched, so
+`constraint_set_hash` does not move**; `I1`–`I9`, every threshold in `§7`,
+`§4.1`'s composition, `§4.2`'s rates, `§4.3`, `§6.1` and `§6.2` are unchanged, and
+no seed, split, family or `target_record_count` moves. `§10` gains `V18`.
 
 ---
 
@@ -944,6 +967,35 @@ Catches a constraint set that is *too strict* — one that excludes reality. If 
 fails, the benchmark is invalid and no results may be reported from it. Runs
 offline, inside the generator's trust zone, before any agent exists.
 
+**The gate quantifies over expressible targets, scoped at spec 1.4.4.** A target
+is **expressible** iff every member of its true allocation has an observation in
+the dataset whose kind is member-eligible under `DATA_MODEL.md §11.1`. The gate
+requires the true allocation to appear among the oracle's enumerated solutions
+**for every expressible target**, and reports the inexpressible ones with their
+cause and count, per family, in the same artifact as the pass.
+
+**Why the quantifier had to move, and why this does not weaken the gate.** The
+gate exists to catch *"a constraint set that is too strict — one that excludes
+reality"*. `§4.2`'s `F05` withholds one constituent `recon_line` at emission while
+`GroundTruth.allocations` is built from the true state, so that member has no
+observation and `C6`'s term is unobtainable from any source; the surviving
+`payment` observation carries no `credit` and no `fee`. No constraint excluded
+that allocation — it was never expressible in the candidate language at all, and a
+gate that failed on it would report a constraint fault where none exists, while
+`§4.2` designs the family and `§9` step 3 makes the gate a seal gate.
+
+**Expressibility is decided without reading `C1`–`C8`.** It is a property of
+observation existence and kind alone. A constraint set that wrongly excludes a
+genuinely expressible true allocation therefore still fails the gate, which is
+what keeps the scoping from becoming a way to pass. Scoping instead by *"the
+oracle enumerated something"* would be circular and would mask exactly the fault
+the gate exists to catch; it is refused here.
+
+**Two exclusion classes, reported apart.** *Inexpressible* — a true member has no
+member-eligible observation — says the observations are insufficient.
+*Budget-exhausted*, if `§5.2`'s bounds are reached, says the oracle is. They are
+not interchangeable and are counted separately.
+
 **Consistency gate.** For `R = 20,000` randomly sampled `(target, member-set)`
 pairs from the dev split — deliberately including inadmissible ones — the
 engine's admissibility verdict must equal the oracle's, constraint by
@@ -1279,11 +1331,20 @@ loses reference rows while its definition against the oracle is untouched; metri
 reference rows that posted under spec 1.1.1 posted to Suspense, which
 `EVALUATION_SPEC.md §4.4` excludes from harm. Metric 25
 `component_size_distribution` and `intractable_rate` — reference observations
-remain candidate members, so component sizes and the `K_max` bound are untouched.
+remain available to stages S1–S4 as evidence (`DATA_MODEL.md §10.1`), so the
+anchor stages and the `K_max` bound are untouched.
 The `tau_sensitivity` half of metric 26. The Ambiguity Oracle (`§5`) — its targets
 are settlements and bank lines, both reconcilable kinds, so its universe does not
-move; a reference observation is still available as a candidate *member*, because
-membership in a candidate is not a terminal state.
+move; a reference observation is still available as evidence, because being
+examined is not a terminal state.
+
+**Corrected at spec 1.4.4.** The superseded wording said *"candidate member"* in
+both places, which `DATA_MODEL.md §11.1` shows to be false: a `Payment` carries no
+`settled_at` and no `credit`, so it satisfies neither `C3`/`C4` nor `C6` and is
+excluded from every candidate. The correction is confined to these two sentences;
+metric 25's **definition** and its value are untouched, and `§10.1`'s *"still
+available to stages S1–S4 as evidence"* is the wording they should always have
+carried.
 
 **Success criteria:** S2's and S3's thresholds are unchanged and both now
 reference a defined universe. Because `batch_value_paise` is roughly 5.9× smaller
@@ -1534,6 +1595,7 @@ Stated here, before results, so they cannot be presented later as afterthoughts.
 | V15 | The unsettled-member rule left two consequences unspecified: the `§15` exception class an unsettled refund reaches, and `C3`/`C4`'s truth value against a null `settled_at` | **Both closed at spec 1.4.2, and the record separates what the specification already determined from what was newly ratified.** *Already determined:* `E02` could not be stretched to a refund — `DATA_MODEL.md §17.1.1` keys it `pay_…` and posts `P6`, crediting `1100_GATEWAY_RECEIVABLE`, an account a refund never debited under `P3`; `E11`'s original clock-based trigger is untouched and still reachable through `F09`; `C3` and `C4` must be treated identically (one table, both unqualified over members, one shared declaration compared constraint by constraint at `§5.3`); `C8`'s unique *"for members claimed as settled"* scoping shows the silence of `C3` and `C4` is deliberate, so they are unconditional; and the `refund` kind's non-posting was forced by exhaustion over `P1`–`P8`. *Newly ratified:* `E11`'s refund clause, as an explicit **semantic addition** confined to refund recon lines; and that a member with a null `settled_at` satisfies neither `C3` nor `C4` and is excluded from every candidate | **Closed. No frozen quantity moved.** No `AccountCode`, posting rule, exception class, metric definition, threshold, rate, composition figure, seed, split, baseline, ablation or stopping rule changed, and benchmark v1.0.3 is unchanged; `target_record_count` is untouched because neither item adds or removes an observation. **One consequence of the `§17.1.1` `refund` row is recorded rather than resolved and binds the engine phase, not generation:** the row fixes what a `refund`-kind observation *posts* (nothing), but `§14.1`'s `value(observation)` table omits the same kind, and the only class `§10.1` attaches to it is `E10`, which requires an orphan — so the terminal state an ordinary `refund`-kind observation reaches under gate `G1` is still to be settled. It blocks no dataset: the kind is never a target, is barred from candidate membership by `C6` (a `Refund` carries no `credit`/`debit`), and posts nothing under any state |
 | V16 | `C3`'s bank-arrival half is available on a minority of settlement targets, so admissibility is not uniform across them | The half needs the target's bank line, identifiable only through `AN2`; `§4.2` freezes `bank_ref` quality at *"30% a clean UTR, 70% absent or non-UTR"*, so it is in scope on roughly three targets in ten. Spec 1.4.3 declares the half `binding-when-in-scope` rather than letting it return a silent pass, and `§5.3` reports the differential test split by whether it was evaluated | **Real and disclosed rather than repaired.** Two settlements identical in every observable respect can receive materially different candidate sets, decided by a frozen population parameter rather than by anything about the reconciliation. Ambiguity rates on `AN2`-backed and non-`AN2` targets are therefore **not comparable**, and are reported split. Repairing it would mean moving `§4.2`'s 30/70 `bank_ref` rate — a composition change, hence a new benchmark version and fresh seeds, which is not taken |
 | V17 | The oracle's candidate-search machinery is exercised on no DEV target | Every DEV settlement is fully `AN1`-anchored: `F08`'s `DROP_SETTLEMENT_ID` is the only operator that detaches a line from its batch identifier, and `F08` is **test-only** at seeds 9100–9104 (`§6.1`). `F05`'s withheld line leaves its settlement short but supplies no unanchored member to search over. Spec 1.4.3's co-settlement coherence makes those `F08` targets enumerable and cheap, but the rule cannot be validated on DEV | **Accepted, and recorded before the seal.** `B5`'s resolution joins `E12` (`V14`) and `E14` (`V13`) as specified-but-unexercised on DEV data: the completeness gate passes on DEV without ever enumerating a candidate. It is first exercised on the sealed test split, where `§9`'s stopping rule permits one run. Reported through `EVALUATION_SPEC.md §5.4`'s oracle-gate line, with the count of targets that entered enumeration stated alongside the pass |
+| V18 | The bank side is neither candidate-matchable nor covered by the completeness gate | `DATA_MODEL.md §11.1` derives that a `settlement` is not a member-eligible kind, so a `bank_line` target has no admissible member and `RECONCILIATION_SPEC.md §4`'s *"a bank line needing settlements"* yields the empty candidate set. `AN2` is therefore the only route by which a bank line reaches `RECONCILED`, and `§4.2` freezes `bank_ref` quality at *"30% a clean UTR, 70% absent or non-UTR"*. Separately, no `bank_line` target is **expressible** under `§5.3`, because `GroundTruth.bank_mappings` names settlements and settlements are not member-eligible | **Real and disclosed rather than repaired.** Metric 27 `coverage_by_value_bank` is bounded by `AN2` alone; its **definition is unchanged** and no threshold or composition figure was adjusted to move it, exactly as `V12` handled metric 28. The completeness gate therefore never covers the bank side at all, which narrows what the gate tests and is reported with the inexpressible counts `§5.3` requires. The consequence for the close gate is a **separate** and larger matter and is not folded in here: it is reported apart, unrepaired, as blocker `B8` |
 
 **The claim ASSAY is entitled to make, and no more:**
 
