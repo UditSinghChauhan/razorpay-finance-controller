@@ -1,6 +1,6 @@
 # PREREGISTRATION — ASSAY Benchmark v1.0.3
 
-**Spec version:** 1.4.2 · **Benchmark version:** 1.0.3
+**Spec version:** 1.4.3 · **Benchmark version:** 1.0.3
 
 **Status: FROZEN on commit. Amendments require a version bump and a new seal.**
 **Date frozen:** 2026-08-23 · **Amended:** 2026-08-24 (benchmark 1.0.1),
@@ -136,6 +136,25 @@ move unfavourably and identically for every agent — metric 28 to `0.0`, metric
 downward, metric 2 upward by one `C_exception` per ledger entry. **No definition
 was amended to compensate and no threshold or composition was adjusted.** Full
 enumeration in §8 and in `DECISION_BRIEF.md §A.8`.
+
+**Amendment 1.4.3 / benchmark 1.0.3 (pre-seal, one undefined field and one
+overloaded constraint).** Applied before the seal, before any dataset was
+generated and before any number was observed. **Three items. Two supply a
+definition where this specification stated none; the third records an
+inconsistency rather than repairing it. No declared value changes.** *(1)*
+`DATA_MODEL.md §6` **defines `ReconLine.settled_at`** as settlement-scoped, with
+register row M18 (§22.2); the field previously carried no semantics at all while
+`C3`, `C4` and `§7` read it. *(2)* `RECONCILIATION_SPEC.md §4.1` **splits `C3`**
+into an ordering half (binding) and a bank-arrival half (binding-when-in-scope),
+and states **co-settlement coherence** as a consequence of (1) rather than as a
+ninth constraint. *(3)* `§5.2` records that *"a fully enumerated space"* under
+`C_oracle` implies a 20-member ceiling, so `K_oracle = 30` is inert as written;
+neither constant is changed. `§5.3`'s differential-test exclusion becomes
+**conditional** for `C3`'s bank-arrival half, and `§10` gains threats `V16` and
+`V17`. **`C1`–`C8` membership and order, `I1`–`I9`, every threshold in `§7`,
+`§4.1`'s composition, `§4.2`'s rates, `§4.3`, `§6.1` and `§6.2` are untouched**,
+and no seed, split, family or `target_record_count` moves. `constraint_set_hash`
+moves for the `C3` split alone.
 
 **Amendment 1.4.2 / benchmark 1.0.3 (pre-seal, one unrepresentable state
 resolved).** Applied before the seal, before any dataset was generated and before
@@ -900,6 +919,20 @@ is **two independent implementations of one declarative specification**:
   minutes per component.
 - `packages/oracle` may not import `packages/engine`; enforced by lint in CI.
 
+**The budget presupposes a bounded pool, and spec 1.4.3 supplies one.** *"A fully
+enumerated space"* under `C_oracle = 2,000,000` is satisfiable only where the pool
+holds at most **20** members — `2^20 = 1,048,576`, and `2^21` overruns — so
+`K_oracle = 30` cannot bind under the declared method and is inert as written.
+That is recorded rather than repaired: nothing in `C1`–`C8` bounds a pool, because
+every per-member clause is silent about the target, and the two constants were
+therefore describing a decomposition the constraint set did not deliver.
+`RECONCILIATION_SPEC.md §4.1`'s **co-settlement coherence**, entailed by
+`DATA_MODEL.md §6`'s definition of `settled_at`, supplies it: the unanchored
+members partition into `settled_at` equivalence classes, each fully enumerated,
+and the classes sit far inside both constants. Neither constant is changed, and
+neither is in `§7`'s frozen list or `DECISION_BRIEF.md §L.1` rule 12, so `AL3`
+does not bind them.
+
 ### 5.3 The two gates
 
 Both are **hard build gates**. They catch different faults and neither is
@@ -922,6 +955,15 @@ Constraint halves declared **non-binding agent-side** in `RECONCILIATION_SPEC.md
 differential test's pass criterion and reported separately as
 *evaluated: non-binding*. A gate that cannot fail on a constraint neither side can
 evaluate would otherwise report agreement it never tested.
+
+**`C3`'s bank-arrival half is excluded conditionally, not wholesale, from spec
+1.4.3.** It is `binding-when-in-scope`: where the target's bank line is
+identifiable it binds hard, and where it is not, neither side can evaluate it. The
+exclusion is therefore **per target rather than per dataset**, and the gate reports
+the split — pairs on which the half was evaluated, and pairs on which it was not.
+Excluding it wholesale would drop a clause the gate can and should test on the
+targets where the evidence exists; including it unconditionally would count
+agreement on the targets where it does not.
 
 ### 5.4 The ambiguity definition
 
@@ -1490,6 +1532,8 @@ Stated here, before results, so they cannot be presented later as afterthoughts.
 | V13 | `E14_UTR_COLLISION` is specified but effectively unreachable | A prefix collision between independently drawn UTRs is negligible at any prefix length a truncated UTR would plausibly retain. Making it reachable would require asserting that a Razorpay UTR's leading run is sequential, time-derived or issuer-prefixed — a claim no official source supports, which §22.3 exists to refuse. | **Accepted.** The class remains specified and its `§17.1.1` posting remains defined; the row in metric 10's matrix stays empty. Recorded so that an empty row is read as a declared limit rather than an oversight. |
 | V14 | `E12_ADJUSTMENT_UNEXPLAINED` is not exercised on DEV data | Under §4.1's exact-realization rule the adjustment count is `round_half_up(0.008 × 31 settlements) = round_half_up(0.248) = `**`0`**, so **no family instance generates a generic adjustment observation**. The only adjustments in the benchmark are `F07`'s dispute-driven chargeback deduction and reversal rows, and `F07` is test-only, held out at seeds 9100–9104 under `§6.1`. **The rate is unchanged**: 0.8% is frozen in §4.2 under `AL3` and is not adjusted in either direction to make the class reachable. | **Accepted, and disclosed rather than repaired.** `DATA_MODEL.md §17.2`'s `P8` fallback and the `E12` path it produces are therefore **never exercised before the sealed run**, so `§F` F9's dev falsification check cannot observe them. It also closes the V10 scenario in which *"a single large undetermined adjustment can exceed the close threshold on its own"* — with essentially none generated, that channel contributes nothing, and the close-gate residual rests on `F04`, `F05`, `F08` and `F10`. `E12` joins `E14` (§V13) as a class specified but not exercisable on DEV: **two of the fourteen**. `E11` left that list at spec 1.4.2, when `DATA_MODEL.md §15` extended it to a refund `recon_line` left unsettled by `§4.2`'s batch-composition rule: `F02` is a `dev + test` family and its *"settled in batch N+2"* mechanism strands a refund raised in the final two days, so `E11` is now exercised on DEV and is no longer F09-only. Reported on every run through `EVALUATION_SPEC.md §6`'s exception table, where an empty class is visible. |
 | V15 | The unsettled-member rule left two consequences unspecified: the `§15` exception class an unsettled refund reaches, and `C3`/`C4`'s truth value against a null `settled_at` | **Both closed at spec 1.4.2, and the record separates what the specification already determined from what was newly ratified.** *Already determined:* `E02` could not be stretched to a refund — `DATA_MODEL.md §17.1.1` keys it `pay_…` and posts `P6`, crediting `1100_GATEWAY_RECEIVABLE`, an account a refund never debited under `P3`; `E11`'s original clock-based trigger is untouched and still reachable through `F09`; `C3` and `C4` must be treated identically (one table, both unqualified over members, one shared declaration compared constraint by constraint at `§5.3`); `C8`'s unique *"for members claimed as settled"* scoping shows the silence of `C3` and `C4` is deliberate, so they are unconditional; and the `refund` kind's non-posting was forced by exhaustion over `P1`–`P8`. *Newly ratified:* `E11`'s refund clause, as an explicit **semantic addition** confined to refund recon lines; and that a member with a null `settled_at` satisfies neither `C3` nor `C4` and is excluded from every candidate | **Closed. No frozen quantity moved.** No `AccountCode`, posting rule, exception class, metric definition, threshold, rate, composition figure, seed, split, baseline, ablation or stopping rule changed, and benchmark v1.0.3 is unchanged; `target_record_count` is untouched because neither item adds or removes an observation. **One consequence of the `§17.1.1` `refund` row is recorded rather than resolved and binds the engine phase, not generation:** the row fixes what a `refund`-kind observation *posts* (nothing), but `§14.1`'s `value(observation)` table omits the same kind, and the only class `§10.1` attaches to it is `E10`, which requires an orphan — so the terminal state an ordinary `refund`-kind observation reaches under gate `G1` is still to be settled. It blocks no dataset: the kind is never a target, is barred from candidate membership by `C6` (a `Refund` carries no `credit`/`debit`), and posts nothing under any state |
+| V16 | `C3`'s bank-arrival half is available on a minority of settlement targets, so admissibility is not uniform across them | The half needs the target's bank line, identifiable only through `AN2`; `§4.2` freezes `bank_ref` quality at *"30% a clean UTR, 70% absent or non-UTR"*, so it is in scope on roughly three targets in ten. Spec 1.4.3 declares the half `binding-when-in-scope` rather than letting it return a silent pass, and `§5.3` reports the differential test split by whether it was evaluated | **Real and disclosed rather than repaired.** Two settlements identical in every observable respect can receive materially different candidate sets, decided by a frozen population parameter rather than by anything about the reconciliation. Ambiguity rates on `AN2`-backed and non-`AN2` targets are therefore **not comparable**, and are reported split. Repairing it would mean moving `§4.2`'s 30/70 `bank_ref` rate — a composition change, hence a new benchmark version and fresh seeds, which is not taken |
+| V17 | The oracle's candidate-search machinery is exercised on no DEV target | Every DEV settlement is fully `AN1`-anchored: `F08`'s `DROP_SETTLEMENT_ID` is the only operator that detaches a line from its batch identifier, and `F08` is **test-only** at seeds 9100–9104 (`§6.1`). `F05`'s withheld line leaves its settlement short but supplies no unanchored member to search over. Spec 1.4.3's co-settlement coherence makes those `F08` targets enumerable and cheap, but the rule cannot be validated on DEV | **Accepted, and recorded before the seal.** `B5`'s resolution joins `E12` (`V14`) and `E14` (`V13`) as specified-but-unexercised on DEV data: the completeness gate passes on DEV without ever enumerating a candidate. It is first exercised on the sealed test split, where `§9`'s stopping rule permits one run. Reported through `EVALUATION_SPEC.md §5.4`'s oracle-gate line, with the count of targets that entered enumeration stated alongside the pass |
 
 **The claim ASSAY is entitled to make, and no more:**
 

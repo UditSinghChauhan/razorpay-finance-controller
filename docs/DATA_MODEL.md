@@ -1,9 +1,20 @@
 # DATA_MODEL — ASSAY
 
-**Spec version:** 1.4.2 · **Date:** 2026-08-27
+**Spec version:** 1.4.3 · **Date:** 2026-08-28
 
 All schemas are normative. The implementation agent must not add, rename or
 retype fields without a spec version bump.
+
+**At spec 1.4.3** this document **defines `ReconLine.settled_at`** (§6) and
+registers the semantics as `[ASSAY-MODEL]` M18 (§22.2). Through spec 1.4.2 the
+field was declared with no comment, no provenance class and no semantics anywhere
+in this specification, which `§0` rule 6 makes a defect in its own right — while
+`C3`, `C4` and §7 all read the term. **No field, entity, account, posting rule,
+exception class, invariant or metric definition changes**, and benchmark v1.0.3 is
+unchanged. The definition asserts **no** relationship to `Settlement.created_at`,
+which is `[RZP-DOC]` and documents the creation of the settlement record. Its
+consequence for candidate generation is stated at `RECONCILIATION_SPEC.md §4.1`.
+See `DECISION_BRIEF.md §A.10`.
 
 **At spec 1.4.2** this document extends `E11_TIMING_BOUNDARY` in §15 to a refund
 `recon_line` left unsettled by `PREREGISTRATION.md §4.2`'s batch-composition rule
@@ -432,6 +443,40 @@ observed only with the value `"default"`. Spec 1.1.0 additionally declared
 source, are **`[NOT-CLAIMED]`**, and have been removed rather than relabelled —
 an invented enum value in a schema that claims API fidelity is exactly the kind of
 detail that discredits the rest of it.
+
+**`settled_at` — semantics `[ASSAY-MODEL]`, supplied at spec 1.4.3.** `settled_at`
+is **the instant at which the settlement that carried this line transferred**, in
+Unix epoch seconds. It is a property of that settlement rather than of the line:
+**every recon line carried by one settlement records the same `settled_at`**,
+whether or not the line still carries the `settlement_id` naming it. It is `null`
+exactly when no settlement carried the line — the unsettled member of
+`PREREGISTRATION.md §4.2`, whose treatment under `C3` and `C4`
+`RECONCILIATION_SPEC.md §4.1` fixes.
+
+*Why this is `[ASSAY-MODEL]` and not `[RZP-DOC]`.* The field's **name, type and
+unit** are documented and are covered by this section's opening; its **semantics**
+are not, exactly as for `posted_at` and `credit_type` above. No official source
+states that the value is settlement-scoped, and none relates it to any field of
+the `Settlement` entity. The reading is ASSAY's.
+
+*It is the reading the frozen constraint set already assumes, and stating it adds
+no constraint.* `C4` is named *"Settlement window"* and is justified entirely by
+the documented **T+2 settlement cycle** — a per-settlement quantity, not a
+per-line one. `C3` places `settled_at` between the capture and the bank value
+date, which is the transfer. And `§7` contrasts the bank line as having *"a
+different clock (value date, not `settled_at`)"*, treating `settled_at` as the
+PG-side settlement clock. Three frozen clauses read this term and none defined
+it; through spec 1.4.2 the field carried no comment, no provenance class and no
+semantics anywhere in this specification, which `§0` rule 6 makes a defect in its
+own right.
+
+*What is deliberately **not** asserted.* **No relationship whatever to
+`Settlement.created_at`.** That field is `[RZP-DOC]` and documents the creation of
+the settlement *record*; `§0` rule 6 forbids promoting an ASSAY reading onto a
+documented field, and no rule anywhere compares the two. The definition is also
+**necessary, not sufficient**: two lines sharing a `settled_at` are not thereby
+carried by the same settlement, which is what keeps `F08` a matching problem
+rather than a lookup.
 
 **Route transfers are out of Tier-0 scope `[ASSAY-MODEL]`.** `type: "transfer"`
 (`trf_…`) is genuinely documented, and Razorpay's own sample shows a transfer row
@@ -1704,6 +1749,7 @@ reference beats endpoint reference beats product guide beats pricing page.
 | M15 | The adjustment information boundary: `Adjustment` (`reason`, `direction`, `related_entity_id`) is true-state only and never observed; ASSAY sees an adjustment as a `ReconLine` with `type === "adjustment"` | Razorpay publishes no Adjustments API entity (M9), so there is no documented observable from which a reason could be read. The boundary is ASSAY's modelling decision, not a Razorpay behaviour |
 | M16 | `AN5` is not exercised, and the merchant ledger is soft evidence only | Retiring the anchor is ASSAY's decision, taken at spec 1.4.1 on two grounds internal to this specification — `order.receipt`'s quarantine (§0 rule 4) and `THREAT_MODEL.md §T5`'s soft-evidence doctrine. Razorpay documents nothing about how a merchant's ERP references its own orders, and asserts no anchor either way |
 | M17 | The `order.receipt` → `MerchantLedgerEntry.order_ref` lossy re-encoding, and its retention band | §8 states that the mapping is lossy; the *form* of the transform and how much shape it retains are ASSAY's, and are a declared governance convention with no documentary basis (`PREREGISTRATION.md §4.2`) |
+| M18 | `ReconLine.settled_at` is **settlement-scoped**: the instant the carrying settlement transferred, identical across every line that settlement carried (§6, spec 1.4.3) | The field's name, type and unit are documented; its **semantics** are not, and no source states the scope or relates it to `Settlement.created_at`. `C3`, `C4` and §7 already read the term this way; the definition states what they assume. The refusal is part of the row: no relationship to `Settlement.created_at` is asserted, and the condition is necessary rather than sufficient |
 
 ### 22.3 `[NOT-CLAIMED]` — considered and deliberately not asserted
 

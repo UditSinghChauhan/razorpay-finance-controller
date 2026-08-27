@@ -1,8 +1,16 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.2 · **Date:** 2026-08-27
+**Spec version:** 1.4.3 · **Date:** 2026-08-28
 **Reviewer role:** principal architect / skeptical reviewer
+
+**At spec 1.4.3** §A.10 records one further resolution, taken at a governance gate
+held **after the `packages/oracle` design audit and before any dataset was
+generated**: `ReconLine.settled_at` carried no definition anywhere in this
+specification while three frozen clauses read it, and `C3` bundled two conjuncts
+with different evidence requirements into one row. **No declared value changes**;
+`C1`–`C8` membership and order, `I1`–`I9`, every `§7` threshold and benchmark
+v1.0.3 are unchanged.
 
 **At spec 1.4.2** §A.9 records one further resolution, taken at a governance gate
 held **after `packages/generator` was written and before any dataset was
@@ -449,6 +457,71 @@ state an ordinary `refund`-kind observation reaches under `G1`, and that kind's
 absence from `§14.1` — binds the engine phase rather than generation.
 
 ---
+
+---
+
+### A.10 Spec 1.4.3 / benchmark 1.0.3 — the field that was never defined
+
+A governance gate held **after the `packages/oracle` design audit and before any
+dataset was generated** asked what bounds the oracle's candidate pool. The answer
+was that nothing does, and that the reason is a field with no semantics.
+
+`PREREGISTRATION.md §5.2` requires the oracle to check candidates *"over a fully
+enumerated space"* under `C_oracle = 2,000,000`, which is satisfiable only where
+the pool holds at most twenty members. Nothing in `C1`–`C8` bounds one: every
+per-member clause is silent about the target, so the pool is every unanchored
+eligible line in the dataset. The budget was describing a decomposition the
+constraint set did not deliver.
+
+**The cause was one undefined field.** `ReconLine.settled_at` was declared in
+`DATA_MODEL.md §6` with no comment, no provenance class and no semantics anywhere
+in the specification — while `C3` chains through it, `C4` is named *"Settlement
+window"* and justified by the documented T+2 **settlement** cycle, and `§7`
+contrasts the bank line as having *"a different clock (value date, not
+`settled_at`)"*. Three frozen clauses read a term none of them defined, which
+`§0` rule 6 makes a defect independent of anything the oracle needed.
+
+**What was rejected, and why it matters more than what was adopted.** The
+tractable rule available without any amendment was to compare a member's clock to
+`Settlement.created_at`. It holds on every generated row. It was **refused**:
+`Settlement.created_at` is `[RZP-DOC]` and documents the creation of the
+settlement *record*, so reading it as the transfer instant would promote an ASSAY
+convention onto a documented field against `§0` rule 6 — and the identity is
+observable only in `packages/generator/src/emit.ts`, which is not a normative
+source. Had it been false, it would have excluded **every** true allocation rather
+than degrading, and no differential test could have detected the assumption. A
+second alternative — enumerating by ascending cardinality until the budget was
+spent — was rejected against `§5.2`'s *"fully enumerated space"*.
+
+**What was adopted.** The definition itself, as `[ASSAY-MODEL]` M18: `settled_at`
+is the instant the carrying settlement transferred, identical across every line
+that settlement carried. Its consequence follows without a new rule — two members
+with different `settled_at` sit in different settlements, so a candidate cannot
+hold both — and that partitions the pool into equivalence classes the declared
+budget can fully enumerate. The relation is **member-to-member**, so `§4.1`'s
+*"no constraint is re-based onto the target's settlement clock"* stands untouched,
+and the definition explicitly asserts nothing about `Settlement.created_at`. It is
+**necessary, not sufficient**: lines sharing an instant need not share a
+settlement, so `F08` stays a matching problem and `C6` still has to separate two
+same-instant settlements.
+
+`C3`'s split is the second item and is independent. Its two conjuncts have
+different evidence requirements — `created_at ≤ settled_at` is intrinsic to the
+member, `settled_at ≤ bank.value_date` needs a bank line `AN2` can identify on
+roughly three settlement targets in ten. Declaring the second half
+**binding-when-in-scope** stops it returning a silent pass that `§5.3`'s
+differential test would have counted as agreement it never tested. The residual —
+admissibility that is not uniform across targets — is disclosed at `§10` V16
+rather than repaired, because repairing it would move `§4.2`'s frozen 30/70
+`bank_ref` quality and that is a new benchmark version.
+
+**What this amendment does not close.** Under the `B2`/`B3` candidate-universe
+proposal a bank-line target's members would be settlements, and a `Settlement`
+carries no `settled_at` — `DATA_MODEL.md §5` says so — so co-settlement coherence
+induces no classes there and that pool is still unbounded. That gap is recorded
+and left open rather than closed by analogy, because the only available link runs
+through a `§4.2` generation parameter and would repeat the mistake this amendment
+refused.
 
 ---
 

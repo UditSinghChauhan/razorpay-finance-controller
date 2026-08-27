@@ -1,9 +1,15 @@
 # EVALUATION_SPEC — ASSAY
 
-**Spec version:** 1.4.2 · **Date:** 2026-08-27
+**Spec version:** 1.4.3 · **Date:** 2026-08-28
 
 Every metric answers the question: **what decision does this number let someone
 make?** A metric that does not change anyone's behaviour is not reported.
+
+**At spec 1.4.3** this document is unchanged apart from the version header. **No
+metric formula, universe or threshold changes.** `§5.4`'s oracle-gate report line
+should carry the count of targets that entered enumeration alongside the pass, so
+a reader can see the completeness gate was exercised rather than vacuous
+(`PREREGISTRATION.md §10` V17). See `DECISION_BRIEF.md §A.10`.
 
 **At spec 1.4.2 / benchmark 1.0.3** this document is unchanged apart from the
 version header. **No metric formula, universe or threshold was amended.**

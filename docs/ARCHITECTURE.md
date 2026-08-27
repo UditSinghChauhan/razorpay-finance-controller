@@ -1,6 +1,12 @@
 # ARCHITECTURE — ASSAY
 
-**Spec version:** 1.4.2 · **Date:** 2026-08-27
+**Spec version:** 1.4.3 · **Date:** 2026-08-28
+
+**At spec 1.4.3** this document is unchanged apart from the version header.
+§7.2's description of the oracle as running "naive per-candidate boolean checks
+over a fully enumerated space" is unchanged and is now satisfiable: the space it
+enumerates is bounded by `RECONCILIATION_SPEC.md §4.1`'s co-settlement coherence.
+See `DECISION_BRIEF.md §A.10`.
 
 **At spec 1.4.2** this document is unchanged apart from the version header.
 Boundary 1's requirement that amounts be non-negative safe integers is one of the

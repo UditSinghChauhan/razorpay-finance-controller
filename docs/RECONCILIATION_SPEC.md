@@ -1,9 +1,23 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.4.2 · **Date:** 2026-08-27
+**Spec version:** 1.4.3 · **Date:** 2026-08-28
 
 The matching algorithm, the ambiguity definition, and the rules that decide
 accept / reject / abstain. This is the technical core of the project.
+
+**At spec 1.4.3** this document **splits `C3` into two declared halves** (§4.1)
+and states **co-settlement coherence** as a consequence of `DATA_MODEL.md §6`'s
+new definition of `settled_at` (§4.1). **`C1`–`C8` membership and order are
+unchanged, no constraint was added, removed or reordered, `I1`–`I9` are unchanged,
+no threshold moved and no metric definition changed**, and benchmark v1.0.3 is
+unchanged. The split follows `C2`'s precedent: `C3`'s two conjuncts have different
+evidence requirements, and the bank-arrival half is declared
+**binding-when-in-scope** rather than allowed to return a silent pass on the ~70%
+of settlement targets whose bank line `AN2` cannot identify. Co-settlement
+coherence is **not a ninth constraint** — it is the observable content of a field
+definition, it reads only members' own `settled_at`, and it is *necessary, not
+sufficient*, so `F08` remains a matching problem. `constraint_set_hash` moves for
+the `C3` split. See `DECISION_BRIEF.md §A.10`.
 
 **At spec 1.4.2** this document fixes the truth value of `C3` and `C4` against a
 null `settled_at` (§4.1): a candidate member whose `settled_at` is null satisfies
@@ -188,7 +202,7 @@ needing settlements), generate candidate member sets subject to hard constraints
 |---|---|---|
 | `C1` | Currency equality across all members and the target | `[ASSAY-MODEL]` Tier-0 is INR-only by construction, so a non-INR line in an INR dataset is a source or scope error, not a netting event. **Not** justified by "cross-currency netting does not occur": Razorpay documents that settlements are made in INR *regardless of the currency the customer paid in*, so a real multi-currency merchant needs the F11 conversion truth model, which is specified and deliberately not implemented |
 | `C2` | Type compatibility. **Refund half, binding:** a refund may only offset a payment on the same `order_id`. **Adjustment half, non-binding agent-side:** an adjustment may only attach to its `related_entity_id` when present | `[RZP-DOC]` for the refund half — a refund documents its parent `payment_id`. `[ASSAY-MODEL]` for the adjustment half: `related_entity_id` is ASSAY's construct, not a Razorpay field, and per `DATA_MODEL.md §10` it is **not observable** — it lives on the true-state `Adjustment` entity (`DATA_MODEL.md §9`), which is never an observation. The adjustment half is therefore a **generation invariant**: the generator honours it when constructing the true state, and neither the engine nor the oracle can evaluate it. Following the `C8` precedent, it is retained in the constraint set and declared expected-non-binding on v1.0.0 data, and the fraction of candidates it excludes is reported so a reviewer can see that it is doing nothing rather than assume it is doing something |
-| `C3` | Temporal ordering: `created_at ≤ settled_at ≤ bank.value_date` for every member | Money cannot settle before capture or arrive before it is sent. `[RZP-DOC]` Razorpay documents that settlement `status: processed` marks *initiation*, with the bank credit following the NEFT/RTGS/IMPS timeline — so a strictly later bank value date is expected, not anomalous |
+| `C3` | Temporal ordering, in two halves since spec 1.4.3. **Ordering half, binding:** `created_at ≤ settled_at` for every member. **Bank-arrival half, binding where a bank line is in scope:** `settled_at ≤ bank.value_date` for every member, where *bank* is the bank line that receives the **target's** money — the target itself when the target is a `bank_line`, and its `AN2`-matched bank line when the target is a `settlement`. Where no bank line is in scope the half is *evaluated: non-binding* under `PREREGISTRATION.md §5.3`, **per target rather than per dataset** | Money cannot settle before capture or arrive before it is sent. `[RZP-DOC]` Razorpay documents that settlement `status: processed` marks *initiation*, with the bank credit following the NEFT/RTGS/IMPS timeline — so a strictly later bank value date is expected, not anomalous. `[ASSAY-MODEL]` the split: the two halves have different evidence requirements — the first is intrinsic to the member, the second needs a bank line identified, and `PREREGISTRATION.md §4.2` freezes `bank_ref` quality at *"30% a clean UTR, 70% absent or non-UTR"*, so the second is unavailable on most settlement targets. Membership is unchanged; this is the shape `C2` has carried since spec 1.3.0 |
 | `C4` | Settlement window: `settled_at − created_at ∈ [T_min, T_max]` (declared: 1–7 **calendar** days) | `[RZP-DOC]` the documented standard domestic cycle is **T+2 working days** from capture, and is subject to bank approval and variation by vertical and risk. `[ASSAY-MODEL]` ASSAY simulates in calendar days with no bank-holiday calendar; `T_max = 7` is sized to absorb the working-day expansion (a capture before a weekend plus a public holiday can exceed five calendar days). See `PREREGISTRATION.md §4.2` |
 | `C5` | Per-line arithmetic identity: `credit = amount − fee` for payments (`fee` is GST-inclusive), `debit = amount` for refunds | `DATA_MODEL.md §6`; a line failing this is corrupt, not a candidate. Corrected in spec 1.1.1: Razorpay documents `fee` as *"Fee (including GST)"* with `tax` the GST component **inside** it, so subtracting both double-counts GST |
 | `C6` | Exact tie-out: `Σ credit(members) − Σ debit(members) = target.amount`, **zero tolerance** in paise | Settlement amounts are exact; a tolerance here is how false matches get admitted |
@@ -235,6 +249,37 @@ member as part of an allocation — a proposal that contradicts the row's own
 therefore narrows enumeration rather than widening it, and it leaves `E02`'s
 unsettled capture and `E11`'s unsettled refund to reach their terminal states by
 the route `§9` already gives them: no admissible candidate exists at all.
+
+**Co-settlement coherence, entailed at spec 1.4.3 — a consequence, not a ninth
+constraint `[ASSAY-MODEL]`.** `DATA_MODEL.md §6` defines `settled_at` as
+settlement-scoped: every recon line carried by one settlement records the same
+value. A candidate for a settlement target proposes a set of lines **as the lines
+that settlement carried**. If two proposed members carry different non-null
+`settled_at`, the definition places them in different settlements, contradicting
+the proposal. Therefore
+
+```
+  every member of a candidate for a settlement target carries the same settled_at.
+```
+
+**`C1`–`C8` membership, order and wording are unchanged, and this is not a ninth
+filter.** It is the observable content of a field definition, so it is stated here
+rather than added to the table above, and `constraints.decl.ts` gains no row for
+it. Two properties are load-bearing and both follow from `§6`'s wording. It reads
+**only members' own `settled_at`** — never the target's clock — so this section's
+*"no constraint is re-based onto the target's settlement clock"* is untouched, and
+`DATA_MODEL.md §6` explicitly asserts no relationship to `Settlement.created_at`.
+And it is **necessary, not sufficient**: lines sharing a `settled_at` need not
+share a settlement, so `F08` remains a matching problem rather than becoming a
+lookup, and `C6` still has to tell two same-instant settlements apart.
+
+**What it supplies is the bound `PREREGISTRATION.md §5.2`'s budget already
+presupposes.** The unanchored members partition into `settled_at` equivalence
+classes, each fully enumerated. `§5.2` requires *"a fully enumerated space"* under
+`C_oracle`, which is satisfiable only over a bounded pool; nothing in `C1`–`C8`
+bounds one, because every per-member clause is silent about the target. This does,
+and `§5`'s expectation that *"~90% of components have size 1–3"* is a statement
+about those classes rather than about an undifferentiated pool.
 
 Zero tolerance on `C6` is deliberate and worth defending: real settlement
 arithmetic is exact in paise. **In benchmark v1.0.0 `C6` is zero-tolerance
