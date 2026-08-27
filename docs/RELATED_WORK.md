@@ -1,6 +1,9 @@
 # RELATED_WORK — ASSAY
 
-**Spec version:** 1.4.4 · **Date:** 2026-08-28
+**Spec version:** 1.4.5 · **Date:** 2026-08-28
+
+**At spec 1.4.5** this document is unchanged apart from the version header. See
+`DECISION_BRIEF.md §A.12`.
 
 **At spec 1.4.4** this document is unchanged apart from the version header. See
 `DECISION_BRIEF.md §A.11`.

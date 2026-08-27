@@ -1,8 +1,15 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.4 · **Date:** 2026-08-28
+**Spec version:** 1.4.5 · **Date:** 2026-08-28
 **Reviewer role:** principal architect / skeptical reviewer
+
+**At spec 1.4.5** §A.12 records one disclosure, taken at a governance gate held
+after spec 1.4.4 and before any dataset was generated: under the frozen `§4.2`
+composition the close gate cannot return `CLOSED`, so `S12`'s `CLOSED` half is
+reported failed. **Documentation only — no threshold, population parameter,
+metric definition or criterion is changed**, `DECISION_BRIEF.md §F` F9's
+pre-declared disposition governs, and benchmark v1.0.3 is unchanged.
 
 **At spec 1.4.4** §A.11 records one further resolution, taken at a governance gate
 held **after spec 1.4.3 and before any dataset was generated**: the specification
@@ -586,6 +593,60 @@ definition unchanged — the treatment `V12` already gave metric 28. **A larger
 consequence is deliberately not addressed in this amendment:** the close gate is
 unreachable under these rules, and that is reported separately and unrepaired as
 blocker `B8` rather than folded in here.
+
+---
+
+### A.12 Spec 1.4.5 / benchmark 1.0.3 — the close that cannot happen, and the rule that already covered it
+
+A governance gate held after spec 1.4.4 and before any dataset was generated
+asked whether the close gate can ever return `CLOSED` on the frozen population.
+It cannot, and the reason is arithmetic rather than a defect in any single rule.
+
+`PREREGISTRATION.md §4.1` realizes `§4.2`'s 30% clean `bank_ref` share exactly —
+`realize(30/100, 31) = 9` per family instance — so **at least** 22 of each
+family's 31 bank lines carry no anchorable reference. The figure is a floor
+rather than an exact count: `F04`'s `DUPLICATE_ROW` and `F08`'s `MANGLE_UTR`
+perturb it **upward only**, never down. `RECONCILIATION_SPEC.md §3` makes `AN2`
+the only bank-side anchor and `DATA_MODEL.md §11.1` leaves a `bank_line` target
+no admissible member, so nothing else can reach them. `§17.1.1` sends each to
+`E03` → `P5`, `§14.1` enters it at its full `amount`, and `§10.3` allows 0.5% of
+`batch_value_paise`. The bank side alone is of the order of 138 times the
+threshold.
+
+**What was rejected.** Six repairs were surveyed. Raising the clean-`bank_ref`
+share, redefining `value(bank_line)`, removing `E03`'s posting and raising
+`max_unresolved_ratio_bps` all change benchmark semantics and would require a new
+benchmark version and fresh seeds; the last is additionally barred by `§L.4`,
+which forbids changing a frozen decision parameter *"on the basis of an observed
+result"*, and by `§F` F9, which forbids re-tuning in response to the
+falsification check. **Withdrawing `S12` was also rejected** — F9's declared
+response is to report the finding, and deleting the criterion that surfaces it
+would destroy the evidence rather than disclose it.
+
+**What was adopted, and why it is barely a decision.** `§F` F9 already governs
+this outcome: if *"all families close, or none does"*, the result *"is reported
+as a finding in the threats-to-validity section and the run proceeds to the seal
+unchanged"*. This amendment is that report, written from the derivation because
+the derivation needs no run. `§I`'s Aug 27 row draws the matching distinction on
+the implementation side: the three close outcomes are exercised **on constructed
+inputs**, while *"the DEV-seed outcome distribution is recorded for `§F` F9 and
+is not a completion gate"*.
+
+**The preregistered claim is unaffected, and that is the test that matters.**
+`PREREGISTRATION.md §10`'s claim is a disjunction — the period close *"either
+completes with balanced books **or refuses to complete with the unresolved value
+quantified**"*. A run that ends `OPEN` with `unresolved_value_paise` named
+satisfies the second disjunct. `S12`'s `CLOSED` half is reported failed; its
+`OPEN` half passes, and `S12`'s stated purpose — that a gate which has never
+refused is untested — is met on every run. `PROJECT_SPEC.md §7` lists `S3`,
+`S4`, `S6`, `S9` and `S11` as the criteria that matter and none of them reads the
+close outcome.
+
+**Evidence discipline.** The derivation uses frozen parameters only and
+references no seed. It was separately illustrated on seeds outside `§6.1`'s split
+table, which are **not benchmark results** and carry no `AL7` consequence.
+Confirmation on split seeds remains `F9`'s dev run, which this record does not
+pre-empt.
 
 ---
 

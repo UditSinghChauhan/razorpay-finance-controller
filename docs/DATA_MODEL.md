@@ -1,9 +1,14 @@
 # DATA_MODEL — ASSAY
 
-**Spec version:** 1.4.4 · **Date:** 2026-08-28
+**Spec version:** 1.4.5 · **Date:** 2026-08-28
 
 All schemas are normative. The implementation agent must not add, rename or
 retype fields without a spec version bump.
+
+**At spec 1.4.5** this document is unchanged apart from the version header.
+`§14.1`'s `value(bank_line)` and `§17.1.1`'s `E03` → `P5` are two of the five
+frozen rules `PREREGISTRATION.md §10` V19 records, and **both are unchanged** —
+V19 is a disclosure, not a repair. See `DECISION_BRIEF.md §A.12`.
 
 **At spec 1.4.4** this document gains **§11.1, the candidate universe** — the
 member and target contributions `C1`–`C8` read — and register row **M19**

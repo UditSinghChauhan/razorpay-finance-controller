@@ -2,8 +2,13 @@
 
 **Track:** 04 — AI Finance Controller
 **Status:** Specification. Frozen scope for implementation.
-**Spec version:** 1.4.4
+**Spec version:** 1.4.5
 **Date:** 2026-08-27
+
+**At spec 1.4.5** this document is unchanged apart from the version header. **No
+success criterion moves and `S12` is not weakened or deleted.** Under the frozen
+population its `CLOSED` half is reported failed and its `OPEN` half satisfied;
+`PREREGISTRATION.md §10` V19 records why. See `DECISION_BRIEF.md §A.12`.
 
 **At spec 1.4.4** this document is unchanged apart from the version header. **No
 success criterion moves.** A separate, unrepaired blocker against `S12` is

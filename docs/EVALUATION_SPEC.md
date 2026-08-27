@@ -1,9 +1,15 @@
 # EVALUATION_SPEC — ASSAY
 
-**Spec version:** 1.4.4 · **Date:** 2026-08-28
+**Spec version:** 1.4.5 · **Date:** 2026-08-28
 
 Every metric answers the question: **what decision does this number let someone
 make?** A metric that does not change anyone's behaviour is not reported.
+
+**At spec 1.4.5** this document is unchanged apart from the version header. **No
+metric definition changes.** Metric 11 `period_status_distribution` is expected to
+be structurally degenerate on the frozen population and is reported with its
+cause (`PREREGISTRATION.md §10` V19); metrics 12, 13 and 14 are unaffected and
+`BLOCKED` must still be 0. See `DECISION_BRIEF.md §A.12`.
 
 **At spec 1.4.4** this document is unchanged apart from the version header. **No
 metric definition changes.** Metric 27 `coverage_by_value_bank` is bounded by

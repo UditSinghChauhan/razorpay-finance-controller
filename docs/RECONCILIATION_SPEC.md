@@ -1,9 +1,14 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.4.4 · **Date:** 2026-08-28
+**Spec version:** 1.4.5 · **Date:** 2026-08-28
 
 The matching algorithm, the ambiguity definition, and the rules that decide
 accept / reject / abstain. This is the technical core of the project.
+
+**At spec 1.4.5** this document is unchanged apart from the version header.
+`§3`'s `AN2` and `§10.3`'s close policy are named in `PREREGISTRATION.md §10`
+V19 and **neither is changed**; `max_unresolved_ratio_bps` remains 50. See
+`DECISION_BRIEF.md §A.12`.
 
 **At spec 1.4.4** this document is unchanged apart from the version header.
 `C1`–`C8` membership, order and clauses are untouched and `constraint_set_hash`
