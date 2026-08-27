@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   CONSTRAINT_IDS,
   HARD_CONSTRAINTS,
+  SETTLED_AT_NULL_CONSTRAINTS,
+  SETTLED_AT_NULL_RULE,
   canonicalConstraintSet,
   nonBindingClauses,
   type ConstraintId,
@@ -104,6 +106,73 @@ describe("binding status", () => {
         expect(["RZP-DOC", "ASSAY-MODEL"]).toContain(cls);
       }
     }
+  });
+});
+
+/**
+ * `RECONCILIATION_SPEC.md §4.1`, "`C3` and `C4` against a null `settled_at`,
+ * ratified at spec 1.4.2".
+ *
+ * `PREREGISTRATION.md §4.2`'s batch-composition rule emits a settlement member
+ * its batch cannot carry with `settled_at: null`. The rule lives here rather
+ * than in either implementation because `§5.2` has the engine and the oracle
+ * implement one shared declaration and `§5.3`'s consistency gate compares them
+ * constraint by constraint — a rule the two sides read from different places is
+ * one they can disagree about while both believe they conform.
+ */
+describe("the null settled_at rule", () => {
+  it("attaches to exactly C3 and C4, the two constraints that read the field", () => {
+    // C8 alone is written "for members claimed as settled", so §4.1 holds that
+    // the silence of C3 and C4 on that point is deliberate and they remain
+    // unconditional over members. No other constraint reads settled_at.
+    expect([...SETTLED_AT_NULL_CONSTRAINTS]).toEqual(["C3", "C4"]);
+  });
+
+  it("gives C3 and C4 the SAME declaration object, not two equal copies", () => {
+    // §4.1: "a split treatment would make one null admissible under C3 and not
+    // under C4 with nothing to justify the difference." Reference equality makes
+    // a split unrepresentable rather than merely absent today.
+    const c3 = HARD_CONSTRAINTS.find((c) => c.id === "C3");
+    const c4 = HARD_CONSTRAINTS.find((c) => c.id === "C4");
+    expect(c3?.settledAtNull).toBe(SETTLED_AT_NULL_RULE);
+    expect(c4?.settledAtNull).toBe(SETTLED_AT_NULL_RULE);
+  });
+
+  it("leaves every other constraint with no rule rather than a permissive one", () => {
+    for (const constraint of HARD_CONSTRAINTS) {
+      if (constraint.id === "C3" || constraint.id === "C4") continue;
+      expect(constraint.settledAtNull, constraint.id).toBeNull();
+    }
+  });
+
+  it("declares exclusion, never vacuous satisfaction", () => {
+    // §4.1: "effect: exclusion, never admission ... an unconditional filter
+    // whose bounded quantity does not exist cannot report that it is within
+    // bounds." A verdict of anything else would admit an unsettled member into
+    // a candidate, which is the freedom the rule exists to remove.
+    expect(SETTLED_AT_NULL_RULE.verdict).toBe("NOT_SATISFIED");
+    expect(SETTLED_AT_NULL_RULE.ratified_at_spec).toBe("1.4.2");
+    for (const field of ["rule", "applies", "scope", "effect"] as const) {
+      expect(SETTLED_AT_NULL_RULE[field].length, field).toBeGreaterThan(40);
+    }
+  });
+
+  it("is frozen, so neither implementation can soften it at runtime", () => {
+    expect(Object.isFrozen(SETTLED_AT_NULL_RULE)).toBe(true);
+    expect(() => {
+      (SETTLED_AT_NULL_RULE as unknown as { verdict: string }).verdict = "SATISFIED";
+    }).toThrow(TypeError);
+  });
+
+  it("is inside the hashed declaration, so constraint_set_hash pins it", () => {
+    // PREREGISTRATION.md §5.5: a result is only interpretable alongside the
+    // exact declaration in force when it was produced. A rule kept beside the
+    // serialization rather than inside it would bind both implementations and
+    // be pinned by nothing.
+    const encoded = canonicalConstraintSet();
+    expect(encoded).toContain("NOT_SATISFIED");
+    const parsed = JSON.parse(encoded) as { id: string; settledAtNull: unknown }[];
+    expect(parsed.filter((c) => c.settledAtNull !== null).map((c) => c.id)).toEqual(["C3", "C4"]);
   });
 });
 
