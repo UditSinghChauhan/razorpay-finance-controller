@@ -1,6 +1,10 @@
 # RELATED_WORK — ASSAY
 
-**Spec version:** 1.4.0 · **Date:** 2026-08-26
+**Spec version:** 1.4.2 · **Date:** 2026-08-27
+
+**At spec 1.4.2** this document is unchanged apart from the version header.
+
+**At spec 1.4.1** this document is unchanged apart from the version header.
 
 **At spec 1.4.0** this document is unchanged apart from the version header. §7's
 statement that the ledger package *"exposes exactly one write path and it accepts
