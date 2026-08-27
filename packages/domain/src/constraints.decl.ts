@@ -23,6 +23,16 @@
  * Membership is frozen. `DECISION_BRIEF.md §A.6` states that no constraint was
  * "added, removed or reordered" through spec 1.3.0, and `§L.4` forbids changing
  * a frozen decision parameter without a governance cycle.
+ *
+ * **Spec 1.4.2 added `settledAtNull` and changed no membership.** No constraint
+ * was added, removed or reordered and no clause was edited; the eight rows and
+ * their order are the ones spec 1.3.0 froze. What the amendment supplied is the
+ * truth value of `C3` and `C4` against a null `settled_at`, which was previously
+ * undetermined, and it is recorded on the declaration rather than in either
+ * implementation. `constraint_set_hash` therefore moves — deliberately, because
+ * `PREREGISTRATION.md §5.5` exists so a result names the exact declaration in
+ * force when it was produced, and this is a different declaration. No dataset
+ * and no manifest has been generated against the previous one.
  */
 
 import { canonicalJson } from "./canonical-json.js";
@@ -47,6 +57,70 @@ export type ProvenanceClass = "RZP-DOC" | "ASSAY-MODEL";
  * can evaluate would otherwise report agreement it never tested".
  */
 export type AgentSideBinding = "binding" | "expected-non-binding";
+
+/**
+ * How a constraint that reads `settled_at` evaluates against a **null** one.
+ *
+ * Ratified at spec 1.4.2. `PREREGISTRATION.md §4.2`'s batch-composition rule
+ * emits a settlement member its batch cannot carry with `settled_at: null`, and
+ * `C3` and `C4` both read that field. Their truth value there was undetermined
+ * until `RECONCILIATION_SPEC.md §4.1` fixed it, and it is transcribed here
+ * because `PREREGISTRATION.md §5.2` has the engine and the oracle implement one
+ * shared declaration that `§5.3`'s consistency gate compares constraint by
+ * constraint. A rule the two sides read from different places is a rule they can
+ * disagree about while both believe they are conforming.
+ *
+ * The four fields are `§4.1`'s own block, verbatim in structure, so a reviewer
+ * checks this against the specification rather than against a paraphrase.
+ */
+export interface SettledAtNullRule {
+  /** `§4.1`: the member "does NOT satisfy" the constraint. Never "satisfies vacuously". */
+  readonly verdict: "NOT_SATISFIED";
+  readonly rule: string;
+  /** Why the treatment is identical across every constraint carrying this rule. */
+  readonly applies: string;
+  /** Which `settled_at` is read, and which re-basings `§4.1` refuses. */
+  readonly scope: string;
+  /** Exclusion, never admission. */
+  readonly effect: string;
+  /** The specification version that ratified it. */
+  readonly ratified_at_spec: string;
+}
+
+/**
+ * `RECONCILIATION_SPEC.md §4.1`, "`C3` and `C4` against a null `settled_at`,
+ * ratified at spec 1.4.2 `[ASSAY-MODEL]`".
+ *
+ * One object, referenced by both constraints rather than written twice, because
+ * `§4.1` states the identity of treatment as part of the rule: "a split
+ * treatment would make one null admissible under `C3` and not under `C4` with
+ * nothing to justify the difference." Two copies could drift; one cannot.
+ */
+export const SETTLED_AT_NULL_RULE: SettledAtNullRule = deepFreeze({
+  verdict: "NOT_SATISFIED",
+  rule:
+    "A candidate member whose settled_at is null does NOT satisfy this " +
+    "constraint. It is excluded from every candidate.",
+  applies:
+    "Identically to C3 and C4. They sit in one table, are both unqualified " +
+    "over members, read the same field and are evaluated at the same stage on " +
+    "the same candidate; PREREGISTRATION.md §5.2 has the engine and the oracle " +
+    "implement one shared declaration that §5.3's consistency gate compares " +
+    "constraint by constraint, so a split treatment would make one null " +
+    "admissible under C3 and not under C4 with nothing to justify the " +
+    "difference.",
+  scope:
+    "The member's OWN settled_at. No constraint is re-based onto the target's " +
+    "settlement clock, and none is given a settled-only scope: C8 alone is " +
+    "written \"for members claimed as settled\", so the silence of C3 and C4 " +
+    "on that point is deliberate and they remain unconditional over members.",
+  effect:
+    "Exclusion, never admission. A filter admits or excludes, never ranks, and " +
+    "an unconditional filter whose bounded quantity does not exist cannot " +
+    "report that it is within bounds: C4 bounds a settlement window an " +
+    "unsettled member does not have, and C3's ordering chain has a missing link.",
+  ratified_at_spec: "1.4.2",
+});
 
 /**
  * One clause of a constraint. Most constraints have exactly one; `C2` has two
@@ -84,6 +158,17 @@ export interface ConstraintDeclaration {
    */
   readonly provenance: readonly ProvenanceClass[];
   readonly clauses: readonly ConstraintClause[];
+  /**
+   * The ratified treatment of a null `settled_at`, or `null` where the
+   * constraint does not read the field.
+   *
+   * It lives inside the hashed declaration rather than beside it because
+   * `canonicalConstraintSet()` is what `constraint_set_hash` covers, and
+   * `PREREGISTRATION.md §5.5` exists so a result can be read against "the exact
+   * declaration in force when it was produced". A rule kept outside that
+   * serialization would bind both implementations and be pinned by nothing.
+   */
+  readonly settledAtNull: SettledAtNullRule | null;
 }
 
 /**
@@ -134,6 +219,7 @@ export const HARD_CONSTRAINTS = deepFreeze([
       "multi-currency merchant needs the F11 conversion truth model, which is " +
       "specified and not implemented.",
     provenance: ["ASSAY-MODEL"],
+    settledAtNull: null,
     clauses: [bindingClause("Currency is equal across all members and the target.")],
   },
   {
@@ -144,6 +230,7 @@ export const HARD_CONSTRAINTS = deepFreeze([
       "payment's order. An adjustment's parent is ASSAY's own construct and is " +
       "not observable.",
     provenance: ["RZP-DOC", "ASSAY-MODEL"],
+    settledAtNull: null,
     clauses: [
       {
         half: "refund half",
@@ -173,6 +260,7 @@ export const HARD_CONSTRAINTS = deepFreeze([
       "with the bank credit following the NEFT/RTGS/IMPS timeline, so a " +
       "strictly later bank value date is expected rather than anomalous.",
     provenance: ["RZP-DOC"],
+    settledAtNull: SETTLED_AT_NULL_RULE,
     clauses: [
       bindingClause(
         "created_at <= settled_at <= bank.value_date for every member.",
@@ -189,6 +277,7 @@ export const HARD_CONSTRAINTS = deepFreeze([
       "T_max = 7 is sized to absorb the working-day expansion — a capture " +
       "before a weekend plus a public holiday can exceed five calendar days.",
     provenance: ["RZP-DOC", "ASSAY-MODEL"],
+    settledAtNull: SETTLED_AT_NULL_RULE,
     clauses: [
       bindingClause(
         "settled_at - created_at falls within [T_min, T_max], declared as 1 to " +
@@ -204,6 +293,7 @@ export const HARD_CONSTRAINTS = deepFreeze([
       "as 'Fee (including GST)' with tax the GST component inside it, so " +
       "subtracting both would double-count GST.",
     provenance: ["RZP-DOC"],
+    settledAtNull: null,
     clauses: [
       bindingClause(
         "credit = amount - fee for payments, where fee is GST-inclusive; " +
@@ -223,6 +313,7 @@ export const HARD_CONSTRAINTS = deepFreeze([
       "force. A global tolerance is the standard way recon tools manufacture " +
       "confident wrong answers.",
     provenance: [],
+    settledAtNull: null,
     clauses: [
       bindingClause(
         "Sum of member credit minus sum of member debit equals target.amount " +
@@ -239,6 +330,7 @@ export const HARD_CONSTRAINTS = deepFreeze([
       "the next slot — its own worked example settles P1 and P2 and defers P3 " +
       "— so a single payment is not split across two settlements.",
     provenance: ["RZP-DOC"],
+    settledAtNull: null,
     clauses: [
       bindingClause(
         "No member may already belong to an accepted allocation.",
@@ -254,6 +346,7 @@ export const HARD_CONSTRAINTS = deepFreeze([
       "transfer is on hold' — a Razorpay Route concept toggled via " +
       "PATCH /v1/transfers/:id.",
     provenance: ["ASSAY-MODEL", "RZP-DOC"],
+    settledAtNull: null,
     clauses: [
       {
         half: null,
@@ -274,6 +367,45 @@ export const HARD_CONSTRAINTS = deepFreeze([
 export const CONSTRAINT_IDS = deepFreeze(
   HARD_CONSTRAINTS.map((c) => c.id),
 ) as readonly ConstraintId[];
+
+/**
+ * The constraints that read `settled_at` and therefore carry the ratified
+ * null-settlement rule. Derived from the declaration, never restated.
+ */
+export const SETTLED_AT_NULL_CONSTRAINTS = deepFreeze(
+  HARD_CONSTRAINTS.filter((c) => c.settledAtNull !== null).map((c) => c.id),
+) as readonly ConstraintId[];
+
+/**
+ * `RECONCILIATION_SPEC.md §4.1` makes the identity of treatment part of the
+ * rule, so it is checked at load rather than left to review.
+ *
+ * Two conditions, and both are load-bearing. The carrier set must be exactly
+ * `C3` and `C4`: `§4.1` scopes the rule to the two constraints that read the
+ * field, and `C8`'s unique "for members claimed as settled" wording is the
+ * evidence that the silence of the others is deliberate. And the two must carry
+ * the **same object**, not two equal ones — reference equality is what makes "a
+ * split treatment" unrepresentable rather than merely absent today.
+ */
+{
+  const carriers = SETTLED_AT_NULL_CONSTRAINTS.join(",");
+  if (carriers !== "C3,C4") {
+    throw new Error(
+      `constraints.decl: RECONCILIATION_SPEC.md §4.1 ratifies the null settled_at rule for ` +
+        `C3 and C4; this declaration carries it on [${carriers}].`,
+    );
+  }
+  for (const constraint of HARD_CONSTRAINTS) {
+    if (constraint.settledAtNull === null) continue;
+    if (constraint.settledAtNull !== SETTLED_AT_NULL_RULE) {
+      throw new Error(
+        `constraints.decl: ${constraint.id} carries its own copy of the null settled_at rule. ` +
+          `§4.1 requires C3 and C4 to be treated identically, "so a split treatment would make ` +
+          `one null admissible under C3 and not under C4 with nothing to justify the difference".`,
+      );
+    }
+  }
+}
 
 /**
  * The canonical serialization of the constraint set.

@@ -50,8 +50,11 @@ export {
   type AgentSideBinding,
   type ConstraintClause,
   type ConstraintDeclaration,
+  type SettledAtNullRule,
   HARD_CONSTRAINTS,
   CONSTRAINT_IDS,
+  SETTLED_AT_NULL_CONSTRAINTS,
+  SETTLED_AT_NULL_RULE,
   canonicalConstraintSet,
   nonBindingClauses,
 } from "./constraints.decl.js";

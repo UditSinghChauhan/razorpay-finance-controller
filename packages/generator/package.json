@@ -1,0 +1,19 @@
+{
+  "name": "@assay/generator",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "ASSAY benchmark generator \u2014 forward business simulation, ground truth by construction, declared degradation",
+  "license": "UNLICENSED",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@assay/domain": "workspace:*",
+    "@assay/ledger": "workspace:*",
+    "@assay/money": "workspace:*"
+  }
+}
