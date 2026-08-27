@@ -1,9 +1,13 @@
 # THREAT_MODEL — ASSAY
 
-**Spec version:** 1.4.2 · **Date:** 2026-08-27
+**Spec version:** 1.4.3 · **Date:** 2026-08-28
 
 Every control answers: **what specific failure does this prevent?** Controls that
 cannot name a failure are removed.
+
+**At spec 1.4.3** this document is unchanged apart from the version header. `§T5`'s
+soft-evidence doctrine is untouched: spec 1.4.3 defines `ReconLine.settled_at` and
+splits `C3`, and neither reaches the merchant ledger. See `DECISION_BRIEF.md §A.10`.
 
 **At spec 1.4.2** this document is unchanged apart from the version header. **No
 control, threat or mitigation was added, removed or weakened.**

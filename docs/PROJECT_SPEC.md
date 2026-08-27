@@ -2,8 +2,12 @@
 
 **Track:** 04 — AI Finance Controller
 **Status:** Specification. Frozen scope for implementation.
-**Spec version:** 1.4.2
+**Spec version:** 1.4.3
 **Date:** 2026-08-27
+
+**At spec 1.4.3** this document is unchanged apart from the version header. **No
+success criterion moves**, and `S4`'s abstention-precision bar still reads against
+the oracle. See `DECISION_BRIEF.md §A.10`.
 
 **At spec 1.4.2** this document is unchanged apart from the version header. **No
 success-criterion threshold changed and no criterion was added, removed or
