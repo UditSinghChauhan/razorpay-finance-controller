@@ -1,6 +1,11 @@
 # ARCHITECTURE — ASSAY
 
-**Spec version:** 1.4.4 · **Date:** 2026-08-28
+**Spec version:** 1.4.5 · **Date:** 2026-08-28
+
+**At spec 1.4.5** this document is unchanged apart from the version header. §12's
+row for unresolved value exceeding the close threshold — the period ends `OPEN`
+with the figure quantified — is the path every conforming run is now expected to
+take. See `DECISION_BRIEF.md §A.12`.
 
 **At spec 1.4.4** this document is unchanged apart from the version header. §7.3's
 completeness gate is scoped to expressible targets by `PREREGISTRATION.md §5.3`;
