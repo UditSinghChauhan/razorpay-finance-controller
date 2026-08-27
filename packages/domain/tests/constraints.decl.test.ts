@@ -7,6 +7,7 @@ import {
   SETTLED_AT_NULL_RULE,
   canonicalConstraintSet,
   nonBindingClauses,
+  conditionallyBindingClauses,
   type ConstraintId,
 } from "@assay/domain";
 
@@ -80,17 +81,35 @@ describe("binding status", () => {
     expect(c2?.clauses[1]?.agentSideBinding).toBe("expected-non-binding");
   });
 
-  it("requires a reason for every non-binding clause and none for a binding one", () => {
+  it("requires a reason for every clause that does not bind unconditionally", () => {
+    // Tri-state since spec 1.4.3. "binding" is the only status that asserts the
+    // clause always excludes on its own evidence, so it is the only one that may
+    // carry no reason; the other two must say why they do not.
     for (const constraint of HARD_CONSTRAINTS) {
       for (const clause of constraint.clauses) {
-        if (clause.agentSideBinding === "expected-non-binding") {
+        if (clause.agentSideBinding === "binding") {
+          expect(clause.nonBindingReason).toBeNull();
+        } else {
           expect(clause.nonBindingReason).not.toBeNull();
           expect(clause.nonBindingReason?.length ?? 0).toBeGreaterThan(40);
-        } else {
-          expect(clause.nonBindingReason).toBeNull();
         }
       }
     }
+  });
+
+  it("splits C3 into the two halves spec 1.4.3 names, and only C3", () => {
+    // RECONCILIATION_SPEC.md §4.1: the ordering half is intrinsic to the member;
+    // the bank-arrival half needs a bank line the target may not have.
+    const c3 = HARD_CONSTRAINTS.find((c) => c.id === "C3");
+    expect(c3?.clauses.map((clause) => clause.half)).toEqual([
+      "ordering half",
+      "bank-arrival half",
+    ]);
+    expect(c3?.clauses[0]?.agentSideBinding).toBe("binding");
+    expect(c3?.clauses[1]?.agentSideBinding).toBe("binding-when-in-scope");
+    expect(conditionallyBindingClauses()).toEqual([
+      { id: "C3", half: "bank-arrival half" },
+    ]);
   });
 
   it("leaves C6 with no provenance class, because §4.1 tags none", () => {

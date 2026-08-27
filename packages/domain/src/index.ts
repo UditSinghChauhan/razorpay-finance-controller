@@ -57,6 +57,7 @@ export {
   SETTLED_AT_NULL_RULE,
   canonicalConstraintSet,
   nonBindingClauses,
+  conditionallyBindingClauses,
 } from "./constraints.decl.js";
 
 export * from "./schemas/index.js";

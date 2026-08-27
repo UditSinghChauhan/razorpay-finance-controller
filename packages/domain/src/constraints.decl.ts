@@ -24,6 +24,18 @@
  * "added, removed or reordered" through spec 1.3.0, and `§L.4` forbids changing
  * a frozen decision parameter without a governance cycle.
  *
+ * **Spec 1.4.3 split `C3` into two clauses and changed no membership.** The
+ * eight rows and their order are unchanged; `C3` gains a second clause the way
+ * `C2` has carried two halves since spec 1.3.0, because its two conjuncts have
+ * different evidence requirements — `created_at <= settled_at` is intrinsic to
+ * the member, while `settled_at <= bank.value_date` needs a bank line the target
+ * may not have. `constraint_set_hash` moves, for the reason recorded below.
+ * Spec 1.4.3 also defines `ReconLine.settled_at` (`DATA_MODEL.md §6`) and states
+ * its consequence — co-settlement coherence — in `RECONCILIATION_SPEC.md §4.1`.
+ * That consequence is deliberately **not** a row here: it is the observable
+ * content of a field definition, not a ninth constraint, and adding it would
+ * make the set nine.
+ *
  * **Spec 1.4.2 added `settledAtNull` and changed no membership.** No constraint
  * was added, removed or reordered and no clause was edited; the eight rows and
  * their order are the ones spec 1.3.0 froze. What the amendment supplied is the
@@ -46,6 +58,16 @@ export type ProvenanceClass = "RZP-DOC" | "ASSAY-MODEL";
 /**
  * Whether a clause can actually be evaluated from observations.
  *
+ * `binding-when-in-scope`, added at spec 1.4.3, is a third status and not a
+ * softer second: the clause **is** evaluable and **does** exclude, but only where
+ * the evidence it reads is in scope for the target at hand. `C3`'s bank-arrival
+ * half is the only carrier. `RECONCILIATION_SPEC.md §4.1` scopes it "per target
+ * rather than per dataset", which is why it is not folded into
+ * `expected-non-binding`: that status says a clause excludes nothing on v1.0.0
+ * data, and this one excludes a great deal on the targets where it applies.
+ * `nonBindingClauses()` therefore continues to return only the wholesale pair,
+ * and `§5.3`'s differential-test exclusion for this half is conditional.
+ *
  * `expected-non-binding` is not a weaker constraint — it is a declared
  * statement that on v1.0.0 data the clause excludes nothing, either because the
  * field it reads is out of Tier-0 scope (`C8`, Route) or because no observable
@@ -56,7 +78,10 @@ export type ProvenanceClass = "RZP-DOC" | "ASSAY-MODEL";
  * pass criterion, because "a gate that cannot fail on a constraint neither side
  * can evaluate would otherwise report agreement it never tested".
  */
-export type AgentSideBinding = "binding" | "expected-non-binding";
+export type AgentSideBinding =
+  | "binding"
+  | "expected-non-binding"
+  | "binding-when-in-scope";
 
 /**
  * How a constraint that reads `settled_at` evaluates against a **null** one.
@@ -259,12 +284,31 @@ export const HARD_CONSTRAINTS = deepFreeze([
       "Razorpay documents that settlement status 'processed' marks initiation, " +
       "with the bank credit following the NEFT/RTGS/IMPS timeline, so a " +
       "strictly later bank value date is expected rather than anomalous.",
-    provenance: ["RZP-DOC"],
+    provenance: ["RZP-DOC", "ASSAY-MODEL"],
     settledAtNull: SETTLED_AT_NULL_RULE,
     clauses: [
-      bindingClause(
-        "created_at <= settled_at <= bank.value_date for every member.",
-      ),
+      {
+        half: "ordering half",
+        statement: "created_at <= settled_at for every member.",
+        agentSideBinding: "binding",
+        nonBindingReason: null,
+      },
+      {
+        half: "bank-arrival half",
+        statement:
+          "settled_at <= bank.value_date for every member, where bank is the " +
+          "bank line that receives the TARGET's money: the target itself when " +
+          "the target is a bank_line, and its AN2-matched bank line when the " +
+          "target is a settlement.",
+        agentSideBinding: "binding-when-in-scope",
+        nonBindingReason:
+          "A settlement target's bank line is identifiable only through AN2, " +
+          "which needs a clean bank_ref, and PREREGISTRATION.md §4.2 freezes " +
+          "bank_ref quality at '30% a clean UTR, 70% absent or non-UTR'. Where " +
+          "no bank line is in scope the half is reported evaluated: non-binding " +
+          "under §5.3 — per target, not per dataset. Where it IS in scope it " +
+          "binds hard, so it is not expected-non-binding.",
+      },
     ],
   },
   {
@@ -427,6 +471,27 @@ export function canonicalConstraintSet(): string {
  * separately as *evaluated: non-binding*", because a gate that cannot fail on
  * them "would otherwise report agreement it never tested".
  */
+/**
+ * The clauses that bind only where their evidence is in scope for the target.
+ *
+ * Added at spec 1.4.3 with `C3`'s bank-arrival half, the only carrier. Kept apart
+ * from `nonBindingClauses()` deliberately: `PREREGISTRATION.md §5.3` excludes a
+ * clause from the consistency gate's pass criterion because *neither side can
+ * evaluate it*, which is a property of the dataset. This one is evaluable on some
+ * targets and not others, so its exclusion is **per target**, and folding the two
+ * together would let the gate drop a clause it can and should test.
+ */
+export function conditionallyBindingClauses(): readonly {
+  id: ConstraintId;
+  half: string | null;
+}[] {
+  return HARD_CONSTRAINTS.flatMap((constraint) =>
+    constraint.clauses
+      .filter((clause) => clause.agentSideBinding === "binding-when-in-scope")
+      .map((clause) => ({ id: constraint.id, half: clause.half })),
+  );
+}
+
 export function nonBindingClauses(): readonly {
   id: ConstraintId;
   half: string | null;
