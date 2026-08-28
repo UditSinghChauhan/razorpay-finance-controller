@@ -1,7 +1,7 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.6 · **Date:** 2026-08-28
+**Spec version:** 1.4.7 · **Date:** 2026-08-28
 **Reviewer role:** principal architect / skeptical reviewer
 
 **At spec 1.4.6** §A.13 records one definition, taken at a governance gate held
@@ -717,6 +717,57 @@ criterion `S12`'s neighbour `S4`, therefore depended on a field the specificatio
 had left blank. `packages/oracle`'s property suite pins that divergence and is
 retained, because it is the demonstration that the base has to be normative
 rather than a convention.
+
+### A.14 Spec 1.4.7 / benchmark 1.0.3 — the silence that decided a gate
+
+**The decision.** `PREREGISTRATION.md §4.2` now freezes the **time of day** it had
+left free: the settlement instant at `21:00:00` IST on the settlement's own
+calendar date, and captures, refunds and ERP bookings within
+`[00:00:00, 21:00:00)` IST of their day. Register row M21.
+
+**Why a silence needed closing.** `§4.2` fixed each entity's **day** — capture
+window, `T+n` cycle, merchant clock — and said nothing about the time within it.
+That looked like a free implementation detail and was not. `C4` bounds
+`settled_at − created_at` at `T_min = 1` day; `DATA_MODEL.md §6` makes
+`settled_at` **settlement-scoped**, one instant for every line the settlement
+carried, explicitly unrelated to `Settlement.created_at`. The gap therefore varies
+across a batch by the spread of capture times inside its capture-day, and on a
+`T+1` batch a member captured late in the day has a gap under one day in elapsed
+seconds and exactly one day as a calendar-date difference.
+
+**That member is in a true allocation, which is what makes it a governance
+matter.** `PREREGISTRATION.md §5.3`'s completeness gate requires every true
+allocation to appear among the oracle's solutions, and *"if it fails, the
+benchmark is invalid and no results may be reported from it."* Two defensible
+readings of `C4` therefore disagreed about **whether the benchmark is valid** —
+not about a label, and not about throughput.
+
+**The amendment makes the readings agree instead of picking a winner, and that
+is the whole of its content.** With every event strictly before the settlement
+instant, `elapsed > n · 86_400 ≥ T_min` strictly, `elapsed ≤ 334_800 s ≤ T_max`,
+and the calendar difference is `n ∈ {1,2,3} ⊆ [1,7]`. Both readings admit every
+member of every true allocation. **`C4` is not amended, `T_min` and `T_max` do not
+move, and `constraint_set_hash` does not move.** `21:00:00` is derived rather than
+preferred: it is the latest instant leaving the three hours `§4.2`'s own bank
+clock needs inside the same calendar date, so `C3`'s bank-arrival half also holds
+by construction.
+
+**What was actually wrong, stated plainly.** The property the benchmark's
+validity rested on was implemented in `packages/generator`'s `period.ts` and
+registered there as `U-CLOCKS` — **with `spec_basis: null`**, and with a row whose
+text recorded only *"drawn uniformly within the IST calendar day"*, omitting the
+`21:00` cap and the `21:00` stamp that do the work. An author honouring that row
+as written would have drawn over the full day and invalidated the benchmark
+without touching a frozen parameter. Meanwhile `packages/oracle`'s `O-C4-UNIT`
+described the exposure as a *consistency*-gate concern only, which understated it.
+Both rows are corrected and ratified against `§4.2` here.
+
+**No population quantity moves.** The grid states what the benchmark already had:
+no rate, count, composition figure, seed, split, family or `target_record_count`
+changes, and a regeneration at the same seeds is byte-identical. Benchmark v1.0.3
+is unchanged. This is a case of the specification catching up with a property its
+own gates already depended on, not of the population being altered to suit an
+implementation.
 
 **A disclosed consequence of the member scope.** Because anchored observations
 are excluded, a component's value is the value of its *unanchored* residual, so
