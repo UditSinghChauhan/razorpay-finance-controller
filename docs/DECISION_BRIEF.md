@@ -1,7 +1,7 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.7 · **Date:** 2026-08-28
+**Spec version:** 1.4.8 · **Date:** 2026-08-28
 **Reviewer role:** principal architect / skeptical reviewer
 
 **At spec 1.4.6** §A.13 records one definition, taken at a governance gate held
@@ -769,6 +769,64 @@ changes, and a regeneration at the same seeds is byte-identical. Benchmark v1.0.
 is unchanged. This is a case of the specification catching up with a property its
 own gates already depended on, not of the population being altered to suit an
 implementation.
+
+### A.15 Spec 1.4.8 / benchmark 1.0.3 — the word that meant two things
+
+**The decision.** `RECONCILIATION_SPEC.md §4.1`'s `C2` refund half is
+**referential**: the refund member's own `order_id` must equal the `order_id` of
+the payment its `payment_id` names, and **that payment need not be a member of
+the same candidate**. A named payment absent from the dataset leaves the clause
+unevaluated and excludes nothing — that is `E10_REFUND_ORPHAN`. Where a
+`recon_line` and a `payment` observation both carry the parent's `order_id`, the
+`recon_line` governs. Register row M22.
+
+**Why it needed deciding.** *"A refund may only offset a payment on the same
+`order_id`"* admits **co-membership** — the parent must be in the candidate — and
+**referential** — the refund's own field must agree with its parent's. Both are
+ordinary readings of *"offset"*, and neither §4.1 nor
+`packages/domain/src/constraints.decl.ts` chose. The declaration carried the
+sentence **verbatim**, which mattered because `PREREGISTRATION.md §5.2` has the
+engine and the oracle implement *"one declarative specification"*: an ambiguity
+there is an ambiguity both must resolve independently, and `§5.3`'s consistency
+gate would catch a divergence only at build time, after both were written.
+
+**Co-membership is refuted, not outvoted — and this is the difference from
+`§A.13`.** `§4.2` allocates one settlement batch per capture-day; `§4.1`'s `F02`
+settles a refund *"in batch N+2"*; and `§4.2` relies on exactly that when it says
+the rule *"leaves the 31-day grid for a refund raised in the final two days"* — a
+refund can only leave the grid if its batch is keyed to **its own** day. Since a
+refund follows its capture, the parent's batch is strictly earlier, so the two
+are never in one settlement and never co-members. Co-membership would therefore
+exclude **every** refund-carrying true allocation, fail `§5.3`'s completeness
+gate, and by `§5.3`'s own words make *"the benchmark invalid"*. Three further
+signals point the same way independently: `§3`'s `AN3` gives the link's basis as
+*"Referential"*, `§4.1`'s justification is *"a refund documents its parent
+`payment_id`"* — a fact on the refund's own row — and `§15`'s `E10` already owns
+absence from the dataset, so `C2` was never the absence filter.
+
+**One half of this is a declaration and the record says so.** Nothing ranks the
+two observations that can supply the parent's `order_id`. The `recon_line` is
+chosen because `DATA_MODEL.md §11.1` scopes a member's quantities to *"its own
+observation payload and from no other source"* and `§22.1` D10 makes the
+date-scoped recon report the constituent source; taking it from `pg_payments`
+would compare across two views whose agreement nothing guarantees, which is what
+`F04` and `F08` attack. A reviewer who prefers the other source is not
+contradicted by frozen text.
+
+**`constraint_set_hash` moves, and only for this.** From
+`1f389d5d4e9898e2dc5ba460ae90f2c95ed22b326ac876c0d92c00930f0e1649` to
+`f0c93b5f6a5ffd583c6619a8eaf4d44099718fdf39b28bf61588a887a02f0c1b`, verified by
+diffing the canonical serialisation: eight constraints before and after, ids and
+order identical, and exactly one field different — `C2.clauses[0].statement`.
+`C1` and `C3`–`C8` are byte-identical, the adjustment half is untouched, and the
+precedent is `§A.10`, where the `C3` split moved the hash at benchmark 1.0.3.
+
+**No behaviour changes and no data moves.** `packages/oracle`'s `checkC2` already
+implemented the referential reading as its unratified `O-C2-REFUND` convention,
+so this ratification makes the specification the authority for what the code
+already did. No population parameter, seed, split, family or
+`target_record_count` changes; benchmark v1.0.3 is unchanged; and no dataset
+exists to regenerate.
 
 **A disclosed consequence of the member scope.** Because anchored observations
 are excluded, a component's value is the value of its *unanchored* residual, so
