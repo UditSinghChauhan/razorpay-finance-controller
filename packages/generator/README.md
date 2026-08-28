@@ -5,7 +5,7 @@ layer. `ARCHITECTURE.md §3`: *"Must be independently runnable and
 seed-deterministic. Kept out of the engine so no engine code can ever import
 ground truth — an import lint enforces this."*
 
-Written against **specification 1.4.6 / benchmark 1.0.3**.
+Written against **specification 1.4.7 / benchmark 1.0.3**.
 
 ## What this package guarantees
 
@@ -113,7 +113,6 @@ the ordering it records — refuse until ratified, never guess — is the point.
 | `U-LEDGER-FIELDS` | `invoice_no`, `expected_net_paise`, `gl_account` |
 | `U-BANK-FIELDS` | `running_balance` |
 | `U-UTR-SHAPE` | UTR shape. One documented sample; `§22.2` M8 records at least three real shapes |
-| `U-CLOCKS` | Time of day for captures, refunds and bookings. Left free, `C4` fails on the seconds reading and the oracle completeness gate would invalidate the benchmark |
 | `U-ADJ-AMOUNT` | `ReconLine.amount` on an adjustment row, which `§17.2` leaves *"deliberately unconstrained"* |
 
 ### Implementation decisions with no specification counterpart

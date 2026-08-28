@@ -6,17 +6,27 @@
  * (`DATA_MODEL.md §0` rule 2). Every timestamp this generator emits is derived
  * here, so that "which day is this on" has one answer.
  *
- * **Why the time-of-day grid exists.** `§4.2` fixes each entity's *day* — the
- * capture window, the `T+n` cycle, the merchant clock — and states no time of
- * day. Left free, the obvious choice (draw uniformly over the whole day)
- * **breaks constraint `C4`**: a capture at 23:59 on day `d` settling at 00:01 on
- * day `d+1` is 120 seconds apart, and `C4` requires
- * `settled_at - created_at ∈ [1, 7]` days. A true allocation that fails a hard
- * constraint fails the oracle **completeness gate**, at which point
- * "the benchmark is invalid and no results may be reported from it"
- * (`§5.3`). The grid below is the smallest arrangement under which every true
- * allocation satisfies `C3` and `C4` on the seconds reading as well as the
- * calendar-date reading. Registered as `conventions.ts` `U-CLOCKS`.
+ * **The time-of-day grid is frozen at spec 1.4.7 and read from `§4.2`.** That
+ * section now states both halves — *"settlement instant: 21:00:00 IST on the
+ * settlement's own calendar date"* and *"event window: captures, refunds and ERP
+ * bookings are drawn from [00:00:00, 21:00:00) IST of the day they belong to"* —
+ * so the constants below are transcribed, not chosen. `conventions.ts`
+ * `C-CLOCKS` carries the citation.
+ *
+ * **Why it is frozen rather than left to this package.** Through spec 1.4.6
+ * `§4.2` fixed each entity's *day* and stated no time of day. Left free, the
+ * obvious choice (draw uniformly over the whole day) **breaks constraint `C4`**:
+ * a capture at 23:59 on day `d` settling at 00:01 on day `d+1` is 120 seconds
+ * apart, and `C4` requires `settled_at - created_at ∈ [1, 7]` days. A true
+ * allocation that fails a hard constraint fails the oracle **completeness
+ * gate**, at which point "the benchmark is invalid and no results may be
+ * reported from it" (`§5.3`). So the grid was never a generator preference —
+ * it was a property the benchmark's validity rested on, sitting in an
+ * unratified package convention where it could have been changed without a
+ * governance cycle. Under the frozen grid every true allocation satisfies `C3`
+ * and `C4` on the seconds reading **and** the calendar-date reading, which is
+ * what makes `C4`'s measurement stop being a decision. Nothing here changed
+ * when it was frozen; this package has always emitted on this grid.
  */
 
 import { roundHalfUp } from "@assay/money";

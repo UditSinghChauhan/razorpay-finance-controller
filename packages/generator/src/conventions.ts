@@ -115,6 +115,34 @@ export const CONVENTIONS: readonly Convention[] = Object.freeze([
       "the point.",
   },
 
+  {
+    id: "C-CLOCKS",
+    subject: "Time of day for captures, refunds, bookings and settlements",
+    decision:
+      "Captures, refunds and ERP bookings are drawn uniformly from " +
+      "[00:00:00, 21:00:00) IST of the day the entity belongs to; every " +
+      "settlement batch is stamped at 21:00:00 IST on its own calendar date. A " +
+      "refund is created 0-2 days after its capture, within the period.",
+    spec_basis: "PREREGISTRATION.md §4.2 (settlement instant, event window) and §22.2 M21, spec 1.4.7",
+    why:
+      "RATIFIED AT SPEC 1.4.7, AND THE ROW RECORDS WHAT IT PREVIOUSLY OMITTED. " +
+      "Through spec 1.4.6 §4.2 fixed each entity's DAY through the capture " +
+      "window, the T+n cycle and the merchant clock, and stated NO TIME OF " +
+      "DAY, so this package chose one. The choice was not free: C4 bounds " +
+      "settled_at - created_at at T_min = 1 day and DATA_MODEL.md §6 makes " +
+      "settled_at settlement-scoped, so on a T+1 batch a member captured late " +
+      "in the day has a gap under one day in elapsed seconds and exactly one " +
+      "day as a calendar-date difference. That member is in a TRUE allocation, " +
+      "so the two readings disagreed about whether §5.3's completeness gate " +
+      "passes -- benchmark validity, not implementation taste. THIS ROW USED " +
+      "TO SAY ONLY 'drawn uniformly within the IST calendar day', WHICH OMITTED " +
+      "THE 21:00 CAP AND THE 21:00 STAMP THAT DO THE WORK: an author honouring " +
+      "it as written would have drawn over the whole day and invalidated the " +
+      "benchmark without touching a frozen parameter. §4.2 now freezes the " +
+      "grid, so both readings admit every member of every true allocation and " +
+      "the emitted data is unchanged -- this package has always emitted on it. " +
+      "DATA_MODEL.md §4 requires refund.created_at >= payment.created_at.",
+  },
   // --- UNRATIFIED: the specification states nothing -------------------------
   {
     id: "U-ISSUER-SET",
@@ -336,18 +364,6 @@ export const CONVENTIONS: readonly Convention[] = Object.freeze([
       "digit is drawn; nothing is sequential or time-derived (§22.3 refuses that).",
   },
   {
-    id: "U-CLOCKS",
-    subject: "Time of day for captures, refunds and bookings",
-    decision:
-      "Drawn uniformly within the IST calendar day the entity belongs to. A " +
-      "refund is created 0-2 days after its capture, within the period.",
-    spec_basis: null,
-    why:
-      "§4.2 fixes each entity's DAY through the capture window, the T+n cycle and " +
-      "the merchant clock, and states no time of day. DATA_MODEL.md §4 requires " +
-      "refund.created_at >= payment.created_at.",
-  },
-  {
     id: "U-INJECT-VARIANTS",
     subject: "INJECT_NOTES declared variants",
     decision: "Two variants, V1 and V2, in frozen.ts INJECT_NOTES_CORPUS.",
@@ -426,7 +442,7 @@ export const UNRATIFIED: readonly Convention[] = Object.freeze(
  * the specification does not carry as a spec amendment, and this is the smallest
  * mechanism that makes that countable.
  */
-export const UNRATIFIED_COUNT = 22;
+export const UNRATIFIED_COUNT = 21;
 
 /** `U-ISSUER-SET`. Four characters each, per `DATA_MODEL.md §6`. */
 export const CARD_ISSUER_SET = Object.freeze(["HDFC", "ICIC", "SBIN", "UTIB"] as const);
