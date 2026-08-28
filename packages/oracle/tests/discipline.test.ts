@@ -113,8 +113,16 @@ describe("the convention register", () => {
     expect(new Set(CONVENTIONS.map((c) => c.id)).size).toBe(CONVENTIONS.length);
   });
 
-  it("keeps B6 unratified — its reading is still this package's own choice", () => {
-    expect(UNRATIFIED.map((c) => c.id)).toContain("O-C2-REFUND");
+  it("records B6 as closed, and says where the decision had to land", () => {
+    // B6 was this package's own choice until spec 1.4.8. It could not stay one:
+    // C2 binds the ENGINE too, §5.2 has both sides implement one declarative
+    // specification, and constraints.decl.ts carried the ambiguous sentence
+    // verbatim — so a package-local register could not bind the party that
+    // most needed binding.
+    const c = CONVENTIONS.find((c) => c.id === "O-C2-REFUND");
+    expect(c?.spec_basis).not.toBeNull();
+    expect(c?.why).toMatch(/Audit seam B6, closed/);
+    expect(c?.why).toMatch(/WRONG PLACE/);
   });
 
   it("records B7 as RATIFIED at spec 1.4.6, citing the clause that settled it", () => {
@@ -184,10 +192,35 @@ describe("the convention register", () => {
     expect(scope?.why).not.toMatch(/agree in magnitude on every material pair/);
   });
 
-  it("leaves exactly C2 and the impl choice unratified after spec 1.4.7", () => {
-    expect([...UNRATIFIED.map((c) => c.id)].sort()).toEqual(
-      ["O-C2-REFUND", "O-MATERIALITY-IMPL"].sort(),
-    );
+  it("leaves the implementation choice as the only unratified row", () => {
+    expect(UNRATIFIED.map((c) => c.id)).toEqual(["O-MATERIALITY-IMPL"]);
+  });
+
+  it("records O-C2-REFUND as ratified at spec 1.4.8, with E10 kept distinct", () => {
+    const c = CONVENTIONS.find((c) => c.id === "O-C2-REFUND");
+    expect(c?.spec_basis).toMatch(/RECONCILIATION_SPEC\.md §4\.1 C2 refund half/);
+    expect(c?.spec_basis).toMatch(/1\.4\.8/);
+    expect(c?.decision).toMatch(/NOT be a candidate member/);
+    expect(c?.decision).toMatch(/E10_REFUND_ORPHAN/);
+    expect(c?.decision).toMatch(/recon_line governs/);
+    expect(UNRATIFIED.map((c) => c.id)).not.toContain("O-C2-REFUND");
+  });
+
+  it("keeps the register's two blocks honest about which side a row is on", () => {
+    // The blocks are comments, so nothing enforced them, and a row ratified in
+    // place stayed under a separator reading "the specification determines
+    // nothing here" while carrying a citation. UNRATIFIED filters on
+    // spec_basis rather than position, so no count was ever wrong -- but the
+    // file read falsely, which is the failure mode this register exists to
+    // prevent. Position and basis are pinned to agree.
+    const src = readFileSync(join(SRC, "conventions.ts"), "utf8");
+    const boundary = src.indexOf("--- unratified:");
+    expect(boundary).toBeGreaterThan(0);
+    for (const c of CONVENTIONS) {
+      const at = src.indexOf(`id: "${c.id}"`);
+      expect(at, `${c.id} must appear in the register source`).toBeGreaterThan(0);
+      expect(at > boundary, `${c.id} block placement`).toBe(c.spec_basis === null);
+    }
   });
 
   it("records O-C4-UNIT as ratified against §4.2's frozen clock grid", () => {

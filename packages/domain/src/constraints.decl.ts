@@ -259,7 +259,15 @@ export const HARD_CONSTRAINTS = deepFreeze([
     clauses: [
       {
         half: "refund half",
-        statement: "A refund may only offset a payment on the same order_id.",
+        statement:
+          "A refund may only offset a payment on the same order_id. The test is " +
+          "REFERENTIAL, not co-membership: the refund member's own order_id must " +
+          "equal the order_id of the payment its payment_id names, and that payment " +
+          "need NOT be a member of the same candidate. Where the named payment has " +
+          "no observation in the dataset the clause is not evaluated and excludes " +
+          "nothing; that absence is E10_REFUND_ORPHAN. Where both a recon_line with " +
+          "that entity_id and a payment observation with that id are present, the " +
+          "recon_line governs.",
         agentSideBinding: "binding",
         nonBindingReason: null,
       },

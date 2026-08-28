@@ -5,7 +5,7 @@ only**. `ARCHITECTURE.md §3`: *"Deliberately a second, slow, naive
 implementation. Its whole value is being *not* the engine and *not* the
 generator."*
 
-Written against **specification 1.4.7 / benchmark 1.0.3**.
+Written against **specification 1.4.8 / benchmark 1.0.3**.
 
 ## What this package guarantees
 
@@ -63,13 +63,32 @@ Recorded at `PREREGISTRATION.md §10` V18.
 ## Specification seams
 
 Every decision the frozen specification does not state is a row in
-`conventions.ts` with `spec_basis: null`. **Two are unratified**, and the count
-is pinned so a third cannot appear unnoticed.
+`conventions.ts` with `spec_basis: null`. **One is unratified**, and the count is
+pinned so a second cannot appear unnoticed.
 
 | Id | Seam |
 |---|---|
-| `O-C2-REFUND` | Which reading of `C2`'s refund half. The co-membership reading is refuted by `§5.3`; the referential reading is implemented. Audit seam `B6` |
 | `O-MATERIALITY-IMPL` | Whether the counterfactual projection is computed natively or through `@assay/ledger`. **Semantic impact nil** — both routes implement `§17.1`'s shared frozen posting table |
+
+### `O-C2-REFUND` left this table at spec 1.4.8, and it could not have stayed
+
+`C2`'s *"a refund may only offset a payment on the same `order_id`"* admitted a
+**co-membership** reading — the parent must be in the candidate — as readily as
+the referential one implemented here. `RECONCILIATION_SPEC.md §4.1` now states
+the referential reading, that the named payment **need not be a member**, that an
+absent parent is `E10_REFUND_ORPHAN` rather than a `C2` exclusion, and that the
+`recon_line` governs where both views carry the parent's `order_id`.
+
+Co-membership is **refuted**, not disfavoured: `§4.2`'s one-batch-per-capture-day
+and `§4.1`'s `F02` *"batch N+2"* key a refund's batch to its own day, so the
+parent is never a co-member and the reading would exclude every refund-carrying
+true allocation and fail `§5.3`.
+
+**The row was also in the wrong register.** `C2` binds the engine too, `§5.2` has
+both sides implement *"one declarative specification"*, and
+`constraints.decl.ts` carried the ambiguous sentence verbatim — so a
+package-local convention could not bind the party that most needed binding. The
+clause is amended there as well, and `constraint_set_hash` moves for it alone.
 
 ### `O-C4-UNIT` left this table at spec 1.4.7
 
