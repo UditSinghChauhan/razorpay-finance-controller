@@ -1,6 +1,6 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.4.9 · **Date:** 2026-08-28
+**Spec version:** 1.4.10 · **Date:** 2026-08-28
 
 The matching algorithm, the ambiguity definition, and the rules that decide
 accept / reject / abstain. This is the technical core of the project.
@@ -360,15 +360,39 @@ standard way recon tools manufacture confident wrong answers.
 
 | ID | Signal | Weight (bps) |
 |---|---|---|
-| `SE1` | UTR prefix match length | 3500 |
+| `SE1` | UTR prefix match length, between `settlement.utr` and the `bank_ref` of its `AN2`-matched bank line. **Permanently inactive for ranking, from spec 1.4.10.** Both comparands are target-scoped, so `SE1` takes one value across every candidate of a target and can neither order candidates nor move the ε-gap — the only two uses this section gives the score. It could discriminate only for a `bank_line` target, whose candidates are sets of settlements each carrying its own UTR; `DATA_MODEL.md §11.1` (spec 1.4.4) gives that target the empty candidate set, so the context is gone. The row and its weight are **retained, not removed and not reallocated** | 3500 |
 | `SE2` | `order_ref` ↔ `receipt` string similarity (Jaro–Winkler). **Post-probe only** — `receipt` is quarantined, so this signal is computable solely from a `fetch_order` probe result (§6.2), as `SE5` is. It scores 0 for every candidate on which no probe has run | 2000 |
-| `SE3` | Temporal proximity to the modal settlement lag | 1500 |
-| `SE4` | Method / card-network agreement with the merchant memo | 1000 |
+| `SE3` | Temporal proximity to the modal settlement lag. Lag is `settled_at − created_at` in elapsed seconds. The **modal lag** is the mode of `floor(lag / 86400)` — whole days — taken over **every `recon_line` observation in the dataset**, with **ties resolved to the lowest bin**. Score = `max(0, 1 − |lag − mode| / (T_max − T_min))` | 1500 |
+| `SE4` | Method / card-network agreement with the merchant memo. **Post-probe only** — `memo` is quarantined (`DATA_MODEL.md §0` rule 4, `§8`, `§10`) and `MerchantLedgerEntry` carries no structural method or card-network field, so this signal is computable solely from a `fetch_payment` probe result (§6.2), as `SE2` and `SE5` are. It scores 0 for every candidate on which no probe has run. **The agreement function itself — partial credit between `method` and `card_network`, and the treatment of a `card_network` null on both sides — is NOT settled by this amendment and remains open** | 1000 |
 | `SE5` | Probe result corroboration | 2000 |
 
 `evidence_score_bps ∈ [0, 10_000]` is a weighted sum, used **only** to order candidates and
 to compute the ε-gap in §6. Weights are frozen in `PREREGISTRATION.md` before the
 sealed run and are **not tuned on the test split**.
+
+**What is live before a probe, stated at spec 1.4.10 `[ASSAY-MODEL]`, register row
+M24.** With `SE1` inactive and `SE2`, `SE4` and `SE5` post-probe only, **`SE3`
+alone is computable before any probe runs** — *derived*. Under the kernel ratified
+above, `C4` bounds lag to `[T_min, T_max] = [1, 7]` days and the modal bin is 2,
+so the largest attainable `|lag − mode|` is 5 days, `SE3 ∈ [1/6, 1]`, and the
+greatest pre-probe `Δs` is `1500 × (1 − 1/6) = 1250 bps` — **strictly below
+`ε = 1500`**. `§6`'s `DISCRIMINATED` outcome is therefore **unreachable before
+probing**: *derived, but conditional on the ratified kernel, whose denominator
+frozen text does not determine.* Every materially ambiguous component must reach
+`§6.2`'s probe loop or abstain, which is the order `§6.2` already describes, and
+which makes `P_max = 3` and the *abstentions resolved per probe spent* metric
+load-bearing on every material case. Recorded at `PREREGISTRATION.md §10` V20.
+
+**Derived and ratified are kept apart here.** *Derived:* `SE1`'s comparand and its
+inactivity; `SE4`'s post-probe gating and its zero score absent a probe; that
+`SE3` requires **some** binning, because the spec-1.4.7 clock grid makes lag
+near-continuous in seconds and a seconds-granular mode degenerate. *Ratified:*
+retaining `SE1`'s weight rather than reallocating or removing it; and all four of
+`SE3`'s choices — the whole-day granularity, the dataset-wide population, the
+lowest-bin tie rule and the linear kernel — **none of which frozen text
+determines**. **`SE4`'s agreement function and `SE5` in its entirety are not
+settled by this amendment**, and the table above says so in the rows themselves
+rather than leaving a reader to infer completeness.
 
 ### 4.3 Search bound
 
