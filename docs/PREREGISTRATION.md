@@ -1,6 +1,6 @@
 # PREREGISTRATION — ASSAY Benchmark v1.0.3
 
-**Spec version:** 1.4.6 · **Benchmark version:** 1.0.3
+**Spec version:** 1.4.7 · **Benchmark version:** 1.0.3
 
 **Status: FROZEN on commit. Amendments require a version bump and a new seal.**
 **Date frozen:** 2026-08-23 · **Amended:** 2026-08-24 (benchmark 1.0.1),
@@ -272,6 +272,26 @@ what changes is that its second term now has a referent. `C1`–`C8`, `I1`–`I9
 every `§7` threshold, `§4.1`'s composition, `§4.2`'s rates, `§4.3`, `§6.1` and
 `§6.2` are untouched; no seed, split, family or `target_record_count` moves;
 `constraint_set_hash` does not move; and benchmark v1.0.3 is unchanged.
+
+**Amendment 1.4.7 / benchmark 1.0.3 (pre-seal, one unrecorded silence).** Applied
+before the seal, before any dataset was generated and before any number was
+observed. **Documentation only. One item, in `§4.2`.** It freezes the **time of
+day** this section had left free: the settlement instant at `21:00:00 IST` on the
+settlement's own calendar date, and captures, refunds and ERP bookings within
+`[00:00:00, 21:00:00)` IST of their day, with register row M21. **The silence
+was not neutral.** `C4` bounds `settled_at − created_at` at one day and
+`DATA_MODEL.md §6` makes `settled_at` settlement-scoped, so with the times free a
+`T+1` batch admits a true-allocation member that satisfies `C4` on a
+calendar-date reading and fails it on an elapsed-seconds reading — a disagreement
+about whether `§5.3`'s completeness gate passes, which `§5.3` makes a question of
+benchmark validity. The grid makes the two readings agree rather than selecting
+one, so **`C4` is unchanged and its measurement stops being a decision**;
+`packages/oracle`'s `O-C4-UNIT` and `packages/generator`'s `U-CLOCKS` are ratified
+against it. `C1`–`C8`, `I1`–`I9`, every `§7` threshold, `§4.1`'s composition,
+`§4.2`'s rates, `§4.3`, `§6.1` and `§6.2` are untouched; no seed, split, family or
+`target_record_count` moves; `constraint_set_hash` does not move; and benchmark
+v1.0.3 is unchanged, because the grid states what the population already has and
+a regeneration at the same seeds is byte-identical.
 
 ---
 
@@ -580,6 +600,67 @@ here than it would be in production. That direction of bias is reported, not
 corrected, because adding a holiday engine would change the benchmark rather than
 describe it.
 
+**Why the time of day is frozen `[ASSAY-MODEL]`, supplied at spec 1.4.7, register
+row M21.** Through spec 1.4.6 this section fixed each entity's **day** — the
+capture window, the `T+n` cycle, the merchant clock — and **stated no time of
+day**. That silence was load-bearing and unrecorded. `C4` bounds
+`settled_at − created_at` at `T_min = 1` day, and `DATA_MODEL.md §6` makes
+`settled_at` **settlement-scoped** — one instant for every line the settlement
+carried, with no relationship to `Settlement.created_at` — so the gap necessarily
+varies across a batch by the spread of capture times within its capture-day. With
+the times of day left free, a `T+1` batch admits a member whose gap is **under**
+one day measured in elapsed seconds and **exactly** one day measured as a
+calendar-date difference:
+
+```
+  capture   2026-07-10 22:00 IST     batch: capture-day 07-10, draws T+1
+  settled   2026-07-11 06:00 IST     elapsed  = 28_800 s < 86_400  -> C4 fails
+                                     calendar = 1 day              -> C4 passes
+```
+
+That member belongs to a **true** allocation, so the two readings disagree about
+whether `§5.3`'s completeness gate passes — and `§5.3` makes a failure invalidate
+the benchmark. The measurement of `C4` was therefore not a free implementation
+choice, and neither this section nor `RECONCILIATION_SPEC.md §4.1` said which
+reading governs.
+
+**The grid closes it by making the two readings agree, rather than by picking
+one.** Let a member be captured on day `D` at offset `o`, and let its batch draw
+`T+n` with `n ∈ {1, 2, 3}` per the cycle above. Under the grid `o ∈ [0, S)` with
+`S = 21:00:00`, and `settled_at = dayStart(D+n) + S`:
+
+```
+  elapsed = (n * 86_400 + S) - o
+  o ∈ [0, S)   =>   S - o ∈ (0, S]
+               =>   elapsed ∈ ( n*86_400 , n*86_400 + 75_600 ]
+
+  floor     elapsed > n*86_400 >= 86_400 = T_min          STRICT
+  ceiling   elapsed <= 3*86_400 + 75_600 = 334_800 s      ~3.875 d <= T_max
+  calendar  (D+n) - D = n ∈ {1,2,3} ⊆ [1,7]
+```
+
+Both readings admit every member of every true allocation, so `C4`'s measurement
+ceases to be a decision. The floor is strict **because** every event is strictly
+before `21:00:00` and every settlement is exactly at `21:00:00`; without the
+window, `o > S` gives `elapsed < n*86_400`, which at `n = 1` breaks `T_min`.
+
+**`21:00:00` is derived, not preferred.** Any instant at or after the event
+window's end satisfies the floor; the binding constraint on the other side is
+this section's own bank clock, which puts `value_date` at *"the calendar date of
+`settled_at` plus up to three hours"*. `21:00:00` is the **latest** instant
+leaving those three hours inside the same calendar date, so the bank credit stays
+on the settlement's own date and `C3`'s bank-arrival half holds by construction.
+The same grid therefore secures both halves of `C3` as well as `C4`: ordering
+holds since `n ≥ 1` and `o < S`.
+
+**Nothing about the population changes.** This states the grid the benchmark
+already has; `packages/generator` has emitted on it since the generator was
+implemented, where it was recorded as the unratified convention `U-CLOCKS`. No
+rate, count, composition figure, seed, split, family or `target_record_count`
+moves, and a regeneration at the same seeds is byte-identical. What changes is
+that the property `C4`'s validity depends on is **frozen here** rather than left
+to a package convention that could be changed without a governance cycle.
+
 **The `receipt` / `order_ref` contract, added at spec 1.4.1 (ledger row D23).**
 Frozen here because `SE2` reads both fields and `SE2` carries 2,000 of the 10,000
 basis points of `evidence_score_bps`, so the transform's shape moves metric 4 and
@@ -731,6 +812,11 @@ specification determines them.
                             Bounded by DATA_MODEL.md §7's "sometimes a
                             clean UTR, often not"; the figure within that
                             bound is a convention               [Convention 1]
+  settlement instant      : 21:00:00 IST on the settlement's own calendar
+                            date. Frozen at spec 1.4.7 -- see below
+  event window            : captures, refunds and ERP bookings are drawn
+                            from [00:00:00, 21:00:00) IST of the day they
+                            belong to. Frozen at spec 1.4.7 -- see below
   bank clock              : value_date = the calendar date of settled_at
                             plus up to three hours (DATA_MODEL.md §5,
                             [RZP-DOC] NEFT/RTGS/IMPS timeline)
