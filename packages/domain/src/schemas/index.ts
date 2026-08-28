@@ -76,3 +76,22 @@ export {
   checkReconLineInvariants,
   gstIdentityHolds,
 } from "./invariants.js";
+
+export {
+  type ProbeKind,
+  type PaymentMethod,
+  type ProbeResultDetail,
+  type FetchOrderResult,
+  type FetchPaymentResult,
+  type FetchRefundResult,
+  type FetchSettlementReconResult,
+  type WidenTemporalWindowResult,
+  PROBE_KINDS,
+  ProbeResultDetailSchema,
+  FetchOrderResultSchema,
+  FetchPaymentResultSchema,
+  FetchRefundResultSchema,
+  FetchSettlementReconResultSchema,
+  WidenTemporalWindowResultSchema,
+  isProbeKind,
+} from "./probe-result.js";
