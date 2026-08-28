@@ -18,8 +18,9 @@
  *     pin failing and a human being told.
  *
  * `DECISION_BRIEF.md §L.4` makes inventing a rule the specification does not
- * carry a spec amendment. Nothing here changes a declared value; every row
- * supplies one where none exists.
+ * carry a spec amendment. **Nothing here changes a declared value.** A row with
+ * a `spec_basis` cites the clause that determines it; a row without one supplies
+ * a value where the specification states none.
  *
  * **The audit's `B6` and `B7` seams both appear here, on opposite sides of the
  * line.** `B6` (`O-C2-REFUND`) is still a declared convention: evaluable,
@@ -27,6 +28,16 @@
  * (`O-TAU-BASE`) was escalated to governance and **ratified at spec 1.4.6**, so
  * it now carries a citation. Its row states what the ratification moved rather
  * than reading as though the base had always been settled.
+ *
+ * **Two further rows were ratified without a spec amendment**, on citations that
+ * were available the whole time and had simply not been traced: `O-ANCHOR-SCOPE`
+ * and `O-MATERIALITY-SCOPE`. Neither changed a line of behaviour — what changed
+ * is which document is recorded as the authority. `O-MATERIALITY-SCOPE` was
+ * split out of a combined row that had bundled a *derivable* question (which
+ * postings enter the counterfactual) with a genuinely *undetermined* one
+ * (whether to compute the projection natively); the second is now
+ * `O-MATERIALITY-IMPL` and stays unratified, with its semantic impact declared
+ * nil. Bundling them had let a citation-worthy decision inherit a null basis.
  */
 
 /** One decision, its basis, and why it had to be made. */
@@ -83,6 +94,36 @@ export const CONVENTIONS: readonly Convention[] = Object.freeze([
       "A settlement is not a member-eligible kind, so §4's 'a bank line " +
       "needing settlements' yields the empty candidate set and the target " +
       "reaches EXCEPTION by §9's 'no admissible candidate exists at all'.",
+  },
+  {
+    id: "O-ANCHOR-SCOPE",
+    subject: "Which anchors the oracle evaluates",
+    decision:
+      "AN1 and AN2 only. AN3 and AN4 are inert for candidate membership and " +
+      "target search; AN5 is explicitly UNEXERCISED by §3 and has no code path.",
+    spec_basis:
+      "RECONCILIATION_SPEC.md §3 (anchor table, AN5 struck) and §4; " +
+      "§4.1 C3 bank-arrival half; DATA_MODEL.md §11.1 and §17.1.1",
+    why:
+      "Each of the three dispositions is read off frozen text rather than " +
+      "judged. AN5: §3 strikes the row through -- 'NOT EXERCISED at spec " +
+      "1.4.1 ... The anchor set is AN1-AN4' -- and gives two independent " +
+      "reasons, that it is not implementable (order.receipt is quarantined by " +
+      "DATA_MODEL.md §0 rule 4) and that it should not be (an anchor is hard " +
+      "evidence and §T5 rates the field merchant-controlled). AN1 and AN2 are " +
+      "required BY NAME: §4 generates candidates 'for each unanchored TARGET', " +
+      "and §4.1's C3 bank-arrival half reads 'its AN2-matched bank line when " +
+      "the target is a settlement'. AN3 and AN4 are INERT: they relate " +
+      "refund->payment and payment->order, and all three kinds are neither " +
+      "targets -- §4 and §17.1.1 fix the target universe as settlement and " +
+      "bank_line -- nor member-eligible under §11.1, which admits recon_line " +
+      "and adjustment only; PREREGISTRATION.md §10 V15 confirms the refund " +
+      "kind is 'barred from candidate membership by C6'. A relation between " +
+      "kinds that can be neither target nor member removes nothing from what " +
+      "§3's 'everything anchored is removed from the search space' operates " +
+      "on, so implementing AN3 or AN4 would change no candidate, no label and " +
+      "no metric. Not implementing them is therefore a statement about the " +
+      "specification, not an optimisation.",
   },
   {
     id: "O-ANCHOR-TEST",
@@ -168,6 +209,35 @@ export const CONVENTIONS: readonly Convention[] = Object.freeze([
       "which side the ratified base falls on, so a future change to this row " +
       "fails loudly. Audit seam B7, closed.",
   },
+  {
+    id: "O-MATERIALITY-SCOPE",
+    subject: "Which postings a counterfactual allocation is projected through",
+    decision:
+      "The allocation's own postings only -- P2 per payment member and P4 per " +
+      "refund member, per DATA_MODEL.md §17.1. Displaced members' " +
+      "terminal-state postings (P5/P6) are EXCLUDED.",
+    spec_basis: "RECONCILIATION_SPEC.md §5 and §6; DATA_MODEL.md §17.1.1",
+    why:
+      "DERIVED, NOT MEASURED. §6 computes materiality at stage S4. §5 states " +
+      "that 'allocation is committed in a single serialized pass AFTER all " +
+      "components are solved', so at S4 a member displaced from one allocation " +
+      "has no determined disposition: it may be allocated to a different " +
+      "target in another component, or reach EXCEPTION. §17.1.1 triggers " +
+      "P5/P6 on 'Abstention or open exception', a TERMINAL STATE that does not " +
+      "yet exist at S4. Projecting one would assert a state the stage cannot " +
+      "know, and the full counterfactual is not even well-defined without " +
+      "solving the whole run twice. An earlier version of this row justified " +
+      "the same decision by reporting that both readings had been MEASURED to " +
+      "agree; that warrant is withdrawn, because a measurement is the wrong " +
+      "kind of evidence for what the specification means and the derivation " +
+      "above was available. A COROLLARY WORTH RECORDING: C6 forces " +
+      "Sigma credit - Sigma debit = target.amount for BOTH allocations and " +
+      "P2/P4 post exactly that net to 1200_BANK, so 1200_BANK is IDENTICAL " +
+      "between any two admissible allocations of one target; materiality is " +
+      "carried entirely by 1100_GATEWAY_RECEIVABLE, 5100_PG_FEE_EXPENSE, " +
+      "1300_GST_INPUT_CREDIT and 2200_REFUND_LIABILITY.",
+  },
+
   // --- unratified: the specification determines nothing here ---------------
   {
     id: "O-C2-REFUND",
@@ -189,22 +259,23 @@ export const CONVENTIONS: readonly Convention[] = Object.freeze([
       "rather than assume it is doing something. Audit seam B6.",
   },
   {
-    id: "O-MATERIALITY-PROJECTION",
-    subject: "Which postings a counterfactual allocation is projected through",
-    decision:
-      "The allocation's own postings only -- P2 per payment member and P4 per " +
-      "refund member, per DATA_MODEL.md §17.1 -- computed natively rather than " +
-      "through @assay/ledger.",
+    id: "O-MATERIALITY-IMPL",
+    subject: "Whether the projection is computed natively or through @assay/ledger",
+    decision: "Natively, in classify.ts, from DATA_MODEL.md §17.1's table.",
     spec_basis: null,
     why:
-      "§6 says materiality is 'computed by running both allocations through " +
-      "the ledger projection in memory' and does not say whether displaced " +
-      "members' terminal-state postings are included. Both readings were " +
-      "measured and agree in magnitude on every material pair found. The " +
-      "projection is implemented natively because routing it through the " +
+      "NO FROZEN CLAUSE REQUIRES THIS AND THE CHOICE CANNOT CHANGE A NUMBER. " +
+      "ARCHITECTURE.md §7.2's independence argument is scoped to C1-C8, and " +
+      "§5.3's consistency gate never compares materiality, so neither route is " +
+      "mandated. Both implement §17.1's posting table, which IS shared frozen " +
+      "data, so a correct implementation of either produces identical " +
+      "balances. Native is chosen as independence hygiene: routing through the " +
       "agent's journal module would make the oracle's product depend on the " +
-      "agent's posting implementation, which ARCHITECTURE.md §7.2's " +
-      "independence argument exists to prevent.",
+      "agent's posting code, which ARCHITECTURE.md §3's 'not the engine and " +
+      "not the generator' exists to prevent. SEMANTIC IMPACT: NIL. This row is " +
+      "registered so the choice is visible, not because a value turns on it, " +
+      "and it stays unratified because the specification genuinely does not " +
+      "decide it -- not because the decision is in doubt.",
   },
   {
     id: "O-C4-UNIT",
@@ -219,21 +290,6 @@ export const CONVENTIONS: readonly Convention[] = Object.freeze([
       "7.04-day gap passes one reading and fails the other, so the two " +
       "implementations must be pinned to one.",
   },
-  {
-    id: "O-ANCHOR-SCOPE",
-    subject: "Which anchors the oracle evaluates",
-    decision:
-      "AN1 and AN2 only. AN3 and AN4 are referential facts about payments and " +
-      "orders and remove nothing from the settlement search space; AN5 is " +
-      "retired by §3 and is not implemented.",
-    spec_basis: null,
-    why:
-      "§3 removes 'everything anchored' from the search space and §4 generates " +
-      "candidates for each UNANCHORED target, but does not say which anchors " +
-      "bear on which target kind. AN1 attaches a recon line to its settlement " +
-      "and AN2 attaches a settlement to a bank line; those are the two that " +
-      "change what remains to be searched.",
-  },
 ] as const satisfies readonly Convention[]);
 
 /** The rows awaiting ratification. A test pins the count. */
@@ -247,9 +303,15 @@ export const UNRATIFIED: readonly Convention[] = Object.freeze(
  * `packages/generator` pins the same way and for the same reason: a new
  * unratified parameter must not be addable without a human being told.
  *
- * **Five until spec 1.4.6, four after it.** `O-TAU-BASE` moved to the ratified
- * half when `DATA_MODEL.md §11` defined `Component.total_value_paise`. The pin
- * has to move with it, which is the point: the count only means something if
- * changing it is a deliberate act attached to a stated basis.
+ * **Five, then four at spec 1.4.6, then three.** `O-TAU-BASE` moved to the
+ * ratified half when `DATA_MODEL.md §11` defined `Component.total_value_paise`.
+ * `O-ANCHOR-SCOPE` and `O-MATERIALITY-SCOPE` followed, on citations that were
+ * available the whole time and had simply not been traced. The pin moves with
+ * each, which is the point: the count only means something if changing it is a
+ * deliberate act attached to a stated basis.
+ *
+ * **Ratifying is not the same as deciding.** Neither move changed a line of
+ * behaviour; what changed is that the specification is now recorded as the
+ * authority for each, rather than this package.
  */
-export const UNRATIFIED_COUNT = 4;
+export const UNRATIFIED_COUNT = 3;

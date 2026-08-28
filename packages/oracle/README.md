@@ -63,15 +63,35 @@ Recorded at `PREREGISTRATION.md §10` V18.
 ## Specification seams
 
 Every decision the frozen specification does not state is a row in
-`conventions.ts` with `spec_basis: null`. **Four are unratified**, and the count
-is pinned so a fifth cannot appear unnoticed.
+`conventions.ts` with `spec_basis: null`. **Three are unratified**, and the count
+is pinned so a fourth cannot appear unnoticed.
 
 | Id | Seam |
 |---|---|
 | `O-C2-REFUND` | Which reading of `C2`'s refund half. The co-membership reading is refuted by `§5.3`; the referential reading is implemented. Audit seam `B6` |
-| `O-MATERIALITY-PROJECTION` | Whether displaced members' terminal-state postings enter the counterfactual. Both readings agree in magnitude on every material pair measured |
 | `O-C4-UNIT` | Whether `C4`'s *"calendar days"* is elapsed seconds or a date difference |
-| `O-ANCHOR-SCOPE` | Which anchors bear on which target kind |
+| `O-MATERIALITY-IMPL` | Whether the counterfactual projection is computed natively or through `@assay/ledger`. **Semantic impact nil** — both routes implement `§17.1`'s shared frozen posting table |
+
+### Two rows left this table without a spec amendment
+
+`O-ANCHOR-SCOPE` and `O-MATERIALITY-SCOPE` were ratified on citations that were
+available the whole time and had simply not been traced. **Neither changed a line
+of behaviour**; what changed is which document is recorded as the authority.
+
+- **`O-ANCHOR-SCOPE`** — `§3` strikes `AN5` through in terms (*"NOT EXERCISED at
+  spec 1.4.1 … The anchor set is `AN1`–`AN4`"*); `§4` and `§4.1`'s `C3`
+  bank-arrival half require `AN1` and `AN2` **by name**; and `AN3`/`AN4` relate
+  kinds that are neither targets (`§17.1.1`) nor member-eligible (`§11.1`), so
+  they remove nothing from the search space `§3` operates on. Implementing them
+  would change no candidate, no label and no metric.
+- **`O-MATERIALITY-SCOPE`** — `§5` commits allocations *"in a single serialized
+  pass **after** all components are solved"*, so at `S4` a displaced member has
+  no determined disposition, and `§17.1.1` triggers `P5`/`P6` on a **terminal
+  state** that does not yet exist there. It was split out of a combined row whose
+  other half — native vs `@assay/ledger` — is genuinely undetermined and remains
+  above as `O-MATERIALITY-IMPL`. Bundling them had let a citation-worthy decision
+  inherit a null basis, and the old row warranted itself by **measurement**,
+  which is the wrong kind of evidence for what the specification means.
 
 ### `O-TAU-BASE` was the fifth, and spec 1.4.6 ratified it
 
