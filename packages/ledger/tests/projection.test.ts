@@ -854,13 +854,35 @@ describe("non-posting events", () => {
 });
 
 describe("the package cannot reach a later phase", () => {
-  // The boundary this suite guards moved when journal.ts landed, and it moved
-  // by exactly one file. `journalFor` is now a legitimate export; `closeGate`
-  // and `ValidatedDecision` are not, and neither is any mutating write path.
-  it("exports no close-gate and no ValidatedDecision surface", async () => {
+  // The boundary this suite guards moved when journal.ts landed, and again at
+  // spec 1.4.9 when `ValidatedDecision` was DECLARED here without its write
+  // path. `journalFor` is a legitimate export; `closeGate` and any mutating
+  // write path are not. The `ValidatedDecision` clause is narrowed rather than
+  // dropped: what it was really guarding is that no RUNTIME construction
+  // surface exists, and that is now asserted positively below.
+  it("exports no close-gate and no close-report surface", async () => {
     const ledger: Record<string, unknown> = await import("@assay/ledger");
     for (const name of Object.keys(ledger)) {
-      expect(name).not.toMatch(/closeGate|closeReport|ValidatedDecision/i);
+      expect(name).not.toMatch(/closeGate|closeReport/i);
+    }
+  });
+
+  it("exports ValidatedDecision as a TYPE only — no runtime value, no constructor", async () => {
+    // ARCHITECTURE.md §4 boundary 3: ledger "exports no constructor". A type-only
+    // export leaves nothing on the runtime namespace, so the check is that the
+    // name is absent from the module object even though `import type` compiles.
+    const ledger: Record<string, unknown> = await import("@assay/ledger");
+    expect(Object.keys(ledger)).not.toContain("ValidatedDecision");
+    for (const name of Object.keys(ledger)) {
+      // Nothing that would let a caller mint one either.
+      expect(name).not.toMatch(/validatedDecision|mintValidated|makeValidated/i);
+    }
+  });
+
+  it("still exposes no mutating write path", async () => {
+    const ledger: Record<string, unknown> = await import("@assay/ledger");
+    for (const name of Object.keys(ledger)) {
+      expect(name).not.toMatch(/^(write|persist|save|commit|post)[A-Z]/);
     }
   });
 

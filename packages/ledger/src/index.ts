@@ -21,8 +21,17 @@
  * that S5 -> `I1` -> mint -> write stays acyclic.
  *
  * `close-gate.ts` and `close.ts` follow, and are deliberately absent rather
- * than stubbed. `ValidatedDecision` is declared with the mutating write path it
- * exists to guard, which arrives with persistence.
+ * than stubbed.
+ *
+ * `ValidatedDecision` is **declared** here at specification 1.4.9, in
+ * `validated-decision.ts`, and the **mutating write path it exists to guard is
+ * not**. Through spec 1.4.8 this header tied the two together and said the type
+ * arrived with persistence; `ARCHITECTURE.md §4` licenses the split in terms —
+ * "This paragraph and `§L.1` rule 4 constrain the mutating write path and
+ * nothing else" — and `§L.2` sequences `ledger Layer B -> engine S4-S5`, which
+ * needs the type to exist so S5 can name its own return. The type is exported;
+ * **no constructor is**, and the brand that makes "only S5 may construct" a
+ * property rather than a convention is a non-exported unique symbol.
  */
 
 export {
@@ -92,6 +101,8 @@ export {
   type DecisionStates,
   type LedgerProjection,
 } from "./projection.js";
+
+export type { ValidatedDecision } from "./validated-decision.js";
 
 export {
   ChainMismatchError,
