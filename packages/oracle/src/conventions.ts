@@ -281,14 +281,31 @@ export const CONVENTIONS: readonly Convention[] = Object.freeze([
     id: "O-C4-UNIT",
     subject: "How C4's 1-7 CALENDAR days is measured",
     decision: "Elapsed epoch seconds: settled_at - created_at in [1x86400, 7x86400].",
-    spec_basis: null,
+    spec_basis: "PREREGISTRATION.md §4.2 (clock grid) and §22.2 M21, spec 1.4.7; RECONCILIATION_SPEC.md §4.1 C4",
     why:
-      "§4.1 states the unit and not the measurement. The completeness gate is " +
-      "insensitive to the choice -- packages/generator's period grid was built " +
-      "so every true allocation satisfies C4 on both readings -- but §5.3's " +
-      "consistency gate samples deliberately inadmissible pairs, where a " +
-      "7.04-day gap passes one reading and fails the other, so the two " +
-      "implementations must be pinned to one.",
+      "RATIFIED AT SPEC 1.4.7 ON AN EQUIVALENCE, NOT ON A CLAUSE PICKING THIS " +
+      "READING. §4.1 writes C4 as a subtraction of two epoch-second fields and " +
+      "glosses the bound as CALENDAR days, contrasting it with the RZP-DOC " +
+      "WORKING-day cycle rather than with elapsed time; that fixed the unit and " +
+      "not the measurement. §4.2 now freezes the grid -- settlements stamped at " +
+      "21:00:00 IST, every capture, refund and ERP booking drawn from " +
+      "[00:00:00, 21:00:00) of its day -- under which both readings admit every " +
+      "member of every true allocation: elapsed lies in (n*86400, n*86400+75600] " +
+      "for a T+n batch, so it exceeds T_min STRICTLY and stays under T_max, " +
+      "while the calendar difference is n in {1,2,3}. The measurement therefore " +
+      "stops being a decision. " +
+      "THIS ROW PREVIOUSLY UNDERSTATED THE EXPOSURE AND THE CORRECTION IS PART " +
+      "OF THE RECORD: it called the completeness gate insensitive and located " +
+      "the risk in §5.3's consistency gate. The reverse was true. Because " +
+      "DATA_MODEL.md §6 makes settled_at settlement-scoped, a T+1 batch admits " +
+      "a TRUE-allocation member captured late in the day whose gap is under one " +
+      "day in seconds and exactly one day by date -- so the readings disagreed " +
+      "about whether the COMPLETENESS gate passes, which §5.3 makes a question " +
+      "of benchmark validity. The old row also cited packages/generator's grid " +
+      "as the reason it was safe, which was true and was the problem: the grid " +
+      "was that package's unratified U-CLOCKS convention -- ratified there now " +
+      "as C-CLOCKS -- changeable without a " +
+      "governance cycle. It is frozen in §4.2 now, and both rows cite it.",
   },
 ] as const satisfies readonly Convention[]);
 
@@ -303,7 +320,7 @@ export const UNRATIFIED: readonly Convention[] = Object.freeze(
  * `packages/generator` pins the same way and for the same reason: a new
  * unratified parameter must not be addable without a human being told.
  *
- * **Five, then four at spec 1.4.6, then three.** `O-TAU-BASE` moved to the
+ * **Five, then four at spec 1.4.6, then three, then two at spec 1.4.7.** `O-TAU-BASE` moved to the
  * ratified half when `DATA_MODEL.md §11` defined `Component.total_value_paise`.
  * `O-ANCHOR-SCOPE` and `O-MATERIALITY-SCOPE` followed, on citations that were
  * available the whole time and had simply not been traced. The pin moves with
@@ -314,4 +331,4 @@ export const UNRATIFIED: readonly Convention[] = Object.freeze(
  * behaviour; what changed is that the specification is now recorded as the
  * authority for each, rather than this package.
  */
-export const UNRATIFIED_COUNT = 3;
+export const UNRATIFIED_COUNT = 2;

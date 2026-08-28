@@ -5,7 +5,7 @@ only**. `ARCHITECTURE.md §3`: *"Deliberately a second, slow, naive
 implementation. Its whole value is being *not* the engine and *not* the
 generator."*
 
-Written against **specification 1.4.6 / benchmark 1.0.3**.
+Written against **specification 1.4.7 / benchmark 1.0.3**.
 
 ## What this package guarantees
 
@@ -63,14 +63,30 @@ Recorded at `PREREGISTRATION.md §10` V18.
 ## Specification seams
 
 Every decision the frozen specification does not state is a row in
-`conventions.ts` with `spec_basis: null`. **Three are unratified**, and the count
-is pinned so a fourth cannot appear unnoticed.
+`conventions.ts` with `spec_basis: null`. **Two are unratified**, and the count
+is pinned so a third cannot appear unnoticed.
 
 | Id | Seam |
 |---|---|
 | `O-C2-REFUND` | Which reading of `C2`'s refund half. The co-membership reading is refuted by `§5.3`; the referential reading is implemented. Audit seam `B6` |
-| `O-C4-UNIT` | Whether `C4`'s *"calendar days"* is elapsed seconds or a date difference |
 | `O-MATERIALITY-IMPL` | Whether the counterfactual projection is computed natively or through `@assay/ledger`. **Semantic impact nil** — both routes implement `§17.1`'s shared frozen posting table |
+
+### `O-C4-UNIT` left this table at spec 1.4.7
+
+`τ`'s neighbour in the frozen thresholds, `C4`, bounds `settled_at − created_at`
+at one day — and `DATA_MODEL.md §6` makes `settled_at` **settlement-scoped**, so
+the gap varies across a batch by the spread of capture times. On a `T+1` batch a
+**true-allocation** member captured late in the day satisfies `C4` on a
+calendar-date reading and fails it on an elapsed-seconds reading, which put the
+**completeness** gate — and so benchmark validity — on the reading. This row used
+to say the opposite: that the completeness gate was insensitive and the risk sat
+with the consistency gate.
+
+`PREREGISTRATION.md §4.2` now freezes the clock grid, under which both readings
+admit every member of every true allocation, so the measurement stops being a
+decision. The generator's `U-CLOCKS` — where the grid actually lived, unratified
+— is ratified against the same clause, and renamed `C-CLOCKS` under that
+package's convention of prefixing a ratified row `C-`.
 
 ### Two rows left this table without a spec amendment
 
