@@ -1,7 +1,7 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.11 · **Date:** 2026-08-28
+**Spec version:** 1.4.12 · **Date:** 2026-08-28
 **Reviewer role:** principal architect / skeptical reviewer
 
 **At spec 1.4.6** §A.13 records one definition, taken at a governance gate held
@@ -1043,6 +1043,67 @@ weight table would otherwise have to reconstruct.
 `constraint_set_hash` does not move, `C1`–`C8` being untouched; benchmark v1.0.3
 is unchanged and no dataset exists. `packages/oracle` receives no convention row:
 `PREREGISTRATION.md §5.2` gives the oracle *"no soft scoring"*.
+
+### A.19 Spec 1.4.12 / benchmark 1.0.3 — a schema for one kind, and nine left alone
+
+**The decision.** `DATA_MODEL.md §12`'s `Evidence.detail` gains a schema for
+`kind: "probe_result"` — a five-variant discriminated union on `probe`, matching
+`RECONCILIATION_SPEC.md §6.2`'s closed enum. Register row M26. **`SE5` is not
+defined here**, and the `Evidence` entity is not implemented.
+
+**Why this could be settled while `SE5` could not.** `§12` promises *"schema per
+kind"* and supplies none, so `SE5` has no input record to read and could not be
+implemented even if its function were chosen. The two are separable: `SE2`,
+`C2`/`E10` and `C4` need their variants regardless of what `SE5` turns out to
+mean, so the schema is worth having on its own and prejudges nothing.
+
+**Every field is required by a named frozen consumer.** `receipt` by `SE2`;
+`method` by `SE4`; the result `payment_id` by `C2`'s referential half and `E10`;
+`constituent_entity_ids` by `SE5`; `days` by `C4`. The **argument** ids are
+required by `I6` through `§L.1` rule 8 — *"Every **LLM-referenced** entity ID must
+exist in the observation set (invariant `I6`), independently of any allowlist
+check"* — because `R3` proposes the probe, so its argument **is** an
+LLM-referenced entity id, and `Evidence.obs_ids` carries **observation** ids
+rather than entity ids, leaving the referenced id otherwise unrecoverable from
+the record.
+
+**`date` is omitted, and that is the ratified half.** `§6.2` names it as a probe
+**argument**, and no frozen rule reads it back out of `detail`; every
+*"date-scoped"* statement in the corpus describes the recon **report** or the
+endpoint. `§22.1` D11 documents that endpoint as `year` + `month` with an optional
+`day` — the shape of a **query** — and no document states an ASSAY representation
+for it as a value, so the three candidate encodings (`UnixSeconds`, D11's triple,
+an ISO string) each carry a different semantic and none is derivable. The `PROBE`
+`LedgerEvent` already logs the call through `subject_ids` and `inputs_hash`,
+*"hash of everything the step read"*. **Carrying `date` would have meant inventing
+a date type for a field nothing consumes**, which is the trade this project has
+refused elsewhere. The omission is enforced rather than intended: the variants are
+strict objects, and a test asserts that a `date` key fails to parse.
+
+**Two disclosures rather than repairs.** `THREAT_MODEL.md §T7` promises that
+`widen_temporal_window` *"has a hard bound and its use is recorded on the
+decision"*, and **no document states the number**; the schema types `days` as a
+positive integer and asserts no ceiling, because inventing one would create a
+frozen constant, and a test records the deliberate absence. And `Evidence` remains
+unimplemented: its other nine kinds have no identified consumers and no stated
+fields, so declaring the entity would force nine invented schemas — the invention
+`§12`'s silence should not be repaired with.
+
+**No `card_network` field exists on any variant**, and a test enforces its
+rejection. Spec 1.1.1 corrected the card attributes onto `ReconLine` *"when they
+are settlement-recon columns"*, so `PaymentSchema` carries none and a probe cannot
+return one — the same fact that made `SE4` expected-non-binding at `§A.18`.
+
+**Still open, and deliberately.** `SE5`'s scope, its scoring function, its
+multi-probe and member aggregation, and whether one probe result may feed two
+signals. Three candidate functions straddle `ε` with proven crossings, and none is
+preferred by frozen text. `SE1`, `SE3` and `SE4` are untouched.
+
+**Nothing observable moves.** No population parameter, seed, split, family,
+`target_record_count`, rate, threshold or metric definition changes;
+`constraint_set_hash` does not move, `C1`–`C8` being untouched; benchmark v1.0.3
+is unchanged and no dataset exists. This is additive domain typing: no existing
+type, schema or runtime behaviour is altered.
 
 ---
 
