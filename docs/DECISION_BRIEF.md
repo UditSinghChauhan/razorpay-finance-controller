@@ -1,7 +1,7 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.10 · **Date:** 2026-08-28
+**Spec version:** 1.4.11 · **Date:** 2026-08-28
 **Reviewer role:** principal architect / skeptical reviewer
 
 **At spec 1.4.6** §A.13 records one definition, taken at a governance gate held
@@ -965,6 +965,70 @@ invention, and it is left open.
 is unchanged and no dataset exists. `packages/oracle` receives **no** convention
 row: `PREREGISTRATION.md §5.2` gives the oracle *"no soft scoring"*, so `SE1`–`SE5`
 are engine-side and their register entries belong with `packages/engine`.
+
+### A.18 Spec 1.4.11 / benchmark 1.0.3 — the second signal with nothing to compare
+
+**The decision.** `SE4` is declared **expected-non-binding on v1.0.0 data**,
+retained with its 1000-bps weight, and its agreement function is left undefined.
+Register row M25; threat row `PREREGISTRATION.md §10` V21.
+
+**The question that was asked, and the answer that was found.** The open item
+after spec 1.4.10 was `SE4`'s agreement function — partial credit between
+`method` and `card_network`, and the handling of a `card_network` null on both
+sides. Auditing it produced a different answer: **the function is unobservable,
+because `SE4` separates no candidates at all.** Six frozen facts, none of them a
+choice:
+
+1. `memo` is quarantined and **no `§6.2` probe returns it**. The closed enum
+   holds `fetch_order`, `fetch_payment`, `fetch_refund`,
+   `fetch_settlement_recon` and `widen_temporal_window` — no ledger-entry probe.
+   `DATA_MODEL.md §3` gives `receipt` an explicit sentence making it *"reachable
+   only through the `fetch_order` probe"*; **`memo` has no counterpart anywhere.**
+2. `MerchantLedgerEntry` (`§8`) carries no structural method or card-network
+   field.
+3. `fetch_payment` supplies `method` — which `§10`'s `payment` observation
+   **already carries structurally**, so the probe adds nothing.
+4. `card_network` has **no Payment-side field**. Spec 1.1.1 corrected the card
+   attributes onto `ReconLine` *"when they are settlement-recon columns"*, so the
+   card half of `SE4` has no comparand on the probed entity.
+5. No **exercised** `§4.3` operator perturbs `method` or `card_network`;
+   `DROP_FIELD` could and is declared not exercised.
+6. `PREREGISTRATION.md §4.2`'s `F06` construction draws *"identical method —
+   ONCE from the frozen mix"* and uses it for **both** members of a collision
+   pair. The family that manufactures equal-credit ambiguity gives `SE4` nothing
+   to separate exactly where separation would be needed.
+
+**Derived, then, is that `SE4` takes one value across every candidate of a
+target.** Ratified is only the disposition: retain the row and its weight, report
+that it does nothing, and leave the function undefined. That is
+`RECONCILIATION_SPEC.md §4.1`'s treatment of `C8` applied unchanged — *"retained
+as a declared admissibility filter, and the fraction of candidates it excludes is
+reported so a reviewer can see that it is doing nothing rather than assume it is
+doing something."*
+
+**What was deliberately not done.** The agreement function is **not** invented:
+partial-credit and null-handling rules would be unexercisable on any conforming
+dataset, and ratifying an unexercisable rule is worse than leaving the gap
+visible. `§6.2`'s probe enum is **not** opened: a `fetch_ledger_entry` probe would
+make `SE4` genuinely discriminating, and it was considered and rejected here
+rather than silently omitted — it would open an enum `§6.2` calls closed, spend
+`P_max` budget, and route a merchant-controlled surface (`THREAT_MODEL.md §T1`'s
+injection register) into the evidence path. The 1000 bps is **not** reallocated,
+`AL3` freezing it and `§7`'s *"summing to 10_000 bps"* holding.
+
+**Two signals now, and the pattern is worth naming.** `§A.17` found `SE1`
+inactive because spec 1.4.4 removed the matching problem it was sized for; this
+record finds `SE4` non-binding because its comparand was never reachable. Both
+were retained rather than repaired, both on the `C8` precedent, and both are
+reported. The evidence budget that is **live and defined** is now `SE2` + `SE3` =
+3500 of 10000 bps, with `SE5`'s 2000 still undefined — a fact a reader of `§4.2`'s
+weight table would otherwise have to reconstruct.
+
+**Nothing observable moves.** No population parameter, seed, split, family,
+`target_record_count`, rate, threshold or **metric definition** changes;
+`constraint_set_hash` does not move, `C1`–`C8` being untouched; benchmark v1.0.3
+is unchanged and no dataset exists. `packages/oracle` receives no convention row:
+`PREREGISTRATION.md §5.2` gives the oracle *"no soft scoring"*.
 
 **A disclosed consequence of the member scope.** Because anchored observations
 are excluded, a component's value is the value of its *unanchored* residual, so

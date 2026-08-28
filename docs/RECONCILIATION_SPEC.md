@@ -1,6 +1,6 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.4.10 · **Date:** 2026-08-28
+**Spec version:** 1.4.11 · **Date:** 2026-08-28
 
 The matching algorithm, the ambiguity definition, and the rules that decide
 accept / reject / abstain. This is the technical core of the project.
@@ -363,7 +363,7 @@ standard way recon tools manufacture confident wrong answers.
 | `SE1` | UTR prefix match length, between `settlement.utr` and the `bank_ref` of its `AN2`-matched bank line. **Permanently inactive for ranking, from spec 1.4.10.** Both comparands are target-scoped, so `SE1` takes one value across every candidate of a target and can neither order candidates nor move the ε-gap — the only two uses this section gives the score. It could discriminate only for a `bank_line` target, whose candidates are sets of settlements each carrying its own UTR; `DATA_MODEL.md §11.1` (spec 1.4.4) gives that target the empty candidate set, so the context is gone. The row and its weight are **retained, not removed and not reallocated** | 3500 |
 | `SE2` | `order_ref` ↔ `receipt` string similarity (Jaro–Winkler). **Post-probe only** — `receipt` is quarantined, so this signal is computable solely from a `fetch_order` probe result (§6.2), as `SE5` is. It scores 0 for every candidate on which no probe has run | 2000 |
 | `SE3` | Temporal proximity to the modal settlement lag. Lag is `settled_at − created_at` in elapsed seconds. The **modal lag** is the mode of `floor(lag / 86400)` — whole days — taken over **every `recon_line` observation in the dataset**, with **ties resolved to the lowest bin**. Score = `max(0, 1 − |lag − mode| / (T_max − T_min))` | 1500 |
-| `SE4` | Method / card-network agreement with the merchant memo. **Post-probe only** — `memo` is quarantined (`DATA_MODEL.md §0` rule 4, `§8`, `§10`) and `MerchantLedgerEntry` carries no structural method or card-network field, so this signal is computable solely from a `fetch_payment` probe result (§6.2), as `SE2` and `SE5` are. It scores 0 for every candidate on which no probe has run. **The agreement function itself — partial credit between `method` and `card_network`, and the treatment of a `card_network` null on both sides — is NOT settled by this amendment and remains open** | 1000 |
+| `SE4` | Method / card-network agreement with the merchant memo. **Post-probe only** — `memo` is quarantined (`DATA_MODEL.md §0` rule 4, `§8`, `§10`) and `MerchantLedgerEntry` carries no structural method or card-network field, so this signal is computable solely from a `fetch_payment` probe result (§6.2), as `SE2` and `SE5` are. It scores 0 for every candidate on which no probe has run. **`SE4` is additionally declared expected-non-binding on v1.0.0 data at spec 1.4.11**, on the `C8` precedent in `§4.1`: it is retained as a declared signal, its weight is unchanged and unreallocated, and the fact that it separates no candidates is reported rather than assumed. **Its agreement function is therefore left undefined — partial credit between `method` and `card_network`, and the treatment of a `card_network` null on both sides, are unnecessary while the signal is non-discriminating, and are NOT settled here** | 1000 |
 | `SE5` | Probe result corroboration | 2000 |
 
 `evidence_score_bps ∈ [0, 10_000]` is a weighted sum, used **only** to order candidates and
@@ -382,6 +382,46 @@ frozen text does not determine.* Every materially ambiguous component must reach
 `§6.2`'s probe loop or abstain, which is the order `§6.2` already describes, and
 which makes `P_max = 3` and the *abstentions resolved per probe spent* metric
 load-bearing on every material case. Recorded at `PREREGISTRATION.md §10` V20.
+
+**Why `SE4` separates nothing, stated at spec 1.4.11 `[ASSAY-MODEL]`, register row
+M25.** Six facts, each read off frozen text and none of them a choice:
+
+```
+  1  `memo` is quarantined (§0 rule 4, §8, §10) and NO §6.2 probe returns it.
+     The five probes are fetch_order, fetch_payment, fetch_refund,
+     fetch_settlement_recon and widen_temporal_window, and none is a
+     ledger-entry probe. Contrast `receipt`, which DATA_MODEL.md §3 states
+     is "reachable only through the `fetch_order` probe".
+
+  2  MerchantLedgerEntry (§8) carries ledger_entry_id, booked_at, order_ref,
+     invoice_no, gross_paise, expected_net_paise and gl_account -- no
+     structural method or card-network field of any kind.
+
+  3  fetch_payment supplies `method`, and §10's `payment` observation ALREADY
+     carries `method` structurally, so the probe supplies nothing the engine
+     lacked.
+
+  4  `card_network` has NO Payment-side field. Spec 1.1.1 corrected the card
+     attributes onto ReconLine "when they are settlement-recon columns", so
+     the card half of this signal has no comparand on the probed entity.
+
+  5  No EXERCISED §4.3 operator perturbs `method` or `card_network`.
+     DROP_FIELD could and is declared not exercised; CONFLICT_REFERENCE
+     alters references, not methods.
+
+  6  §4.2's F06 construction draws "identical method -- ONCE from the frozen
+     mix" and uses it for BOTH members of a collision pair, so the family
+     that manufactures equal-credit ambiguity gives SE4 nothing to separate
+     precisely where separation would be needed.
+```
+
+**Therefore `SE4` takes one value across every candidate of a target on any
+conforming dataset, and contributes nothing to the ε-gap — derived.** Retaining
+the row and its 1000 bps rather than reallocating or removing them is the
+**ratified** half, and follows `§4.1`'s treatment of `C8` exactly: a declared
+signal that excludes nothing is kept and reported doing nothing rather than
+deleted. `§6.2`'s `fetch_payment` route is unchanged, the probe enum stays
+closed, and no ledger-entry probe is added.
 
 **Derived and ratified are kept apart here.** *Derived:* `SE1`'s comparand and its
 inactivity; `SE4`'s post-probe gating and its zero score absent a probe; that
