@@ -286,7 +286,7 @@ calendar-date reading and fails it on an elapsed-seconds reading — a disagreem
 about whether `§5.3`'s completeness gate passes, which `§5.3` makes a question of
 benchmark validity. The grid makes the two readings agree rather than selecting
 one, so **`C4` is unchanged and its measurement stops being a decision**;
-`packages/oracle`'s `O-C4-UNIT` and `packages/generator`'s `U-CLOCKS` are ratified
+`packages/oracle`'s `O-C4-UNIT` and `packages/generator`'s `C-CLOCKS` are ratified
 against it. `C1`–`C8`, `I1`–`I9`, every `§7` threshold, `§4.1`'s composition,
 `§4.2`'s rates, `§4.3`, `§6.1` and `§6.2` are untouched; no seed, split, family or
 `target_record_count` moves; `constraint_set_hash` does not move; and benchmark
@@ -655,7 +655,8 @@ holds since `n ≥ 1` and `o < S`.
 
 **Nothing about the population changes.** This states the grid the benchmark
 already has; `packages/generator` has emitted on it since the generator was
-implemented, where it was recorded as the unratified convention `U-CLOCKS`. No
+implemented, where it was recorded as the unratified convention `U-CLOCKS`, now
+ratified there as `C-CLOCKS`. No
 rate, count, composition figure, seed, split, family or `target_record_count`
 moves, and a regeneration at the same seeds is byte-identical. What changes is
 that the property `C4`'s validity depends on is **frozen here** rather than left
