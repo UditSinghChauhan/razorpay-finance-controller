@@ -1,7 +1,7 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.8 · **Date:** 2026-08-28
+**Spec version:** 1.4.9 · **Date:** 2026-08-28
 **Reviewer role:** principal architect / skeptical reviewer
 
 **At spec 1.4.6** §A.13 records one definition, taken at a governance gate held
@@ -827,6 +827,57 @@ so this ratification makes the specification the authority for what the code
 already did. No population parameter, seed, split, family or
 `target_record_count` changes; benchmark v1.0.3 is unchanged; and no dataset
 exists to regenerate.
+
+### A.16 Spec 1.4.9 / benchmark 1.0.3 — two vocabularies, one field
+
+**The decision.** `DATA_MODEL.md §13`'s `invariants_checked` and
+`invariants_failed` are retyped from `ConstraintId[]` to **`InvariantId[]`**, and
+`InvariantId` is declared as exactly `I1`–`I9`. Register row M23.
+
+**The conflict, stated rather than absorbed.** Three frozen statements could not
+all be true at once:
+
+- `§13` typed both fields `ConstraintId[]`, and `ConstraintId` is exactly
+  `C1`–`C8` — the hard constraints of `RECONCILIATION_SPEC.md §4.1`, evaluated at
+  stage **S2**.
+- `RECONCILIATION_SPEC.md §7`, the **only** stage that populates them, is the S5
+  validation gate over `I1`–`I9`: *"any invariant failure rejects the allocation …
+  The rejected allocation becomes an exception carrying `invariants_failed`."*
+- `§10.1`'s gate `G5` and `ARCHITECTURE.md §4` boundary 3 read the fields as the
+  **result of that gate** — `§4` puts both on `ValidatedDecision` precisely
+  because *"`G5` is unverifiable unless the validated artifact carries the
+  result."*
+
+`I1`–`I9` are not `ConstraintId`s, and **no document declared a type for them at
+all**. So the fields as typed could not hold the values the specification
+requires: S5 could record *that* validation failed but never *which* invariant
+failed, and an `Exception` would name a hard constraint for a gate that never
+evaluates one.
+
+**Why this is a correction and not a preference.** Unlike `§A.13`, where two
+readings were each defensible and one was chosen, here the declared typing is
+**unsatisfiable by the stage that fills the field**. There is no reading of
+`ConstraintId[]` under which `§7`'s gate can report its own result. The
+alternative — leaving the typing and having S5 report constraint ids — would make
+`G5` a non-emptiness check over values describing the wrong stage, which is worse
+than silent: it is a record that reads as informative and is not.
+
+**Scope, kept minimal.** The gate is untouched: `§7`'s `I1`–`I9`, `§4.1`'s
+`C1`–`C8`, `§10.1`'s five close gates and `ARCHITECTURE.md §4`'s field list all
+stand exactly as frozen. **`ConstraintId` remains exactly `C1`–`C8`.** The two
+vocabularies are deliberately distinct and neither is a subset of the other; this
+amendment states which of them the fields were always drawing from, and supplies
+the type that was missing.
+
+**Nothing observable moves.** No population parameter, seed, split, family,
+`target_record_count`, rate, threshold, metric definition or stopping rule
+changes. `constraint_set_hash` does **not** move — `ConstraintId` is unchanged
+and `constraints.decl.ts` does not carry these fields. Benchmark v1.0.3 is
+unchanged and no dataset exists to regenerate.
+
+**What it unblocks.** `ARCHITECTURE.md §4` boundary 3's `ValidatedDecision` names
+these two fields among its minimum set, so the boundary type could not be
+declared while their element type was undetermined. It can now.
 
 **A disclosed consequence of the member scope.** Because anchored observations
 are excluded, a component's value is the value of its *unanchored* residual, so
