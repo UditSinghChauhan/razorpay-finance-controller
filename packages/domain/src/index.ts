@@ -60,4 +60,10 @@ export {
   conditionallyBindingClauses,
 } from "./constraints.decl.js";
 
+export {
+  type InvariantId,
+  INVARIANT_IDS,
+  isInvariantId,
+} from "./invariants.decl.js";
+
 export * from "./schemas/index.js";
