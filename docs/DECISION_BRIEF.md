@@ -1,8 +1,15 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.5 · **Date:** 2026-08-28
+**Spec version:** 1.4.6 · **Date:** 2026-08-28
 **Reviewer role:** principal architect / skeptical reviewer
+
+**At spec 1.4.6** §A.13 records one definition, taken at a governance gate held
+during the `packages/oracle` build and before any dataset was generated:
+`Component.total_value_paise` — the quantity `τ`'s *"10 bps of component value"*
+names — carried no definition, and neither did the field it sums over.
+**Documentation only; the choice is a ratification and the record says so.**
+Benchmark v1.0.3 is unchanged and no frozen quantity moved.
 
 **At spec 1.4.5** §A.12 records one disclosure, taken at a governance gate held
 after spec 1.4.4 and before any dataset was generated: under the frozen `§4.2`
@@ -647,6 +654,83 @@ references no seed. It was separately illustrated on seeds outside `§6.1`'s spl
 table, which are **not benchmark results** and carry no `AL7` consequence.
 Confirmation on split seeds remains `F9`'s dev run, which this record does not
 pre-empt.
+
+---
+
+### A.13 Spec 1.4.6 / benchmark 1.0.3 — the base for τ, ratified rather than derived
+
+A governance gate held after spec 1.4.5, during the `packages/oracle` build and
+before any dataset was generated, asked what `τ`'s *"10 bps of component value"*
+is 10 bps **of**.
+
+The frozen formula names a quantity: `Component.total_value_paise` is the only
+value field the `Component` entity carries (`DATA_MODEL.md §11`). The pointer
+resolves. **The field did not.** It appeared exactly once in nine documents, as a
+bare declaration with no comment, while the sibling line above it carried one.
+
+**Three readings were examined and one was eliminated on the text.**
+
+*Option A, the target's own amount,* was **rejected outright**: no section names
+a target's value as the component's value, so it has no normative pointer at all.
+It is what `packages/oracle` implemented before this gate, and it is recorded
+here as an error found and corrected rather than quietly replaced.
+
+*Option C, members plus targets,* has the better single citation — `§5`'s graph
+where *"nodes are unanchored observations **and** targets"*. It was **rejected on
+double-counting**: `§14.1` values a settlement at `payload.amount` and each of its
+recon lines at `payload.amount`, while `I4` closes the settlement as the sum of
+those lines, so C counts one economic break roughly twice. That is the inflation
+`RECONCILIATION_SPEC.md §10.1` removed at benchmark v1.0.3, where *"posting each
+view separately would relieve `1100_GATEWAY_RECEIVABLE` twice for one break"* and
+each break must now *"contribute once"*. **The analogy is the reason for the
+choice, not a demonstration that the text required it** — `§10.1` decided that
+for `unresolved_value_paise` under gate `G3`, not for this field.
+
+*Option B, members only,* is adopted: the narrower, member-scoped reading,
+consistent with `§11`'s own `size` comment (*"|members|"*) and total over
+`§14.1`'s existing valuation table for every member-eligible kind.
+
+**A second ambiguity was found inside Option B, before the amendment was
+applied, and it is recorded rather than glossed.** The first drafting said the
+sum ranged over *"the component's member observations"*. That phrase admitted
+three readings — the component's unanchored nodes, the whole allocation including
+anchored members, or merely every observation of a member-eligible kind — because
+`member_obs_ids` is declared **three times** across `Candidate`, `Component` and
+`AmbiguityCertificate`, and only the `Candidate` one carried a comment. The two
+live readings differ by roughly 3.2× on a realistic settlement, which moves labels
+at the threshold. `§11` therefore now defines `Component.member_obs_ids` **first**,
+as `§5`'s unanchored observation nodes, and states the three-way distinction
+explicitly. `§11` had never said that `Component` is `§5`'s graph output; the link
+was by name and stage only.
+
+**This is a governance decision and the record does not dress it as anything
+else.** Neither B nor C was excluded by spec 1.4.5. A reviewer who prefers C is
+not contradicted by the frozen text; they are outvoted by this gate, and the
+reason is written above so the choice can be revisited on its merits.
+
+**What made the choice unavoidable rather than deferrable.** The three readings
+give different labels on the same case. On a certified two-solution example with
+materiality 75,000 paise, `τ` is 50,000 under A, 100,075 under B and 150,075
+under C — `TRULY_AMBIGUOUS` under the first and `IMMATERIALLY_AMBIGUOUS` under the
+other two. `§5.4`'s ambiguity ground truth, and through it metric 4 and success
+criterion `S12`'s neighbour `S4`, therefore depended on a field the specification
+had left blank. `packages/oracle`'s property suite pins that divergence and is
+retained, because it is the demonstration that the base has to be normative
+rather than a convention.
+
+**A disclosed consequence of the member scope.** Because anchored observations
+are excluded, a component's value is the value of its *unanchored* residual, so
+`τ` sits at its `₹100.00` floor whenever that residual is at or below `₹1,00,000`
+— a threshold derived from the frozen formula alone, since `10 bps` of `₹1,00,000`
+is exactly the floor. A fully anchored settlement has `total_value_paise = 0` and
+`τ` at the floor; such a target has one solution, so `τ` is never consulted on it.
+The `10 bps` term is **not** inert, but it binds on a minority of components. This
+is disclosed here rather than treated as a reason to reopen the base.
+
+**No frozen quantity moved.** No `AccountCode`, posting rule, exception class,
+metric definition, threshold, rate, composition figure, seed, split, baseline,
+ablation or stopping rule changed, `C1`–`C8` are untouched so
+`constraint_set_hash` does not move, and benchmark v1.0.3 is unchanged.
 
 ---
 

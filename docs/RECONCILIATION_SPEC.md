@@ -1,9 +1,16 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.4.5 · **Date:** 2026-08-28
+**Spec version:** 1.4.6 · **Date:** 2026-08-28
 
 The matching algorithm, the ambiguity definition, and the rules that decide
 accept / reject / abstain. This is the technical core of the project.
+
+**At spec 1.4.6** this document is unchanged apart from the version header.
+**`§6`'s `τ` formula is untouched** — `max(₹100.00, 10 bps of component value)`
+stands exactly as written; what changed is that `DATA_MODEL.md §11` now defines
+the `Component.total_value_paise` its second term names. `§5`'s component
+decomposition is likewise unchanged and is now cited by that definition. See
+`DECISION_BRIEF.md §A.13`.
 
 **At spec 1.4.5** this document is unchanged apart from the version header.
 `§3`'s `AN2` and `§10.3`'s close policy are named in `PREREGISTRATION.md §10`

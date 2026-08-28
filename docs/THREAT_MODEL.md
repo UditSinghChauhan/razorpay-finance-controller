@@ -1,9 +1,12 @@
 # THREAT_MODEL — ASSAY
 
-**Spec version:** 1.4.5 · **Date:** 2026-08-28
+**Spec version:** 1.4.6 · **Date:** 2026-08-28
 
 Every control answers: **what specific failure does this prevent?** Controls that
 cannot name a failure are removed.
+
+**At spec 1.4.6** this document is unchanged apart from the version header. See
+`DECISION_BRIEF.md §A.13`.
 
 **At spec 1.4.5** this document is unchanged apart from the version header. See
 `DECISION_BRIEF.md §A.12`.

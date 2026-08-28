@@ -1,9 +1,17 @@
 # DATA_MODEL — ASSAY
 
-**Spec version:** 1.4.5 · **Date:** 2026-08-28
+**Spec version:** 1.4.6 · **Date:** 2026-08-28
 
 All schemas are normative. The implementation agent must not add, rename or
 retype fields without a spec version bump.
+
+**At spec 1.4.6** this document **defines `Component.member_obs_ids` and
+`Component.total_value_paise`** (§11) and registers the pair as `[ASSAY-MODEL]`
+M20 (§22.2). The second is the quantity `τ` reads as *"component value"*, and
+neither carried a definition through spec 1.4.5. **No field, entity, account,
+posting rule, exception class, invariant or metric definition changes**,
+`C1`–`C8` are untouched so `constraint_set_hash` does not move, and benchmark
+v1.0.3 is unchanged. See `DECISION_BRIEF.md §A.13`.
 
 **At spec 1.4.5** this document is unchanged apart from the version header.
 `§14.1`'s `value(bank_line)` and `§17.1.1`'s `E03` → `P5` are two of the five
@@ -816,6 +824,67 @@ executions, and because the score reaches the hashed event body through
 `AmbiguityCertificate.evidence_score_gap_bps` (§13), where §0 rule 5 admits
 integers only. The SE1–SE5 weighted sum is evaluated in integer basis points with
 `round_half_up` applied once, at the end.
+
+**`Component.member_obs_ids` and `Component.total_value_paise` `[ASSAY-MODEL]`,
+supplied at spec 1.4.6.** Both were declared without comment through spec 1.4.5,
+while `RECONCILIATION_SPEC.md §6` and `PREREGISTRATION.md §7` read the second as
+*"component value"* in `τ`. They are defined here in that order, because the
+second is a sum over the first and a value cannot be scoped before its domain is.
+
+**`Component.member_obs_ids` — the component's unanchored observation nodes.**
+`RECONCILIATION_SPEC.md §5` builds the component graph where *"nodes are
+unanchored observations and targets"*, and this field is exactly that graph's
+**observation** nodes for this component; `target_ids` is its target nodes.
+Anchored observations are **not** members of a component: `§3` states that
+*"everything anchored is removed from the search space"*, and the component is
+that search space.
+
+**Three fields share the name `member_obs_ids` and they are not the same set.**
+The distinction is load-bearing and is stated once here:
+
+```
+  Candidate.member_obs_ids   (§11) the observations proposed to explain a
+                             target -- the whole allocation, ANCHORED members
+                             INCLUDED, because §4.1's C6 reads
+                             "Sigma credit(members) - Sigma debit(members) =
+                             target.amount" over the allocation and not over a
+                             residual.
+
+  Component.member_obs_ids   (§11) the UNANCHORED observation nodes of one §5
+                             component. A strict subset of the union of its
+                             candidates' member sets whenever any member is
+                             anchored.
+
+  AmbiguityCertificate
+    .solution_*.member_obs_ids  (§13) Candidate semantics: the field sits
+                             beside `candidate_id` and names that candidate's
+                             members.
+```
+
+**`Component.total_value_paise`:**
+
+```
+  total_value_paise = Sigma value(observation) over Component.member_obs_ids
+```
+
+`value(observation)` is §14.1's table, which is total over the member-eligible
+kinds §11.1 admits (`recon_line`, `adjustment`), so the sum is defined for every
+observation this field can range over. **Target observations are excluded**, and
+so are anchored observations, by the scoping above.
+
+**Two scopes named "member" meet here and are orthogonal.** §11.1's
+*member-eligible* is a scope over **kinds** — which kinds can supply a member
+contribution at all. This paragraph's scope is over **membership** — which
+observations belong to this component. `Component.member_obs_ids` satisfies
+both: unanchored, and of a member-eligible kind.
+
+**This is a ratification, not a derivation, and the record says so.** For
+`total_value_paise`, §5's node definition and §11's sibling `size` comment
+(*"|members|"*) each supported a different reading and **neither excluded the
+other**; the member-scoped one is chosen. For `member_obs_ids`, §11 never stated
+that `Component` is §5's graph output — the link was by name and stage only — and
+this paragraph states it. Neither claims spec 1.4.5 already implied it. See
+`DECISION_BRIEF.md §A.13`.
 
 ---
 
@@ -1841,6 +1910,7 @@ reference beats endpoint reference beats product guide beats pricing page.
 | M17 | The `order.receipt` → `MerchantLedgerEntry.order_ref` lossy re-encoding, and its retention band | §8 states that the mapping is lossy; the *form* of the transform and how much shape it retains are ASSAY's, and are a declared governance convention with no documentary basis (`PREREGISTRATION.md §4.2`) |
 | M18 | `ReconLine.settled_at` is **settlement-scoped**: the instant the carrying settlement transferred, identical across every line that settlement carried (§6, spec 1.4.3) | The field's name, type and unit are documented; its **semantics** are not, and no source states the scope or relates it to `Settlement.created_at`. `C3`, `C4` and §7 already read the term this way; the definition states what they assume. The refusal is part of the row: no relationship to `Settlement.created_at` is asserted, and the condition is necessary rather than sufficient |
 | M19 | `currency(target) := "INR"` for both target kinds (§11.1, spec 1.4.4) | Neither `Settlement` nor `BankStatementLine` carries a `currency` field, and `C1` names the target explicitly rather than being silent about it, so a target contribution must be declared or `C1` admits nothing. The value asserts nothing beyond the frozen schema, where `currency` is a literal `"INR"` on every observation carrying the field, and matches `C1`'s own *"Tier-0 is INR-only by construction"*. It is ASSAY's declaration, not a documented Razorpay fact about either entity |
+| M20 | `Component.member_obs_ids` is the **unanchored** observation nodes of one `RECONCILIATION_SPEC.md §5` component, and `Component.total_value_paise` is `Σ value(observation)` over that field — targets and anchored observations excluded (§11, spec 1.4.6) | Both were declared without comment while `τ` read the second as *"component value"*. For the value, §5's node definition and §11's `size` comment each supported a different reading and neither excluded the other, so the member-scoped one is **ratified** rather than derived; the rationale is `size`'s own member scope and the v1.0.3 single-contribution treatment, not textual necessity. For the domain, §11 never stated that `Component` is §5's graph output — the link was by name and stage only |
 
 ### 22.3 `[NOT-CLAIMED]` — considered and deliberately not asserted
 
