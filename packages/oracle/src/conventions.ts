@@ -238,44 +238,45 @@ export const CONVENTIONS: readonly Convention[] = Object.freeze([
       "1300_GST_INPUT_CREDIT and 2200_REFUND_LIABILITY.",
   },
 
-  // --- unratified: the specification determines nothing here ---------------
   {
     id: "O-C2-REFUND",
     subject: "Which reading of C2's refund half the oracle implements",
     decision:
       "Referential consistency: a refund member's own order_id must equal the " +
-      "order_id of the recon line its payment_id names, where that line is in " +
-      "the observation set. A refund whose parent is absent is not excluded on " +
-      "that ground.",
-    spec_basis: null,
+      "order_id of the recon line its payment_id names. The named payment need " +
+      "NOT be a candidate member; where it has no observation the clause is not " +
+      "evaluated and excludes nothing, which is E10_REFUND_ORPHAN's business; " +
+      "and where a recon_line and a payment observation both carry the parent's " +
+      "order_id, the recon_line governs.",
+    spec_basis:
+      "RECONCILIATION_SPEC.md §4.1 C2 refund half (spec 1.4.8); " +
+      "DATA_MODEL.md §15 E10 and §22.2 M22; DECISION_BRIEF.md §A.15",
     why:
-      "§4.1 says only 'a refund may only offset a payment on the same " +
-      "order_id' and declares the half binding. The co-membership reading is " +
-      "refuted by §5.3 -- it excludes the true allocation on the large majority " +
-      "of refund-carrying settlements, because a refund is batched by its own " +
-      "creation day rather than its parent's. Binding means EVALUABLE, not " +
-      "excluding: C1 is the standing precedent, and §4.1 requires the excluded " +
-      "fraction to be reported so a reviewer can see the clause doing nothing " +
-      "rather than assume it is doing something. Audit seam B6.",
-  },
-  {
-    id: "O-MATERIALITY-IMPL",
-    subject: "Whether the projection is computed natively or through @assay/ledger",
-    decision: "Natively, in classify.ts, from DATA_MODEL.md §17.1's table.",
-    spec_basis: null,
-    why:
-      "NO FROZEN CLAUSE REQUIRES THIS AND THE CHOICE CANNOT CHANGE A NUMBER. " +
-      "ARCHITECTURE.md §7.2's independence argument is scoped to C1-C8, and " +
-      "§5.3's consistency gate never compares materiality, so neither route is " +
-      "mandated. Both implement §17.1's posting table, which IS shared frozen " +
-      "data, so a correct implementation of either produces identical " +
-      "balances. Native is chosen as independence hygiene: routing through the " +
-      "agent's journal module would make the oracle's product depend on the " +
-      "agent's posting code, which ARCHITECTURE.md §3's 'not the engine and " +
-      "not the generator' exists to prevent. SEMANTIC IMPACT: NIL. This row is " +
-      "registered so the choice is visible, not because a value turns on it, " +
-      "and it stays unratified because the specification genuinely does not " +
-      "decide it -- not because the decision is in doubt.",
+      "RATIFIED AT SPEC 1.4.8. Through spec 1.4.7 §4.1 said only 'a refund may " +
+      "only offset a payment on the same order_id', and 'offset' admitted a " +
+      "CO-MEMBERSHIP reading -- the parent must be in the candidate -- as " +
+      "readily as a referential one. The co-membership reading is REFUTED, not " +
+      "merely disfavoured: §4.2 allocates one settlement batch per capture-day " +
+      "and §4.1's F02 settles a refund 'in batch N+2', which §4.2 relies on " +
+      "when it says the rule 'leaves the 31-day grid for a refund raised in the " +
+      "final two days' -- a refund's batch is keyed to ITS OWN day, and a " +
+      "refund follows its capture, so the parent is never in the same " +
+      "settlement and never a co-member. Co-membership would therefore exclude " +
+      "EVERY refund-carrying true allocation and fail §5.3's completeness gate, " +
+      "at which point 'the benchmark is invalid'. Three further signals agree " +
+      "independently: §3's AN3 gives the link's basis as 'Referential', §4.1's " +
+      "own justification is 'a refund documents its parent payment_id' -- a " +
+      "fact on the refund's own row -- and §15's E10 already owns absence from " +
+      "the dataset. THE SOURCE PRECEDENCE IS A DECLARATION AND §4.1 MARKS IT " +
+      "AS ONE: nothing ranks the recon_line against the payment view, and the " +
+      "recon line is chosen because §11.1 scopes a member to its own payload " +
+      "and §22.1 D10 makes the recon report the constituent source. THIS " +
+      "REGISTRATION WAS ALSO IN THE WRONG PLACE, AND THAT IS PART OF THE " +
+      "RECORD: C2 binds the ENGINE too, §5.2 has both sides implement one " +
+      "declarative specification, and constraints.decl.ts carried the " +
+      "ambiguous sentence verbatim -- so a package-local convention could not " +
+      "bind the party it most needed to. The clause is amended there as well, " +
+      "and constraint_set_hash moves for it alone. Audit seam B6, closed.",
   },
   {
     id: "O-C4-UNIT",
@@ -307,6 +308,26 @@ export const CONVENTIONS: readonly Convention[] = Object.freeze([
       "as C-CLOCKS -- changeable without a " +
       "governance cycle. It is frozen in §4.2 now, and both rows cite it.",
   },
+  // --- unratified: the specification determines nothing here ---------------
+  {
+    id: "O-MATERIALITY-IMPL",
+    subject: "Whether the projection is computed natively or through @assay/ledger",
+    decision: "Natively, in classify.ts, from DATA_MODEL.md §17.1's table.",
+    spec_basis: null,
+    why:
+      "NO FROZEN CLAUSE REQUIRES THIS AND THE CHOICE CANNOT CHANGE A NUMBER. " +
+      "ARCHITECTURE.md §7.2's independence argument is scoped to C1-C8, and " +
+      "§5.3's consistency gate never compares materiality, so neither route is " +
+      "mandated. Both implement §17.1's posting table, which IS shared frozen " +
+      "data, so a correct implementation of either produces identical " +
+      "balances. Native is chosen as independence hygiene: routing through the " +
+      "agent's journal module would make the oracle's product depend on the " +
+      "agent's posting code, which ARCHITECTURE.md §3's 'not the engine and " +
+      "not the generator' exists to prevent. SEMANTIC IMPACT: NIL. This row is " +
+      "registered so the choice is visible, not because a value turns on it, " +
+      "and it stays unratified because the specification genuinely does not " +
+      "decide it -- not because the decision is in doubt.",
+  },
 ] as const satisfies readonly Convention[]);
 
 /** The rows awaiting ratification. A test pins the count. */
@@ -320,7 +341,8 @@ export const UNRATIFIED: readonly Convention[] = Object.freeze(
  * `packages/generator` pins the same way and for the same reason: a new
  * unratified parameter must not be addable without a human being told.
  *
- * **Five, then four at spec 1.4.6, then three, then two at spec 1.4.7.** `O-TAU-BASE` moved to the
+ * **Five, then four at spec 1.4.6, three, two at spec 1.4.7, and one at spec
+ * 1.4.8.** `O-TAU-BASE` moved to the
  * ratified half when `DATA_MODEL.md §11` defined `Component.total_value_paise`.
  * `O-ANCHOR-SCOPE` and `O-MATERIALITY-SCOPE` followed, on citations that were
  * available the whole time and had simply not been traced. The pin moves with
@@ -331,4 +353,4 @@ export const UNRATIFIED: readonly Convention[] = Object.freeze(
  * behaviour; what changed is that the specification is now recorded as the
  * authority for each, rather than this package.
  */
-export const UNRATIFIED_COUNT = 2;
+export const UNRATIFIED_COUNT = 1;
