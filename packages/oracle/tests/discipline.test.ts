@@ -184,11 +184,28 @@ describe("the convention register", () => {
     expect(scope?.why).not.toMatch(/agree in magnitude on every material pair/);
   });
 
-  it("leaves exactly C2 and C4 unratified alongside the impl choice", () => {
-    // Step 1 of the governance package touches neither C2 nor C4.
+  it("leaves exactly C2 and the impl choice unratified after spec 1.4.7", () => {
     expect([...UNRATIFIED.map((c) => c.id)].sort()).toEqual(
-      ["O-C2-REFUND", "O-C4-UNIT", "O-MATERIALITY-IMPL"].sort(),
+      ["O-C2-REFUND", "O-MATERIALITY-IMPL"].sort(),
     );
+  });
+
+  it("records O-C4-UNIT as ratified against §4.2's frozen clock grid", () => {
+    const c = CONVENTIONS.find((c) => c.id === "O-C4-UNIT");
+    expect(c?.spec_basis).toMatch(/PREREGISTRATION\.md §4\.2/);
+    expect(c?.spec_basis).toMatch(/1\.4\.7/);
+    expect(UNRATIFIED.map((c) => c.id)).not.toContain("O-C4-UNIT");
+  });
+
+  it("corrects the row's earlier claim that the completeness gate was insensitive", () => {
+    // The exposure was the reverse of what this row used to state, and the
+    // correction is part of the record rather than a silent overwrite: a
+    // true-allocation member can fail C4 on one reading, which is a
+    // completeness-gate question, not a consistency-gate one.
+    const c = CONVENTIONS.find((c) => c.id === "O-C4-UNIT");
+    expect(c?.why).toMatch(/UNDERSTATED THE EXPOSURE/);
+    expect(c?.why).toMatch(/COMPLETENESS gate/);
+    expect(c?.why).not.toMatch(/completeness gate is insensitive/);
   });
 
   it("registers the component node set that the base is summed over", () => {
