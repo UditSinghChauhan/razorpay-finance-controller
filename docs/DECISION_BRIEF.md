@@ -754,7 +754,8 @@ by construction.
 
 **What was actually wrong, stated plainly.** The property the benchmark's
 validity rested on was implemented in `packages/generator`'s `period.ts` and
-registered there as `U-CLOCKS` — **with `spec_basis: null`**, and with a row whose
+registered there as `U-CLOCKS` (ratified at this amendment and renamed
+`C-CLOCKS`) — **with `spec_basis: null`**, and with a row whose
 text recorded only *"drawn uniformly within the IST calendar day"*, omitting the
 `21:00` cap and the `21:00` stamp that do the work. An author honouring that row
 as written would have drawn over the full day and invalidated the benchmark
