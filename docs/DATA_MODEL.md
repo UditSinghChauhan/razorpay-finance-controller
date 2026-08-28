@@ -1,6 +1,6 @@
 # DATA_MODEL — ASSAY
 
-**Spec version:** 1.4.11 · **Date:** 2026-08-28
+**Spec version:** 1.4.12 · **Date:** 2026-08-28
 
 All schemas are normative. The implementation agent must not add, rename or
 retype fields without a spec version bump.
@@ -985,6 +985,69 @@ never rank them. `soft` evidence can only rank, never admit. Keeping these
 mechanically distinct is what stops a persuasive-but-wrong signal from
 manufacturing a match.
 
+**`detail` for `kind: "probe_result"` `[ASSAY-MODEL]`, supplied at spec 1.4.12,
+register row M26.** `detail` is typed `object` above and annotated *"kind-specific,
+schema per kind"*, and **no schema was supplied for any of the ten kinds**. This
+amendment supplies the one kind whose consumers are already named in frozen text.
+The other nine are untouched and remain undefined; `Evidence` itself is
+deliberately **not** implemented, because declaring it would force nine invented
+detail schemas.
+
+```
+  ProbeResultDetail = discriminated union on `probe`, exactly five variants,
+                      matching RECONCILIATION_SPEC.md §6.2's closed enum
+
+  { probe: "fetch_order",            order_id,      receipt: string | null }
+  { probe: "fetch_payment",          payment_id,    method: PaymentMethod | null }
+  { probe: "fetch_refund",           refund_id,     payment_id: PaymentId | null }
+  { probe: "fetch_settlement_recon", settlement_id, constituent_entity_ids: string[] }
+  { probe: "widen_temporal_window",  days: integer > 0 }
+```
+
+**Every field is required by a named frozen consumer, and nothing else is
+present.** `receipt` by `SE2`; `method` by `SE4`; the result `payment_id` by
+`C2`'s referential half and `E10_REFUND_ORPHAN`; `constituent_entity_ids` by
+`SE5`; `days` by `C4`. The **argument** ids — `order_id`, `payment_id`,
+`refund_id`, `settlement_id` — are required by `I6`, through
+`DECISION_BRIEF.md §L.1` rule 8: *"Every **LLM-referenced** entity ID must exist
+in the observation set (invariant `I6`), independently of any allowlist check."*
+`R3` proposes the probe, so its argument **is** an LLM-referenced entity id, and
+`obs_ids` above carries **observation** ids rather than entity ids — so the id is
+not recoverable from the evidence record by any other route.
+
+**`null` on a result field means the probe ran and the referent yielded
+nothing**, not that the probe was skipped. `§6.2` hedges every effect — *"**may**
+supply `receipt`"*, *"**may** resolve a refund's parent payment"* — and
+`ARCHITECTURE.md §5`'s worked probe returns *"still no discriminator"*, so
+ran-but-empty is a state the specification already contemplates. A probe that
+never ran produces no `Evidence` row at all. An empty
+`constituent_entity_ids` is likewise a result rather than an error.
+
+**`date` is deliberately absent, and this is the one ratified choice here.**
+`§6.2` names it as a probe **argument** — `fetch_settlement_recon(settlement_id,
+date)` — and **no frozen rule reads it back out of `detail`**; every
+*"date-scoped"* statement in this specification describes the recon **report** or
+the endpoint, not a result field. `§22.1` D11 documents that endpoint as
+requiring `year` + `month` with an optional `day`, which is the shape of a
+**query**, and no document states an ASSAY representation for it as a value.
+Recording the call belongs to the `PROBE` `LedgerEvent`, which `§16` gives
+`subject_ids` and an `inputs_hash` defined as *"hash of everything the step
+read"*. Carrying it here would require inventing a date type for a field nothing
+consumes.
+
+**`days` carries no upper bound here, and that is a disclosure rather than an
+omission.** `THREAT_MODEL.md §T7` states that `widen_temporal_window` *"has a
+hard bound and its use is recorded on the decision"*, but **no document states
+the number** and `PREREGISTRATION.md §7`'s frozen block carries none. Bounding it
+in this schema would invent a frozen constant; enforcing `§T7`'s promise belongs
+to whichever stage relaxes `C4`, once the figure is ratified.
+
+**What this does not decide.** `SE5`'s scope, its scoring function, its
+multi-probe and member aggregation, and whether one probe result may feed two
+signals are all **open** at spec 1.4.12. This is the schema `SE5` will read
+*from*; it says nothing about what `SE5` computes. `SE1`, `SE3` and `SE4` are
+untouched, as are `C1`–`C8` and every `§7` threshold.
+
 ---
 
 ## 13. `Decision` and `AmbiguityCertificate`
@@ -1965,6 +2028,7 @@ reference beats endpoint reference beats product guide beats pricing page.
 | M23 | `Decision.invariants_checked` and `Decision.invariants_failed` carry **`InvariantId`** (`I1`–`I9`), not `ConstraintId` (`C1`–`C8`), and `InvariantId` is declared as exactly `I1`–`I9` (§13, spec 1.4.9) | Through spec 1.4.8 §13 typed both fields `ConstraintId[]`, while the only stage that populates them — `RECONCILIATION_SPEC.md §7`'s S5 gate — evaluates `I1`–`I9`, and gate `G5` and `ARCHITECTURE.md §4` boundary 3 read them as *"the result"* of that gate. `I1`–`I9` had **no declared type anywhere**, so the fields could not hold the values the specification required: S5 could record that validation failed but never which invariant failed. The correction is the **typing**, not the gate — `§7`'s invariants, `§4.1`'s constraints and `§10.1`'s gates are untouched, `ConstraintId` remains exactly `C1`–`C8`, and the two vocabularies stay distinct with neither a subset of the other |
 | M24 | `SE1`'s comparands are `settlement.utr` and its `AN2`-matched `bank_ref`, and `SE1` is permanently **inactive** for ranking; `SE3`'s modal lag is day-binned over the dataset's `recon_line` observations with lowest-bin ties and a linear kernel over `[T_min, T_max]`; `SE4` is **post-probe only** (`RECONCILIATION_SPEC.md §4.2`, spec 1.4.10) | **What is derived:** `SE1`'s comparand — M8 registers it in one row with `AN2` on the same UTR justification, `E14` frames prefix collision bank-side, and `RECONCILIATION_SPEC.md §11`'s worked example is arithmetically reproducible **only** if `SE1` contributes equally to both candidates, its stated `Δs = 400 bps` with `SE3` deciding being impossible under a member-scoped reading, which would put `Δs ≥ 3500` and yield `DISCRIMINATED` rather than the stated `ABSTAINED`. `SE1`'s inactivity — from `§11.1`'s spec-1.4.4 empty candidate set. `SE4`'s gating — from the quarantine of `memo` plus `AL3`'s frozen weights, which bar renormalisation and leave zero as the only defined contribution. That `SE3` requires **some** binning — from the spec-1.4.7 clock grid, which makes a seconds-granular mode degenerate. **What is ratified:** retaining `SE1`'s weight rather than reallocating or removing it, on the `C8` precedent; and all four of `SE3`'s choices — the whole-day granularity, the dataset-wide population, the lowest-bin tie rule and the linear kernel — **none of which frozen text determines**. `SE4`'s agreement function and `SE5` in its entirety are **not** settled here |
 | M25 | `SE4` is **expected-non-binding on v1.0.0 data**: it is retained with its 1000-bps weight, its agreement function is left undefined, and the fact that it separates no candidates is reported (`RECONCILIATION_SPEC.md §4.2`, spec 1.4.11) | **Derived:** `memo` is quarantined and no `§6.2` probe returns it; `MerchantLedgerEntry` (§8) has no structural method or card-network field; `fetch_payment` supplies `method`, which §10's `payment` observation already carries; `card_network` has no Payment-side field, spec 1.1.1 having moved the card attributes to `ReconLine`; no exercised `§4.3` operator perturbs either field; and `PREREGISTRATION.md §4.2`'s `F06` draws one method for both members of a collision pair. `SE4` therefore takes one value across every candidate of a target. **Ratified:** retaining the row and its weight rather than reallocating or removing them, on the `C8` precedent — `§4.1` keeps a declared filter that excludes nothing and reports it doing nothing. **Not settled, and deliberately so:** the agreement function itself, which is unobservable while the signal is non-discriminating |
+| M26 | `Evidence.detail` for `kind: "probe_result"` is a five-variant discriminated union on `probe`, matching `RECONCILIATION_SPEC.md §6.2`'s closed enum; `date` is **not** a member of the `fetch_settlement_recon` variant (§12, spec 1.4.12) | **Derived:** the five variants and their argument ids — `§6.2` declares exactly five probes and `THREAT_MODEL.md §T7` calls them *"a closed enum of five read-only operations"*; each result field has a named consumer (`receipt`→`SE2`, `method`→`SE4`, parent `payment_id`→`C2`/`E10`, `constituent_entity_ids`→`SE5`, `days`→`C4`); and the argument ids are required by `I6` through `DECISION_BRIEF.md §L.1` rule 8, since `R3` proposes the probe and `obs_ids` carries observation rather than entity ids. Nullable results are `§6.2`'s own hedging (*"may supply"*) plus `ARCHITECTURE.md §5`'s *"still no discriminator"*. **Ratified:** omitting `date`, because no frozen rule reads it from `detail`, `§22.1` D11 describes only the external endpoint's query shape, and the `PROBE` `LedgerEvent` already logs the call — so carrying it would mean inventing a date type for a field nothing consumes. Also ratified: defining this one kind **without** implementing the `Evidence` entity, whose other nine kinds have no identified consumers. **Not settled:** `SE5`'s scope, function and aggregation, and `§T7`'s unstated hard bound on `days` |
 
 ### 22.3 `[NOT-CLAIMED]` — considered and deliberately not asserted
 

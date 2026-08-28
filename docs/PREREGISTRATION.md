@@ -1,6 +1,6 @@
 # PREREGISTRATION — ASSAY Benchmark v1.0.3
 
-**Spec version:** 1.4.11 · **Benchmark version:** 1.0.3
+**Spec version:** 1.4.12 · **Benchmark version:** 1.0.3
 
 **Status: FROZEN on commit. Amendments require a version bump and a new seal.**
 **Date frozen:** 2026-08-23 · **Amended:** 2026-08-24 (benchmark 1.0.1),
@@ -415,6 +415,42 @@ stays **closed**, and **no `fetch_ledger_entry` probe is added**.
 untouched; **no metric definition is amended**; no seed, split, family or
 `target_record_count` moves; `constraint_set_hash` does not move; and benchmark
 v1.0.3 is unchanged, with no dataset in existence to regenerate.
+
+**Amendment 1.4.12 / benchmark 1.0.3 (pre-seal, one schema for one kind).**
+Applied before the seal, before any dataset was generated and before any number
+was observed. **Documentation and domain typing. One item, in
+`DATA_MODEL.md §12`.** It supplies `Evidence.detail` for `kind: "probe_result"`
+as a five-variant discriminated union on `probe`, matching
+`RECONCILIATION_SPEC.md §6.2`'s closed enum. Register row M26; record at
+`DECISION_BRIEF.md §A.19`.
+
+**Why this was separable from `SE5`.** `§12` promises *"schema per kind"* and
+supplies none, so `SE5` had no input record to read and could not be implemented
+whatever its function turned out to be. `SE2`, `C2`/`E10` and `C4` need their
+variants regardless, so the schema stands on its own and prejudges nothing.
+
+**Derived:** the five variants and the closed enum (`§6.2`, `THREAT_MODEL.md
+§T7`'s *"closed enum of five read-only operations"*); each result field's named
+consumer — `receipt`→`SE2`, `method`→`SE4`, parent `payment_id`→`C2`/`E10`,
+`constituent_entity_ids`→`SE5`, `days`→`C4`; the **argument** ids, required by
+`I6` through `DECISION_BRIEF.md §L.1` rule 8 since `R3` proposes the probe and
+`Evidence.obs_ids` carries observation rather than entity ids; and nullable
+results, from `§6.2`'s own hedging and `ARCHITECTURE.md §5`'s *"still no
+discriminator"*. **Ratified:** omitting `date`, no frozen rule reading it from
+`detail` and `§22.1` D11 describing only the external endpoint's query shape; and
+defining this one kind without implementing the `Evidence` entity.
+
+**Two disclosures rather than repairs:** `§T7` promises `widen_temporal_window`
+*"has a hard bound"* and no document states the number, so the schema asserts no
+ceiling on `days`; and `Evidence`'s other nine kinds remain undefined.
+
+**`SE5` is untouched** — its row, its 2000 bps, its scope, its scoring function
+and its aggregation all stand open. `SE1`, `SE3` and `SE4` are untouched.
+`C1`–`C8`, `I1`–`I9`, every `§7` threshold, `§4.1`'s composition, `§4.2`'s rates
+and clock grid, `§4.3`, `§6.1` and `§6.2` are untouched; **no metric definition is
+amended**; no seed, split, family or `target_record_count` moves;
+`constraint_set_hash` does not move; and benchmark v1.0.3 is unchanged, with no
+dataset in existence to regenerate.
 
 ---
 
