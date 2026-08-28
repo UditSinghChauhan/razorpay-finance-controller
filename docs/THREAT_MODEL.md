@@ -1,6 +1,6 @@
 # THREAT_MODEL — ASSAY
 
-**Spec version:** 1.4.8 · **Date:** 2026-08-28
+**Spec version:** 1.4.9 · **Date:** 2026-08-28
 
 Every control answers: **what specific failure does this prevent?** Controls that
 cannot name a failure are removed.

@@ -1,6 +1,6 @@
 # DATA_MODEL — ASSAY
 
-**Spec version:** 1.4.8 · **Date:** 2026-08-28
+**Spec version:** 1.4.9 · **Date:** 2026-08-28
 
 All schemas are normative. The implementation agent must not add, rename or
 retype fields without a spec version bump.
@@ -997,6 +997,11 @@ type ObservationState = "RECONCILED" | "EXCEPTION" | "ABSTAINED" | "REFERENCE";
 // so `REFERENCE` is deliberately NOT a member of this union.
 type DecisionType = "RECONCILED" | "EXCEPTION" | "ABSTAINED";
 
+// The S5 validation-gate invariants of `RECONCILIATION_SPEC.md §7`. Corrected
+// at spec 1.4.9 -- see below. DISTINCT from `ConstraintId` (`C1`-`C8`), which
+// is the hard-constraint set of `RECONCILIATION_SPEC.md §4.1`.
+type InvariantId = "I1" | "I2" | "I3" | "I4" | "I5" | "I6" | "I7" | "I8" | "I9";
+
 interface Decision {
   decision_id: DecisionId;
   run_id: RunId;
@@ -1005,8 +1010,8 @@ interface Decision {
   chosen_candidate_id: CandidateId | null;   // null when ABSTAINED
   uniqueness: "UNIQUE" | "DISCRIMINATED" | "IMMATERIALLY_AMBIGUOUS"
             | "AMBIGUOUS" | "INTRACTABLE";
-  invariants_checked: ConstraintId[];
-  invariants_failed: ConstraintId[];
+  invariants_checked: InvariantId[];
+  invariants_failed: InvariantId[];
   certificate: AmbiguityCertificate | null;
   financial_impact: Array<{ account: AccountCode; delta_paise: Paise }>;
   explanation: string;             // R4 output, or template if rejected
@@ -1035,6 +1040,50 @@ interface AmbiguityCertificate {
 The certificate is the product. It is the difference between "confidence 0.62"
 and "here is the specific alternative I could not rule out, here is the ₹ at
 stake, and here is what I tried."
+
+**`invariants_checked` / `invariants_failed` carry `I1`–`I9`, corrected at spec
+1.4.9 `[ASSAY-MODEL]`, register row M23.** Through spec 1.4.8 both fields were
+typed `ConstraintId[]`, and that typing **conflicted with the only stage that
+populates them**:
+
+```
+  what §13 declared   invariants_checked: ConstraintId[]
+                      invariants_failed:  ConstraintId[]
+                      ConstraintId is C1..C8 -- the HARD CONSTRAINTS of
+                      RECONCILIATION_SPEC.md §4.1, evaluated at stage S2.
+
+  what fills them     RECONCILIATION_SPEC.md §7's S5 validation gate, whose
+                      table is I1..I9: "any invariant failure rejects the
+                      allocation ... The rejected allocation becomes an
+                      exception carrying `invariants_failed`."
+
+  who reads them      gate G5 (§10.1): "No allocation with a non-empty
+                      `invariants_failed` was posted", and ARCHITECTURE.md §4
+                      boundary 3, which puts both fields on `ValidatedDecision`
+                      because "G5 is unverifiable unless the validated artifact
+                      carries the result" -- the result of S5, which is I1..I9.
+```
+
+`I1`–`I9` are not `ConstraintId`s and **no document declared a type for them**,
+so the fields could not express the values the specification requires them to
+hold. Under the old typing `S5` could record *that* validation failed but never
+*which* invariant failed, and `Exception.invariants_failed` would name a hard
+constraint for a gate that never evaluates one.
+
+**The correction is the typing, not the gate.** `InvariantId` is declared above
+as exactly `I1`–`I9`, matching `§7`'s table row for row, and both fields are
+retyped to it. `ConstraintId` is **unchanged and remains exactly `C1`–`C8`**; the
+two vocabularies are deliberately distinct and neither is a subset of the other.
+`RECONCILIATION_SPEC.md §7`'s invariants, `§4.1`'s constraints, `§10.1`'s gates
+and `ARCHITECTURE.md §4`'s field list are all untouched — this states which of
+two already-frozen vocabularies the fields were always drawing from.
+
+**Nothing observable moves.** No benchmark population parameter, seed, split,
+family, `target_record_count`, rate, threshold, metric definition or stopping
+rule changes; `C1`–`C8` and `constraint_set_hash` are untouched, because
+`ConstraintId` is unchanged and the constraint declaration does not carry these
+fields; and no generated data exists or would differ. See
+`DECISION_BRIEF.md §A.16`.
 
 ---
 
@@ -1913,6 +1962,7 @@ reference beats endpoint reference beats product guide beats pricing page.
 | M20 | `Component.member_obs_ids` is the **unanchored** observation nodes of one `RECONCILIATION_SPEC.md §5` component, and `Component.total_value_paise` is `Σ value(observation)` over that field — targets and anchored observations excluded (§11, spec 1.4.6) | Both were declared without comment while `τ` read the second as *"component value"*. For the value, §5's node definition and §11's `size` comment each supported a different reading and neither excluded the other, so the member-scoped one is **ratified** rather than derived; the rationale is `size`'s own member scope and the v1.0.3 single-contribution treatment, not textual necessity. For the domain, §11 never stated that `Component` is §5's graph output — the link was by name and stage only |
 | M21 | The **time of day** for the settlement instant (`21:00:00` IST on the settlement's own calendar date) and for captures, refunds and ERP bookings (`[00:00:00, 21:00:00)` IST of their day) (`PREREGISTRATION.md §4.2`, spec 1.4.7) | `§4.2` fixed each entity's **day** and stated no time of day. The silence was load-bearing: `C4` bounds `settled_at − created_at` at one day and `§6` makes `settled_at` settlement-scoped, so with the times free a `T+1` batch admits a **true-allocation** member that passes `C4` on a calendar-date reading and fails it on an elapsed-seconds reading — which `PREREGISTRATION.md §5.3` makes a question of benchmark validity, not of implementation taste. The grid is chosen so the two readings **agree** rather than so one wins: every event is strictly before the settlement instant, which makes the `T_min` floor strict. `21:00:00` is the latest instant leaving the three hours `§4.2`'s bank clock needs inside the same calendar date, so `C3`'s bank-arrival half holds by construction. It states the grid the benchmark already had; no population quantity moves |
 | M22 | `C2`'s refund half is **referential** — the refund member's own `order_id` must equal the `order_id` of the payment its `payment_id` names, and that payment need not be a candidate member — and where a `recon_line` and a `payment` observation both carry it, the **`recon_line` governs** (`RECONCILIATION_SPEC.md §4.1`, spec 1.4.8) | *"Offset"* admitted a co-membership reading and §4.1 had not chosen. The referential reading is **forced**: §3's `AN3` states the link's basis as *"Referential"*, §4.1's own justification is *"a refund documents its parent `payment_id`"*, §15's `E10_REFUND_ORPHAN` already owns absence from the dataset, and `PREREGISTRATION.md §4.2`'s one-batch-per-capture-day with `F02`'s *"batch N+2"* puts a refund's batch on its own day, so the parent is never a co-member and co-membership would exclude every refund-carrying true allocation and fail `§5.3`. **The source precedence is a declaration, not a derivation:** no clause ranks the two views, and the recon line is chosen because §11.1 scopes a member to its own payload and §22.1 D10 makes the recon report the constituent source |
+| M23 | `Decision.invariants_checked` and `Decision.invariants_failed` carry **`InvariantId`** (`I1`–`I9`), not `ConstraintId` (`C1`–`C8`), and `InvariantId` is declared as exactly `I1`–`I9` (§13, spec 1.4.9) | Through spec 1.4.8 §13 typed both fields `ConstraintId[]`, while the only stage that populates them — `RECONCILIATION_SPEC.md §7`'s S5 gate — evaluates `I1`–`I9`, and gate `G5` and `ARCHITECTURE.md §4` boundary 3 read them as *"the result"* of that gate. `I1`–`I9` had **no declared type anywhere**, so the fields could not hold the values the specification required: S5 could record that validation failed but never which invariant failed. The correction is the **typing**, not the gate — `§7`'s invariants, `§4.1`'s constraints and `§10.1`'s gates are untouched, `ConstraintId` remains exactly `C1`–`C8`, and the two vocabularies stay distinct with neither a subset of the other |
 
 ### 22.3 `[NOT-CLAIMED]` — considered and deliberately not asserted
 

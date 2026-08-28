@@ -1,6 +1,6 @@
 # PREREGISTRATION — ASSAY Benchmark v1.0.3
 
-**Spec version:** 1.4.8 · **Benchmark version:** 1.0.3
+**Spec version:** 1.4.9 · **Benchmark version:** 1.0.3
 
 **Status: FROZEN on commit. Amendments require a version bump and a new seal.**
 **Date frozen:** 2026-08-23 · **Amended:** 2026-08-24 (benchmark 1.0.1),
@@ -321,6 +321,33 @@ byte-identical, verified against the canonical serialisation. `I1`–`I9`, every
 `§7` threshold, `§4.1`'s composition, `§4.2`'s rates and clock grid, `§4.3`,
 `§6.1` and `§6.2` are untouched; no seed, split, family or `target_record_count`
 moves; and benchmark v1.0.3 is unchanged, with no dataset in existence to
+regenerate.
+
+**Amendment 1.4.9 / benchmark 1.0.3 (pre-seal, one field that could not hold its
+own contents).** Applied before the seal, before any dataset was generated and
+before any number was observed. **Documentation only. One item, in
+`DATA_MODEL.md §13`.** It retypes `Decision.invariants_checked` and
+`Decision.invariants_failed` from `ConstraintId[]` to **`InvariantId[]`**, and
+declares `InvariantId` as exactly `I1`–`I9`. Register row M23; record at
+`DECISION_BRIEF.md §A.16`.
+
+**The conflict it resolves.** `ConstraintId` is exactly `C1`–`C8` — `§4.1`'s hard
+constraints, evaluated at stage S2 — while the only stage that populates these
+fields is `RECONCILIATION_SPEC.md §7`'s S5 validation gate over `I1`–`I9`, and
+gate `G5` together with `ARCHITECTURE.md §4` boundary 3 read them as *"the
+result"* of that gate. `I1`–`I9` had **no declared type anywhere**, so the fields
+could not hold the values the specification requires them to hold: S5 could
+record that validation failed but never which invariant failed. This is a
+correction of an unsatisfiable typing, not a choice between readings.
+
+**The gate is untouched and the two vocabularies stay distinct.** `§7`'s
+`I1`–`I9`, `§4.1`'s `C1`–`C8`, `§10.1`'s close gates and `ARCHITECTURE.md §4`'s
+field list are unchanged, and **`ConstraintId` remains exactly `C1`–`C8`**.
+`C1`–`C8`, `I1`–`I9`, every `§7` threshold, `§4.1`'s composition, `§4.2`'s rates
+and clock grid, `§4.3`, `§6.1` and `§6.2` are untouched; no seed, split, family or
+`target_record_count` moves; **`constraint_set_hash` does not move**, because
+`ConstraintId` is unchanged and `constraints.decl.ts` does not carry these
+fields; and benchmark v1.0.3 is unchanged, with no dataset in existence to
 regenerate.
 
 ---
