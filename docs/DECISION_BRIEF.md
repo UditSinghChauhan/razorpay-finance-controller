@@ -1,7 +1,7 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.9 · **Date:** 2026-08-28
+**Spec version:** 1.4.10 · **Date:** 2026-08-28
 **Reviewer role:** principal architect / skeptical reviewer
 
 **At spec 1.4.6** §A.13 records one definition, taken at a governance gate held
@@ -878,6 +878,93 @@ unchanged and no dataset exists to regenerate.
 **What it unblocks.** `ARCHITECTURE.md §4` boundary 3's `ValidatedDecision` names
 these two fields among its minimum set, so the boundary type could not be
 declared while their element type was undetermined. It can now.
+
+### A.17 Spec 1.4.10 / benchmark 1.0.3 — the signal that lost its question
+
+**The decisions.** `RECONCILIATION_SPEC.md §4.2` now states `SE1`'s comparands and
+declares it **permanently inactive** for ranking; ratifies `SE3`'s scoring
+function; and gates `SE4` to post-probe only. Register row M24; threat row
+`PREREGISTRATION.md §10` V20. **`SE5` is deliberately untouched.**
+
+**`SE1` had two live readings and one of them is impossible.** *Target-scoped*
+compares `settlement.utr` with its `AN2`-matched `bank_ref`; *member-scoped*
+compares each member's `settlement_utr` with the target settlement's `utr`. The
+member-scoped reading is not merely unsupported — `settlement_utr` is read by no
+normative rule anywhere — it is **arithmetically refuted by `§11`**. That worked
+example states three facts: the winner is `{A,B,C}`, the deciding signal is `SE3`,
+and `Δs = 400 bps`, giving `ABSTAINED`. Under the member-scoped reading its
+`F08` members retain `setl_A`'s UTR — `DROP_SETTLEMENT_ID` nulls only
+`settlement_id`, `PREREGISTRATION.md §4.3` saying *"sets the field to null"* in the
+singular — while `{D,E}` carry another settlement's, so `SE1` alone would
+contribute 3500 bps. That falsifies all three stated facts at once: `Δs` would
+exceed 3500, `SE1` rather than `SE3` would decide, and `3500 ≥ ε` would yield
+`DISCRIMINATED` instead of the stated `ABSTAINED`. The target-scoped reading
+reproduces the example exactly, and `§22.2` M8 independently registers `SE1` in
+one row with `AN2` on the same UTR justification.
+
+**And the target-scoped reading makes `SE1` inert.** Both comparands are fixed per
+target, so `SE1` takes one value across every candidate of that target and can do
+neither of the two things `§4.2` says the score is for. It could rank only for a
+`bank_line` target, whose candidates are sets of settlements each carrying its own
+UTR — and `DATA_MODEL.md §11.1` at spec **1.4.4** gave that target the empty
+candidate set. **The amendment that closed the bank-side matching problem also
+inactivated the largest weight in the frozen evidence set, and `§10` V18 recorded
+1.4.4's other consequences without recording this one.**
+
+**Three repairs, and why retention was chosen.** *Retire it* — `AN5`'s striking is
+precedent, but `AN5` was not an `AL3` constant and retirement would break
+`PREREGISTRATION.md §7`'s stated *"summing to 10_000 bps"*. *Reallocate the 3500
+bps* — `§7` does permit pre-seal adjustment, but its stated mechanism is tuning
+*"on the TRAIN and DEV splits"*, which is data-driven, and no data exists; a
+principled reallocation would still be a change to `AL3` constants. *Retain,
+declare inactive, report* — which is what `RECONCILIATION_SPEC.md §4.1` already
+does for `C8` and for `C2`'s adjustment half, requiring that *"the fraction of
+candidates it excludes is reported so a reviewer can see that it is doing nothing
+rather than assume it is doing something."* **The third is taken. It changes no
+frozen constant, and it is a ratification, not a derivation.**
+
+**`SE3` is four ratified choices standing on one derivation.** *Derived:* that a
+mode over raw seconds is degenerate, because the spec-1.4.7 clock grid makes
+`lag = n·86400 + (S − o)` with `o` drawn from a 21-hour window. *Ratified, and
+none of it determined by frozen text:* binning at whole days, taking the
+population as every `recon_line` in the dataset, resolving ties to the lowest bin,
+and the linear kernel over `[T_min, T_max]`. Two of these are better supported
+than the others — `C4` and `§4.2` express this quantity only in days, and `§4.2`
+speaks of *"ASSAY's settlement-lag distribution"* as a run-level property — but
+support is not entailment and the record says so.
+
+**A consequence of the combination, disclosed rather than absorbed.** With `SE1`
+inactive and `SE2`, `SE4` and `SE5` post-probe, `SE3` is the only signal
+computable before a probe. Under the ratified kernel `SE3 ∈ [1/6, 1]`, so the
+greatest pre-probe `Δs` is 1250 bps — **below `ε = 1500`** — and `DISCRIMINATED`
+is unreachable before probing. That follows the order `§6.2` already describes,
+but it makes `P_max` load-bearing on every material case. It is an artefact of the
+kernel's denominator, which is a ratified choice: `(T_max − mode)` would have made
+the ceiling exactly `ε`. Recorded at V20.
+
+**`SE4` is gated here and not defined here.** Post-probe only, scoring 0 absent a
+probe, weight unchanged — all **derived** from `memo`'s quarantine, the absence of
+any structural method or card-network field on `MerchantLedgerEntry`, and `AL3`
+barring renormalisation. **The agreement function is a separate governance
+decision and the `§4.2` row says so in its own text**, so the table does not read
+as complete.
+
+**`SE5` remains wholly unresolved, and this record exists partly to say so.** Its
+row is unchanged byte for byte, its 2000 bps stands, and no probe scope, scoring
+function or `probe_result` `Evidence.detail` schema is supplied. Six frozen
+mentions name it, weight it, and place it post-probe; none says what it measures.
+Three defensible definitions — binary consistency, fraction of probes
+corroborating, and probe-ID overlap — straddle `ε` with an exact flip on a minimal
+two-probe case, and that flip decides whether a component posts to the control
+accounts or opens a Suspense item. Choosing among them from this text would be
+invention, and it is left open.
+
+**Nothing observable moves.** No population parameter, seed, split, family,
+`target_record_count`, rate, threshold or metric definition changes;
+`constraint_set_hash` does not move, `C1`–`C8` being untouched; benchmark v1.0.3
+is unchanged and no dataset exists. `packages/oracle` receives **no** convention
+row: `PREREGISTRATION.md §5.2` gives the oracle *"no soft scoring"*, so `SE1`–`SE5`
+are engine-side and their register entries belong with `packages/engine`.
 
 **A disclosed consequence of the member scope.** Because anchored observations
 are excluded, a component's value is the value of its *unanchored* residual, so
