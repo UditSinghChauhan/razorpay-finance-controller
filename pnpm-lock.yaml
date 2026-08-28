@@ -62,6 +62,15 @@ importers:
 
   packages/money: {}
 
+  packages/oracle:
+    dependencies:
+      '@assay/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@assay/money':
+        specifier: workspace:*
+        version: link:../money
+
 packages:
 
   '@eslint-community/eslint-utils@4.10.1':
