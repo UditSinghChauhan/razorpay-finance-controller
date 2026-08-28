@@ -1,9 +1,14 @@
 # EVALUATION_SPEC — ASSAY
 
-**Spec version:** 1.4.5 · **Date:** 2026-08-28
+**Spec version:** 1.4.6 · **Date:** 2026-08-28
 
 Every metric answers the question: **what decision does this number let someone
 make?** A metric that does not change anyone's behaviour is not reported.
+
+**At spec 1.4.6** this document is unchanged apart from the version header. **No
+metric definition changes.** Metric 26's `tau_sensitivity` sweep is unaffected —
+it sweeps `τ` over absolute values and does not read the base. See
+`DECISION_BRIEF.md §A.13`.
 
 **At spec 1.4.5** this document is unchanged apart from the version header. **No
 metric definition changes.** Metric 11 `period_status_distribution` is expected to

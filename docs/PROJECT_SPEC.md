@@ -2,8 +2,11 @@
 
 **Track:** 04 — AI Finance Controller
 **Status:** Specification. Frozen scope for implementation.
-**Spec version:** 1.4.5
+**Spec version:** 1.4.6
 **Date:** 2026-08-27
+
+**At spec 1.4.6** this document is unchanged apart from the version header. **No
+success criterion moves.** See `DECISION_BRIEF.md §A.13`.
 
 **At spec 1.4.5** this document is unchanged apart from the version header. **No
 success criterion moves and `S12` is not weakened or deleted.** Under the frozen

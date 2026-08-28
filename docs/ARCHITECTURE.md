@@ -1,6 +1,10 @@
 # ARCHITECTURE — ASSAY
 
-**Spec version:** 1.4.5 · **Date:** 2026-08-28
+**Spec version:** 1.4.6 · **Date:** 2026-08-28
+
+**At spec 1.4.6** this document is unchanged apart from the version header. `§7`'s
+oracle description is unaffected; `DATA_MODEL.md §11` now defines the component
+value `τ` reads. See `DECISION_BRIEF.md §A.13`.
 
 **At spec 1.4.5** this document is unchanged apart from the version header. §12's
 row for unresolved value exceeding the close threshold — the period ends `OPEN`

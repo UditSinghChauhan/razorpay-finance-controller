@@ -1,6 +1,6 @@
 # PREREGISTRATION — ASSAY Benchmark v1.0.3
 
-**Spec version:** 1.4.5 · **Benchmark version:** 1.0.3
+**Spec version:** 1.4.6 · **Benchmark version:** 1.0.3
 
 **Status: FROZEN on commit. Amendments require a version bump and a new seal.**
 **Date frozen:** 2026-08-23 · **Amended:** 2026-08-24 (benchmark 1.0.1),
@@ -257,6 +257,21 @@ constraint or stopping rule changes**, `C1`–`C8` are untouched so
 `constraint_set_hash` does not move, and benchmark v1.0.3 is unchanged. The
 finding is derived from frozen parameters; `F9`'s dev run remains the declared
 confirmation and is not pre-empted by this record.
+
+**Amendment 1.4.6 / benchmark 1.0.3 (pre-seal, one definition).** Applied before
+the seal, before any dataset was generated and before any number was observed.
+**Documentation only. One item, in `DATA_MODEL.md §11`.** It defines
+`Component.member_obs_ids` as the **unanchored** observation nodes of one
+`RECONCILIATION_SPEC.md §5` component, and `Component.total_value_paise` as
+`Σ value(observation)` over that field — targets and anchored observations
+excluded — with register row M20. That field is the quantity `τ`'s *"10 bps of
+component value"* names in `§7` and in `RECONCILIATION_SPEC.md §6`, and it
+carried no definition through spec 1.4.5. **`τ`'s frozen form
+`max(₹100.00, 10 bps of component value)` is unchanged and no threshold moved** —
+what changes is that its second term now has a referent. `C1`–`C8`, `I1`–`I9`,
+every `§7` threshold, `§4.1`'s composition, `§4.2`'s rates, `§4.3`, `§6.1` and
+`§6.2` are untouched; no seed, split, family or `target_record_count` moves;
+`constraint_set_hash` does not move; and benchmark v1.0.3 is unchanged.
 
 ---
 
