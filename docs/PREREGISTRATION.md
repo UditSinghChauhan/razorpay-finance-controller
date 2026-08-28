@@ -1,6 +1,6 @@
 # PREREGISTRATION — ASSAY Benchmark v1.0.3
 
-**Spec version:** 1.4.7 · **Benchmark version:** 1.0.3
+**Spec version:** 1.4.8 · **Benchmark version:** 1.0.3
 
 **Status: FROZEN on commit. Amendments require a version bump and a new seal.**
 **Date frozen:** 2026-08-23 · **Amended:** 2026-08-24 (benchmark 1.0.1),
@@ -292,6 +292,36 @@ against it. `C1`–`C8`, `I1`–`I9`, every `§7` threshold, `§4.1`'s compositi
 `target_record_count` moves; `constraint_set_hash` does not move; and benchmark
 v1.0.3 is unchanged, because the grid states what the population already has and
 a regeneration at the same seeds is byte-identical.
+
+**Amendment 1.4.8 / benchmark 1.0.3 (pre-seal, one word that meant two things).**
+Applied before the seal, before any dataset was generated and before any number
+was observed. **One item, in `RECONCILIATION_SPEC.md §4.1`.** It states that
+`C2`'s refund half is **referential** rather than co-membership: the refund
+member's own `order_id` must equal the `order_id` of the payment its `payment_id`
+names, that payment **need not be a candidate member**, a named payment absent
+from the dataset leaves the clause unevaluated and reaches `E10_REFUND_ORPHAN`
+instead, and where a `recon_line` and a `payment` observation both carry the
+parent's `order_id` the `recon_line` governs. Register row M22; record at
+`DECISION_BRIEF.md §A.15`.
+
+**Why it could not be left open.** *"Offset"* admits both readings, and `§5.2`
+has the engine and the oracle implement *"one declarative specification"* — so an
+ambiguity in the shared declaration is one both must resolve independently, with
+`§5.3`'s consistency gate catching a divergence only after both are written. The
+co-membership reading is **refuted rather than disfavoured**: `§4.2`'s
+one-batch-per-capture-day and `§4.1`'s `F02` *"batch N+2"* key a refund's batch to
+its own day — which is what lets a late refund *"leave the 31-day grid"* — so the
+parent is never a co-member, and co-membership would exclude **every**
+refund-carrying true allocation and fail `§5.3`'s completeness gate.
+
+**`constraint_set_hash` moves for the `C2` refund-half statement alone**, from
+`1f389d5d…` to `f0c93b5f…`, exactly as it moved for the `C3` split at spec 1.4.3.
+`C1`–`C8` **membership and order are unchanged** and every other clause is
+byte-identical, verified against the canonical serialisation. `I1`–`I9`, every
+`§7` threshold, `§4.1`'s composition, `§4.2`'s rates and clock grid, `§4.3`,
+`§6.1` and `§6.2` are untouched; no seed, split, family or `target_record_count`
+moves; and benchmark v1.0.3 is unchanged, with no dataset in existence to
+regenerate.
 
 ---
 

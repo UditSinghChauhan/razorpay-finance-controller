@@ -1,6 +1,6 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.4.7 · **Date:** 2026-08-28
+**Spec version:** 1.4.8 · **Date:** 2026-08-28
 
 The matching algorithm, the ambiguity definition, and the rules that decide
 accept / reject / abstain. This is the technical core of the project.
@@ -218,13 +218,59 @@ needing settlements), generate candidate member sets subject to hard constraints
 | ID | Constraint | Real-world justification |
 |---|---|---|
 | `C1` | Currency equality across all members and the target | `[ASSAY-MODEL]` Tier-0 is INR-only by construction, so a non-INR line in an INR dataset is a source or scope error, not a netting event. **Not** justified by "cross-currency netting does not occur": Razorpay documents that settlements are made in INR *regardless of the currency the customer paid in*, so a real multi-currency merchant needs the F11 conversion truth model, which is specified and deliberately not implemented |
-| `C2` | Type compatibility. **Refund half, binding:** a refund may only offset a payment on the same `order_id`. **Adjustment half, non-binding agent-side:** an adjustment may only attach to its `related_entity_id` when present | `[RZP-DOC]` for the refund half — a refund documents its parent `payment_id`. `[ASSAY-MODEL]` for the adjustment half: `related_entity_id` is ASSAY's construct, not a Razorpay field, and per `DATA_MODEL.md §10` it is **not observable** — it lives on the true-state `Adjustment` entity (`DATA_MODEL.md §9`), which is never an observation. The adjustment half is therefore a **generation invariant**: the generator honours it when constructing the true state, and neither the engine nor the oracle can evaluate it. Following the `C8` precedent, it is retained in the constraint set and declared expected-non-binding on v1.0.0 data, and the fraction of candidates it excludes is reported so a reviewer can see that it is doing nothing rather than assume it is doing something |
+| `C2` | Type compatibility. **Refund half, binding:** a refund may only offset a payment on the same `order_id`. **The test is referential, not co-membership, ratified at spec 1.4.8 `[ASSAY-MODEL]`, register row M22:** the refund member's own `order_id` must equal the `order_id` of the payment its `payment_id` names, and **that payment need not be a member of the same candidate**. Where the named payment has no observation in the dataset the clause is **not evaluated** and excludes nothing — that absence is `E10_REFUND_ORPHAN` (`DATA_MODEL.md §15`), not a `C2` exclusion. Where both a `recon_line` carrying that `entity_id` and a `payment` observation carrying that `id` are present, **the `recon_line` governs**. **Adjustment half, non-binding agent-side:** an adjustment may only attach to its `related_entity_id` when present | `[RZP-DOC]` for the refund half — a refund documents its parent `payment_id`. `[ASSAY-MODEL]` for the adjustment half: `related_entity_id` is ASSAY's construct, not a Razorpay field, and per `DATA_MODEL.md §10` it is **not observable** — it lives on the true-state `Adjustment` entity (`DATA_MODEL.md §9`), which is never an observation. The adjustment half is therefore a **generation invariant**: the generator honours it when constructing the true state, and neither the engine nor the oracle can evaluate it. Following the `C8` precedent, it is retained in the constraint set and declared expected-non-binding on v1.0.0 data, and the fraction of candidates it excludes is reported so a reviewer can see that it is doing nothing rather than assume it is doing something |
 | `C3` | Temporal ordering, in two halves since spec 1.4.3. **Ordering half, binding:** `created_at ≤ settled_at` for every member. **Bank-arrival half, binding where a bank line is in scope:** `settled_at ≤ bank.value_date` for every member, where *bank* is the bank line that receives the **target's** money — the target itself when the target is a `bank_line`, and its `AN2`-matched bank line when the target is a `settlement`. Where no bank line is in scope the half is *evaluated: non-binding* under `PREREGISTRATION.md §5.3`, **per target rather than per dataset** | Money cannot settle before capture or arrive before it is sent. `[RZP-DOC]` Razorpay documents that settlement `status: processed` marks *initiation*, with the bank credit following the NEFT/RTGS/IMPS timeline — so a strictly later bank value date is expected, not anomalous. `[ASSAY-MODEL]` the split: the two halves have different evidence requirements — the first is intrinsic to the member, the second needs a bank line identified, and `PREREGISTRATION.md §4.2` freezes `bank_ref` quality at *"30% a clean UTR, 70% absent or non-UTR"*, so the second is unavailable on most settlement targets. Membership is unchanged; this is the shape `C2` has carried since spec 1.3.0 |
 | `C4` | Settlement window: `settled_at − created_at ∈ [T_min, T_max]` (declared: 1–7 **calendar** days) | `[RZP-DOC]` the documented standard domestic cycle is **T+2 working days** from capture, and is subject to bank approval and variation by vertical and risk. `[ASSAY-MODEL]` ASSAY simulates in calendar days with no bank-holiday calendar; `T_max = 7` is sized to absorb the working-day expansion (a capture before a weekend plus a public holiday can exceed five calendar days). See `PREREGISTRATION.md §4.2` |
 | `C5` | Per-line arithmetic identity: `credit = amount − fee` for payments (`fee` is GST-inclusive), `debit = amount` for refunds | `DATA_MODEL.md §6`; a line failing this is corrupt, not a candidate. Corrected in spec 1.1.1: Razorpay documents `fee` as *"Fee (including GST)"* with `tax` the GST component **inside** it, so subtracting both double-counts GST |
 | `C6` | Exact tie-out: `Σ credit(members) − Σ debit(members) = target.amount`, **zero tolerance** in paise | Settlement amounts are exact; a tolerance here is how false matches get admitted |
 | `C7` | One-allocation: no member may already belong to an accepted allocation | Double-counting a payment is the most expensive reconciliation error. `[RZP-DOC]` and directly supported: Razorpay documents that partial settlements defer **whole transactions** to the next slot — its own worked example settles P1 and P2 and defers P3 — so a single payment is not split across two settlements |
 | `C8` | `on_hold === false` for members claimed as settled | `[ASSAY-MODEL]` a line flagged as held is not part of the settled set. `[RZP-DOC]` the field itself is documented, but specifically as *"whether the account settlement **for transfer** is on hold"* — a Razorpay Route concept toggled via `PATCH /v1/transfers/:id`. Route is out of Tier-0 scope, so **`C8` is expected to be non-binding on v1.0.0 data**; it is retained as a declared admissibility filter, and the fraction of candidates it excludes is reported so a reviewer can see that it is doing nothing rather than assume it is doing something |
+
+**`C2`'s refund half is referential, ratified at spec 1.4.8 `[ASSAY-MODEL]`.**
+*"Offset"* admitted two readings and this section had not chosen between them.
+**Co-membership** would require the parent payment to be a member of the same
+candidate; **referential** requires only that the refund's own `order_id` agree
+with the payment its `payment_id` names. The referential reading is adopted, and
+the co-membership reading is not merely disfavoured but **refuted**:
+
+```
+  §3's AN3      states the refund -> payment link's basis as "Referential".
+
+  this row's    "a refund documents its parent payment_id" -- a fact carried
+  justification on the refund's own row, needing no co-member.
+
+  §15's E10     "Refund references a payment NOT IN THE DATASET" already owns
+                absence, so C2 is not the absence filter.
+
+  §4.2 + §4.1   one settlement batch per capture-day, and F02's refund
+                "settled in batch N+2" -- which §4.2 relies on when it says
+                this "leaves the 31-day grid for a refund raised in the final
+                two days". A refund's batch is keyed to ITS OWN day, and a
+                refund follows its capture, so the parent is never in the
+                same batch and never a co-member.
+
+  PREREGISTRATION.md §5.3   co-membership therefore excludes EVERY
+                refund-carrying true allocation, failing the completeness
+                gate, at which point "the benchmark is invalid and no results
+                may be reported from it".
+```
+
+A reading under which this specification invalidates its own benchmark is not
+the reading it intends, so the choice is closed rather than preferred.
+
+**The source precedence is a declaration, not a derivation.** No clause ranks the
+two observations that can carry the parent's `order_id`. The `recon_line` is
+chosen because `DATA_MODEL.md §11.1` scopes a member's quantities to *"its own
+observation payload and from no other source"* and `§22.1` D10 makes the
+date-scoped recon report the source of settlement constituents: taking the
+parent's `order_id` from the `pg_payments` view would compare a recon-report
+field against a different view whose cross-view agreement nothing guarantees,
+which is what `F04` and `F08` attack. Registered at `DATA_MODEL.md §22.2` M22.
+
+**Membership, ordering and every other clause are unchanged.** The adjustment
+half is untouched and stays *expected-non-binding*; `C1`, `C3`–`C8` are
+untouched. `constraint_set_hash` **moves**, for the `C2` refund-half statement
+alone, exactly as it moved for the `C3` split at spec 1.4.3.
 
 **`C3` and `C4` against a null `settled_at`, ratified at spec 1.4.2
 `[ASSAY-MODEL]`.** `PREREGISTRATION.md §4.2`'s batch-composition rule emits a
