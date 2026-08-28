@@ -718,6 +718,20 @@ had left blank. `packages/oracle`'s property suite pins that divergence and is
 retained, because it is the demonstration that the base has to be normative
 rather than a convention.
 
+**A disclosed consequence of the member scope.** Because anchored observations
+are excluded, a component's value is the value of its *unanchored* residual, so
+`τ` sits at its `₹100.00` floor whenever that residual is at or below `₹1,00,000`
+— a threshold derived from the frozen formula alone, since `10 bps` of `₹1,00,000`
+is exactly the floor. A fully anchored settlement has `total_value_paise = 0` and
+`τ` at the floor; such a target has one solution, so `τ` is never consulted on it.
+The `10 bps` term is **not** inert, but it binds on a minority of components. This
+is disclosed here rather than treated as a reason to reopen the base.
+
+**No frozen quantity moved.** No `AccountCode`, posting rule, exception class,
+metric definition, threshold, rate, composition figure, seed, split, baseline,
+ablation or stopping rule changed, `C1`–`C8` are untouched so
+`constraint_set_hash` does not move, and benchmark v1.0.3 is unchanged.
+
 ### A.14 Spec 1.4.7 / benchmark 1.0.3 — the silence that decided a gate
 
 **The decision.** `PREREGISTRATION.md §4.2` now freezes the **time of day** it had
@@ -1029,20 +1043,6 @@ weight table would otherwise have to reconstruct.
 `constraint_set_hash` does not move, `C1`–`C8` being untouched; benchmark v1.0.3
 is unchanged and no dataset exists. `packages/oracle` receives no convention row:
 `PREREGISTRATION.md §5.2` gives the oracle *"no soft scoring"*.
-
-**A disclosed consequence of the member scope.** Because anchored observations
-are excluded, a component's value is the value of its *unanchored* residual, so
-`τ` sits at its `₹100.00` floor whenever that residual is at or below `₹1,00,000`
-— a threshold derived from the frozen formula alone, since `10 bps` of `₹1,00,000`
-is exactly the floor. A fully anchored settlement has `total_value_paise = 0` and
-`τ` at the floor; such a target has one solution, so `τ` is never consulted on it.
-The `10 bps` term is **not** inert, but it binds on a minority of components. This
-is disclosed here rather than treated as a reason to reopen the base.
-
-**No frozen quantity moved.** No `AccountCode`, posting rule, exception class,
-metric definition, threshold, rate, composition figure, seed, split, baseline,
-ablation or stopping rule changed, `C1`–`C8` are untouched so
-`constraint_set_hash` does not move, and benchmark v1.0.3 is unchanged.
 
 ---
 
