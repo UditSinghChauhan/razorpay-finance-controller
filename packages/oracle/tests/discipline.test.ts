@@ -148,6 +148,49 @@ describe("the convention register", () => {
     expect(t?.why).toMatch(/DECLARED POPULATION/);
   });
 
+  it("records O-ANCHOR-SCOPE as ratified, with AN5 explicitly unexercised", () => {
+    const a = CONVENTIONS.find((c) => c.id === "O-ANCHOR-SCOPE");
+    expect(a?.spec_basis).toMatch(/RECONCILIATION_SPEC\.md §3/);
+    expect(a?.decision).toMatch(/AN1 and AN2 only/);
+    expect(a?.decision).toMatch(/UNEXERCISED/);
+    expect(a?.decision).toMatch(/inert/);
+    expect(UNRATIFIED.map((c) => c.id)).not.toContain("O-ANCHOR-SCOPE");
+  });
+
+  it("splits materiality into a ratified SCOPE and an unratified IMPL", () => {
+    // The two questions are different in kind and were bundled in one row: which
+    // postings enter the counterfactual is derivable from §5 and §17.1.1;
+    // whether to compute the projection natively is not decided anywhere. Kept
+    // together, the derivable half inherited the undetermined half's null basis.
+    const scope = CONVENTIONS.find((c) => c.id === "O-MATERIALITY-SCOPE");
+    const impl = CONVENTIONS.find((c) => c.id === "O-MATERIALITY-IMPL");
+    expect(scope?.spec_basis).toMatch(/RECONCILIATION_SPEC\.md §5/);
+    expect(scope?.spec_basis).toMatch(/§17\.1\.1/);
+    expect(scope?.decision).toMatch(/EXCLUDED/);
+    expect(impl?.spec_basis).toBeNull();
+    expect(impl?.why).toMatch(/SEMANTIC IMPACT: NIL/);
+    expect(UNRATIFIED.map((c) => c.id)).not.toContain("O-MATERIALITY-SCOPE");
+    expect(UNRATIFIED.map((c) => c.id)).toContain("O-MATERIALITY-IMPL");
+    // The combined row must be gone, not merely renamed alongside the old one.
+    expect(CONVENTIONS.map((c) => c.id)).not.toContain("O-MATERIALITY-PROJECTION");
+  });
+
+  it("does NOT warrant the materiality scope by measurement", () => {
+    // The earlier row justified the decision by reporting that both readings had
+    // been measured to agree. A measurement is the wrong kind of evidence for
+    // what the specification MEANS, and the derivation was available.
+    const scope = CONVENTIONS.find((c) => c.id === "O-MATERIALITY-SCOPE");
+    expect(scope?.why).toMatch(/DERIVED, NOT MEASURED/);
+    expect(scope?.why).not.toMatch(/agree in magnitude on every material pair/);
+  });
+
+  it("leaves exactly C2 and C4 unratified alongside the impl choice", () => {
+    // Step 1 of the governance package touches neither C2 nor C4.
+    expect([...UNRATIFIED.map((c) => c.id)].sort()).toEqual(
+      ["O-C2-REFUND", "O-C4-UNIT", "O-MATERIALITY-IMPL"].sort(),
+    );
+  });
+
   it("registers the component node set that the base is summed over", () => {
     const nodes = CONVENTIONS.find((c) => c.id === "O-COMPONENT-NODES");
     expect(nodes?.spec_basis).toMatch(/RECONCILIATION_SPEC\.md §5/);
