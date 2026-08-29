@@ -1,6 +1,6 @@
 # PREREGISTRATION — ASSAY Benchmark v1.0.3
 
-**Spec version:** 1.4.20 · **Benchmark version:** 1.0.3
+**Spec version:** 1.4.21 · **Benchmark version:** 1.0.3
 
 **Status: FROZEN on commit. Amendments require a version bump and a new seal.**
 **Date frozen:** 2026-08-23 · **Amended:** 2026-08-24 (benchmark 1.0.1),
@@ -756,6 +756,45 @@ definition is amended**; no seed, split, family or `target_record_count` moves;
 unchanged, with no dataset in existence to regenerate; and no ledger-entry probe is
 added. `packages/oracle`'s scoring logic is untouched — `§5.2` gives the oracle
 *"no soft scoring"*, so no `SE` reaches it.
+
+**Amendment 1.4.21 / benchmark 1.0.3 (pre-seal, one tie-break and one example).**
+Applied before the seal, before any dataset was generated and before any number was
+observed. **Documentation only.** An exact `evidence_score_bps` tie between feasible
+solutions is resolved by the **lexicographically smallest canonical allocation
+key**. Register row M35; record at `DECISION_BRIEF.md §A.28`.
+
+**Derived.** Exact ties are reachable and, pre-probe, ordinary: with `SE1` inactive,
+`SE2` and `SE4` expected-non-binding and `SE5` zero before any probe,
+`evidence_score_bps` is `SE3` alone, which reads member lag only, so members sharing
+a capture day and cycle score identically — and `§4.2`'s `F06` constructs exactly
+that shape. An ordering is then required, because `Δs = 0 < ε` routes a tie to
+`AMBIGUOUS` or `IMMATERIALLY_AMBIGUOUS`, whose *"accept best"* fixes
+`Decision.chosen_candidate_id` and the `source_entity_id`s gate `G3` partitions by,
+while `solution_a`/`solution_b` enter the hashed event body. Metric 23 and
+`DATA_MODEL.md §16` together forbid enumeration order from supplying it.
+
+**Ratified.** The canonical key itself — the solution's `(target_id,
+member_obs_id)` pairs, sorted, serialised and compared lexicographically. `§16`
+demands determinism without naming an ordering. `member_obs_ids` alone is
+**insufficient**, since two targets of equal amount in one component admit the same
+member set; the key therefore carries the target and adds **no new quantity** to the
+frozen model.
+
+**Documentation correction, non-normative.** `RECONCILIATION_SPEC.md §11`'s worked
+materiality figure of ₹1,00,000 is **withdrawn as non-reproducible** from `§6`'s
+formula, which is **unchanged and remains normative**. No new materiality
+definition, no `source_entity_id` dimension, no change to `τ` and no metric
+definition change. The worked example's verdict is unchanged.
+
+**Nothing else moves.** The ranking criterion, `ε = 1500`, `τ`, `P_max = 3`,
+`K_max`, `C_max`, the `SE1`–`SE5` weights at 3500 / 2000 / 1500 / 1000 / 2000,
+`C1`–`C8` and `I1`–`I9` are untouched; **no metric definition is amended**; no seed,
+split, family or `target_record_count` moves; `constraint_set_hash` does not move;
+benchmark v1.0.3 with `GT_VERSION` 1.1.0 is unchanged, with no dataset in existence
+to regenerate. `packages/engine` is neither created nor modified — `S4` remains
+unimplemented — and `packages/oracle`, `packages/domain`, `packages/ledger` and
+`constraints.decl.ts` are untouched. Historical amendment records are preserved
+verbatim.
 
 ---
 
