@@ -192,7 +192,7 @@ export function anchor(observations: readonly Observation[]): AnchorResult {
   //        UTR is ASSAY's uniqueness assumption, "which is why the anchor also
   //        requires amount equality, and why E14_UTR_COLLISION exists".
   const keyOf = (utr: string, amount: number): string =>
-    `${normalizeUtr(utr)} ${String(amount)}`;
+    `${normalizeUtr(utr)}\u0000${String(amount)}`;
 
   const bankByKey = new Map<string, Obs<"bank_line">[]>();
   for (const b of bankLines) {
