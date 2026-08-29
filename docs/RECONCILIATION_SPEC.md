@@ -1,6 +1,6 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.4.12 · **Date:** 2026-08-28
+**Spec version:** 1.4.13 · **Date:** 2026-08-28
 
 The matching algorithm, the ambiguity definition, and the rules that decide
 accept / reject / abstain. This is the technical core of the project.
@@ -362,7 +362,7 @@ standard way recon tools manufacture confident wrong answers.
 |---|---|---|
 | `SE1` | UTR prefix match length, between `settlement.utr` and the `bank_ref` of its `AN2`-matched bank line. **Permanently inactive for ranking, from spec 1.4.10.** Both comparands are target-scoped, so `SE1` takes one value across every candidate of a target and can neither order candidates nor move the ε-gap — the only two uses this section gives the score. It could discriminate only for a `bank_line` target, whose candidates are sets of settlements each carrying its own UTR; `DATA_MODEL.md §11.1` (spec 1.4.4) gives that target the empty candidate set, so the context is gone. The row and its weight are **retained, not removed and not reallocated** | 3500 |
 | `SE2` | `order_ref` ↔ `receipt` string similarity (Jaro–Winkler). **Post-probe only** — `receipt` is quarantined, so this signal is computable solely from a `fetch_order` probe result (§6.2), as `SE5` is. It scores 0 for every candidate on which no probe has run | 2000 |
-| `SE3` | Temporal proximity to the modal settlement lag. Lag is `settled_at − created_at` in elapsed seconds. The **modal lag** is the mode of `floor(lag / 86400)` — whole days — taken over **every `recon_line` observation in the dataset**, with **ties resolved to the lowest bin**. Score = `max(0, 1 − |lag − mode| / (T_max − T_min))` | 1500 |
+| `SE3` | Temporal proximity to the modal settlement lag, restated in dimensionally coherent form at spec 1.4.13. `lag_days = (settled_at − created_at) / 86400`, a **real number, not floored**. `mode_days` = the mode of `floor(lag_days)` over **every `recon_line` observation in the dataset**, **ties to the lowest bin**. A **member's** score is `max(0, 1 − |lag_days − mode_days| / (T_max − T_min))`; a **candidate's** score is the **arithmetic mean** of its members' scores. Both terms are in days, so the ratio is unitless and expressing both in seconds gives an identical value | 1500 |
 | `SE4` | Method / card-network agreement with the merchant memo. **Post-probe only** — `memo` is quarantined (`DATA_MODEL.md §0` rule 4, `§8`, `§10`) and `MerchantLedgerEntry` carries no structural method or card-network field, so this signal is computable solely from a `fetch_payment` probe result (§6.2), as `SE2` and `SE5` are. It scores 0 for every candidate on which no probe has run. **`SE4` is additionally declared expected-non-binding on v1.0.0 data at spec 1.4.11**, on the `C8` precedent in `§4.1`: it is retained as a declared signal, its weight is unchanged and unreallocated, and the fact that it separates no candidates is reported rather than assumed. **Its agreement function is therefore left undefined — partial credit between `method` and `card_network`, and the treatment of a `card_network` null on both sides, are unnecessary while the signal is non-discriminating, and are NOT settled here** | 1000 |
 | `SE5` | Probe result corroboration | 2000 |
 
@@ -371,17 +371,75 @@ to compute the ε-gap in §6. Weights are frozen in `PREREGISTRATION.md` before 
 sealed run and are **not tuned on the test split**.
 
 **What is live before a probe, stated at spec 1.4.10 `[ASSAY-MODEL]`, register row
-M24.** With `SE1` inactive and `SE2`, `SE4` and `SE5` post-probe only, **`SE3`
-alone is computable before any probe runs** — *derived*. Under the kernel ratified
-above, `C4` bounds lag to `[T_min, T_max] = [1, 7]` days and the modal bin is 2,
-so the largest attainable `|lag − mode|` is 5 days, `SE3 ∈ [1/6, 1]`, and the
-greatest pre-probe `Δs` is `1500 × (1 − 1/6) = 1250 bps` — **strictly below
+M24, restated at spec 1.4.13 (M27).** With `SE1` inactive and `SE2`, `SE4` and
+`SE5` post-probe only, **`SE3` alone is computable before any probe runs** —
+*derived*. `PREREGISTRATION.md §4.2`'s frozen cycle admits only `T+1`, `T+2` and
+`T+3`, and the spec-1.4.7 grid puts `lag_days ∈ (n, n + 0.875]`, so on any
+conforming dataset the modal bin is `2` and the largest attainable
+`|lag_days − mode_days|` is **1.875 days** — reached by a `T+3` member captured at
+the start of its day. Hence `SE3 ∈ [1 − 1.875/6, 1) = [0.6875, 1)` and the
+greatest pre-probe `Δs` is `1500 × 0.3125 = **469 bps**`, **roughly one third of
 `ε = 1500`**. `§6`'s `DISCRIMINATED` outcome is therefore **unreachable before
-probing**: *derived, but conditional on the ratified kernel, whose denominator
-frozen text does not determine.* Every materially ambiguous component must reach
+probing**, and by a wide margin rather than at a boundary.
+
+**This supersedes the figure published at spec 1.4.10.** That amendment stated
+`1250 bps`, computed from `C4`'s full `[1, 7]`-day domain under the formula
+corrected here. `1250` remains a true upper bound and nothing published under it
+is falsified, but the frozen `T+1`–`T+3` cycle never populates that domain's
+tails, so `469` is the bound that actually holds. Every materially ambiguous component must reach
 `§6.2`'s probe loop or abstain, which is the order `§6.2` already describes, and
 which makes `P_max = 3` and the *abstentions resolved per probe spent* metric
 load-bearing on every material case. Recorded at `PREREGISTRATION.md §10` V20.
+
+**A dimensional error in the spec-1.4.10 wording, corrected at spec 1.4.13
+`[ASSAY-MODEL]`, register row M27.** That text defined `lag` in **elapsed
+seconds** and the modal lag in **whole days**, then wrote `|lag − mode|` —
+subtracting a day index from a second count. The two terms had no common unit:
+
+```
+  member: T+2 batch, captured 09:00   lag = 216_000 s = 2.5 days,  mode = 2
+
+  as written, denominator in days     1 - |216000 - 2| / 6      -> clamped to 0
+  as written, denominator in seconds  1 - |216000 - 2| / 518400  -> 0.5833
+  dimensionally coherent (days)       1 - |2.5 - 2|    / 6       -> 0.9167
+```
+
+Under the first reading **every member scores 0** and `SE3` would have been
+silently inert, joining `SE1` and `SE4`; under the second it is systematically
+wrong, because `mode` is subtracted from a seconds quantity without conversion.
+The row above is the coherent form. **`T_min`, `T_max`, the 1500-bps weight and
+the kernel's shape are unchanged** — only the units and the two previously
+unstated terms are supplied.
+
+**What is derived and what is ratified, kept apart.** *Derived:* the lag term
+itself (`C4`; `O-C4-UNIT` at spec 1.4.7); that the **mode** requires binning (the
+1.4.7 grid makes a seconds-granular mode degenerate); that the **numerator stays
+continuous**, because that binning rationale is scoped to the mode and does not
+reach the `lag` term; that days and seconds give an identical ratio; and the two
+exclusions above. *Ratified, and frozen text determines none of them:* the
+whole-day bin granularity, the run-level modal population, the lowest-bin tie
+rule, the linear clamped kernel, the **`T_max − T_min` denominator** and the
+**arithmetic-mean** member aggregation.
+
+**Why those last two, on the record.** The denominator is `T_max − T_min` because
+it is expressible in `C4`'s two frozen constants alone, where `T_max − mode`
+mixes a frozen constant with a data-derived statistic and is **zero when the mode
+reaches `T_max`** — well-defined here only because `§4.2`'s frozen cycle holds the
+mode at 2, which is the kind of population-accident safety spec 1.4.7 was issued
+to remove. **No cross-run comparability argument is offered:**
+`EVALUATION_SPEC.md §5.3`'s batch sweep *"measures metrics 21 and 22 only"* and
+produces no close-loop metric, so it does not bear on this choice. Aggregation is
+the **arithmetic mean** because *"proximity"* of a set reads as a central tendency
+rather than an extremum; `min` and `max` are extremum readings, and on a
+two-member example `max` selects the **opposite** candidate from `mean`, `median`
+and `min` alike. That ground is linguistic, and the record says so rather than
+dressing it as a derivation.
+
+**Members of one candidate genuinely differ in lag**, so aggregation is not
+vacuous: `settled_at` is the instant of `capture-day + cycle`, so capture-day 5 at
+`T+3`, capture-day 6 at `T+2` and capture-day 7 at `T+1` all settle on day 8 and
+fall in one co-settlement class. A candidate may therefore hold members with
+`n = 1, 2` and `3`.
 
 **Why `SE4` separates nothing, stated at spec 1.4.11 `[ASSAY-MODEL]`, register row
 M25.** Six facts, each read off frozen text and none of them a choice:
@@ -427,10 +485,21 @@ closed, and no ledger-entry probe is added.
 inactivity; `SE4`'s post-probe gating and its zero score absent a probe; that
 `SE3` requires **some** binning, because the spec-1.4.7 clock grid makes lag
 near-continuous in seconds and a seconds-granular mode degenerate. *Ratified:*
-retaining `SE1`'s weight rather than reallocating or removing it; and all four of
-`SE3`'s choices — the whole-day granularity, the dataset-wide population, the
-lowest-bin tie rule and the linear kernel — **none of which frozen text
-determines**. **`SE4`'s agreement function and `SE5` in its entirety are not
+retaining `SE1`'s weight rather than reallocating or removing it; and `SE3`'s
+whole-day bin granularity, its dataset-wide modal population, its lowest-bin tie
+rule, its linear clamped kernel, **its `T_max − T_min` denominator and its
+arithmetic-mean member aggregation** — **none of which frozen text determines**.
+
+**Two further `SE3` properties are excluded by derivation, recorded at spec 1.4.13
+so they are not revisited.** A **candidate-scoped** modal population would let
+each candidate supply its own mode and score itself ≈ 1.0, making `SE3` constant
+across candidates and unable to rank — the only two uses this section gives the
+score. A **raw sum** over members leaves `[0, 1]` — two members alone reach 1.686
+— and breaks this section's `evidence_score_bps ∈ [0, 10_000]`; a *normalised*
+sum is the arithmetic mean. Keeping the numerator **continuous** is likewise
+derived: spec 1.4.10 introduced binning because a *seconds-granular **mode*** is
+degenerate, and that reason does not reach the `lag` term, which `C4` defines as
+the raw difference. **`SE4`'s agreement function and `SE5` in its entirety are not
 settled by this amendment**, and the table above says so in the rows themselves
 rather than leaving a reader to infer completeness.
 
