@@ -1,7 +1,7 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.16 · **Date:** 2026-08-28
+**Spec version:** 1.4.17 · **Date:** 2026-08-28
 **Reviewer role:** principal architect / skeptical reviewer
 
 **At spec 1.4.6** §A.13 records one definition, taken at a governance gate held
@@ -1342,6 +1342,60 @@ untouched; the `ProbeResultDetail` union of spec 1.4.12 is **sufficient as
 committed** and no schema field is added or altered; the identifier relation of
 spec 1.4.14 is unchanged. No population parameter, seed, split, family,
 `target_record_count`, rate, threshold or metric definition changes;
+`constraint_set_hash` does not move, `C1`–`C8` being untouched; benchmark v1.0.3 is
+unchanged and no dataset exists.
+
+### A.24 Spec 1.4.17 / benchmark 1.0.3 — what a second probe is for
+
+**The decision.** Where several `fetch_settlement_recon` results carry one
+`settlement_id`, `R` is the **union** of their `constituent_entity_ids` — date
+argument and probe order both irrelevant. Register row M31. **Derived; this is the
+first `SE5` cycle with no ratified component.**
+
+**The question was whether a second probe gathers more evidence or retries the same
+evidence.** `RECONCILIATION_SPEC.md §6.2` answers it structurally: the loop is
+*"deterministic code executes it and **re-runs the solve**"*, `P_max = 3` is a budget
+**per component**, and `DATA_MODEL.md §13`'s certificate carries `probes_attempted` as
+a **list**. `§11`'s worked case spends three probes, weighs them together and records
+all three. A second probe **gathers**; nothing in this specification retires what the
+first returned.
+
+**Union is not a preference — every alternative falsifies a sentence frozen one
+version ago.** `§4.2` says *"`SE5 = 1` iff `R*` and `M` are equal and non-empty"*.
+Against a six-constituent settlement reported through three windows, a candidate
+**equal to the true constituent set** scores `1.000` under union, `0.000` under
+intersection and `0.333` under latest, first and every per-probe aggregate. Under
+*latest* the clause instead certifies the one-window candidate at `1.000` — the
+specification would declare a wrong allocation perfect. That is the defect the `F05`
+exclusion was derived from at 1.4.16, reappearing.
+
+**Three independent confirmations.** Latest and first swing `667` bps over the six
+orderings of three windows, on an input `ProbeResultDetail` deliberately does not
+carry. Intersection and latest let a probe that returns nothing **erase** an earlier
+probe's evidence, against `§6.2`'s *"abstentions resolved per probe spent"* and
+`ARCHITECTURE.md §R3`'s expressly contemplated *"wasted probe budget"*. Summing
+results as separate evidence yields `6000` bps for a signal frozen at `2000` and makes
+three identical probes score triple one — `AL3` bars the renormalisation that would
+hide it.
+
+**What the rule deliberately does not need.** The recon endpoint's **date-scoping
+field is unnamed anywhere in this corpus**, and it stays that way. Under a
+`settled_at` reading a settlement's lines share one bucket and a query is
+all-or-nothing; under a `created_at` reading the optional `day` splits capture-days
+into disjoint partials. **Union is correct under both**, which is the property that
+let this be settled without settling that. `R3`'s probe-selection policy is likewise
+untouched.
+
+**`DATA_MODEL.md §12`'s live disposition table now reads `settled at spec 1.4.17
+(M31)`.** The paragraph recording what 1.4.12 and 1.4.14 left open is preserved
+byte-identical — history is not rewritten; only the table that tracks current
+disposition moves, which is what it exists for.
+
+**Nothing observable moves.** `SE5`'s 2000-bps weight, scope, scoring function, `F05`
+treatment and empty-result zero all stand exactly as frozen at 1.4.16; `SE1`–`SE4` are
+untouched; `ProbeResultDetail` and the 1.4.14 identifier relation are unchanged and
+**no schema field is added**; `P_max = 3` is unchanged. No population parameter, seed,
+split, family, `target_record_count`, rate, threshold or metric definition changes;
 `constraint_set_hash` does not move, `C1`–`C8` being untouched; benchmark v1.0.3 is
 unchanged and no dataset exists.
 

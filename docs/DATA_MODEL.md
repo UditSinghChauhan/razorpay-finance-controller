@@ -1,6 +1,6 @@
 # DATA_MODEL — ASSAY
 
-**Spec version:** 1.4.16 · **Date:** 2026-08-28
+**Spec version:** 1.4.17 · **Date:** 2026-08-28
 
 All schemas are normative. The implementation agent must not add, rename or
 retype fields without a spec version bump.
@@ -1081,7 +1081,7 @@ relation and stops there: it does not say whether such an id is skipped, counted
 against a candidate, or excluded from a denominator, because that choice belongs
 to whichever rule performs the comparison and is outcome-bearing there.
 
-**What this does not decide — and, from spec 1.4.16, what has since been decided
+**What this does not decide — and, from spec 1.4.17, what has since been decided
 elsewhere.** `SE5`'s scope, its scoring function, its multi-probe and member
 aggregation, and whether one probe result may feed two signals were all **open** at
 spec 1.4.12 and **remained open at spec 1.4.14**; in particular this section decided
@@ -1107,14 +1107,20 @@ stands as written, and the questions were settled afterwards in
   member aggregation         does not arise -- the formula is set-level, so
                              there is no separate per-member step to aggregate
 
-  multi-probe combination    STILL UNRESOLVED
+  multi-probe combination    settled at spec 1.4.17 (M31)
+                             -- R is the UNION of every fetch_settlement_recon
+                                result carrying that settlement_id; date
+                                argument and probe order are irrelevant
+
   double-counting            dormant, not settled -- no other signal consumes
                              fetch_settlement_recon at the ratified scope
 ```
 
-**Only multi-probe combination remains unresolved.** This section is still the
-schema `SE5` reads *from* and still defines none of `SE5`'s arithmetic itself;
-what changed is that the arithmetic now exists to point at. `SE1`, `SE3` and `SE4`
+**Every `SE5` question this section raised is now settled elsewhere.** Only the
+double-counting entry stays dormant, and it is not `SE5`'s to answer while the scope
+names one probe no other signal consumes. This section is still the schema `SE5`
+reads *from* and still defines none of `SE5`'s arithmetic itself; what changed is
+that the arithmetic now exists to point at. `SE1`, `SE3` and `SE4`
 are untouched, as are `C1`–`C8` and every `§7` threshold.
 
 ---
@@ -2102,6 +2108,7 @@ reference beats endpoint reference beats product guide beats pricing page.
 | M28 | A probe-returned `constituent_entity_id` and a `Candidate.member_obs_id` are in **distinct namespaces**, related only through the observation whose `payload.entity_id` equals the returned id; the relation is **one-to-one** on a conforming dataset and **partial** (§12, spec 1.4.14) | **Derived:** the two grammars are already frozen — §6 gives `entity_id` as `pay_… | rfnd_… | adj_…` and §11 types `member_obs_ids` as `ObservationId`, so a direct comparison always yields the empty set; the relation is one-to-one because `PREREGISTRATION.md §4.3`'s only duplication operator, `DUPLICATE_ROW`, is scoped to *"share of `bank_line`"* and `§4.1` credits `F04` with extra **bank_line** rows alone, so no `recon_line` is emitted twice; and it is partial because `§4.2`'s `F05` withholds a constituent `recon_line` while `fetch_settlement_recon` queries the PG's recon report (§22.1 D10) rather than the observation set. **Ratified:** nothing — this row states a relation that the frozen grammars and operator table already determine. **Deliberately not decided:** what a comparing rule does with a returned id that has no observation. That is outcome-bearing where the comparison happens, and `SE5`'s scope, function, normalisation, aggregation and double-counting all remain open |
 | M29 | `SE5`'s **scope** is `fetch_settlement_recon` results only; its **scoring function remains undefined** (`RECONCILIATION_SPEC.md §4.2`, spec 1.4.15) | **Ratified, not derived.** `§6.2` names a consumer for four of its five probes — `fetch_order`→`SE2`, `fetch_payment`→`SE4`, `fetch_refund`→`C2`/`E10`, `widen_temporal_window`→`C4` — leaving `SE5` the one signal without a named input and `fetch_settlement_recon` the one probe without a named consumer. That is elimination, not entailment, and `§4.2`'s *"Probe **result** corroboration"* with §12's generic `kind: "probe_result"` both read the other way. **The generic-scope exclusion IS derived:** scoring `widen_temporal_window` would let a `C4` relaxation raise the evidence score of the candidates it admitted — the *"quiet constraint relaxation to manufacture a match"* `THREAT_MODEL.md §T7` names — and §12 classes a rule change as *"hard"* evidence rather than a score contribution. A named subset using `fetch_order` or `fetch_payment` is **not** excluded: no clause forbids one probe result feeding two signals and the arithmetic permits it, but it would need a double-counting policy this specification does not state. **Not settled:** the scoring function, the `F05` denominator treatment — shown to be one coupled decision with the function rather than two — empty-result scoring, and multi-probe aggregation |
 | M30 | `SE5 = \|R* ∩ M\| / \|R* ∪ M\|`, where `R*` is the `fetch_settlement_recon` report's returned ids mapped through §12's relation with **unobserved ids excluded entirely** and `M` is `Candidate.member_obs_ids`; `0` when `\|R* ∪ M\| = 0` (`RECONCILIATION_SPEC.md §4.2`, spec 1.4.16) | **Derived — the `F05` exclusion:** `PREREGISTRATION.md §5.3` resolved the identical pattern for the completeness gate, holding that an `F05`-withheld member *"was never expressible in the candidate language at all"* and that a gate failing on it *"would report a constraint fault where none exists"*; a candidate cannot hold a member with no observation, so charging it reports an evidence fault where none exists, and `§5.3`'s guard — expressibility is *"a property of observation existence and kind alone"* — carries over. Under the rejected reading a perfect score is unattainable on any `F05` settlement (`Δs = 1333 < ε` where exclusion gives `2000`). **Derived — symmetry:** `§4.1` makes `C6` exact with zero tolerance and `I4` equates a settlement with its allocated lines, so omission and addition are errors of one kind; each asymmetric measure returns a **tie** between a confirmed and a contradicted allocation (binary: `{a,g}` vs all six; recall: exact vs superset; precision: `{a}` vs `{a,b,c}`), and a signal whose only uses are ordering and the ε-gap cannot rank there. **Derived — empty result scores 0:** §12 calls an empty `constituent_entity_ids` *"a result rather than an error"*, `AL3` bars renormalisation, and `§4.2` needs a defined sum. **Ratified:** Jaccard specifically, over `F1` or any other symmetric measure — frozen text names none, and the adoption follows `§4.2`'s own Jaro–Winkler precedent for `SE2`. **Not settled:** multi-probe aggregation under `P_max = 3`; `§6.2`'s determinism makes repeated identical calls idempotent, but combining results from different arguments is unspecified |
+| M31 | Where several `fetch_settlement_recon` results carry one `settlement_id`, `R` is the **union** of their `constituent_entity_ids`, irrespective of `date` argument or probe order (`RECONCILIATION_SPEC.md §4.2`, spec 1.4.17) | **Derived, nothing ratified.** *Evidence accumulates:* §13's certificate carries `probes_attempted: ProbeId[]`, *"what we tried before giving up"*, and `RECONCILIATION_SPEC.md §11` spends three probes, evaluates them together and records all three; no clause discards or supersedes an `Evidence` row. *Union is forced:* `§6.2`'s referent is *"the lines carrying that `settlement_id`"*, and §6 makes the report *"date-scoped and paginated"* such that *"a period-close ingest must iterate rather than issue one call"*. Against windows `{a,b}`/`{c,d}`/`{e,f}` only the union lets a candidate equal to the constituent set score `1.000`; intersection scores it `0.000` and latest, first and per-probe aggregates `0.333`, each falsifying `§4.2`'s frozen *"`SE5 = 1` iff `R*` and `M` are equal and non-empty"*, with *latest* certifying a one-window candidate at `1.000`. *Also excluded:* latest/first are order-dependent (`667` bps over six orderings) on an input `ProbeResultDetail` does not carry; intersection and latest let a nothing-returning probe erase established evidence against `§6.2`'s *"abstentions resolved per probe spent"*; and summing results yields `6000` bps for a signal frozen at `2000`, which `AL3` forbids renormalising. **Not decided:** the field the recon endpoint is date-scoped on — the rule is correct under every reading of it — and any `R3` probe-selection policy |
 
 ### 22.3 `[NOT-CLAIMED]` — considered and deliberately not asserted
 
