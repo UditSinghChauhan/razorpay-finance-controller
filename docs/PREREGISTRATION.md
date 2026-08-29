@@ -1,6 +1,6 @@
 # PREREGISTRATION — ASSAY Benchmark v1.0.3
 
-**Spec version:** 1.4.14 · **Benchmark version:** 1.0.3
+**Spec version:** 1.4.15 · **Benchmark version:** 1.0.3
 
 **Status: FROZEN on commit. Amendments require a version bump and a new seal.**
 **Date frozen:** 2026-08-23 · **Amended:** 2026-08-24 (benchmark 1.0.1),
@@ -527,6 +527,47 @@ grid, `§4.3`, `§6.1` and `§6.2` are untouched; **no metric definition is
 amended**; no seed, split, family or `target_record_count` moves;
 `constraint_set_hash` does not move; and benchmark v1.0.3 is unchanged, with no
 dataset in existence to regenerate.
+
+**Amendment 1.4.15 / benchmark 1.0.3 (pre-seal, one scope and no function).**
+Applied before the seal, before any dataset was generated and before any number
+was observed. **Documentation only. One row, in `RECONCILIATION_SPEC.md §4.2`.**
+`SE5`'s **scope** is ratified as `fetch_settlement_recon` results only. Register
+row M29; record at `DECISION_BRIEF.md §A.22`. **`SE5`'s scoring function is not
+defined and is not implied.**
+
+**Ratified, not derived.** `§6.2` names a consumer for four of its five probes —
+`fetch_order`→`SE2`, `fetch_payment`→`SE4`, `fetch_refund`→`C2`/`E10`,
+`widen_temporal_window`→`C4` — leaving `SE5` the one signal without a named input
+and `fetch_settlement_recon` the one probe without a named consumer. That is
+elimination, and `§4.2`'s *"Probe **result** corroboration"* with
+`DATA_MODEL.md §12`'s generic `kind: "probe_result"` both read the other way.
+
+**One part is derived: the generic scope is excluded.** It would score
+`widen_temporal_window`, letting a `C4` relaxation raise the evidence score of the
+candidates it admitted — the *"quiet constraint relaxation to manufacture a
+match"* `THREAT_MODEL.md §T7` names — and `§12` classes a rule change as *"hard"*
+evidence rather than a score contribution. **A named subset using `fetch_order` or
+`fetch_payment` is left open**: no clause forbids one probe result feeding two
+signals, but such a subset would need a double-counting policy this specification
+does not state.
+
+**What remains open, and why it could not be closed here.** The **scoring
+function** — no binary, recall, precision or Jaccard rule is introduced — and
+`§4.2`'s **`F05` partiality**, since `fetch_settlement_recon` queries the PG's
+recon report and a returned constituent id may have no observation
+(`DATA_MODEL.md §12`, spec 1.4.14). The audit established these are **one coupled
+decision**: the measures whose denominator ranges over the returned set cannot be
+chosen without deciding `F05`, and the measures that avoid `F05` score
+degenerately. Empty-result scoring and multi-probe aggregation under `P_max = 3`
+are open likewise.
+
+**`SE5`'s 2000-bps weight stands**, `SE1`–`SE4` are untouched, and the
+`ProbeResultDetail` union of spec 1.4.12 and the identifier relation of spec
+1.4.14 are unchanged. `C1`–`C8`, `I1`–`I9`, every `§7` threshold, `§4.1`'s
+composition, `§4.2`'s rates and clock grid, `§4.3`, `§6.1` and `§6.2` are
+untouched; **no metric definition is amended**; no seed, split, family or
+`target_record_count` moves; `constraint_set_hash` does not move; and benchmark
+v1.0.3 is unchanged, with no dataset in existence to regenerate.
 
 ---
 
