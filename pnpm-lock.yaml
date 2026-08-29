@@ -39,6 +39,18 @@ importers:
         specifier: 4.4.3
         version: 4.4.3
 
+  packages/engine:
+    dependencies:
+      '@assay/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@assay/ledger':
+        specifier: workspace:*
+        version: link:../ledger
+      '@assay/money':
+        specifier: workspace:*
+        version: link:../money
+
   packages/generator:
     dependencies:
       '@assay/domain':
