@@ -1,6 +1,6 @@
 # ARCHITECTURE — ASSAY
 
-**Spec version:** 1.4.13 · **Date:** 2026-08-28
+**Spec version:** 1.4.14 · **Date:** 2026-08-28
 
 **At spec 1.4.6** this document is unchanged apart from the version header. `§7`'s
 oracle description is unaffected; `DATA_MODEL.md §11` now defines the component

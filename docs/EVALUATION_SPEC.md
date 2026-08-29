@@ -1,6 +1,6 @@
 # EVALUATION_SPEC — ASSAY
 
-**Spec version:** 1.4.13 · **Date:** 2026-08-28
+**Spec version:** 1.4.14 · **Date:** 2026-08-28
 
 Every metric answers the question: **what decision does this number let someone
 make?** A metric that does not change anyone's behaviour is not reported.

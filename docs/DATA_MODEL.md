@@ -1,6 +1,6 @@
 # DATA_MODEL — ASSAY
 
-**Spec version:** 1.4.13 · **Date:** 2026-08-28
+**Spec version:** 1.4.14 · **Date:** 2026-08-28
 
 All schemas are normative. The implementation agent must not add, rename or
 retype fields without a spec version bump.
@@ -1042,9 +1042,52 @@ the number** and `PREREGISTRATION.md §7`'s frozen block carries none. Bounding 
 in this schema would invent a frozen constant; enforcing `§T7`'s promise belongs
 to whichever stage relaxes `C4`, once the figure is ratified.
 
+**The two identifier namespaces, and the relation between them `[ASSAY-MODEL]`,
+supplied at spec 1.4.14, register row M28.** They are distinct, and a rule that
+compared them directly would always find the empty set:
+
+```
+  constituent_entity_ids   ENTITY ids, on §6's grammar: pay_… | rfnd_… | adj_…
+                           Typed `string[]` above, as `ReconLine.entity_id`
+                           itself is.
+
+  Candidate.member_obs_ids (§11) OBSERVATION ids -- `ObservationId`, obs_…
+```
+
+**The relation.** For each returned `entity_id`, the corresponding observation is
+the one whose `payload.entity_id` equals that `entity_id`; its `obs_id` is the
+`ObservationId` that may appear in `Candidate.member_obs_ids`. The relation runs
+through the observation set and through nothing else — neither id is derivable
+from the other by transformation.
+
+**It is one-to-one on a conforming dataset, and that is derived rather than
+assumed.** `PREREGISTRATION.md §4.3`'s operator table carries exactly one
+duplication operator, `DUPLICATE_ROW`, and its parameter row scopes it to
+*"share of **`bank_line`**"*; `§4.1`'s composition credits `F04` with
+*"`round_half_up(0.10 × B)` = 3 extra **`bank_line`** rows"*. **No operator emits
+a `recon_line` twice**, so no `entity_id` maps to two observations.
+
+**It is PARTIAL, and this is not an edge case.** `§4.2`'s `F05` *"withholds one
+constituent `recon_line` at emission"* while the settlement itself is emitted, so
+`fetch_settlement_recon` — which queries the PG's own date-scoped recon report
+(`RECONCILIATION_SPEC.md §6.2`, `§22.1` D10) rather than the observation set — may
+return an `entity_id` for which **no observation exists**. The relation is
+therefore a partial function from returned entity ids to observation ids, and the
+gap is a designed property of the benchmark rather than a defect.
+
+**Any rule that compares the two namespaces must state what it does with a
+returned `entity_id` that has no observation.** This section establishes the
+relation and stops there: it does not say whether such an id is skipped, counted
+against a candidate, or excluded from a denominator, because that choice belongs
+to whichever rule performs the comparison and is outcome-bearing there.
+
 **What this does not decide.** `SE5`'s scope, its scoring function, its
 multi-probe and member aggregation, and whether one probe result may feed two
-signals are all **open** at spec 1.4.12. This is the schema `SE5` will read
+signals are all **open** at spec 1.4.12, **and remain open at spec 1.4.14**. In
+particular this section decides **nothing** about whether an unobserved
+constituent counts in an `SE5` denominator, whether `SE5` normalises by the
+returned set, by the candidate's members or by their union, or whether `SE5`
+reads `fetch_settlement_recon` exclusively. This is the schema `SE5` will read
 *from*; it says nothing about what `SE5` computes. `SE1`, `SE3` and `SE4` are
 untouched, as are `C1`–`C8` and every `§7` threshold.
 
@@ -2030,6 +2073,7 @@ reference beats endpoint reference beats product guide beats pricing page.
 | M25 | `SE4` is **expected-non-binding on v1.0.0 data**: it is retained with its 1000-bps weight, its agreement function is left undefined, and the fact that it separates no candidates is reported (`RECONCILIATION_SPEC.md §4.2`, spec 1.4.11) | **Derived:** `memo` is quarantined and no `§6.2` probe returns it; `MerchantLedgerEntry` (§8) has no structural method or card-network field; `fetch_payment` supplies `method`, which §10's `payment` observation already carries; `card_network` has no Payment-side field, spec 1.1.1 having moved the card attributes to `ReconLine`; no exercised `§4.3` operator perturbs either field; and `PREREGISTRATION.md §4.2`'s `F06` draws one method for both members of a collision pair. `SE4` therefore takes one value across every candidate of a target. **Ratified:** retaining the row and its weight rather than reallocating or removing them, on the `C8` precedent — `§4.1` keeps a declared filter that excludes nothing and reports it doing nothing. **Not settled, and deliberately so:** the agreement function itself, which is unobservable while the signal is non-discriminating |
 | M26 | `Evidence.detail` for `kind: "probe_result"` is a five-variant discriminated union on `probe`, matching `RECONCILIATION_SPEC.md §6.2`'s closed enum; `date` is **not** a member of the `fetch_settlement_recon` variant (§12, spec 1.4.12) | **Derived:** the five variants and their argument ids — `§6.2` declares exactly five probes and `THREAT_MODEL.md §T7` calls them *"a closed enum of five read-only operations"*; each result field has a named consumer (`receipt`→`SE2`, `method`→`SE4`, parent `payment_id`→`C2`/`E10`, `constituent_entity_ids`→`SE5`, `days`→`C4`); and the argument ids are required by `I6` through `DECISION_BRIEF.md §L.1` rule 8, since `R3` proposes the probe and `obs_ids` carries observation rather than entity ids. Nullable results are `§6.2`'s own hedging (*"may supply"*) plus `ARCHITECTURE.md §5`'s *"still no discriminator"*. **Ratified:** omitting `date`, because no frozen rule reads it from `detail`, `§22.1` D11 describes only the external endpoint's query shape, and the `PROBE` `LedgerEvent` already logs the call — so carrying it would mean inventing a date type for a field nothing consumes. Also ratified: defining this one kind **without** implementing the `Evidence` entity, whose other nine kinds have no identified consumers. **Not settled:** `SE5`'s scope, function and aggregation, and `§T7`'s unstated hard bound on `days` |
 | M27 | `SE3`'s complete definition, dimensionally corrected (`RECONCILIATION_SPEC.md §4.2`, spec 1.4.13): `lag_days` is the **unfloored** real quotient, `mode_days` the mode of `floor(lag_days)` run-level with lowest-bin ties, a member scores `max(0, 1 − |lag_days − mode_days| / (T_max − T_min))`, and a **candidate scores the arithmetic mean** of its members | **The correction:** spec 1.4.10 defined `lag` in elapsed seconds and the mode in whole days and then subtracted them, so the terms had no common unit — on a `T+2` member captured at 09:00 the formula clamped to **0** rather than the intended **0.9167**, and `SE3` would have been silently inert. **Derived:** the lag term (`C4`, `O-C4-UNIT`); that the *mode* needs binning (the 1.4.7 grid makes a seconds-granular mode degenerate); that the *numerator stays continuous*, that rationale being scoped to the mode alone; that days and seconds give an identical ratio; that a **candidate-scoped** mode is excluded, since it would make `SE3` constant across candidates and unable to rank; and that a **raw sum** over members is excluded, leaving `[0,1]` and breaking `§4.2`'s `[0, 10_000]`. **Ratified, none determined by frozen text:** the whole-day granularity, the run-level population, the lowest-bin tie, the linear clamped kernel, the `T_max − T_min` denominator and the arithmetic-mean aggregation. The 1500-bps weight, `T_min`, `T_max` and the kernel's shape are unchanged |
+| M28 | A probe-returned `constituent_entity_id` and a `Candidate.member_obs_id` are in **distinct namespaces**, related only through the observation whose `payload.entity_id` equals the returned id; the relation is **one-to-one** on a conforming dataset and **partial** (§12, spec 1.4.14) | **Derived:** the two grammars are already frozen — §6 gives `entity_id` as `pay_… | rfnd_… | adj_…` and §11 types `member_obs_ids` as `ObservationId`, so a direct comparison always yields the empty set; the relation is one-to-one because `PREREGISTRATION.md §4.3`'s only duplication operator, `DUPLICATE_ROW`, is scoped to *"share of `bank_line`"* and `§4.1` credits `F04` with extra **bank_line** rows alone, so no `recon_line` is emitted twice; and it is partial because `§4.2`'s `F05` withholds a constituent `recon_line` while `fetch_settlement_recon` queries the PG's recon report (§22.1 D10) rather than the observation set. **Ratified:** nothing — this row states a relation that the frozen grammars and operator table already determine. **Deliberately not decided:** what a comparing rule does with a returned id that has no observation. That is outcome-bearing where the comparison happens, and `SE5`'s scope, function, normalisation, aggregation and double-counting all remain open |
 
 ### 22.3 `[NOT-CLAIMED]` — considered and deliberately not asserted
 
