@@ -92,4 +92,4 @@ export const BPS_DENOMINATOR = 10_000;
  *
  * Bumped with the documents, exactly as `packages/generator/src/frozen.ts` does.
  */
-export const SPEC_VERSION = "1.4.14";
+export const SPEC_VERSION = "1.4.15";
