@@ -1,6 +1,6 @@
 # THREAT_MODEL — ASSAY
 
-**Spec version:** 1.4.19 · **Date:** 2026-08-28
+**Spec version:** 1.4.20 · **Date:** 2026-08-28
 
 Every control answers: **what specific failure does this prevent?** Controls that
 cannot name a failure are removed.
@@ -196,7 +196,11 @@ source** — it is one of three views, never a source of truth. An entry with no
 counterpart becomes `E13_LEDGER_ONLY`, with an owner and an analyst question, and
 enters the value-ranked queue. It can never create a PG-side allocation, because
 candidates are generated from PG observations and the ledger only contributes
-*soft* evidence (`SE2`).
+*soft* evidence (`SE2`) — which at spec 1.4.20 is declared **expected-non-binding
+on v1.0.0 data**, no frozen clause pairing a `MerchantLedgerEntry` with a candidate
+once `AN5` was retired. **The control is strengthened, not weakened:** the ledger's
+contribution to a PG-side allocation was already bounded to soft evidence, and is
+now expected to be nil.
 
 **`E13` posts no journal line, corrected at spec 1.4.0.** This paragraph
 previously said it *"posts to Suspense"*, and no rule among `P1`–`P8` can do that
