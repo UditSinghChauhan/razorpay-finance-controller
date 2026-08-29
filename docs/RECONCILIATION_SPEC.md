@@ -1,6 +1,6 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.4.18 · **Date:** 2026-08-28
+**Spec version:** 1.4.19 · **Date:** 2026-08-28
 
 The matching algorithm, the ambiguity definition, and the rules that decide
 accept / reject / abstain. This is the technical core of the project.
@@ -781,6 +781,51 @@ All probes are read-only, allowlist-constrained, and logged. If probes exhaust
 without discriminating, the certificate records `PROBE_BUDGET_EXHAUSTED`. The
 metric `abstentions resolved per probe spent` measures whether the LLM's probe
 selection beats a static priority list (`A3-NOLLM`).
+
+**`widen_temporal_window` is expected-non-binding on v1.0.0 data, recorded at spec
+1.4.19 `[ASSAY-MODEL]`, register row M33.** `THREAT_MODEL.md §T7` states that this
+probe *"has a hard bound"*. **No document states the number**, `PREREGISTRATION.md
+§7`'s frozen block carries none, `§6.2` AL3's enumeration omits it, and **none is
+supplied here** — the figure remains **unspecified**, as `DATA_MODEL.md §12` and
+`PREREGISTRATION.md §4.2` already disclosed at spec 1.4.12.
+
+**What is derived instead is that no relaxation is needed at all.** Three frozen
+facts fix the true lag range on any conforming dataset. `PREREGISTRATION.md §4.2`
+admits only `T+1`, `T+2` and `T+3`; the spec-1.4.7 clock grid puts
+`lag_days ∈ (n, n + 0.875]`; and `§4.3`'s `SHIFT_TIMESTAMP(±d)` — the only operator
+that could move a lag — is **declared not exercised** (*"No family declares it; the
+clock skew it models is already structural"*). Hence:
+
+```
+  C4 admits        [T_min, T_max] = [1, 7] days
+  true lag range   (1, 3.875]     days      T+1..T+3 under the 1.4.7 grid
+
+    lower   min lag > 1 >= T_min      C4's lower bound never binds
+    upper   max lag = 3.875 <= 7      headroom 3.125 days
+```
+
+**`C4` therefore excludes no member of any true allocation, and the widening
+required for completeness is zero days.** That figure is a *derived quantity — what
+is needed —* and **not a ceiling imposed on the probe**: `days` keeps the
+`integer > 0` type spec 1.4.12 gave it, with no upper bound in the schema. It
+follows that any `days > 0` **strictly enlarges** the admissible candidate set with
+allocations the true one does not require, which is why the probe is expected to
+separate nothing on this population.
+
+**This is the `C8` treatment, and it is a disclosure rather than a prohibition.**
+`§4.1` keeps a declared-but-inert clause and reports that it does nothing rather
+than deleting it; spec 1.4.10 did the same for `SE1` and spec 1.4.11 for `SE4`. The
+probe **stays in the closed enum of five** — `THREAT_MODEL.md §T7`'s SSRF and spend
+controls depend on that enum being shut, and `DATA_MODEL.md §12`'s
+`ProbeResultDetail` has five variants for the same reason. **Expected-non-binding
+does not mean prohibited: nothing here forbids `R3` from proposing this probe, and
+whether it may is NOT settled.** `P_max = 3`, `C4`, `T_min`, `T_max` and every `§7`
+threshold are unchanged.
+
+**What remains open.** The numeric hard bound `§T7` promises. Whether `R3` may
+propose the probe. And the engine's treatment of a proposed-but-unnecessary widen,
+beyond what `§6.2` already fixes — the probe is logged, it consumes one of `P_max`,
+and spec 1.4.15 already bars its result from feeding `SE5`.
 
 ---
 

@@ -1,6 +1,6 @@
 # PREREGISTRATION — ASSAY Benchmark v1.0.3
 
-**Spec version:** 1.4.18 · **Benchmark version:** 1.0.3
+**Spec version:** 1.4.19 · **Benchmark version:** 1.0.3
 
 **Status: FROZEN on commit. Amendments require a version bump and a new seal.**
 **Date frozen:** 2026-08-23 · **Amended:** 2026-08-24 (benchmark 1.0.1),
@@ -673,6 +673,47 @@ definition is amended**; no seed, split, family or `target_record_count` moves;
 unchanged, with no dataset in existence to regenerate. `A2`, `THREAT_MODEL.md §T7`'s
 `days` bound, `SE4`'s agreement function and the recon endpoint's date-scoping field
 are not resolved here.
+
+**Amendment 1.4.19 / benchmark 1.0.3 (pre-seal, one disclosure and no constant).**
+Applied before the seal, before any dataset was generated and before any number was
+observed. **Documentation only.** `widen_temporal_window` is declared
+**expected-non-binding on v1.0.0 data**; its numeric hard bound remains
+**unspecified** and **none is invented**. Register row M33; record at
+`DECISION_BRIEF.md §A.26`.
+
+**Derived.** `§4.2` admits only `T+1`, `T+2` and `T+3`; the spec-1.4.7 clock grid
+puts `lag_days ∈ (n, n + 0.875]`; `§4.3`'s `SHIFT_TIMESTAMP` is declared not
+exercised. The true lag range is therefore `(1, 3.875]` days against `C4`'s
+`[1, 7]` — **3.125 days of headroom** — so `C4` excludes no true allocation member,
+the widening needed for completeness is **zero days**, and any positive widening
+only admits allocations the true one does not require.
+
+**Ratified.** Retaining the probe and its position in the closed five-probe enum
+while disclosing that it separates nothing, on the `C8` precedent
+(`RECONCILIATION_SPEC.md §4.1`) already applied to `SE1` at 1.4.10 and `SE4` at
+1.4.11. And **declining to state the missing figure**: `§7`'s frozen block and
+`§6.2` AL3's enumeration both omit a widen bound, and **neither gains a constant
+here**.
+
+**Still open.** The numeric hard bound `THREAT_MODEL.md §T7` promises. **Whether
+`R3` may propose the probe — expected-non-binding is a statement about effect, not
+a prohibition.** And the engine's treatment of a proposed-but-unnecessary widen
+beyond what is already fixed: it is logged, it costs one of `P_max = 3`, and spec
+1.4.15 bars its result from feeding `SE5`.
+
+**The earlier disclosures stand unrewritten.** `§4.2`'s spec-1.4.12 note — *"`§T7`
+promises `widen_temporal_window` 'has a hard bound' and no document states the
+number, so the schema asserts no ceiling on `days`"* — and `DATA_MODEL.md §12`'s
+counterpart are both **preserved verbatim**; this amendment adds the arithmetic they
+lacked rather than replacing them.
+
+`ProbeResultDetail` is untouched and `days` keeps `integer > 0` with no ceiling;
+`C4`, `T_min`, `T_max`, `P_max = 3`, `C1`–`C8`, `SE1`–`SE5`, `I1`–`I9` and every
+`§7` threshold are unchanged; **no metric definition is amended**; no seed, split,
+family or `target_record_count` moves; `constraint_set_hash` does not move; and
+benchmark v1.0.3 with `GT_VERSION` 1.1.0 is unchanged, with no dataset in existence
+to regenerate. The recon endpoint's date-scoping field, the `NO_USEFUL_PROBE`
+early-stop semantics and the `apps/cli` build-order note are **not** resolved here.
 
 ---
 
