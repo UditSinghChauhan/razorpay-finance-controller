@@ -1,6 +1,6 @@
 # DATA_MODEL — ASSAY
 
-**Spec version:** 1.4.15 · **Date:** 2026-08-28
+**Spec version:** 1.4.16 · **Date:** 2026-08-28
 
 All schemas are normative. The implementation agent must not add, rename or
 retype fields without a spec version bump.
@@ -1081,15 +1081,41 @@ relation and stops there: it does not say whether such an id is skipped, counted
 against a candidate, or excluded from a denominator, because that choice belongs
 to whichever rule performs the comparison and is outcome-bearing there.
 
-**What this does not decide.** `SE5`'s scope, its scoring function, its
-multi-probe and member aggregation, and whether one probe result may feed two
-signals are all **open** at spec 1.4.12, **and remain open at spec 1.4.14**. In
-particular this section decides **nothing** about whether an unobserved
-constituent counts in an `SE5` denominator, whether `SE5` normalises by the
-returned set, by the candidate's members or by their union, or whether `SE5`
-reads `fetch_settlement_recon` exclusively. This is the schema `SE5` will read
-*from*; it says nothing about what `SE5` computes. `SE1`, `SE3` and `SE4` are
-untouched, as are `C1`–`C8` and every `§7` threshold.
+**What this does not decide — and, from spec 1.4.16, what has since been decided
+elsewhere.** `SE5`'s scope, its scoring function, its multi-probe and member
+aggregation, and whether one probe result may feed two signals were all **open** at
+spec 1.4.12 and **remained open at spec 1.4.14**; in particular this section decided
+**nothing** about whether an unobserved constituent counts in an `SE5` denominator,
+whether `SE5` normalises by the returned set, by the candidate's members or by their
+union, or whether `SE5` reads `fetch_settlement_recon` exclusively. **That record
+stands as written, and the questions were settled afterwards in
+`RECONCILIATION_SPEC.md §4.2` rather than here:**
+
+```
+  scope                      settled at spec 1.4.15 (M29)
+                             -- fetch_settlement_recon results only
+
+  F05 treatment              settled at spec 1.4.16 (M30)
+                             -- a returned id with no observation is excluded
+                                from R* entirely, neither numerator nor
+                                denominator
+
+  normalisation / scoring    settled at spec 1.4.16 (M30)
+                             -- SE5 = |R* ∩ M| / |R* ∪ M| over the union, with
+                                0 when the union is empty
+
+  member aggregation         does not arise -- the formula is set-level, so
+                             there is no separate per-member step to aggregate
+
+  multi-probe combination    STILL UNRESOLVED
+  double-counting            dormant, not settled -- no other signal consumes
+                             fetch_settlement_recon at the ratified scope
+```
+
+**Only multi-probe combination remains unresolved.** This section is still the
+schema `SE5` reads *from* and still defines none of `SE5`'s arithmetic itself;
+what changed is that the arithmetic now exists to point at. `SE1`, `SE3` and `SE4`
+are untouched, as are `C1`–`C8` and every `§7` threshold.
 
 ---
 
@@ -2075,6 +2101,7 @@ reference beats endpoint reference beats product guide beats pricing page.
 | M27 | `SE3`'s complete definition, dimensionally corrected (`RECONCILIATION_SPEC.md §4.2`, spec 1.4.13): `lag_days` is the **unfloored** real quotient, `mode_days` the mode of `floor(lag_days)` run-level with lowest-bin ties, a member scores `max(0, 1 − |lag_days − mode_days| / (T_max − T_min))`, and a **candidate scores the arithmetic mean** of its members | **The correction:** spec 1.4.10 defined `lag` in elapsed seconds and the mode in whole days and then subtracted them, so the terms had no common unit — on a `T+2` member captured at 09:00 the formula clamped to **0** rather than the intended **0.9167**, and `SE3` would have been silently inert. **Derived:** the lag term (`C4`, `O-C4-UNIT`); that the *mode* needs binning (the 1.4.7 grid makes a seconds-granular mode degenerate); that the *numerator stays continuous*, that rationale being scoped to the mode alone; that days and seconds give an identical ratio; that a **candidate-scoped** mode is excluded, since it would make `SE3` constant across candidates and unable to rank; and that a **raw sum** over members is excluded, leaving `[0,1]` and breaking `§4.2`'s `[0, 10_000]`. **Ratified, none determined by frozen text:** the whole-day granularity, the run-level population, the lowest-bin tie, the linear clamped kernel, the `T_max − T_min` denominator and the arithmetic-mean aggregation. The 1500-bps weight, `T_min`, `T_max` and the kernel's shape are unchanged |
 | M28 | A probe-returned `constituent_entity_id` and a `Candidate.member_obs_id` are in **distinct namespaces**, related only through the observation whose `payload.entity_id` equals the returned id; the relation is **one-to-one** on a conforming dataset and **partial** (§12, spec 1.4.14) | **Derived:** the two grammars are already frozen — §6 gives `entity_id` as `pay_… | rfnd_… | adj_…` and §11 types `member_obs_ids` as `ObservationId`, so a direct comparison always yields the empty set; the relation is one-to-one because `PREREGISTRATION.md §4.3`'s only duplication operator, `DUPLICATE_ROW`, is scoped to *"share of `bank_line`"* and `§4.1` credits `F04` with extra **bank_line** rows alone, so no `recon_line` is emitted twice; and it is partial because `§4.2`'s `F05` withholds a constituent `recon_line` while `fetch_settlement_recon` queries the PG's recon report (§22.1 D10) rather than the observation set. **Ratified:** nothing — this row states a relation that the frozen grammars and operator table already determine. **Deliberately not decided:** what a comparing rule does with a returned id that has no observation. That is outcome-bearing where the comparison happens, and `SE5`'s scope, function, normalisation, aggregation and double-counting all remain open |
 | M29 | `SE5`'s **scope** is `fetch_settlement_recon` results only; its **scoring function remains undefined** (`RECONCILIATION_SPEC.md §4.2`, spec 1.4.15) | **Ratified, not derived.** `§6.2` names a consumer for four of its five probes — `fetch_order`→`SE2`, `fetch_payment`→`SE4`, `fetch_refund`→`C2`/`E10`, `widen_temporal_window`→`C4` — leaving `SE5` the one signal without a named input and `fetch_settlement_recon` the one probe without a named consumer. That is elimination, not entailment, and `§4.2`'s *"Probe **result** corroboration"* with §12's generic `kind: "probe_result"` both read the other way. **The generic-scope exclusion IS derived:** scoring `widen_temporal_window` would let a `C4` relaxation raise the evidence score of the candidates it admitted — the *"quiet constraint relaxation to manufacture a match"* `THREAT_MODEL.md §T7` names — and §12 classes a rule change as *"hard"* evidence rather than a score contribution. A named subset using `fetch_order` or `fetch_payment` is **not** excluded: no clause forbids one probe result feeding two signals and the arithmetic permits it, but it would need a double-counting policy this specification does not state. **Not settled:** the scoring function, the `F05` denominator treatment — shown to be one coupled decision with the function rather than two — empty-result scoring, and multi-probe aggregation |
+| M30 | `SE5 = \|R* ∩ M\| / \|R* ∪ M\|`, where `R*` is the `fetch_settlement_recon` report's returned ids mapped through §12's relation with **unobserved ids excluded entirely** and `M` is `Candidate.member_obs_ids`; `0` when `\|R* ∪ M\| = 0` (`RECONCILIATION_SPEC.md §4.2`, spec 1.4.16) | **Derived — the `F05` exclusion:** `PREREGISTRATION.md §5.3` resolved the identical pattern for the completeness gate, holding that an `F05`-withheld member *"was never expressible in the candidate language at all"* and that a gate failing on it *"would report a constraint fault where none exists"*; a candidate cannot hold a member with no observation, so charging it reports an evidence fault where none exists, and `§5.3`'s guard — expressibility is *"a property of observation existence and kind alone"* — carries over. Under the rejected reading a perfect score is unattainable on any `F05` settlement (`Δs = 1333 < ε` where exclusion gives `2000`). **Derived — symmetry:** `§4.1` makes `C6` exact with zero tolerance and `I4` equates a settlement with its allocated lines, so omission and addition are errors of one kind; each asymmetric measure returns a **tie** between a confirmed and a contradicted allocation (binary: `{a,g}` vs all six; recall: exact vs superset; precision: `{a}` vs `{a,b,c}`), and a signal whose only uses are ordering and the ε-gap cannot rank there. **Derived — empty result scores 0:** §12 calls an empty `constituent_entity_ids` *"a result rather than an error"*, `AL3` bars renormalisation, and `§4.2` needs a defined sum. **Ratified:** Jaccard specifically, over `F1` or any other symmetric measure — frozen text names none, and the adoption follows `§4.2`'s own Jaro–Winkler precedent for `SE2`. **Not settled:** multi-probe aggregation under `P_max = 3`; `§6.2`'s determinism makes repeated identical calls idempotent, but combining results from different arguments is unspecified |
 
 ### 22.3 `[NOT-CLAIMED]` — considered and deliberately not asserted
 

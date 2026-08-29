@@ -1,7 +1,7 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.15 · **Date:** 2026-08-28
+**Spec version:** 1.4.16 · **Date:** 2026-08-28
 **Reviewer role:** principal architect / skeptical reviewer
 
 **At spec 1.4.6** §A.13 records one definition, taken at a governance gate held
@@ -1294,6 +1294,56 @@ identifier relation of spec 1.4.14 are unchanged. No population parameter, seed,
 split, family, `target_record_count`, rate, threshold or metric definition
 changes; `constraint_set_hash` does not move, `C1`–`C8` being untouched;
 benchmark v1.0.3 is unchanged and no dataset exists.
+
+### A.23 Spec 1.4.16 / benchmark 1.0.3 — the coupled decision, taken together
+
+**The decision.** `SE5 = |R* ∩ M| / |R* ∪ M|`; a returned constituent id with no
+observation is excluded from `R*` entirely; an empty result scores 0. Register row
+M30. Spec 1.4.15 established these were **one coupled decision rather than
+three**, and this record closes all of it or none.
+
+**Three parts are derived.** The `F05` treatment, from `PREREGISTRATION.md §5.3`,
+which resolved the identical fact pattern for the completeness gate and held that
+a gate failing on an inexpressible member *"would report a constraint fault where
+none exists"*. Symmetry, from `C6`'s zero tolerance and `I4`'s equality. The empty
+result, from `DATA_MODEL.md §12`'s *"a result rather than an error"* against
+`AL3`'s frozen weights.
+
+**One part is ratified, and is marked as such.** Derivation fixes that both
+directions of disagreement count; it does not pick Jaccard over `F1`. Frozen text
+names no symmetric measure, and the adoption rests on `RECONCILIATION_SPEC.md
+§4.2`'s own precedent of naming Jaro–Winkler for `SE2` rather than deriving a
+metric.
+
+**The asymmetric measures fail on ties, not on taste.** Each returns an identical
+score for an allocation the authoritative report confirms and one it contradicts —
+binary for `{a,g}` against all six of `{a…f}`, recall for the exact set against a
+superset, precision for `{a}` against `{a,b,c}`. `§4.2` gives the score two uses,
+ordering candidates and the ε-gap, and a tie serves neither.
+
+**`SE5` avoids the failure mode that inactivated `SE1`.** `SE1` was declared
+permanently inactive at spec 1.4.10 because **both** its comparands are
+target-scoped, so it takes one value across every candidate of a target and can
+neither order candidates nor move the ε-gap. `SE5`'s `R*` is target-scoped but its
+`M` is candidate-scoped, so the quotient varies across a target's candidates and
+the signal ranks. With `SE1` inactive and `SE4` expected-non-binding on v1.0.0
+data, the evidence budget that is both live and defined rises from `SE2` + `SE3` =
+3500 bps to `SE2` + `SE3` + `SE5` = **5500** of 10,000.
+
+**What is still open, and stated rather than left to inference.** Multi-probe
+aggregation under `P_max = 3`. `§6.2`'s *"deterministic code"* makes repeated
+identical calls idempotent, so the open case is narrow — combining results from
+different arguments — but it is genuinely unspecified and no rule is implied here.
+`SE4`'s agreement function is untouched, and the spec-1.4.15 double-counting
+question stays dormant while the scope names one probe no other signal consumes.
+
+**Nothing observable moves.** `SE5`'s 2000-bps weight stands; `SE1`–`SE4` are
+untouched; the `ProbeResultDetail` union of spec 1.4.12 is **sufficient as
+committed** and no schema field is added or altered; the identifier relation of
+spec 1.4.14 is unchanged. No population parameter, seed, split, family,
+`target_record_count`, rate, threshold or metric definition changes;
+`constraint_set_hash` does not move, `C1`–`C8` being untouched; benchmark v1.0.3 is
+unchanged and no dataset exists.
 
 ---
 
