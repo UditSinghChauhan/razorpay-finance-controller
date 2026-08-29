@@ -1,7 +1,7 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.17 · **Date:** 2026-08-28
+**Spec version:** 1.4.18 · **Date:** 2026-08-28
 **Reviewer role:** principal architect / skeptical reviewer
 
 **At spec 1.4.6** §A.13 records one definition, taken at a governance gate held
@@ -1399,6 +1399,67 @@ split, family, `target_record_count`, rate, threshold or metric definition chang
 `constraint_set_hash` does not move, `C1`–`C8` being untouched; benchmark v1.0.3 is
 unchanged and no dataset exists.
 
+### A.25 Spec 1.4.18 / benchmark 1.0.3 — the stage nobody owned
+
+**The decision.** `packages/domain` owns stage `S0`'s orchestration over source data
+`apps/cli` has already read; `apps/cli` performs the filesystem I/O and no `S0`
+transform; `packages/engine` begins at `S1` and owns `S1`–`S5`. Register row M32.
+
+**A1 was a true contradiction, and only one side could stand.** `ARCHITECTURE.md §3`
+gave the engine *"Stages S1–S5"* while `§L.2`, `§I`'s T0-4, `§I`'s Aug-25 row and
+`§I`'s repository tree gave it `S0` — the tree going so far as to place
+`s0-ingest.ts` inside `packages/engine/src/`. **The engine side was not merely
+outvoted, it was impossible.** `RECONCILIATION_SPEC.md §2` declares `S0`'s output as
+`Observation[]` + **`UntrustedText[]`**, and `DATA_MODEL.md §10` states that
+*"nothing in `packages/engine` may import `UntrustedText`"*, because *"it is not that
+the core **chooses** not to read hostile text, it is that it **cannot**"*. `§L.1`
+rule 3 lists that ban among the invariants that may never be violated,
+`PREREGISTRATION.md §6.2` `AL1` repeats it, and `eslint.config.js` enforces it in CI
+with `noInlineConfig` and a dynamic-import ban. **A stage cannot emit a type its
+package is forbidden to import.**
+
+**A build order does not outrank an invariant, and `§L.2` had already made this
+mistake once.** `§L.1` is titled *"Invariants that may never be violated"* and sits
+directly above `§L.2` in the same document; rule 3 is the `UntrustedText` ban. `§L.2`
+itself records an earlier correction in the same voice — of the `ledger` split, *"the
+two documents disagreed and this one was wrong"* — and the identical remedy applies.
+`§I`'s entries were not shorthand either: T0-4 read *"`packages/engine` S0–S3 —
+**quarantine**"*, naming `S0` step 3 and the package together.
+
+**Why `packages/domain`, and why this creates nothing.** `ARCHITECTURE.md §3`
+excluded the engine but **named no owner**, so the owner was a genuine choice among
+`domain`, `apps/cli` and a new package. `domain` wins on every stated preference at
+once: it already holds every per-record part `S0` performs — the strict schemas of
+`§4` boundary 1.1, `checkReconLineInvariants` for `RECONCILIATION_SPEC.md §2` step 2,
+the quarantine module at the separately-bannable `@assay/domain/untrusted-text`, and
+`DATA_MODEL.md §10.1`'s static `REFERENCE` classification — all committed before this
+amendment. It builds second, so nothing waits on it. It performs **no I/O**, so `S0`
+stays deterministic and unit-testable without a filesystem. **No package is created
+and no code moves.** `apps/cli` was the alternative and loses on one concrete count:
+it does not appear in `§L.2`'s build order at all, so `S0` would sit outside the
+ordering that makes *"every stage independently testable"*.
+
+**The I/O split is the load-bearing part.** `S0`'s stated input is *"raw source
+files"* while `§3` gives the engine *"no I/O, no network"*. Those are reconciled by
+separating **who reads** from **who transforms**: the CLI acquires bytes, domain
+turns them into `Observation[]` + `UntrustedText[]`, the engine receives
+`Observation[]` alone. `ARCHITECTURE.md §2`'s component map already drew exactly this
+— `ingest` inside trust boundary 1, the engine box beneath it listing `S1`–`S5` — and
+is unchanged.
+
+**Nothing is built here.** `packages/engine` remains **absent** at spec 1.4.18 and
+domain's `S0` orchestration is scheduled, not written; the amendment moves no file and
+adds no module. `ARCHITECTURE.md §4` boundary 1's three obligations, `§2`'s map and
+the engine's `§3` row are all untouched — the engine row's *"Stages S1–S5"* is
+byte-identical to what it has said since spec 1.0.0, which is the point.
+
+**Nothing observable moves.** No population parameter, seed, split, family,
+`target_record_count`, rate, threshold or metric definition changes; `C1`–`C8` and
+`SE1`–`SE5` are untouched and `constraint_set_hash` does not move; benchmark v1.0.3
+and `GT_VERSION` 1.1.0 are unchanged and no dataset exists. `A2`, `THREAT_MODEL.md
+§T7`'s `days` bound, `SE4`'s agreement function and the recon endpoint's date-scoping
+field are all untouched.
+
 ---
 
 ## B. Locked project definition
@@ -1431,9 +1492,9 @@ never from here. A working Tier-0 beats a half-built Tier-1 by a wide margin.
 | # | Component | Acceptance test |
 |---|---|---|
 | T0-1 | `packages/money` — branded `Paise`, integer-only | Property test: conservation under split/allocate over 10k random cases; float usage is a compile error |
-| T0-2 | `packages/domain` — zod schemas, Razorpay-faithful fee/GST, ID grammars, **`constraints.decl.ts`** | Ingest invariants reject malformed records; `credit = amount − fee` holds on every generated line, with `fee` GST-inclusive and `tax = 18% × (fee − tax)` (`DATA_MODEL.md §6`) |
+| T0-2 | `packages/domain` — zod schemas, Razorpay-faithful fee/GST, ID grammars, **`constraints.decl.ts`**, **stage `S0`: quarantine, ingest invariants, normalization, static `REFERENCE` (spec 1.4.18)** | Ingest invariants reject malformed records; `credit = amount − fee` holds on every generated line, with `fee` GST-inclusive and `tax = 18% × (fee − tax)` (`DATA_MODEL.md §6`) |
 | T0-3 | `packages/generator` — forward simulation, families **F01–F10**, seeded | Same seed → byte-identical output; ground truth is a construction byproduct with no `is_ambiguous` field. All four held-out families (`F07`–`F10`) are authored in Tier-0 and held out at family level until the seal (`PREREGISTRATION.md §6.1`) |
-| T0-4 | `packages/engine` S0–S3 — quarantine, anchors, candidates under C1–C8, component decomposition | Component-size distribution printed; `intractable_rate` measured on dev |
+| T0-4 | `packages/engine` S1–S3 — anchors, candidates under C1–C8, component decomposition. **`S0` is `packages/domain`'s at spec 1.4.18 and moved to T0-2** | Component-size distribution printed; `intractable_rate` measured on dev |
 | T0-5 | `packages/engine` S4–S5 — exact solve, **no-good cut, second-best certificate**, materiality test, invariants I1–I9 | The ₹1,00,000 worked example (`RECONCILIATION_SPEC.md §11`) abstains with a correct certificate |
 | T0-6 | `packages/ledger` — Layer A hash chain + Layer B double-entry projection + **close gate G1–G5** | `assay verify` passes; trial balance zero; Suspense identity exact; the close gate emits `CLOSED`, `OPEN` and `BLOCKED` correctly for constructed inputs on each side of the threshold. Whether both `CLOSED` and `OPEN` occur on the DEV seeds is assumption `§F` F9's falsification check — reported as a finding, and **never** grounds for adjusting the close policy (`§L.4`) |
 | T0-7 | `packages/llm` — **`LlmProvider` interface + `offline` + `replay` providers**; roles R1, R2; schema/allowlist/grounding verification | **Full pipeline passes with `--llm=offline`, no network.** Hallucinated IDs rejected and counted. `--llm=replay` reproduces byte-identically |
@@ -1611,9 +1672,9 @@ Tier-0 freeze **31 August**. Seal and sealed run **1 September**. Submission
 
 | Date | Build | Done when |
 |---|---|---|
-| **Aug 23** | Monorepo, `money`, `domain` (incl. `constraints.decl.ts`), ledger Layer A skeleton | Property tests pass; a hand-built 5-event chain verifies |
+| **Aug 23** | Monorepo, `money`, `domain` (incl. `constraints.decl.ts`, and **`S0`** from spec 1.4.18), ledger Layer A skeleton | Property tests pass; a hand-built 5-event chain verifies |
 | **Aug 24** | Generator: forward simulation, families **F01–F10** (T0-3). **F07–F10 are authored today and held out at family level until the seal (`PREREGISTRATION.md §6.1`).** | `assay generate --split dev`; same seed → identical bytes; `F07`–`F10` generator functions exist and pass structural property tests under the four conditions in `PREREGISTRATION.md §6.1`, with no `--split test` invocation, no engine involvement, and no payload displayed |
-| **Aug 25** | Engine S0–S3: quarantine, anchors, candidates under C1–C8, decomposition | Component-size distribution printed; F8 assumption checked |
+| **Aug 25** | Engine S1–S3: anchors, candidates under C1–C8, decomposition (**`S0`'s quarantine is `domain`'s, spec 1.4.18**) | Component-size distribution printed; F8 assumption checked |
 | **Aug 26** | Engine S4–S5: exact solve, no-good cut, second-best certificate, materiality, I1–I9 | ₹1,00,000 worked example abstains with a correct certificate |
 | **Aug 27** | Ledger Layer B + close gate G1–G5 + three outcomes | Trial balance zero; Suspense identity exact; all three close outcomes exercised on constructed inputs. The DEV-seed outcome distribution is recorded for `§F` F9 and is not a completion gate for this day |
 | **Aug 28** | `LlmProvider` interface + `offline` provider (all four roles) + `replay` provider; roles R1, R2 + three verification layers | **Full pipeline green with `--llm=offline`, no network** |
@@ -1704,10 +1765,10 @@ razorpay-finance-controller/
 ├── packages/
 │   ├── money/        src/{paise.ts,ops.ts,round.ts}              + tests/property/
 │   ├── domain/       src/{schemas/,ids.ts,accounts.ts,canonical-json.ts,
-│   │                      constraints.decl.ts}
+│   │                      constraints.decl.ts,s0-ingest.ts}
 │   ├── generator/    src/{prng.ts,simulate.ts,families/F01..F12.ts,degrade.ts,emit.ts}
 │   ├── oracle/       src/{enumerate.ts,completeness-gate.ts}
-│   ├── engine/       src/{s0-ingest.ts,s1-anchor.ts,s2-candidates.ts,
+│   ├── engine/       src/{s1-anchor.ts,s2-candidates.ts,
 │   │                      s3-decompose.ts,s4-solve.ts,s5-validate.ts,
 │   │                      constraints/C1..C8.ts,invariants/I1..I9.ts}
 │   ├── llm/          src/{provider.ts,                    # the LlmProvider interface
@@ -1799,13 +1860,33 @@ with a version bump, not a judgement call at the keyboard.
 
 ### L.2 Build order (do not reorder)
 
-`money` → `domain` → `ledger Layer A` → `generator` → `engine S0–S3` →
+`money` → `domain (incl. S0)` → `ledger Layer A` → `generator` → `engine S1–S3` →
 `ledger Layer B` → `engine S4–S5` → `llm (provider + offline + replay)` →
 `oracle` → `eval` → `api` → `web` → seal → sealed run.
 
 Each package depends only on those before it, so the dependency graph is acyclic
 in build order and every stage is independently testable. Note `llm` precedes
 `oracle`: the offline provider is on the critical path for the demo guarantee.
+
+
+**`S0` is `domain`'s, not the engine's, corrected at spec 1.4.18.** This line read
+`engine S0–S3` and `§I` said the same in two places, which `ARCHITECTURE.md §3` has
+contradicted since spec 1.0.0 by giving `packages/engine` *"Stages S1–S5"*. **The two
+documents disagreed and this one was wrong again** — the same failure this section
+already recorded for `ledger`. It was not a labelling slip: `RECONCILIATION_SPEC.md
+§2` gives `S0` the output `Observation[]` + `UntrustedText[]`, while `§L.1` rule 3
+above forbids `packages/engine` from importing `UntrustedText` at all, so the engine
+could never have run `S0`'s step 3. A stage cannot emit a type its package may not
+import. `ARCHITECTURE.md §3` now names the owner — `packages/domain`, over source
+data `apps/cli` has already read — and `§A.25` carries the record.
+
+**`domain` does not move position.** It already built second; it now carries `S0`,
+whose per-record parts (`schemas/`, `checkReconLineInvariants`,
+`schemas/untrusted-text.ts`, `§10.1`'s `REFERENCE` classification) were committed
+there before this correction. The order stays linear and acyclic: nothing that builds
+before `domain` needs `S0`, and `engine S1–S3` consumes only its `Observation[]`
+output. **`apps/cli` is absent from this line** and is not added here — the omission
+predates spec 1.4.18 and is left standing rather than repaired in passing.
 
 **`ledger` occupies two positions, not one, and `§I` already scheduled it that
 way.** `ARCHITECTURE.md §8` splits the package in two — Layer A is the

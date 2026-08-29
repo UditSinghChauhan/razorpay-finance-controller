@@ -1,6 +1,6 @@
 # ARCHITECTURE — ASSAY
 
-**Spec version:** 1.4.17 · **Date:** 2026-08-28
+**Spec version:** 1.4.18 · **Date:** 2026-08-28
 
 **At spec 1.4.6** this document is unchanged apart from the version header. `§7`'s
 oracle description is unaffected; `DATA_MODEL.md §11` now defines the component
@@ -155,7 +155,7 @@ carries.
 | Package | Responsibility | Why it is separate |
 |---|---|---|
 | `packages/money` | `Paise` branded integer type; add/sub/split/allocate; no float ever | Money bugs are the highest-severity class here. Isolating them makes them property-testable and makes float arithmetic a *type error*, not a review comment. |
-| `packages/domain` | Zod schemas; ID grammars; canonical JSON; **`constraints.decl.ts`** — the declarative constraint table | One definition of truth for shapes and constraints, shared by generator, engine, oracle and eval. The declarative table is what lets engine and oracle be two independent implementations of one specification (§7). |
+| `packages/domain` | Zod schemas; ID grammars; canonical JSON; **`constraints.decl.ts`** — the declarative constraint table; **stage `S0` orchestration over already-read source data, ratified at spec 1.4.18** | One definition of truth for shapes and constraints, shared by generator, engine, oracle and eval. The declarative table is what lets engine and oracle be two independent implementations of one specification (§7). |
 | `packages/generator` | Forward business simulation to observations + hidden ground truth; degradation operators | Must be independently runnable and seed-deterministic. Kept out of the engine so no engine code can ever import ground truth — an import lint enforces this. |
 | `packages/oracle` | Exhaustive enumeration of evidence-admissible allocations from **observations only** | Deliberately a second, slow, naive implementation. Its whole value is being *not* the engine and *not* the generator. See §7. |
 | `packages/engine` | Stages S1–S5. Pure functions, no I/O, no network | Purity makes the core replayable and property-testable, and makes the LLM absence from the arithmetic path structurally verifiable. |
@@ -164,7 +164,41 @@ carries.
 | `packages/eval` | Metrics, bootstrap CIs, baselines, ablations, report generation | Must run against any agent behind one interface, so ablations are configuration, not forked code. |
 | `apps/api` | Thin HTTP over engine + ledger | — |
 | `apps/web` | Four screens (`PROJECT_SPEC.md §10`) | — |
-| `apps/cli` | `assay generate / oracle / run / bench / close / verify / seal` | The CLI is the real interface; the UI is a view over it. Everything demonstrable must be scriptable. |
+| `apps/cli` | `assay generate / oracle / run / bench / close / verify / seal`; **all filesystem I/O — it acquires raw source contents and passes them into `packages/domain`'s `S0` boundary, and performs no `S0` transform itself (spec 1.4.18)** | The CLI is the real interface; the UI is a view over it. Everything demonstrable must be scriptable. |
+
+
+**`S0`'s owner, ratified at spec 1.4.18 `[ASSAY-MODEL]`, register row M32.** The
+table above has said *"Stages S1–S5"* of `packages/engine` since spec 1.0.0, and
+`§2`'s component map draws `ingest` inside **trust boundary 1** with the engine box
+below it — but **no document named the package that owns `S0`**, and
+`DECISION_BRIEF.md §L.2` and `§I` named `packages/engine`. That was not a labelling
+preference; it was impossible. `RECONCILIATION_SPEC.md §2` gives `S0` the output
+`Observation[]` + **`UntrustedText[]`**, and `DATA_MODEL.md §10` states that
+*"nothing in `packages/engine` may import `UntrustedText`"* — *"it is not that the
+core **chooses** not to read hostile text, it is that it **cannot**"* — a ban
+`§L.1` rule 3 lists among the invariants that may never be violated, that
+`PREREGISTRATION.md §6.2` `AL1` repeats, and that `eslint.config.js` enforces in CI
+with `noInlineConfig`. **A stage cannot emit a type its package is forbidden to
+import**, so `S0` could never have lived in the engine. `DECISION_BRIEF.md §A.25`
+carries the correction.
+
+**The split, and why it needs three parties rather than two.** `apps/cli` reads the
+files, because `S0`'s stated input is *"raw source files"* while this table gives the
+engine *"no I/O, no network"* and `§4` boundary 1 puts the crossing outside the core.
+`packages/domain` owns the transform: it already holds every per-record piece `S0`
+performs — the strict schemas of `§4` boundary 1.1, `checkReconLineInvariants` for
+`RECONCILIATION_SPEC.md §2` step 2, the quarantine module at the separately-bannable
+`@assay/domain/untrusted-text`, and `DATA_MODEL.md §10.1`'s static `REFERENCE`
+classification — so the orchestration lands where its parts already are and **no new
+package is created**. `packages/engine` receives `Observation[]` and begins at `S1`.
+Domain performs **no I/O**; it transforms bytes the CLI has already read, which keeps
+`S0` deterministic and unit-testable without a filesystem.
+
+**What this does not do.** It moves no code and creates no module — `packages/engine`
+remains absent at spec 1.4.18, and domain's `S0` orchestration is scheduled, not
+written. `ARCHITECTURE.md §4` boundary 1's three obligations are unchanged, as is
+`§2`'s map, which already drew this boundary correctly.
+
 
 ## 4. Trust boundaries
 
