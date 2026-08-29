@@ -1,7 +1,7 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.13 · **Date:** 2026-08-28
+**Spec version:** 1.4.14 · **Date:** 2026-08-28
 **Reviewer role:** principal architect / skeptical reviewer
 
 **At spec 1.4.6** §A.13 records one definition, taken at a governance gate held
@@ -1191,6 +1191,49 @@ are untouched. No population parameter, seed, split, family,
 `target_record_count`, rate, threshold or metric definition changes;
 `constraint_set_hash` does not move, `C1`–`C8` being untouched; benchmark v1.0.3
 is unchanged and no dataset exists.
+
+### A.21 Spec 1.4.14 / benchmark 1.0.3 — two namespaces that never met
+
+**The decision.** `DATA_MODEL.md §12` states the relation between a
+probe-returned `constituent_entity_id` and a `Candidate.member_obs_id`. Register
+row M28. **`SE5` is not defined here and its status is unchanged.**
+
+**Why it was needed before any `SE5` definition.** Every candidate `SE5` function
+compares the ids `fetch_settlement_recon` returns against a candidate's members.
+Those are **different namespaces**: `§6` gives `entity_id` as
+`pay_… | rfnd_… | adj_…`, and `§11` types `member_obs_ids` as `ObservationId`
+(`obs_…`). A direct intersection is **always empty**, so every proposed `SE5`
+function — binary consistency, fraction, overlap in either normalisation — was
+resting on a comparison that cannot be performed as written. The relation had to
+be stated before the function could be argued about at all.
+
+**Everything here is derived; nothing is ratified.** The grammars are already
+frozen. The relation is **one-to-one** on a conforming dataset because
+`PREREGISTRATION.md §4.3`'s operator table carries exactly one duplication
+operator, `DUPLICATE_ROW`, scoped to *"share of `bank_line`"*, with `§4.1`
+crediting `F04` with *"`round_half_up(0.10 × B)` = 3 extra **`bank_line`** rows"*
+— no operator emits a `recon_line` twice. And it is **partial** because `§4.2`'s
+`F05` *"withholds one constituent `recon_line` at emission"* while
+`fetch_settlement_recon` queries the PG's own recon report (`§22.1` D10) rather
+than the observation set, so a returned id can have no observation at all.
+
+**What this record deliberately does not do, stated so the next cycle is not
+prejudged.** It does **not** decide whether an unobserved constituent counts in an
+`SE5` denominator; whether `SE5` normalises by the returned set, by the
+candidate's members, or by their union; whether `SE5` reads
+`fetch_settlement_recon` exclusively; how multiple probes combine; or whether one
+probe result may feed two signals. Each of those is outcome-bearing — the audit
+that produced this amendment reproduced three separate reversals, two crossing
+`ε = 1500` exactly — and none is preferred by frozen text. `§12` therefore says
+only that a comparing rule **must** state its treatment of an unmatched id, and
+leaves the treatment to the rule.
+
+**Nothing observable moves.** `SE5`'s 2000-bps weight and unresolved status stand;
+`SE1`, `SE2`, `SE3` and `SE4` are untouched; no population parameter, seed, split,
+family, `target_record_count`, rate, threshold or metric definition changes;
+`constraint_set_hash` does not move, `C1`–`C8` being untouched; benchmark v1.0.3
+is unchanged and no dataset exists. No schema field is added or altered — the
+`ProbeResultDetail` union of spec 1.4.12 stands exactly as committed.
 
 ---
 

@@ -1,6 +1,6 @@
 # PREREGISTRATION — ASSAY Benchmark v1.0.3
 
-**Spec version:** 1.4.13 · **Benchmark version:** 1.0.3
+**Spec version:** 1.4.14 · **Benchmark version:** 1.0.3
 
 **Status: FROZEN on commit. Amendments require a version bump and a new seal.**
 **Date frozen:** 2026-08-23 · **Amended:** 2026-08-24 (benchmark 1.0.1),
@@ -490,6 +490,43 @@ every `§7` threshold, `§4.1`'s composition, `§4.2`'s rates and clock grid, `�
 `§6.1` and `§6.2`. **No metric definition is amended**; no seed, split, family or
 `target_record_count` moves; `constraint_set_hash` does not move; and benchmark
 v1.0.3 is unchanged, with no dataset in existence to regenerate.
+
+**Amendment 1.4.14 / benchmark 1.0.3 (pre-seal, two namespaces that never met).**
+Applied before the seal, before any dataset was generated and before any number
+was observed. **Documentation only. One item, in `DATA_MODEL.md §12`.** It states
+the relation between a probe-returned `constituent_entity_id` and a
+`Candidate.member_obs_id`. Register row M28; record at
+`DECISION_BRIEF.md §A.21`.
+
+**Why it was needed before `SE5` could be argued about.** `§6` gives `entity_id`
+as `pay_… | rfnd_… | adj_…` and `§11` types `member_obs_ids` as `ObservationId`.
+They are **different namespaces**, so a direct intersection is **always empty** —
+and every candidate `SE5` function rests on exactly that comparison. The relation
+runs through the observation whose `payload.entity_id` equals the returned id.
+
+**Everything in it is derived; nothing is ratified.** The relation is
+**one-to-one** on a conforming dataset because `§4.3`'s operator table carries
+exactly one duplication operator, `DUPLICATE_ROW`, scoped to *"share of
+`bank_line`"*, with `§4.1` crediting `F04` with extra **`bank_line`** rows alone —
+no operator emits a `recon_line` twice. It is **partial** because `§4.2`'s `F05`
+withholds a constituent `recon_line` while `fetch_settlement_recon` queries the
+PG's recon report rather than the observation set, so a returned id may have no
+observation.
+
+**`SE5` remains wholly unresolved and this amendment does not narrow it.** It
+decides nothing about whether an unobserved constituent counts in a denominator,
+about normalisation by the returned set, the candidate's members or their union,
+about whether `SE5` reads `fetch_settlement_recon` exclusively, about multi-probe
+aggregation, or about double-counting. `§12` requires only that a comparing rule
+**state** its treatment of an unmatched id.
+
+**`SE5`'s 2000-bps weight and unresolved status stand**, and `SE1`, `SE2`, `SE3`
+and `SE4` are untouched. No schema field is added or altered. `C1`–`C8`,
+`I1`–`I9`, every `§7` threshold, `§4.1`'s composition, `§4.2`'s rates and clock
+grid, `§4.3`, `§6.1` and `§6.2` are untouched; **no metric definition is
+amended**; no seed, split, family or `target_record_count` moves;
+`constraint_set_hash` does not move; and benchmark v1.0.3 is unchanged, with no
+dataset in existence to regenerate.
 
 ---
 
