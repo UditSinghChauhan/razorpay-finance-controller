@@ -1,7 +1,7 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.20 · **Date:** 2026-08-28
+**Spec version:** 1.4.21 · **Date:** 2026-08-28
 **Reviewer role:** principal architect / skeptical reviewer
 
 **At spec 1.4.6** §A.13 records one definition, taken at a governance gate held
@@ -1560,6 +1560,55 @@ seed, split, family, rate, threshold or metric definition changes;
 `constraint_set_hash` does not move; benchmark v1.0.3 and `GT_VERSION` 1.1.0 are
 unchanged and no dataset exists. `packages/engine` is not created or modified by
 this amendment.
+
+### A.28 Spec 1.4.21 / benchmark 1.0.3 — which of two equal answers
+
+**The decision.** An exact `evidence_score_bps` tie is resolved by the
+lexicographically smallest **canonical allocation key**: the solution's
+`(target_id, member_obs_id)` pairs, sorted, serialised `target_id | member_obs_id`,
+joined by `;`. The same order fixes `solution_a` before `solution_b`. Register row
+M35.
+
+**Found by implementing, again.** `S4` needs a best and a second-best.
+`RECONCILIATION_SPEC.md §6` says *"the best is the one with the highest
+`evidence_score_bps`"* and stops there. Three amendments had quietly made that gap
+load-bearing: with `SE1` inactive, `SE2` and `SE4` expected-non-binding and `SE5`
+zero before a probe, the score **is `SE3` alone** — a function of member lag — so
+any two candidates drawn from members sharing a capture day and cycle score
+*exactly* equal. `§4.2`'s `F06` builds that population on purpose.
+
+**The specification demanded a deterministic answer without supplying one.** Metric
+23 requires identical ledger root hashes across two runs and `DATA_MODEL.md §16`
+forbids a result that depends on *"iteration order over an unordered collection"*,
+while `IMMATERIALLY_AMBIGUOUS`'s *"accept best"* decides which allocation posts.
+Determinism was frozen; the ordering was not. That is the narrow thing this record
+ratifies, and it is marked ratified rather than dressed as derivation.
+
+**Why the target is in the key.** `member_obs_ids` alone would collide: a component
+may hold several targets, two of equal amount admit the identical member set, and
+`§5` defers `C7`'s coupling to *"a single serialized pass after all components are
+solved"*, so both are feasible when the tie is broken. The key is the smallest
+representation that separates them, and it introduces no quantity `DATA_MODEL.md
+§11` did not already carry.
+
+**A second finding, corrected as documentation only.** `§11`'s worked example
+states a materiality of ₹1,00,000, and that figure does not reproduce from `§6`'s
+`max over AccountCode` formula: the example is an `F08` case with no `AN2` match, so
+`P2`/`P4` do not fire, and the unallocated remainder takes `E02`→`P6` for the same
+₹1,00,000 either way. The figure is **withdrawn as illustrative**; `§6` is
+**unchanged and normative**. Materiality remains generally non-zero in the real
+case, because `C6` pins `Σ credit − Σ debit` and **not** `Σ amount` or `Σ fee`,
+while `P2` posts on `amount`, `fee − tax` and `tax` — so allocations differing in
+fee composition move the control accounts by different totals, and `AMBIGUOUS`
+stays reachable. **No new materiality definition was invented to rescue the old
+number**, which was the tempting repair and the wrong one.
+
+**Nothing observable moves.** The ranking criterion is unchanged and the tie-break
+applies only after exact equality; it never enters `evidence_score_bps`. `ε`, `τ`,
+`P_max`, `K_max`, `C_max`, every `SE` weight, `C1`–`C8` and `I1`–`I9` are untouched;
+`constraint_set_hash` does not move; benchmark v1.0.3 and `GT_VERSION` 1.1.0 are
+unchanged and no dataset exists. `packages/engine` is not created or modified by
+this amendment — `S4` remains unimplemented.
 
 ---
 

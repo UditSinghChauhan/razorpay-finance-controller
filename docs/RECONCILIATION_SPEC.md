@@ -1,6 +1,6 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.4.20 · **Date:** 2026-08-28
+**Spec version:** 1.4.21 · **Date:** 2026-08-28
 
 The matching algorithm, the ambiguity definition, and the rules that decide
 accept / reject / abstain. This is the technical core of the project.
@@ -806,6 +806,62 @@ Where:
   and only its encoding differs, so that the test is bit-identical across runs
   and the certificate can be hashed under `DATA_MODEL.md §0` rule 5.
 
+**Exact-score ties, ratified at spec 1.4.21 `[ASSAY-MODEL]`, register row M35.**
+Step 1 says *"the best is the one with the highest `evidence_score_bps`"* and
+**does not say which is best when two are equal**. That gap is outcome-bearing and
+is closed here.
+
+**Ties are reachable, and pre-probe they are ordinary — derived.** With `SE1`
+inactive (spec 1.4.10), `SE2` expected-non-binding (spec 1.4.20), `SE4`
+expected-non-binding (spec 1.4.11) and `SE5` zero before any probe,
+`evidence_score_bps` **is `SE3` alone**, and `SE3` reads member lag only. Members
+sharing a capture day and cycle carry identical `lag_days`, so candidates with the
+same lag multiset score identically: four such members of equal credit against a
+target admitting any two of them yield **six feasible allocations at the same
+score**. `PREREGISTRATION.md §4.2`'s `F06` sharpens this deliberately — *"identical
+amount, drawn ONCE and used for both; identical method; same simulated day"*.
+
+**An ordering is required — derived.** `Δs = 0 < ε`, so a tie never reaches
+`DISCRIMINATED`; it reaches `AMBIGUOUS` or, below `τ`, `IMMATERIALLY_AMBIGUOUS`,
+whose rule is *"accept best"*. Which allocation is accepted sets
+`Decision.chosen_candidate_id` and the `source_entity_id`s gate `G3` partitions by,
+and `solution_a`/`solution_b` enter the hashed event body (`DATA_MODEL.md §13`,
+`§16`). Metric 23 requires identical root hashes across two runs and `§16` forbids
+any result depending on *"iteration order over an unordered collection"*, so
+**enumeration order cannot be the tie-break** — also derived.
+
+**The key is ratified, not derived.** `§16` demands determinism; it names no
+ordering, and nothing else in this specification ranks equal-scored allocations.
+
+```
+  allocation identity   the set of (target_id, member_obs_id) pairs the
+                        solution asserts; a target with an empty allocation
+                        contributes the single pair (target_id, "")
+
+  canonical key         those pairs sorted by (target_id, member_obs_id),
+                        each serialised  target_id | member_obs_id,
+                        joined by  ;
+
+  rule                  highest evidence_score_bps wins. On EXACT equality the
+                        lexicographically smallest canonical key wins, and the
+                        same order fixes solution_a before solution_b.
+```
+
+**`member_obs_ids` alone would not do**, and the target is in the key for that
+reason: a component may hold several targets (`§5`), two targets of equal amount
+admit the identical member set, and `§5` defers `C7`'s coupling to *"a single
+serialized pass after all components are solved"* — so both are feasible at solve
+time and their member sets collide. The key adds **no new quantity**: `target_id`
+and `member_obs_ids` are `DATA_MODEL.md §11` fields, and ids match
+`^prefix_[A-Za-z0-9]{14}$`, so neither separator can occur inside one and the
+encoding is injective.
+
+**The ranking criterion is unchanged.** This applies **only** after exact
+equality; it never enters `evidence_score_bps`, never reorders unequal scores, and
+touches no weight. `ε = 1500`, `τ = max(₹100, 10 bps of component value)`, the
+`SE1`–`SE5` weights at 3500 / 2000 / 1500 / 1000 / 2000, and `C1`–`C8` are all
+untouched.
+
 The second-best solution, when it exists and forces abstention, **is** the
 `AmbiguityCertificate`. Producing it costs one extra solve and converts the
 abstention from an assertion into a checkable artifact: a reviewer can take
@@ -1213,7 +1269,20 @@ The motivating example, run through this spec:
 - Component size 6 ≤ `K_max`. Exact solve returns `{A,B,C}` (higher `SE3`
   temporal proximity). No-good cut → second-best `{D,E}`, feasible.
 - Materiality: the two allocations differ by which payments leave
-  `1100_GATEWAY_RECEIVABLE`; max account delta = ₹1,00,000 ≫ τ.
+  `1100_GATEWAY_RECEIVABLE`, and the delta exceeds τ. **The figure this line
+  carried — ₹1,00,000 — was illustrative and is withdrawn at spec 1.4.21 as
+  NON-REPRODUCIBLE from §6's normative formula, which stays unchanged.** `§6`
+  computes `max over AccountCode of |balance_best(acct) − balance_second(acct)|`;
+  this example is an `F08` case with no `AN2` match, so `P2`/`P4` do not fire
+  (`DATA_MODEL.md §17.1.1` conditions both on *"`AN2` satisfied against an actual
+  `bank_line`"*), and the unallocated remainder takes `E02`→`P6` for the same
+  ₹1,00,000 under either allocation — so the per-`AccountCode` delta is not the
+  figure stated. Reproducing a specific number needs the per-line `fee` values
+  this example does not give: `C6` pins `Σ credit − Σ debit`, **not** `Σ amount`
+  or `Σ fee`, and `P2` posts on `amount`, `fee − tax` and `tax`, so competing
+  allocations move the control accounts by genuinely different totals whenever
+  their fee composition differs. **The verdict below is unchanged** — the example
+  still abstains, and `AMBIGUOUS` remains reachable.
 - Δs = 400 bps < ε = 1500 bps.
 - Probes: `fetch_order` on all five returns receipts that match neither set
   distinctively. `PROBE_BUDGET_EXHAUSTED`.
