@@ -1,6 +1,6 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.4.15 · **Date:** 2026-08-28
+**Spec version:** 1.4.16 · **Date:** 2026-08-28
 
 The matching algorithm, the ambiguity definition, and the rules that decide
 accept / reject / abstain. This is the technical core of the project.
@@ -364,7 +364,7 @@ standard way recon tools manufacture confident wrong answers.
 | `SE2` | `order_ref` ↔ `receipt` string similarity (Jaro–Winkler). **Post-probe only** — `receipt` is quarantined, so this signal is computable solely from a `fetch_order` probe result (§6.2), as `SE5` is. It scores 0 for every candidate on which no probe has run | 2000 |
 | `SE3` | Temporal proximity to the modal settlement lag, restated in dimensionally coherent form at spec 1.4.13. `lag_days = (settled_at − created_at) / 86400`, a **real number, not floored**. `mode_days` = the mode of `floor(lag_days)` over **every `recon_line` observation in the dataset**, **ties to the lowest bin**. A **member's** score is `max(0, 1 − |lag_days − mode_days| / (T_max − T_min))`; a **candidate's** score is the **arithmetic mean** of its members' scores. Both terms are in days, so the ratio is unitless and expressing both in seconds gives an identical value | 1500 |
 | `SE4` | Method / card-network agreement with the merchant memo. **Post-probe only** — `memo` is quarantined (`DATA_MODEL.md §0` rule 4, `§8`, `§10`) and `MerchantLedgerEntry` carries no structural method or card-network field, so this signal is computable solely from a `fetch_payment` probe result (§6.2), as `SE2` and `SE5` are. It scores 0 for every candidate on which no probe has run. **`SE4` is additionally declared expected-non-binding on v1.0.0 data at spec 1.4.11**, on the `C8` precedent in `§4.1`: it is retained as a declared signal, its weight is unchanged and unreallocated, and the fact that it separates no candidates is reported rather than assumed. **Its agreement function is therefore left undefined — partial credit between `method` and `card_network`, and the treatment of a `card_network` null on both sides, are unnecessary while the signal is non-discriminating, and are NOT settled here** | 1000 |
-| `SE5` | Probe result corroboration. **Scope, ratified at spec 1.4.15: `fetch_settlement_recon` results only.** `§6.2` names a consumer for every other probe — `fetch_order` to `SE2`, `fetch_payment` to `SE4`, `fetch_refund` to `C2`'s referential half and `E10_REFUND_ORPHAN`, `widen_temporal_window` to `C4` — and leaves this one unnamed. **The scoring function remains undefined**, and nothing here supplies one | 2000 |
+| `SE5` | Probe result corroboration: agreement between a `fetch_settlement_recon` report and a candidate's members. **Post-probe only**, as `SE2` and `SE4` are — already stated by this section's pre-probe block (spec 1.4.10) — so it scores 0 for every candidate on which no such probe has run. **Scope, ratified at spec 1.4.15: `fetch_settlement_recon` results only**; `§6.2` names a consumer for every other probe and leaves this one unnamed. **Score, ratified at spec 1.4.16.** Let `R` be the probe's returned `constituent_entity_ids`; let `R*` be their images under `DATA_MODEL.md §12`'s identifier relation (spec 1.4.14), **a returned id with no observation being excluded from `R*` entirely** — neither numerator nor denominator; and let `M` be `Candidate.member_obs_ids`. Both are then `ObservationId` sets, and `SE5 = \|R* ∩ M\| / \|R* ∪ M\|`, with `SE5 = 0` when `\|R* ∪ M\| = 0`. `SE5 = 1` iff `R*` and `M` are equal and non-empty. `R*` is target-scoped and `M` is candidate-scoped, so unlike `SE1` this signal does order the candidates of one target. **Multi-probe aggregation under `P_max = 3` is NOT settled here** | 2000 |
 
 `evidence_score_bps ∈ [0, 10_000]` is a weighted sum, used **only** to order candidates and
 to compute the ε-gap in §6. Weights are frozen in `PREREGISTRATION.md` before the
@@ -478,6 +478,71 @@ also deciding `F05`, and the measures that avoid `F05` were shown to score
 degenerately on constructed examples. Multi-probe aggregation under `P_max = 3`,
 and any aggregation across probe results, are likewise **open**.
 
+**`SE5`'s score, ratified at spec 1.4.16 `[ASSAY-MODEL]`, register row M30.** The
+scoring function, the `F05` denominator treatment and the empty-result rule were
+shown at spec 1.4.15 to be **one coupled decision**, and they are settled together
+here. Three parts are derived; one is ratified.
+
+**Derived — the `F05` treatment.** `PREREGISTRATION.md §5.3` resolved this exact
+fact pattern for the completeness gate: `F05` withholds one constituent
+`recon_line` at emission, so *"that member has no observation"*, and *"no
+constraint excluded that allocation — it was never expressible in the candidate
+language at all, and a gate that failed on it would report a constraint fault
+where none exists"*. A `Candidate.member_obs_ids` ranges over observations, so
+**no candidate can contain a member that has no observation**; charging one for
+that absence reports an *evidence* fault where none exists. `§5.3`'s guard
+transfers with it — expressibility is *"a property of observation existence and
+kind alone"* — so the exclusion is decided by whether the observation exists and
+never by whether excluding it helps a candidate. Under the rejected reading a
+**perfect score is unattainable on every `F05` settlement**: with `R = {a,b,c}`,
+`c` withheld, the best possible candidate `{a,b}` scores `0.667` against a wrong
+candidate's `0`, giving `Δs = 1333 < ε` and an abstention on a target the
+observable evidence identifies uniquely. Excluding the id gives `1.000` against
+`0`, `Δs = 2000`, `DISCRIMINATED`.
+
+**Derived — both directions of disagreement are penalised.** `§4.1` makes `C6`
+exact with zero tolerance because *"a tolerance here is how false matches get
+admitted"*, and `I4` makes a settlement **equal** to its allocated lines. A
+candidate that omits a constituent the report names and one that adds a member
+the report does not are therefore errors of the same kind. Each asymmetric
+measure is blind to one of them, and blind in the strong sense of **returning a
+tie between an allocation the report confirms and one it contradicts**: binary
+consistency ties `{a,g}` with all six of `{a…f}` and yields `Δs = 0`; recall ties
+the exact `{a,b,c}` with the superset `{a,b,c,d,e}`; precision ties `{a}` with
+`{a,b,c}` against a six-member report. A signal `§4.2` gives no purpose but
+ranking cannot rank there.
+
+**Derived — an empty result scores 0 rather than dropping out.** `DATA_MODEL.md
+§12` states that an empty `constituent_entity_ids` is *"a result rather than an
+error"*, so it must produce a score; `AL3` freezes the `SE1`–`SE5` weights and
+bars renormalisation; and this section requires a defined weighted sum. **Zero is
+the only remaining value** — the same argument this specification accepted for
+`SE4` absent a probe at spec 1.4.11. The formula already yields 0 for an empty
+return whenever the candidate has members; the `|R* ∪ M| = 0` clause covers the
+single remaining case, a zero-member candidate against an empty report.
+
+**Ratified — Jaccard among the symmetric measures.** Derivation fixes that both
+directions count; it does not select `|R* ∩ M| / |R* ∪ M|` over `F1` or any other
+symmetric measure, and **frozen text names none**. Jaccard is adopted as the
+standard set-similarity measure on this section's own precedent for `SE2`, which
+names Jaro–Winkler rather than deriving a string metric. The choice is recorded
+**ratified**, not dressed as entailment.
+
+**Two ε-crossings, at `ε = 1500` bps and `SE5`'s frozen 2000.** Against a
+six-constituent report, the exact candidate versus `{a,g}` scores **1667 under
+recall, 1000 under precision and 1714 under Jaccard** — recall and Jaccard
+`DISCRIMINATED`, precision `AMBIGUOUS`. Against the same report, `{a,g}` versus
+all six scores **0 under binary and 1714 under Jaccard**. Each flips whether a
+component posts to the control accounts or opens a Suspense item.
+
+**What this does not settle. Multi-probe aggregation under `P_max = 3` remains
+open.** `§6.2` executes probes with *"deterministic code"*, so a repeated call on
+identical arguments returns an identical result and every combination rule agrees;
+combining results drawn from **different** arguments is unspecified, and no rule
+is supplied or implied here. `SE4`'s agreement function is likewise untouched, and
+the double-counting question raised at spec 1.4.15 stays dormant while the scope
+is one probe no other signal consumes.
+
 **Why `SE4` separates nothing, stated at spec 1.4.11 `[ASSAY-MODEL]`, register row
 M25.** Six facts, each read off frozen text and none of them a choice:
 
@@ -536,10 +601,11 @@ score. A **raw sum** over members leaves `[0, 1]` — two members alone reach 1.
 sum is the arithmetic mean. Keeping the numerator **continuous** is likewise
 derived: spec 1.4.10 introduced binning because a *seconds-granular **mode*** is
 degenerate, and that reason does not reach the `lag` term, which `C4` defines as
-the raw difference. **`SE4`'s agreement function and `SE5`'s scoring function are not
-settled by this amendment** — `SE5`'s *scope* is settled separately at spec 1.4.15 —
-and the table above says so in the rows themselves rather than leaving a reader to
-infer completeness.
+the raw difference. **`SE4`'s agreement function is not settled by this amendment**,
+and `SE5`'s scoring function was not settled by it either — `SE5`'s *scope* is
+settled separately at spec 1.4.15 and its *score* at spec 1.4.16 — and the table
+above says so in the rows themselves rather than leaving a reader to infer
+completeness.
 
 ### 4.3 Search bound
 
