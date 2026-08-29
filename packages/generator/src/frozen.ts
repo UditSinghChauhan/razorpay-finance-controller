@@ -373,4 +373,4 @@ export const BENCHMARK_VERSION = "1.0.3";
 export const GT_VERSION = "1.1.0";
 
 /** `PREREGISTRATION.md` header: the specification version this package was written against. */
-export const SPEC_VERSION = "1.4.20";
+export const SPEC_VERSION = "1.4.21";
