@@ -1,7 +1,7 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.14 · **Date:** 2026-08-28
+**Spec version:** 1.4.15 · **Date:** 2026-08-28
 **Reviewer role:** principal architect / skeptical reviewer
 
 **At spec 1.4.6** §A.13 records one definition, taken at a governance gate held
@@ -1234,6 +1234,66 @@ family, `target_record_count`, rate, threshold or metric definition changes;
 `constraint_set_hash` does not move, `C1`–`C8` being untouched; benchmark v1.0.3
 is unchanged and no dataset exists. No schema field is added or altered — the
 `ProbeResultDetail` union of spec 1.4.12 stands exactly as committed.
+
+### A.22 Spec 1.4.15 / benchmark 1.0.3 — the one probe nobody had claimed
+
+**The decision.** `SE5`'s **scope** is `fetch_settlement_recon` results only.
+Register row M29. **Its scoring function is not defined here**, and neither is
+the `F05` treatment it turns out to be coupled to.
+
+**The elimination, and its limit.** `RECONCILIATION_SPEC.md §6.2` declares five
+probes and names a consumer for four — `fetch_order` to `SE2`, `fetch_payment` to
+`SE4`, `fetch_refund` to `C2`'s referential half and `E10`, and
+`widen_temporal_window` to `C4`. `SE5` is the one signal with no named input and
+`fetch_settlement_recon` the one probe with no named consumer. **That is
+elimination, not entailment**, and the record marks the decision **ratified**:
+`§4.2`'s own wording — *"Probe **result** corroboration"* — and `DATA_MODEL.md
+§12`'s generic `kind: "probe_result"` both point at a broader scope.
+
+**One part of it is genuinely derived: the generic scope is excluded.** A generic
+`SE5` would take `widen_temporal_window` as an input. That probe returns no
+evidence about the world; it changes `C4`'s bound. Scoring it would let a
+relaxation **raise** the evidence score of the candidates the relaxation
+admitted, which is precisely the *"quiet constraint relaxation to manufacture a
+match"* that `THREAT_MODEL.md §T7` lists among the attacks its controls prevent.
+`§12`'s own split — *"hard = a filter, soft = a score contribution"* — puts a rule
+change on the hard side, so scoring it as soft evidence miscategorises it. **An
+earlier draft of this reasoning said `days` had no candidate-relative content;
+that was wrong** — `days` together with a candidate's own lags does yield a
+candidate-relative predicate — and the exclusion rests on `§T7` instead.
+
+**A named subset is left open rather than closed.** Adding `fetch_order` or
+`fetch_payment` would give `SE5` more to work with, and **no clause in this
+specification forbids one probe result from feeding two signals**; the arithmetic
+permits it, each signal being capped at its own weight with the five totalling
+10,000. It would require a double-counting policy this specification does not
+state, so it is unavailable now — **not wrong**.
+
+**Why the function could not follow in the same amendment.** The audit compared
+binary consistency, recall, precision and Jaccard, and found the choice coupled to
+a question this cycle was asked to leave open. The two substantively sound
+measures — recall and Jaccard — divide by something ranging over the **returned**
+set, so neither can be adopted without also deciding whether an `F05`-withheld
+constituent counts there. The two that avoid `F05` score degenerately on
+constructed examples: binary awards the full 2000 bps for matching **one of
+three** authoritative constituents, and precision scores a candidate holding
+**one of six** constituents at 1.000, because it cannot see what the candidate is
+missing. **Choosing a function to dodge the coupling would have been choosing a
+worse rule for a procedural reason**, and choosing recall or Jaccard would have
+settled `F05` by implication. Both were refused.
+
+**Two ε-crossings stand behind that refusal**, reproduced at spec 1.4.14
+semantics: binary versus recall separates 2000 bps from 667 across `ε = 1500`,
+and recall versus precision separates 1667 from 1000. Each flips `DISCRIMINATED`
+to `AMBIGUOUS`, and with it whether a component posts to the control accounts or
+opens a Suspense item.
+
+**Nothing observable moves.** `SE5`'s 2000-bps weight stands; `SE1`, `SE2`, `SE3`
+and `SE4` are untouched; the `ProbeResultDetail` union of spec 1.4.12 and the
+identifier relation of spec 1.4.14 are unchanged. No population parameter, seed,
+split, family, `target_record_count`, rate, threshold or metric definition
+changes; `constraint_set_hash` does not move, `C1`–`C8` being untouched;
+benchmark v1.0.3 is unchanged and no dataset exists.
 
 ---
 

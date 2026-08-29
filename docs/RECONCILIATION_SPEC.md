@@ -1,6 +1,6 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.4.14 · **Date:** 2026-08-28
+**Spec version:** 1.4.15 · **Date:** 2026-08-28
 
 The matching algorithm, the ambiguity definition, and the rules that decide
 accept / reject / abstain. This is the technical core of the project.
@@ -364,7 +364,7 @@ standard way recon tools manufacture confident wrong answers.
 | `SE2` | `order_ref` ↔ `receipt` string similarity (Jaro–Winkler). **Post-probe only** — `receipt` is quarantined, so this signal is computable solely from a `fetch_order` probe result (§6.2), as `SE5` is. It scores 0 for every candidate on which no probe has run | 2000 |
 | `SE3` | Temporal proximity to the modal settlement lag, restated in dimensionally coherent form at spec 1.4.13. `lag_days = (settled_at − created_at) / 86400`, a **real number, not floored**. `mode_days` = the mode of `floor(lag_days)` over **every `recon_line` observation in the dataset**, **ties to the lowest bin**. A **member's** score is `max(0, 1 − |lag_days − mode_days| / (T_max − T_min))`; a **candidate's** score is the **arithmetic mean** of its members' scores. Both terms are in days, so the ratio is unitless and expressing both in seconds gives an identical value | 1500 |
 | `SE4` | Method / card-network agreement with the merchant memo. **Post-probe only** — `memo` is quarantined (`DATA_MODEL.md §0` rule 4, `§8`, `§10`) and `MerchantLedgerEntry` carries no structural method or card-network field, so this signal is computable solely from a `fetch_payment` probe result (§6.2), as `SE2` and `SE5` are. It scores 0 for every candidate on which no probe has run. **`SE4` is additionally declared expected-non-binding on v1.0.0 data at spec 1.4.11**, on the `C8` precedent in `§4.1`: it is retained as a declared signal, its weight is unchanged and unreallocated, and the fact that it separates no candidates is reported rather than assumed. **Its agreement function is therefore left undefined — partial credit between `method` and `card_network`, and the treatment of a `card_network` null on both sides, are unnecessary while the signal is non-discriminating, and are NOT settled here** | 1000 |
-| `SE5` | Probe result corroboration | 2000 |
+| `SE5` | Probe result corroboration. **Scope, ratified at spec 1.4.15: `fetch_settlement_recon` results only.** `§6.2` names a consumer for every other probe — `fetch_order` to `SE2`, `fetch_payment` to `SE4`, `fetch_refund` to `C2`'s referential half and `E10_REFUND_ORPHAN`, `widen_temporal_window` to `C4` — and leaves this one unnamed. **The scoring function remains undefined**, and nothing here supplies one | 2000 |
 
 `evidence_score_bps ∈ [0, 10_000]` is a weighted sum, used **only** to order candidates and
 to compute the ε-gap in §6. Weights are frozen in `PREREGISTRATION.md` before the
@@ -441,6 +441,43 @@ vacuous: `settled_at` is the instant of `capture-day + cycle`, so capture-day 5 
 fall in one co-settlement class. A candidate may therefore hold members with
 `n = 1, 2` and `3`.
 
+**`SE5`'s scope, ratified at spec 1.4.15 `[ASSAY-MODEL]`, register row M29.**
+`§6.2` declares five probes and names a consumer for four of them; `SE5` is the
+one signal with no named input, and `fetch_settlement_recon` the one probe with no
+named consumer. The scope is therefore **`fetch_settlement_recon` results only** —
+**ratified, not derived**: elimination is not entailment, and this section's own
+wording (*"Probe **result** corroboration"*) and `DATA_MODEL.md §12`'s generic
+`kind: "probe_result"` both read the other way.
+
+**A generic scope is excluded, and that part IS derived.** It would take
+`widen_temporal_window` as an input, and that probe returns no evidence about the
+world — it changes `C4`'s bound. Scoring it would let a constraint relaxation
+**raise** the evidence score of the candidates the relaxation admitted, which is
+the *"quiet constraint relaxation to manufacture a match"* that
+`THREAT_MODEL.md §T7` names as the attack its controls prevent. `DATA_MODEL.md
+§12` also splits evidence into *"hard = a filter, soft = a score contribution"*; a
+rule change is the former, and scoring it as the latter miscategorises it.
+
+**A named subset drawing on `fetch_order` or `fetch_payment` is NOT excluded.**
+No clause in this specification forbids one probe result from feeding two
+signals, and the arithmetic permits it — each signal is capped at its own weight
+and the five total 10,000. Such a subset would, however, require a
+**double-counting policy this specification does not state**, and none is
+supplied here. That option is left open rather than closed.
+
+**What this deliberately does not settle.** The **scoring function** is undefined:
+no binary, recall, precision or Jaccard rule is introduced, and none is implied.
+Nor is the treatment of `PREREGISTRATION.md §4.2`'s **`F05` partiality** —
+`fetch_settlement_recon` queries the PG's recon report, so a returned
+`constituent_entity_id` may have no observation (`DATA_MODEL.md §12`, spec
+1.4.14), and whether such an id enters a numerator, a denominator, or neither is
+**open**. The audit that produced this amendment established that the function
+and that `F05` treatment are **one coupled decision rather than two**: the
+measures whose denominator ranges over the returned set cannot be chosen without
+also deciding `F05`, and the measures that avoid `F05` were shown to score
+degenerately on constructed examples. Multi-probe aggregation under `P_max = 3`,
+and any aggregation across probe results, are likewise **open**.
+
 **Why `SE4` separates nothing, stated at spec 1.4.11 `[ASSAY-MODEL]`, register row
 M25.** Six facts, each read off frozen text and none of them a choice:
 
@@ -499,9 +536,10 @@ score. A **raw sum** over members leaves `[0, 1]` — two members alone reach 1.
 sum is the arithmetic mean. Keeping the numerator **continuous** is likewise
 derived: spec 1.4.10 introduced binning because a *seconds-granular **mode*** is
 degenerate, and that reason does not reach the `lag` term, which `C4` defines as
-the raw difference. **`SE4`'s agreement function and `SE5` in its entirety are not
-settled by this amendment**, and the table above says so in the rows themselves
-rather than leaving a reader to infer completeness.
+the raw difference. **`SE4`'s agreement function and `SE5`'s scoring function are not
+settled by this amendment** — `SE5`'s *scope* is settled separately at spec 1.4.15 —
+and the table above says so in the rows themselves rather than leaving a reader to
+infer completeness.
 
 ### 4.3 Search bound
 
