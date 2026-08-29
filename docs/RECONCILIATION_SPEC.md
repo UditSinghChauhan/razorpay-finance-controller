@@ -1,6 +1,6 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.4.19 · **Date:** 2026-08-28
+**Spec version:** 1.4.20 · **Date:** 2026-08-28
 
 The matching algorithm, the ambiguity definition, and the rules that decide
 accept / reject / abstain. This is the technical core of the project.
@@ -361,7 +361,7 @@ standard way recon tools manufacture confident wrong answers.
 | ID | Signal | Weight (bps) |
 |---|---|---|
 | `SE1` | UTR prefix match length, between `settlement.utr` and the `bank_ref` of its `AN2`-matched bank line. **Permanently inactive for ranking, from spec 1.4.10.** Both comparands are target-scoped, so `SE1` takes one value across every candidate of a target and can neither order candidates nor move the ε-gap — the only two uses this section gives the score. It could discriminate only for a `bank_line` target, whose candidates are sets of settlements each carrying its own UTR; `DATA_MODEL.md §11.1` (spec 1.4.4) gives that target the empty candidate set, so the context is gone. The row and its weight are **retained, not removed and not reallocated** | 3500 |
-| `SE2` | `order_ref` ↔ `receipt` string similarity (Jaro–Winkler). **Post-probe only** — `receipt` is quarantined, so this signal is computable solely from a `fetch_order` probe result (§6.2), as `SE5` is. It scores 0 for every candidate on which no probe has run | 2000 |
+| `SE2` | `order_ref` ↔ `receipt` string similarity (Jaro–Winkler). **Post-probe only** — `receipt` is quarantined, so this signal is computable solely from a `fetch_order` probe result (§6.2), as `SE5` is. It scores 0 for every candidate on which no probe has run. **`SE2` is additionally declared expected-non-binding on v1.0.0 data at spec 1.4.20**, on the `C8` precedent in `§4.1` already applied to `SE1` (1.4.10) and `SE4` (1.4.11): `receipt` is reachable through `fetch_order`, but `order_ref` exists **only** on `MerchantLedgerEntry` (`DATA_MODEL.md §8`) and **no frozen clause pairs a `MerchantLedgerEntry` with a candidate, component, target or probed order** — `AN5`, the one historical pairing route, was retired at spec 1.4.1, and `§11.1` and `§17.1.1` leave `ledger_entry` neither member-eligible nor a target. The comparison therefore has no candidate-relative form on conforming v1.0.0 data. Its weight is **unchanged and unreallocated**, and **no pairing or aggregation function is ratified here** | 2000 |
 | `SE3` | Temporal proximity to the modal settlement lag, restated in dimensionally coherent form at spec 1.4.13. `lag_days = (settled_at − created_at) / 86400`, a **real number, not floored**. `mode_days` = the mode of `floor(lag_days)` over **every `recon_line` observation in the dataset**, **ties to the lowest bin**. A **member's** score is `max(0, 1 − |lag_days − mode_days| / (T_max − T_min))`; a **candidate's** score is the **arithmetic mean** of its members' scores. Both terms are in days, so the ratio is unitless and expressing both in seconds gives an identical value | 1500 |
 | `SE4` | Method / card-network agreement with the merchant memo. **Post-probe only** — `memo` is quarantined (`DATA_MODEL.md §0` rule 4, `§8`, `§10`) and `MerchantLedgerEntry` carries no structural method or card-network field, so this signal is computable solely from a `fetch_payment` probe result (§6.2), as `SE2` and `SE5` are. It scores 0 for every candidate on which no probe has run. **`SE4` is additionally declared expected-non-binding on v1.0.0 data at spec 1.4.11**, on the `C8` precedent in `§4.1`: it is retained as a declared signal, its weight is unchanged and unreallocated, and the fact that it separates no candidates is reported rather than assumed. **Its agreement function is therefore left undefined — partial credit between `method` and `card_network`, and the treatment of a `card_network` null on both sides, are unnecessary while the signal is non-discriminating, and are NOT settled here** | 1000 |
 | `SE5` | Probe result corroboration: agreement between a `fetch_settlement_recon` report and a candidate's members. **Post-probe only**, as `SE2` and `SE4` are — already stated by this section's pre-probe block (spec 1.4.10) — so it scores 0 for every candidate on which no such probe has run. **Scope, ratified at spec 1.4.15: `fetch_settlement_recon` results only**; `§6.2` names a consumer for every other probe and leaves this one unnamed. **Score, ratified at spec 1.4.16.** Let `R` be the probe's returned `constituent_entity_ids`; let `R*` be their images under `DATA_MODEL.md §12`'s identifier relation (spec 1.4.14), **a returned id with no observation being excluded from `R*` entirely** — neither numerator nor denominator; and let `M` be `Candidate.member_obs_ids`. Both are then `ObservationId` sets, and `SE5 = \|R* ∩ M\| / \|R* ∪ M\|`, with `SE5 = 0` when `\|R* ∪ M\| = 0`. `SE5 = 1` iff `R*` and `M` are equal and non-empty. `R*` is target-scoped and `M` is candidate-scoped, so unlike `SE1` this signal does order the candidates of one target. **Multi-probe aggregation, derived at spec 1.4.17.** Where more than one `fetch_settlement_recon` result carries `settlement_id = S`, `R` is the **union** of their `constituent_entity_ids` over **every** such result — irrespective of each probe's `date` argument and of the order the probes ran. Repeating a probe adds nothing; a result that returns nothing removes nothing | 2000 |
@@ -662,6 +662,68 @@ and `SE5`'s scoring function was not settled by it either — `SE5`'s *scope* is
 settled separately at spec 1.4.15 and its *score* at spec 1.4.16 — and the table
 above says so in the rows themselves rather than leaving a reader to infer
 completeness.
+
+**`SE2` separates nothing on v1.0.0 data, derived at spec 1.4.20 `[ASSAY-MODEL]`,
+register row M34.** Four facts, each read off frozen text:
+
+```
+  1  §4.2's SE2 comparands are `order_ref` and `receipt`. `receipt` is
+     quarantined on Order and IS reachable -- §6.2's fetch_order supplies it,
+     and DATA_MODEL.md §12's ProbeResultDetail carries it (spec 1.4.12).
+
+  2  `order_ref` exists ONLY on MerchantLedgerEntry (DATA_MODEL.md §8).
+     ReconLine's counterpart `order_receipt` is quarantined, and no other
+     entity carries the field.
+
+  3  AN5 -- `merchant_ledger.order_ref === order.receipt`, the ONLY clause
+     that ever joined a ledger entry to an order -- is RETIRED at spec 1.4.1
+     (§3), on two independent grounds.
+
+  4  With AN5 retired, DATA_MODEL.md §11.1 makes `ledger_entry` not
+     member-eligible and §17.1.1 makes it not a target, so §3's consequence
+     holds: "every merchant ledger entry reaches E13_LEDGER_ONLY".
+```
+
+**Therefore no frozen clause pairs a `MerchantLedgerEntry` with a candidate, a
+component, a target or a probed order, and `SE2` has no candidate-relative
+comparison to make — derived.** `PREREGISTRATION.md §10` V12 states the same fact
+from the other side: *"ASSAY consumes three sources and **ties out two**."*
+
+**Retaining the row and its 2000 bps is the ratified half**, and follows `§4.1`'s
+treatment of `C8` exactly, as `SE1` did at spec 1.4.10 and `SE4` at spec 1.4.11: a
+declared signal that separates nothing is kept and reported doing nothing rather
+than deleted. **Nothing is renormalised** — `AL3` freezes the `SE1`–`SE5` weights
+at `3500 / 2000 / 1500 / 1000 / 2000`, summing to 10,000, and this amendment moves
+none of them. **No ledger-entry probe is added**, which would open an enum `§6.2`
+calls closed and route a merchant-controlled surface (`THREAT_MODEL.md §T1`) into
+the evidence path. **No pairing rule and no aggregation rule is invented.**
+
+**The narrower formulation is deliberate.** `SE2` is *expected-non-binding on
+v1.0.0 data*, the `SE4` wording — **not** `SE1`'s *permanently inactive*. `SE1`'s
+status follows from `§11.1`'s empty `bank_line` candidate set, a structural fact
+about the candidate language itself. `SE2`'s follows from the **absence** of a
+pairing clause, which a future amendment could supply without changing any
+constraint. The weaker claim is the one the frozen text supports.
+
+**`DISCRIMINATED` remains reachable, and the arithmetic is worth stating.**
+Pre-probe, `SE3` alone gives `Δs ≤ 469 bps < ε` (spec 1.4.13, unchanged).
+Post-probe, `SE5`'s full 2000 bps exceeds `ε = 1500` on its own, so a
+`fetch_settlement_recon` result can still discriminate. What this amendment
+removes is a signal that was never able to contribute, not the system's ability to
+resolve a material ambiguity.
+
+**The current disposition of the five signals**, none of whose weights move:
+
+```
+  SE1  3500  INACTIVE                          spec 1.4.10
+  SE2  2000  EXPECTED-NON-BINDING on v1.0.0    spec 1.4.20
+  SE3  1500  LIVE / DEFINED                    spec 1.4.13
+  SE4  1000  EXPECTED-NON-BINDING on v1.0.0    spec 1.4.11
+  SE5  2000  LIVE / DEFINED                    spec 1.4.16 / 1.4.17
+```
+
+**What is NOT settled.** Any future pairing or aggregation rule for `order_ref` ↔
+`receipt`, and any fetch route not already in `§6.2`'s closed five-probe enum.
 
 ### 4.3 Search bound
 

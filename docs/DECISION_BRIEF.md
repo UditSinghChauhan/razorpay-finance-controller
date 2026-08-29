@@ -1,7 +1,7 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.19 · **Date:** 2026-08-28
+**Spec version:** 1.4.20 · **Date:** 2026-08-28
 **Reviewer role:** principal architect / skeptical reviewer
 
 **At spec 1.4.6** §A.13 records one definition, taken at a governance gate held
@@ -1512,6 +1512,54 @@ sentence was false rather than merely incomplete.
 seed, split, family, `target_record_count`, rate, threshold or metric definition
 changes; `constraint_set_hash` does not move; benchmark v1.0.3 and `GT_VERSION`
 1.1.0 are unchanged and no dataset exists.
+
+### A.27 Spec 1.4.20 / benchmark 1.0.3 — the third signal with no comparand
+
+**The decision.** `SE2` is **expected-non-binding on v1.0.0 data**. Its 2000-bps
+weight is retained, unreallocated, and the row is not removed. Register row M34.
+
+**Found by implementing, not by reading.** `S4` needs `evidence_score_bps`, which
+needs all five signals. Inspecting the actual APIs before writing the scorer
+surfaced a comparand chain that does not close: `receipt` is reachable through
+`fetch_order`, `order_ref` lives only on `MerchantLedgerEntry`, and **nothing pairs
+a `MerchantLedgerEntry` with a candidate**. `AN5` was that pairing and was retired
+at spec 1.4.1 — on grounds this specification argued at length — after which
+`DATA_MODEL.md §11.1` and `§17.1.1` leave `ledger_entry` neither member-eligible
+nor a target, and every one reaches `E13_LEDGER_ONLY`.
+
+**Two frozen statements could not both hold.** `PREREGISTRATION.md §4.2` said the
+surviving receipt sequence made `SE2` *"a strong signal"*; `§10` V12 says *"ASSAY
+consumes three sources and **ties out two**."* `SE2` can only be strong if some
+candidate is scored against a ledger entry's `order_ref`, and V12 says the ledger
+view is never tied out. V12 is the one consistent with `AN5`'s retirement and with
+every clause downstream of it, so the *"strong signal"* sentence is corrected.
+
+**This is the third signal retained while doing nothing, and the pattern now has
+three members.** `§A.17` found `SE1` inactive because spec 1.4.4 removed the
+matching problem it was sized for. `§A.19` found `SE4` non-binding because its
+comparand was never reachable. This record finds `SE2` non-binding because its
+**pairing** was retired — a third distinct cause, same disposition: retained,
+unreallocated, reported. `RECONCILIATION_SPEC.md §4.1`'s `C8` treatment is doing a
+lot of work in this specification, and it is doing it deliberately.
+
+**Expected-non-binding, not permanently inactive.** `SE1`'s status is structural —
+`§11.1`'s empty `bank_line` candidate set removed the only context in which its
+comparands could differ. `SE2`'s is the absence of a clause, which an amendment
+could supply without touching a constraint. The weaker claim is the one the frozen
+text supports, and the stronger one is deliberately not made.
+
+**The system still resolves material ambiguity.** Pre-probe `Δs ≤ 469 bps < ε`
+(spec 1.4.13); post-probe `SE5`'s 2000 bps clears `ε = 1500` unaided. What v1.4.20
+removes is a signal that could never have contributed, not the ability to reach
+`DISCRIMINATED`.
+
+**Nothing observable moves.** No weight is renormalised — the five stand at 3500 /
+2000 / 1500 / 1000 / 2000. `SE1`, `SE3`, `SE4`, `SE5`, `ProbeResultDetail`, M28,
+`C1`–`C8`, `P_max` and every `§7` threshold are untouched; no population parameter,
+seed, split, family, rate, threshold or metric definition changes;
+`constraint_set_hash` does not move; benchmark v1.0.3 and `GT_VERSION` 1.1.0 are
+unchanged and no dataset exists. `packages/engine` is not created or modified by
+this amendment.
 
 ---
 
