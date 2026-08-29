@@ -5,7 +5,7 @@ only**. `ARCHITECTURE.md §3`: *"Deliberately a second, slow, naive
 implementation. Its whole value is being *not* the engine and *not* the
 generator."*
 
-Written against **specification 1.4.19 / benchmark 1.0.3**.
+Written against **specification 1.4.20 / benchmark 1.0.3**.
 
 ## What this package guarantees
 
