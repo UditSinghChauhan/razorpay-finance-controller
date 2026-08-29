@@ -1,6 +1,6 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.4.16 · **Date:** 2026-08-28
+**Spec version:** 1.4.17 · **Date:** 2026-08-28
 
 The matching algorithm, the ambiguity definition, and the rules that decide
 accept / reject / abstain. This is the technical core of the project.
@@ -364,7 +364,7 @@ standard way recon tools manufacture confident wrong answers.
 | `SE2` | `order_ref` ↔ `receipt` string similarity (Jaro–Winkler). **Post-probe only** — `receipt` is quarantined, so this signal is computable solely from a `fetch_order` probe result (§6.2), as `SE5` is. It scores 0 for every candidate on which no probe has run | 2000 |
 | `SE3` | Temporal proximity to the modal settlement lag, restated in dimensionally coherent form at spec 1.4.13. `lag_days = (settled_at − created_at) / 86400`, a **real number, not floored**. `mode_days` = the mode of `floor(lag_days)` over **every `recon_line` observation in the dataset**, **ties to the lowest bin**. A **member's** score is `max(0, 1 − |lag_days − mode_days| / (T_max − T_min))`; a **candidate's** score is the **arithmetic mean** of its members' scores. Both terms are in days, so the ratio is unitless and expressing both in seconds gives an identical value | 1500 |
 | `SE4` | Method / card-network agreement with the merchant memo. **Post-probe only** — `memo` is quarantined (`DATA_MODEL.md §0` rule 4, `§8`, `§10`) and `MerchantLedgerEntry` carries no structural method or card-network field, so this signal is computable solely from a `fetch_payment` probe result (§6.2), as `SE2` and `SE5` are. It scores 0 for every candidate on which no probe has run. **`SE4` is additionally declared expected-non-binding on v1.0.0 data at spec 1.4.11**, on the `C8` precedent in `§4.1`: it is retained as a declared signal, its weight is unchanged and unreallocated, and the fact that it separates no candidates is reported rather than assumed. **Its agreement function is therefore left undefined — partial credit between `method` and `card_network`, and the treatment of a `card_network` null on both sides, are unnecessary while the signal is non-discriminating, and are NOT settled here** | 1000 |
-| `SE5` | Probe result corroboration: agreement between a `fetch_settlement_recon` report and a candidate's members. **Post-probe only**, as `SE2` and `SE4` are — already stated by this section's pre-probe block (spec 1.4.10) — so it scores 0 for every candidate on which no such probe has run. **Scope, ratified at spec 1.4.15: `fetch_settlement_recon` results only**; `§6.2` names a consumer for every other probe and leaves this one unnamed. **Score, ratified at spec 1.4.16.** Let `R` be the probe's returned `constituent_entity_ids`; let `R*` be their images under `DATA_MODEL.md §12`'s identifier relation (spec 1.4.14), **a returned id with no observation being excluded from `R*` entirely** — neither numerator nor denominator; and let `M` be `Candidate.member_obs_ids`. Both are then `ObservationId` sets, and `SE5 = \|R* ∩ M\| / \|R* ∪ M\|`, with `SE5 = 0` when `\|R* ∪ M\| = 0`. `SE5 = 1` iff `R*` and `M` are equal and non-empty. `R*` is target-scoped and `M` is candidate-scoped, so unlike `SE1` this signal does order the candidates of one target. **Multi-probe aggregation under `P_max = 3` is NOT settled here** | 2000 |
+| `SE5` | Probe result corroboration: agreement between a `fetch_settlement_recon` report and a candidate's members. **Post-probe only**, as `SE2` and `SE4` are — already stated by this section's pre-probe block (spec 1.4.10) — so it scores 0 for every candidate on which no such probe has run. **Scope, ratified at spec 1.4.15: `fetch_settlement_recon` results only**; `§6.2` names a consumer for every other probe and leaves this one unnamed. **Score, ratified at spec 1.4.16.** Let `R` be the probe's returned `constituent_entity_ids`; let `R*` be their images under `DATA_MODEL.md §12`'s identifier relation (spec 1.4.14), **a returned id with no observation being excluded from `R*` entirely** — neither numerator nor denominator; and let `M` be `Candidate.member_obs_ids`. Both are then `ObservationId` sets, and `SE5 = \|R* ∩ M\| / \|R* ∪ M\|`, with `SE5 = 0` when `\|R* ∪ M\| = 0`. `SE5 = 1` iff `R*` and `M` are equal and non-empty. `R*` is target-scoped and `M` is candidate-scoped, so unlike `SE1` this signal does order the candidates of one target. **Multi-probe aggregation, derived at spec 1.4.17.** Where more than one `fetch_settlement_recon` result carries `settlement_id = S`, `R` is the **union** of their `constituent_entity_ids` over **every** such result — irrespective of each probe's `date` argument and of the order the probes ran. Repeating a probe adds nothing; a result that returns nothing removes nothing | 2000 |
 
 `evidence_score_bps ∈ [0, 10_000]` is a weighted sum, used **only** to order candidates and
 to compute the ε-gap in §6. Weights are frozen in `PREREGISTRATION.md` before the
@@ -535,13 +535,69 @@ recall, 1000 under precision and 1714 under Jaccard** — recall and Jaccard
 all six scores **0 under binary and 1714 under Jaccard**. Each flips whether a
 component posts to the control accounts or opens a Suspense item.
 
-**What this does not settle. Multi-probe aggregation under `P_max = 3` remains
-open.** `§6.2` executes probes with *"deterministic code"*, so a repeated call on
-identical arguments returns an identical result and every combination rule agrees;
-combining results drawn from **different** arguments is unspecified, and no rule
-is supplied or implied here. `SE4`'s agreement function is likewise untouched, and
-the double-counting question raised at spec 1.4.15 stays dormant while the scope
-is one probe no other signal consumes.
+**`SE5` under more than one probe, derived at spec 1.4.17 `[ASSAY-MODEL]`, register
+row M31.** `P_max = 3` is a budget **per component** (`ARCHITECTURE.md §R3`,
+`THREAT_MODEL.md §T7`), and `§6.2`'s loop is sequential — *"deterministic code
+executes it and **re-runs the solve**"* — so a component may accumulate several
+`fetch_settlement_recon` results before the solve that emits a decision. `R` is the
+**union** of `constituent_entity_ids` over every result carrying the target's
+`settlement_id`. `R*`, `M`, the quotient and the empty-union zero are exactly as
+ratified at spec 1.4.16 and are **not** reopened.
+
+**The evidence accumulates rather than being replaced — derived.** `DATA_MODEL.md
+§13` gives the certificate `probes_attempted: ProbeId[]`, *"what we tried before
+giving up"*, and `§11`'s worked case spends three probes, evaluates them together
+(*"returns receipts that match neither set distinctively"*) and records **all
+three** on one certificate. **No clause in this specification discards or
+supersedes an `Evidence` row.**
+
+**Union is forced by this section's own frozen sentence.** `§6.2` names the probe's
+referent as *"the lines carrying that `settlement_id`"* — the date is a query
+parameter, not the object — and `DATA_MODEL.md §6` states the report is *"date-scoped
+and paginated, and a period-close ingest must **iterate** rather than issue one
+call"*, so reading it whole means combining windows additively. Against three
+windows `{a,b}`, `{c,d}`, `{e,f}` of a six-constituent settlement, **only the union
+lets a candidate equal to the settlement's constituent set score `1.000`**;
+intersection gives `0.000` and latest, first and any per-probe aggregate give
+`0.333`, each **falsifying** the row's *"`SE5 = 1` iff `R*` and `M` are equal and
+non-empty"*. Worse, *latest* certifies the one-window candidate `{e,f}` **at
+1.000** — a wrong allocation declared perfect. This is the same defect the `F05`
+exclusion was derived from at spec 1.4.16: a perfect score made unattainable where
+the evidence is complete.
+
+**The alternatives fail on three further counts.** *Order dependence* — over the six
+orderings of `{a}`, `{b,c}`, `{d,e,f}`, union takes **one** value while latest and
+first take **three**, swinging `667` bps on probe order, an input
+`ProbeResultDetail` does not carry (no date, no ordinal, no timestamp). *Evidence
+destruction* — under intersection or latest a probe spent on a window that returns
+nothing **erases** what an earlier probe established, while `§6.2`'s own metric is
+*"abstentions **resolved** per probe spent"* and `ARCHITECTURE.md §R3` expressly
+contemplates a *"wasted probe budget"*. *The cap* — scoring each result as separate
+evidence gives `6000` bps for a signal frozen at `2000`, breaks
+`evidence_score_bps ∈ [0, 10_000]`, and `AL3` bars the renormalisation that would
+repair it; it also makes three identical probes score triple one probe.
+
+**Union has the properties the loop requires — verified.** *Idempotent*: `§6.2`'s
+*"deterministic code"* over a static dataset makes identical arguments return
+identical results, and union of a repeat is inert. *Order-independent*. *Monotone*:
+`R*` only grows, so an empty or repeated result never lowers a score, and a newly
+returned constituent lowers one **only** where the candidate genuinely omits it — a
+candidate holding the expanded `R*` still scores `1.000`. *Deterministic*: `R` is a
+set, materialised in lexicographic order of `entity_id` so it enters `inputs_hash`
+reproducibly under `DATA_MODEL.md §0` rule 5 and metric 23. **No `Evidence` field is
+added.**
+
+**Two things this deliberately leaves unspecified.** The **field the recon report is
+date-scoped on** — `§22.1` D11 gives only *"`year` + `month`, optional `day`"* and no
+document names the field. The union rule does not need it: under a `settled_at`
+reading every line of one settlement shares a bucket and a query returns
+all-or-nothing; under a `created_at` reading the optional `day` splits a
+settlement's capture-days into disjoint partials. **Union is correct under both**,
+and this amendment decides neither. Also unspecified: **any `R3` policy** about
+which dates or probes to spend the budget on — that is probe *selection*, not probe
+*aggregation*. `SE4`'s agreement function is untouched, and the spec-1.4.15
+double-counting question stays dormant while the scope is one probe no other signal
+consumes.
 
 **Why `SE4` separates nothing, stated at spec 1.4.11 `[ASSAY-MODEL]`, register row
 M25.** Six facts, each read off frozen text and none of them a choice:

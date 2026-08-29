@@ -1,6 +1,6 @@
 # PREREGISTRATION — ASSAY Benchmark v1.0.3
 
-**Spec version:** 1.4.16 · **Benchmark version:** 1.0.3
+**Spec version:** 1.4.17 · **Benchmark version:** 1.0.3
 
 **Status: FROZEN on commit. Amendments require a version bump and a new seal.**
 **Date frozen:** 2026-08-23 · **Amended:** 2026-08-24 (benchmark 1.0.1),
@@ -601,6 +601,45 @@ every `§7` threshold, `§4.1`'s composition, `§4.2`'s rates and clock grid, `�
 `§6.1` and `§6.2` are untouched; **no metric definition is amended**; no seed,
 split, family or `target_record_count` moves; `constraint_set_hash` does not move;
 and benchmark v1.0.3 is unchanged, with no dataset in existence to regenerate.
+
+**Amendment 1.4.17 / benchmark 1.0.3 (pre-seal, one aggregation rule).**
+Applied before the seal, before any dataset was generated and before any number was
+observed. **Documentation only. One row, in `RECONCILIATION_SPEC.md §4.2`.** Where
+several `fetch_settlement_recon` results carry one `settlement_id`, `R` is the
+**union** of their `constituent_entity_ids`, irrespective of `date` argument or probe
+order. Register row M31; record at `DECISION_BRIEF.md §A.24`. **The spec-1.4.16
+scoring function, `F05` treatment, empty-result zero, `SE5` scope and 2000-bps weight
+are unchanged and are not reopened.**
+
+**Derived; nothing is ratified here.** Evidence accumulates across the `§6.2` loop —
+`DATA_MODEL.md §13`'s certificate carries `probes_attempted: ProbeId[]` and
+`RECONCILIATION_SPEC.md §11` records three probes on one certificate — and no clause
+discards an `Evidence` row. Union is then forced by `§6.2`'s referent (*"the lines
+carrying that `settlement_id`"*) together with `§4.2`'s own frozen *"`SE5 = 1` iff
+`R*` and `M` are equal and non-empty"*, which every other aggregation falsifies on a
+partitioned report.
+
+**Two boundaries are held.** The **date-scoping field of the recon endpoint remains
+unspecified** — `§22.1` D11 gives only the query shape, and the union rule is correct
+under every reading of it, so this amendment does not decide it. **`R3`
+probe-selection policy remains unspecified**: this settles aggregation, not which
+probes to spend.
+
+**`DATA_MODEL.md §12`'s disposition table is updated, its historical record
+preserved.** The paragraph recording what specs 1.4.12 and 1.4.14 left open stands
+byte-identical; only the live table's `multi-probe combination` entry and its closing
+sentence move, so the table states the current disposition rather than a superseded
+one. **No V-row is added.**
+
+**`SE5`'s 2000-bps weight stands**, `SE1`–`SE4` are untouched, and the
+`ProbeResultDetail` union of spec 1.4.12 and the identifier relation of spec 1.4.14
+are unchanged — **no schema field is added or altered**; `R` is a set, materialised in
+lexicographic order of `entity_id` so it enters `inputs_hash` reproducibly under `§0`
+rule 5. `C1`–`C8`, `I1`–`I9`, every `§7` threshold including `P_max = 3`, `§4.1`'s
+composition, `§4.2`'s rates and clock grid, `§4.3`, `§6.1` and `§6.2` are untouched;
+**no metric definition is amended**; no seed, split, family or `target_record_count`
+moves; `constraint_set_hash` does not move; and benchmark v1.0.3 is unchanged, with no
+dataset in existence to regenerate.
 
 ---
 
