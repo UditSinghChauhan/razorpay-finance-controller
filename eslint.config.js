@@ -29,7 +29,15 @@ const GENERATOR = [
 /** `packages/oracle` — the deliberately naive second implementation. */
 const ORACLE = ["@assay/oracle", "@assay/oracle/*", "**/packages/oracle/**"];
 
-/** `packages/engine` — stages S0–S5. */
+/**
+ * `packages/engine` — stages S1–S5.
+ *
+ * NOT S0: `RECONCILIATION_SPEC.md §2` gives S0 the output `Observation[]` +
+ * `UntrustedText[]`, and the ban below forbids this package from importing
+ * `UntrustedText` at all. A stage cannot emit a type its package may not
+ * import, so S0 is `packages/domain`'s over data `apps/cli` has already read
+ * (`ARCHITECTURE.md §3`, spec 1.4.18; `DECISION_BRIEF.md §A.25`).
+ */
 const ENGINE = ["@assay/engine", "@assay/engine/*", "**/packages/engine/**"];
 
 /**
