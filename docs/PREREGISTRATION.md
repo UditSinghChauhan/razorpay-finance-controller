@@ -1,6 +1,6 @@
 # PREREGISTRATION — ASSAY Benchmark v1.0.3
 
-**Spec version:** 1.4.17 · **Benchmark version:** 1.0.3
+**Spec version:** 1.4.18 · **Benchmark version:** 1.0.3
 
 **Status: FROZEN on commit. Amendments require a version bump and a new seal.**
 **Date frozen:** 2026-08-23 · **Amended:** 2026-08-24 (benchmark 1.0.1),
@@ -640,6 +640,39 @@ composition, `§4.2`'s rates and clock grid, `§4.3`, `§6.1` and `§6.2` are un
 **no metric definition is amended**; no seed, split, family or `target_record_count`
 moves; `constraint_set_hash` does not move; and benchmark v1.0.3 is unchanged, with no
 dataset in existence to regenerate.
+
+**Amendment 1.4.18 / benchmark 1.0.3 (pre-seal, one package boundary).**
+Applied before the seal, before any dataset was generated and before any number was
+observed. **Documentation only.** Stage `S0` is owned by `packages/domain`, over
+source data `apps/cli` has already read; `apps/cli` performs the filesystem I/O and no
+`S0` transform; `packages/engine` owns `S1`–`S5`. Register row M32; record at
+`DECISION_BRIEF.md §A.25`.
+
+**Derived.** `RECONCILIATION_SPEC.md §2` declares `S0`'s output `Observation[]` +
+`UntrustedText[]`, and `DATA_MODEL.md §10` forbids `packages/engine` from importing
+`UntrustedText` — a ban `DECISION_BRIEF.md §L.1` rule 3 lists among the invariants
+that may never be violated, `§6.2` `AL1` of this document repeats, and
+`eslint.config.js` enforces in CI. A stage cannot emit a type its package may not
+import, so `ARCHITECTURE.md §3`'s *"Stages S1–S5"* was correct and
+`DECISION_BRIEF.md §L.2` and `§I` were wrong in four places, now corrected in the
+self-correcting style `§L.2` already used for `ledger`.
+
+**Ratified.** `packages/domain` as `S0`'s owner rather than `apps/cli` or a new
+package: `ARCHITECTURE.md §3` excluded the engine but named nobody. Domain already
+holds every per-record part of `S0`, builds second, and performs no I/O.
+
+**Nothing is built.** `packages/engine` remains **absent**; domain's `S0`
+orchestration is scheduled, not written; no file moves and no module is added. The
+`eslint.config.js` stage comment is corrected from `S0–S5` to `S1–S5` as a **code**
+change, outside this docs-only commit.
+
+`C1`–`C8`, `SE1`–`SE5`, `I1`–`I9`, every `§7` threshold, `§4.1`'s composition,
+`§4.2`'s rates and clock grid, `§4.3`, `§6.1` and `§6.2` are untouched; **no metric
+definition is amended**; no seed, split, family or `target_record_count` moves;
+`constraint_set_hash` does not move; and benchmark v1.0.3 with `GT_VERSION` 1.1.0 is
+unchanged, with no dataset in existence to regenerate. `A2`, `THREAT_MODEL.md §T7`'s
+`days` bound, `SE4`'s agreement function and the recon endpoint's date-scoping field
+are not resolved here.
 
 ---
 
