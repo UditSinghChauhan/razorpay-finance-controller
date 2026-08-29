@@ -1,7 +1,7 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.12 · **Date:** 2026-08-28
+**Spec version:** 1.4.13 · **Date:** 2026-08-28
 **Reviewer role:** principal architect / skeptical reviewer
 
 **At spec 1.4.6** §A.13 records one definition, taken at a governance gate held
@@ -951,7 +951,9 @@ support is not entailment and the record says so.
 inactive and `SE2`, `SE4` and `SE5` post-probe, `SE3` is the only signal
 computable before a probe. Under the ratified kernel `SE3 ∈ [1/6, 1]`, so the
 greatest pre-probe `Δs` is 1250 bps — **below `ε = 1500`** — and `DISCRIMINATED`
-is unreachable before probing. That follows the order `§6.2` already describes,
+is unreachable before probing. *(Restated at spec 1.4.13: under the corrected
+formula the bound is `469 bps`. `1250` remains a true upper bound and the
+conclusion is unchanged; see `§A.20`.)* That follows the order `§6.2` already describes,
 but it makes `P_max` load-bearing on every material case. It is an artefact of the
 kernel's denominator, which is a ratified choice: `(T_max − mode)` would have made
 the ceiling exactly `ε`. Recorded at V20.
@@ -1104,6 +1106,91 @@ preferred by frozen text. `SE1`, `SE3` and `SE4` are untouched.
 `constraint_set_hash` does not move, `C1`–`C8` being untouched; benchmark v1.0.3
 is unchanged and no dataset exists. This is additive domain typing: no existing
 type, schema or runtime behaviour is altered.
+
+### A.20 Spec 1.4.13 / benchmark 1.0.3 — a formula that could not be evaluated
+
+**The decision.** `RECONCILIATION_SPEC.md §4.2`'s `SE3` row is restated in
+dimensionally coherent form, and the two properties spec 1.4.10 left unstated —
+the denominator and member aggregation — are ratified. Register row M27; `§10`
+V20's figure restated from `1250` to `469 bps`.
+
+**The error.** Spec 1.4.10 defined `lag` in **elapsed seconds**, defined the modal
+lag in **whole days**, and then wrote `|lag − mode|`. The terms had no common
+unit. On a real member — a `T+2` batch captured at 09:00, `lag = 216,000 s`,
+`mode = 2`:
+
+```
+  denominator read as days      1 − |216000 − 2| / 6       -> clamped to 0
+  denominator read as seconds   1 − |216000 − 2| / 518400  -> 0.5833
+  dimensionally coherent        1 − |2.5 − 2|    / 6       -> 0.9167
+```
+
+Under the first reading **every member would have scored 0**, making `SE3`
+silently inert and leaving no live pre-probe signal at all; under the second it is
+systematically wrong. This is a defect in text this project committed, not a
+governance choice, and it had to be fixed whichever denominator was adopted.
+
+**Two properties were also missing, and the earlier audit did not catch them.**
+`§4.2`'s row scored *a* lag, but a candidate holds many members with different
+lags — `settled_at` is the instant of `capture-day + cycle`, so capture-day 5 at
+`T+3`, capture-day 6 at `T+2` and capture-day 7 at `T+1` all settle on day 8 and
+sit in one co-settlement class. **Member aggregation was undefined**, and so was
+whether the numerator's `lag` is the raw quotient or its day bin. Both change the
+selected allocation.
+
+**Derived, and recorded as such.** The lag term itself (`C4`; `O-C4-UNIT`). That
+the **mode** requires binning — the spec-1.4.7 grid makes a seconds-granular mode
+degenerate. That the **numerator stays continuous**: that binning rationale is
+scoped to the mode and does not reach the `lag` term, which `C4` defines as the
+raw difference. That days and seconds yield an identical ratio, the `86400`
+cancelling. That a **candidate-scoped** modal population is excluded, because each
+candidate would supply its own mode and score itself ≈ 1.0, making `SE3` constant
+across candidates and unable to rank. And that a **raw sum** over members is
+excluded, two members alone reaching 1.686 and breaking `§4.2`'s
+`evidence_score_bps ∈ [0, 10_000]`; the normalised sum is the arithmetic mean.
+
+**Ratified, and frozen text determines none of it.** The whole-day bin
+granularity, the run-level modal population, the lowest-bin tie rule, the linear
+clamped kernel, the **`T_max − T_min` denominator** and the **arithmetic-mean**
+member aggregation.
+
+**Why the denominator, on the record.** `T_max − T_min` is expressible in `C4`'s
+two frozen constants alone. `T_max − mode` mixes a frozen constant with a
+data-derived statistic and is **zero when the mode reaches `T_max`** —
+well-defined here only because `§4.2`'s frozen cycle holds the mode at 2, which is
+exactly the population-accident safety spec 1.4.7 was issued to remove. **An
+earlier draft argued this from cross-run comparability under
+`EVALUATION_SPEC.md §5.3`'s batch sweep; that argument is withdrawn**, because
+`§5.3` states the sweep *"measures metrics 21 and 22 only"* and produces no
+close-loop metric, so it does not bear on the choice. `T_max − mode`'s one real
+advantage — reaching 0 — is unused: neither denominator's floor is approached on
+conforming data, `SE3` bottoming at `0.6875` and `0.6250` respectively.
+
+**Why the mean, on the record, and it is the weaker of the two.** *"Proximity"* of
+a set reads as a central tendency rather than an extremum. `min` and `max` are
+extremum readings, and on a two-member example `max` selects the **opposite**
+candidate from `mean`, `median` and `min` alike; on a three-member example
+`median` and `mean` also diverge. The ground is linguistic, and this record says
+so rather than dressing it as a derivation.
+
+**What the corrected mathematics changes.** `§4.2`'s frozen cycle admits only
+`T+1`–`T+3` and the 1.4.7 grid puts `lag_days ∈ (n, n + 0.875]`, so the modal bin
+is `2` and the largest attainable `|lag_days − mode_days|` is **1.875 days**.
+Hence `SE3 ∈ [0.6875, 1)` and the greatest pre-probe `Δs` is **469 bps**, about a
+third of `ε = 1500`. `§A.17` published `1250 bps`, computed from `C4`'s full
+`[1, 7]`-day domain under the formula corrected here. **`1250` remains a true
+upper bound and nothing published under it is falsified** — the conclusion, that
+`DISCRIMINATED` is unreachable before probing, is unchanged and now holds by a
+wider margin. Had the numerator been binned instead, `T+1` and `T+3` would have
+scored **identically**, both sitting one bin from the mode, and `SE3` could not
+have distinguished an early settlement from a late one.
+
+**Nothing observable moves.** `SE3`'s 1500 bps, `T_min`, `T_max` and the kernel's
+shape are unchanged, and no weight is renormalised. `SE1`, `SE2`, `SE4` and `SE5`
+are untouched. No population parameter, seed, split, family,
+`target_record_count`, rate, threshold or metric definition changes;
+`constraint_set_hash` does not move, `C1`–`C8` being untouched; benchmark v1.0.3
+is unchanged and no dataset exists.
 
 ---
 

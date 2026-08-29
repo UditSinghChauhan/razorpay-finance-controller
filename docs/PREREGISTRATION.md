@@ -1,6 +1,6 @@
 # PREREGISTRATION — ASSAY Benchmark v1.0.3
 
-**Spec version:** 1.4.12 · **Benchmark version:** 1.0.3
+**Spec version:** 1.4.13 · **Benchmark version:** 1.0.3
 
 **Status: FROZEN on commit. Amendments require a version bump and a new seal.**
 **Date frozen:** 2026-08-23 · **Amended:** 2026-08-24 (benchmark 1.0.1),
@@ -374,8 +374,9 @@ linear kernel — none of which frozen text determines. **`SE4`'s agreement
 function is not settled**, and `§4.2`'s row says so.
 
 **One consequence is disclosed rather than repaired**, at `§10` V20: with `SE1`
-inactive and `SE2`/`SE4`/`SE5` post-probe, pre-probe `Δs ≤ 1250 bps < ε`, so
-`DISCRIMINATED` is unreachable before probing.
+inactive and `SE2`/`SE4`/`SE5` post-probe, pre-probe `Δs ≤ 469 bps < ε` under the
+spec-1.4.13 formulation — restated from the `1250 bps` published here at spec
+1.4.10 — so `DISCRIMINATED` is unreachable before probing.
 
 **The SE1–SE5 weights are unchanged**, `SE1`'s 3500 included; nothing is
 renormalised. `C1`–`C8`, `I1`–`I9`, every `§7` threshold, `§4.1`'s composition,
@@ -451,6 +452,44 @@ and clock grid, `§4.3`, `§6.1` and `§6.2` are untouched; **no metric definiti
 amended**; no seed, split, family or `target_record_count` moves;
 `constraint_set_hash` does not move; and benchmark v1.0.3 is unchanged, with no
 dataset in existence to regenerate.
+
+**Amendment 1.4.13 / benchmark 1.0.3 (pre-seal, a formula that could not be
+evaluated).** Applied before the seal, before any dataset was generated and
+before any number was observed. **Documentation only. One row, in
+`RECONCILIATION_SPEC.md §4.2`.** It restates `SE3` in dimensionally coherent form
+and supplies the two properties spec 1.4.10 left unstated. Register row M27;
+record at `DECISION_BRIEF.md §A.20`; `§10` V20's figure restated.
+
+**The error being corrected.** Spec 1.4.10 defined `lag` in **elapsed seconds**,
+the modal lag in **whole days**, and then wrote `|lag − mode|` — terms with no
+common unit. On a `T+2` member captured at 09:00 the expression clamped to **0**
+rather than the intended **0.9167**, so **every member would have scored 0** and
+`SE3` would have been silently inert, leaving no live pre-probe signal at all.
+The correction is the units and two previously unstated terms; `T_min`, `T_max`,
+the kernel's shape and the **1500-bps weight are unchanged**.
+
+**Derived:** the lag term (`C4`, `O-C4-UNIT`); that the *mode* needs binning; that
+the *numerator stays continuous*, that rationale being scoped to the mode; that
+days and seconds give an identical ratio; and two exclusions — a candidate-scoped
+mode, which would make `SE3` constant across candidates and unable to rank, and a
+raw sum over members, which breaks `§4.2`'s `[0, 10_000]`. **Ratified, none of it
+determined by frozen text:** the whole-day granularity, the run-level modal
+population, the lowest-bin tie rule, the linear clamped kernel, the
+`T_max − T_min` denominator and the arithmetic-mean member aggregation.
+
+**One published figure is restated rather than left standing.** `§10` V20 gave
+pre-probe `Δs ≤ 1250 bps`, computed from `C4`'s full `[1, 7]`-day domain under the
+formula corrected here. The frozen `T+1`–`T+3` cycle never populates that
+domain's tails, so the bound that holds is **469 bps**. `1250` was a true upper
+bound and nothing published under it is falsified; the conclusion —
+`DISCRIMINATED` unreachable before probing — is unchanged and now holds by a
+wider margin.
+
+**`SE1`, `SE2`, `SE4` and `SE5` are untouched**, as are `C1`–`C8`, `I1`–`I9`,
+every `§7` threshold, `§4.1`'s composition, `§4.2`'s rates and clock grid, `§4.3`,
+`§6.1` and `§6.2`. **No metric definition is amended**; no seed, split, family or
+`target_record_count` moves; `constraint_set_hash` does not move; and benchmark
+v1.0.3 is unchanged, with no dataset in existence to regenerate.
 
 ---
 
@@ -1871,7 +1910,7 @@ Stated here, before results, so they cannot be presented later as afterthoughts.
 | V17 | The oracle's candidate-search machinery is exercised on no DEV target | Every DEV settlement is fully `AN1`-anchored: `F08`'s `DROP_SETTLEMENT_ID` is the only operator that detaches a line from its batch identifier, and `F08` is **test-only** at seeds 9100–9104 (`§6.1`). `F05`'s withheld line leaves its settlement short but supplies no unanchored member to search over. Spec 1.4.3's co-settlement coherence makes those `F08` targets enumerable and cheap, but the rule cannot be validated on DEV | **Accepted, and recorded before the seal.** `B5`'s resolution joins `E12` (`V14`) and `E14` (`V13`) as specified-but-unexercised on DEV data: the completeness gate passes on DEV without ever enumerating a candidate. It is first exercised on the sealed test split, where `§9`'s stopping rule permits one run. Reported through `EVALUATION_SPEC.md §5.4`'s oracle-gate line, with the count of targets that entered enumeration stated alongside the pass |
 | V18 | The bank side is neither candidate-matchable nor covered by the completeness gate | `DATA_MODEL.md §11.1` derives that a `settlement` is not a member-eligible kind, so a `bank_line` target has no admissible member and `RECONCILIATION_SPEC.md §4`'s *"a bank line needing settlements"* yields the empty candidate set. `AN2` is therefore the only route by which a bank line reaches `RECONCILED`, and `§4.2` freezes `bank_ref` quality at *"30% a clean UTR, 70% absent or non-UTR"*. Separately, no `bank_line` target is **expressible** under `§5.3`, because `GroundTruth.bank_mappings` names settlements and settlements are not member-eligible | **Real and disclosed rather than repaired.** Metric 27 `coverage_by_value_bank` is bounded by `AN2` alone; its **definition is unchanged** and no threshold or composition figure was adjusted to move it, exactly as `V12` handled metric 28. The completeness gate therefore never covers the bank side at all, which narrows what the gate tests and is reported with the inexpressible counts `§5.3` requires. The consequence for the close gate is a **separate** and larger matter and is not folded in here: it is reported apart, unrepaired, as blocker `B8` |
 | V19 | The frozen population cannot satisfy the `CLOSED` half of `S12`, so metric 11 is structurally degenerate | Derived from frozen parameters, not from a measured result. `§4.1` realizes `§4.2`'s 30% clean `bank_ref` share exactly at `realize(30/100, 31) = 9` per family instance, leaving **at least 22 unanchored bank lines per family instance** — a floor rather than an exact count, since `F04`'s `DUPLICATE_ROW` and `F08`'s `MANGLE_UTR` perturb it **upward only**. `RECONCILIATION_SPEC.md §3` makes `AN2` the only bank-side anchor and `DATA_MODEL.md §11.1` leaves a `bank_line` target no admissible member, so no second route exists. Each unanchored line reaches `E03` → `P5` (`DATA_MODEL.md §17.1.1`) and enters `unresolved_value_paise` at its full `amount` (`DATA_MODEL.md §14.1`). Against `RECONCILIATION_SPEC.md §10.3`'s 0.5% of `batch_value_paise` the bank-side numerator alone is of the order of 138× the threshold, so `period_status` is `OPEN` for every conforming dataset the frozen composition produces | **Accepted and disclosed; governed by a disposition this specification declared in advance.** `DECISION_BRIEF.md §F` F9 states that if the falsification check finds *"all families close, or none does"*, the outcome *"is **reported as a finding** in the threats-to-validity section and the run proceeds to the seal unchanged"*, and that *"the threshold may **NOT** be adjusted in response to what the check shows"*. This row is that report, written from the derivation rather than awaiting the run; `F9`'s dev run remains the declared confirmation. **`S12`'s `CLOSED` half is not satisfied and is reported failed; its `OPEN` half is satisfied**, and `S12`'s own stated purpose — *"a close gate that has never **refused to close** is an untested close gate"* — is met, since the gate refuses on every run. Metric 11 is reported with its cause; metrics 12, 13 and 14 remain meaningful and `BLOCKED` must still be 0. **`CLOSED` is not universally unreachable**: a conforming dataset with a sufficiently higher clean-`bank_ref` share would close, so the bar is `§4.2`'s composition and not `C1`–`C8`. `DECISION_BRIEF.md §I`'s Aug 27 row already separates the two things being measured — the gate's three outcomes are exercised **on constructed inputs**, while *"the DEV-seed outcome distribution is recorded for `§F` F9 and is not a completion gate"*. The derivation above references no seed; it was separately illustrated on seeds outside `§6.1`'s split table, which are **not benchmark results** and carry no `AL7` consequence |
-| V20 | `SE1`'s 3500 bps is permanently inactive, and pre-probe discrimination is unreachable | **Derived:** `SE1` compares `settlement.utr` with its `AN2` bank line's `bank_ref` (`DATA_MODEL.md §22.2` M8) — both target-scoped, so it takes one value across every candidate of a target and can neither order candidates nor move the ε-gap, which `RECONCILIATION_SPEC.md §4.2` gives as the score's only two uses. It could rank only for a `bank_line` target, and `DATA_MODEL.md §11.1` (spec 1.4.4) gave that target the empty candidate set. `§11`'s worked example corroborates: its stated `Δs = 400 bps` with `SE3` deciding and a verdict of `ABSTAINED` is reproducible only if `SE1` contributes equally to both candidates. **This section's V18 disclosed 1.4.4's bank-side consequences — metric 27, the completeness gate, `B8` — and did not record this one.** With `SE1` inactive and `SE2`/`SE4`/`SE5` probe-gated, pre-probe `Δs ≤ 1250 bps < ε` under the spec-1.4.10 kernel | **Accepted and disclosed rather than repaired.** The weight is **not** reallocated and the row is **not** removed: `AL3` freezes the `SE1`–`SE5` weights, and `RECONCILIATION_SPEC.md §4.1`'s standing treatment of a declared-but-inert clause — `C8`, and `C2`'s adjustment half — is to retain it and report that it does nothing rather than delete it. The effective evidence budget is `SE2`+`SE3`+`SE4`+`SE5` = 6500 bps, of which 5000 is probe-gated. **No metric definition is amended and no threshold moved**; this row reports a consequence and redefines nothing. `SE5` remains undefined and is untouched at spec 1.4.10 |
+| V20 | `SE1`'s 3500 bps is permanently inactive, and pre-probe discrimination is unreachable | **Derived:** `SE1` compares `settlement.utr` with its `AN2` bank line's `bank_ref` (`DATA_MODEL.md §22.2` M8) — both target-scoped, so it takes one value across every candidate of a target and can neither order candidates nor move the ε-gap, which `RECONCILIATION_SPEC.md §4.2` gives as the score's only two uses. It could rank only for a `bank_line` target, and `DATA_MODEL.md §11.1` (spec 1.4.4) gave that target the empty candidate set. `§11`'s worked example corroborates: its stated `Δs = 400 bps` with `SE3` deciding and a verdict of `ABSTAINED` is reproducible only if `SE1` contributes equally to both candidates. **This section's V18 disclosed 1.4.4's bank-side consequences — metric 27, the completeness gate, `B8` — and did not record this one.** With `SE1` inactive and `SE2`/`SE4`/`SE5` probe-gated, pre-probe `Δs ≤ **469 bps** < ε under the spec-1.4.13 formulation — restated from the `1250 bps` published at spec 1.4.10, which was computed from `C4`'s full `[1, 7]`-day domain under a formula since corrected. `1250` was a true upper bound and nothing published under it is falsified; the frozen `T+1`–`T+3` cycle simply never populates that domain's tails, so the bound that holds is `469` | **Accepted and disclosed rather than repaired.** The weight is **not** reallocated and the row is **not** removed: `AL3` freezes the `SE1`–`SE5` weights, and `RECONCILIATION_SPEC.md §4.1`'s standing treatment of a declared-but-inert clause — `C8`, and `C2`'s adjustment half — is to retain it and report that it does nothing rather than delete it. The effective evidence budget is `SE2`+`SE3`+`SE4`+`SE5` = 6500 bps, of which 5000 is probe-gated. **No metric definition is amended and no threshold moved**; this row reports a consequence and redefines nothing. `SE5` remains undefined and is untouched at spec 1.4.10 |
 | V21 | `SE4`'s 1000 bps separates no candidates on v1.0.0 data | **Derived, from six frozen facts.** `memo` is quarantined (`DATA_MODEL.md §0` rule 4, `§8`, `§10`) and **no** `RECONCILIATION_SPEC.md §6.2` probe returns it — the closed enum holds no ledger-entry probe, and `DATA_MODEL.md §3` gives `receipt` an explicit probe-reachability sentence that `memo` has no counterpart to. `MerchantLedgerEntry` (`§8`) carries no structural method or card-network field. `fetch_payment` supplies `method`, which `§10`'s `payment` observation already carries structurally. `card_network` has no Payment-side field at all, spec 1.1.1 having placed the card attributes on `ReconLine` *"when they are settlement-recon columns"*. No **exercised** `§4.3` operator perturbs `method` or `card_network` — `DROP_FIELD` could and is declared not exercised. And `§4.2`'s `F06` construction draws *"identical method — ONCE from the frozen mix"* for **both** members of a collision pair, so the family that manufactures equal-credit ambiguity leaves `SE4` nothing to separate | **Accepted and disclosed rather than repaired**, on the `C8` precedent in `RECONCILIATION_SPEC.md §4.1`. The row and its **1000 bps are retained, not reallocated and not removed**; `AL3` freezes the `SE1`–`SE5` weights and nothing is renormalised. `§6.2`'s `fetch_payment` route is unchanged, the probe enum stays closed, and **no `fetch_ledger_entry` probe is added** — that would open a closed enum and put a merchant-controlled surface (`THREAT_MODEL.md §T1`) inside the probe budget. **The agreement function is left undefined**, being unnecessary while the signal is non-discriminating. **No metric definition is amended and no threshold moved.** With `SE1` inactive (V20) and `SE4` non-binding, the evidence budget that is both live and defined is `SE2` + `SE3` = 3500 of 10000 bps, and `SE5`'s 2000 remains undefined |
 
 **The claim ASSAY is entitled to make, and no more:**
