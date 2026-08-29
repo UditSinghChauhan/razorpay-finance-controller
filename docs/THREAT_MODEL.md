@@ -1,6 +1,6 @@
 # THREAT_MODEL — ASSAY
 
-**Spec version:** 1.4.18 · **Date:** 2026-08-28
+**Spec version:** 1.4.19 · **Date:** 2026-08-28
 
 Every control answers: **what specific failure does this prevent?** Controls that
 cannot name a failure are removed.
@@ -268,7 +268,16 @@ plausible, and the ₹0.01 drift class that silently breaks tie-outs at scale.
 (`RECONCILIATION_SPEC.md §6.2`); arguments must come from the call's allowlist;
 `P_max = 3` per component; every probe logged with its proposer; no probe can
 write, create or mutate anything. `widen_temporal_window` — the only probe that
-relaxes a constraint — has a hard bound and its use is recorded on the decision.
+relaxes a constraint — has its use recorded on the decision. **The numeric hard
+bound this section promised is not stated by any document, and spec 1.4.19 declines
+to invent one** (register row M33). What holds on v1.0.0 data instead is arithmetic:
+`C4`'s `[1, 7]`-day window already admits every true allocation member with
+**3.125 days of headroom**, so the probe is **expected-non-binding** on that
+population and no relaxation can rescue an allocation `C4` excluded. The attack
+named below is separately blocked — spec 1.4.15 derived that a
+`widen_temporal_window` result may **not** feed `SE5`, precisely so that a
+relaxation cannot raise the evidence score of the candidates it admitted. The bound
+remains **open**, as does whether `R3` may propose the probe at all.
 
 **Prevents.** SSRF-style redirection, unbounded API spend, and quiet constraint
 relaxation to manufacture a match.

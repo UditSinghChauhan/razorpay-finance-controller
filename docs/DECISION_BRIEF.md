@@ -1,7 +1,7 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.18 · **Date:** 2026-08-28
+**Spec version:** 1.4.19 · **Date:** 2026-08-28
 **Reviewer role:** principal architect / skeptical reviewer
 
 **At spec 1.4.6** §A.13 records one definition, taken at a governance gate held
@@ -1459,6 +1459,59 @@ byte-identical to what it has said since spec 1.0.0, which is the point.
 and `GT_VERSION` 1.1.0 are unchanged and no dataset exists. `A2`, `THREAT_MODEL.md
 §T7`'s `days` bound, `SE4`'s agreement function and the recon endpoint's date-scoping
 field are all untouched.
+
+### A.26 Spec 1.4.19 / benchmark 1.0.3 — a promised control that was never built
+
+**The decision.** `widen_temporal_window` is **expected-non-binding on v1.0.0
+data**. Its numeric hard bound stays **unspecified**, and this amendment **does not
+invent one**. Register row M33.
+
+**`§T7` asserted a control that does not exist.** Its Controls paragraph lists four:
+a closed enum of five read-only operations, allowlisted arguments, `P_max = 3` per
+component, and — for the one probe that relaxes a constraint — *"a hard bound"*. The
+first three are real and enforced. **The fourth is a claim with nothing behind it**:
+no document states the figure, `PREREGISTRATION.md §7`'s frozen block carries none,
+and `§6.2` AL3's enumeration of frozen constants omits it. Spec 1.4.12 disclosed the
+gap twice, in `DATA_MODEL.md §12` and `PREREGISTRATION.md §4.2`, and declined to
+bound `days` in the schema on the ground that doing so *"would invent a frozen
+constant"*. That reasoning stands; this record adds what it could not.
+
+**The arithmetic makes the missing number harmless on this population.** `§4.2`'s
+frozen cycle admits only `T+1`, `T+2` and `T+3`; the spec-1.4.7 grid puts
+`lag_days ∈ (n, n + 0.875]`; and `§4.3`'s `SHIFT_TIMESTAMP` — the only operator that
+could move a lag — is declared **not exercised**. So the true lag range is
+`(1, 3.875]` days inside `C4`'s `[1, 7]`, with **3.125 days of headroom at the top
+and a lower bound that never binds**. `C4` excludes no true member; the widening
+needed for completeness is **zero days**; and any positive widening can only admit
+allocations the truth does not require — which is `§T7`'s own named attack, *"quiet
+constraint relaxation to manufacture a match"*, approached from the inside.
+
+**Zero is what is *needed*, not a ceiling that is *imposed*.** The distinction is
+the whole of this amendment's restraint. Turning "no widening is necessary" into "no
+widening is permitted" would be a new frozen constant wearing a derivation's
+clothes. `days` keeps `integer > 0` with no schema ceiling, and `packages/domain`'s
+shipped test — *"does NOT bound `days` — `THREAT_MODEL §T7` promises a bound no
+document states"* — keeps pinning that absence.
+
+**Expected-non-binding is not a prohibition, and the record says so explicitly.**
+Nothing here forbids `R3` from proposing the probe; whether it may is **not
+settled**. The probe keeps its place in the closed enum, because `§T7`'s SSRF and
+spend controls rest on that enum being shut at five and `DATA_MODEL.md §12`'s
+`ProbeResultDetail` mirrors it variant for variant.
+
+**`§T7`'s stated attack survives the missing bound on a different control.** Spec
+1.4.15 derived that a `widen_temporal_window` result may **not** feed `SE5`,
+precisely because scoring it *"would let a `C4` relaxation raise the evidence score
+of the candidates it admitted"*. That exclusion is already frozen, and it — not a
+ceiling — is what currently prevents the relaxation-to-manufacture-a-match path. The
+`§T7` edit made here is the **first in the project**, and it is made because the
+sentence was false rather than merely incomplete.
+
+**Nothing observable moves.** `C4`, `T_min`, `T_max`, `P_max = 3`, `C1`–`C8`,
+`SE1`–`SE5` and `ProbeResultDetail` are all unchanged; no population parameter,
+seed, split, family, `target_record_count`, rate, threshold or metric definition
+changes; `constraint_set_hash` does not move; benchmark v1.0.3 and `GT_VERSION`
+1.1.0 are unchanged and no dataset exists.
 
 ---
 
