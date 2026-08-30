@@ -95,6 +95,18 @@ importers:
         specifier: workspace:*
         version: link:../money
 
+  packages/probe:
+    dependencies:
+      '@assay/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@assay/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@assay/ledger':
+        specifier: workspace:*
+        version: link:../ledger
+
 packages:
 
   '@eslint-community/eslint-utils@4.10.1':
