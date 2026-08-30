@@ -23,6 +23,10 @@ import { describe, expect, it } from "vitest";
  *   4  no probe loop    no probe call is constructed here (spec 1.4.23)
  *   5  no R3, no wire   no proposal policy, no transport, no float
  * ```
+ *
+ * A sixth group, *"the surface stays honest"*, asserts the positive claims the
+ * package makes about itself — where its command files live, that only `main.ts`
+ * reads `process`, and that `generate` writes every artifact it says it does.
  */
 
 const ROOT = join(import.meta.dirname, "..");
@@ -313,6 +317,43 @@ describe("the surface stays honest", () => {
       "commands/types.ts",
       "commands/verify.ts",
     ]);
+  });
+
+  it("writes §6.2's probe surface beside the other three artifacts, for every family", () => {
+    // Spec 1.4.24 (M38) closed the gap `generate` used to report: the rows are
+    // packages/generator's and the write is this package's. Asserted from the
+    // source because PREREGISTRATION.md §9 sequences every real generation after
+    // the seal tag, so the command's happy path cannot be driven here.
+    const generate = sources.find((s) => s.rel === "commands/generate.ts");
+    expect(generate).toBeDefined();
+    const body = decomment(generate?.text ?? "");
+
+    for (const artifact of [
+      "observations.jsonl",
+      "untrusted_text.jsonl",
+      "ground_truth.jsonl",
+      "recon_report.jsonl",
+    ]) {
+      expect(body, artifact).toContain(artifact);
+    }
+
+    // Four writes, inside the one `for (const family of ...)` loop, so the
+    // artifact is produced for every family the split table assigns.
+    const loopAt = body.indexOf("for (const family of");
+    const declAt = body.indexOf("export const generateCommand");
+    expect(loopAt).toBeGreaterThan(-1);
+    expect(declAt).toBeGreaterThan(loopAt);
+    const loop = body.slice(loopAt, declAt);
+    expect(loop.match(/context\.sink\.write\(/g)).toHaveLength(4);
+
+    // And unconditioned on the split: `split` names a directory and checks §6.1's
+    // frozen table, both above the loop, and no artifact below is written behind
+    // a test on it. Whichever splits the command accepts, all four are written.
+    expect(loop).not.toContain("split");
+
+    // The BLOCKED report is gone. A command that still announced a gap it has
+    // closed would be exactly as misleading as one that never reported it.
+    expect(body).not.toContain("BLOCKED");
   });
 
   it("reads process only in main.ts", () => {

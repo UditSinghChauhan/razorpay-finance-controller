@@ -1,6 +1,6 @@
 # `@assay/cli`
 
-Written against **specification 1.4.23 / benchmark 1.0.4**.
+Written against **specification 1.4.24 / benchmark 1.0.4**.
 
 `assay generate · oracle · run · bench · close · verify · seal`
 (`DECISION_BRIEF.md §C` T0-11).
@@ -50,24 +50,53 @@ a package that never opens a file intercepts nothing. `§3` gives `apps/cli` all
 filesystem I/O, so this is the only process point at which either read can occur.
 
 **It is keyed on the consumer, not on the path**, because each artifact has
-exactly one legitimate reader and a path-only refusal would refuse those too:
+named legitimate readers and a path-only refusal would refuse those too:
 
 | Zone | `ground_truth*.jsonl` | `recon_report*.jsonl` |
 |---|---|---|
 | `AGENT` | refused (`AL2`) | refused (`AL8`) |
-| `PROBE_DISPATCH` | refused | **admitted** — `AL8`'s only route, under `P_max` |
-| `GENERATOR_TRUST` | **admitted** — `ARCHITECTURE.md §10`'s pre-agent, offline zone | refused |
-| any, under `--sealed` | refused (`AL5`) | admitted for the probe |
+| `PROBE_DISPATCH` | refused | **admitted** — `AL8`'s probe route, under `P_max` |
+| `GENERATOR_TRUST` | **admitted** — `ARCHITECTURE.md §10`'s pre-agent, offline zone | **refused** — the widening `§A.31` rejected |
+| `SEAL` | refused | **admitted** — `§9` step 4's hash (spec 1.4.24, M38) |
+| any, under `--sealed` | refused (`AL5`) | admitted on both of `AL8`'s routes |
 
 `AL5` — *"the CLI's `--sealed` flag refuses to print, log or write any
 ground-truth field"* — is enforced at the read, because a field that was never
-read cannot be printed.
+read cannot be printed. It is scoped to `AL2`: `§6.2` gives the recon report
+`settlement_id`, `entity_id` and `settled_at` and *"nothing else"*, so it holds
+no ground-truth field for the flag to withhold.
+
+### Why `SEAL` is a fourth zone and not a widened third
+
+`PREREGISTRATION.md §9` step 4 hashes `recon_report.jsonl` and step 5 makes its
+absence a **SEAL FAILURE**, so the seal has to be able to open the file. `AL8`'s
+binding prohibition names **engine and oracle code** and the seal is neither;
+spec 1.4.24 (`DATA_MODEL.md §22.2` M38) records the permission and its limit —
+*"hashing is not reachability: the seal spends no `P_max`, runs before any agent
+exists, and a SHA-256 digest carries no `constituent_entity_id` into any
+decision"*.
+
+The one-line alternative — widening `GENERATOR_TRUST` — was **considered and
+rejected** in `DECISION_BRIEF.md §A.31`. That zone is claimed by *both* the
+`§5.3` completeness gate and the seal, and `§5.3` / `§10` V22 require the gate
+never to hold the report: an oracle or gate holding it would void `§5.3`'s
+expressibility scoping and make the gate tautological. Widening the shared zone
+would have left that guarantee resting on no gate call site happening to use it
+today. A distinct zone keeps it structural, and `tests/guard.test.ts` asserts the
+refusal that makes it so.
+
+`SEAL` carries `AL8`'s exception and **only** that one: `assay seal` reads ground
+truth in `GENERATOR_TRUST`, the route `AL2` has always given it, so a caller
+cannot reach ground truth by declaring itself the seal. The four artifacts the
+seal hashes are read in three zones — `observations.jsonl` and
+`ambiguity_labels.jsonl` in `AGENT`, `ground_truth.jsonl` in `GENERATOR_TRUST`,
+`recon_report.jsonl` in `SEAL`.
 
 ## Per command
 
 | Command | Status | If not complete, what blocks it |
 |---|---|---|
-| `generate` | **implemented**, minus the probe surface | `packages/generator` emits no `recon_report.jsonl`, which `ARCHITECTURE.md §3` assigns to it |
+| `generate` | **implemented** | — (`packages/generator` gained the recon report's rows at spec 1.4.24; before that, the command reported the missing emitter and wrote the other three artifacts) |
 | `oracle` | **implemented** | — (`packages/oracle` gained `oracleContext` at spec 1.4.23; before it, the command was blocked for want of a `CandidateContext` builder) |
 | `run` | provider selection implemented; pipeline **blocked** | `packages/domain` has no `S0` entry point (`§3`: *"scheduled, not written"*), then engine's missing `Target`/`EvaluationContext` constructor, then `R3` (`§H` H1), then the ledger write path |
 | `bench` | **deferred** | `packages/eval` (`ARCHITECTURE.md §10`) |
@@ -75,10 +104,24 @@ read cannot be printed.
 | `verify` | **implemented** for `G4` and `G2` | `G3` needs the close gate; the `assay.sqlite` route needs `better-sqlite3`, which is not a workspace dependency |
 | `seal` | **implemented** | — |
 
+`generate` writes four artifacts per family, under
+`<out>/<split>/<seed>/<family>/` — `observations.jsonl`, `untrusted_text.jsonl`,
+`ground_truth.jsonl` and `recon_report.jsonl`. The last is
+`RECONCILIATION_SPEC.md §6.2`'s probe surface: `packages/generator` produces the
+rows, already ordered by `entity_id` ascending (spec 1.4.24, M38) and already
+frozen, and this package serializes them with the same `encodeJsonl` it uses for
+the other three and **re-orders nothing**.
+
 `generate`'s happy path is deliberately **not exercised by the suite**:
 `PREREGISTRATION.md §6.1` holds the test split until the seal and `§9` sequences
-generation after the seal tag, so the tests assert its refusals and stop short of
-`generateFamily`.
+generation after the seal tag, so the tests assert its refusals, its serialized
+bytes and its write set, and stop short of `generateFamily`. That the command
+writes all four artifacts inside its family loop, unconditioned on the split, is
+asserted from its source in `tests/boundary.test.ts`.
+
+`--split test` remains refused for the reason `commands/generate.ts` states: the
+command cannot establish whether the seal tag exists, and *"a command that
+guessed would guess in the direction that costs a seed"*.
 
 A blocked command reports the **owner** and the **citation** and exits `3`. It
 does not implement the missing side: `ARCHITECTURE.md §3` and `§L.2` have already

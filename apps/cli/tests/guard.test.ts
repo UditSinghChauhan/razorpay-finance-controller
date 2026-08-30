@@ -18,7 +18,10 @@ import {
  * > `AL8` *"Neither engine nor oracle code may read a file matching
  * > `**\/recon_report*.jsonl`. Enforced by the same runtime path guard as `AL2`
  * > and by an ESLint rule. The artifact is reachable **only** through the probe
- * > executor, under `RECONCILIATION_SPEC.md §6.2`'s `P_max` budget."*
+ * > executor, under `RECONCILIATION_SPEC.md §6.2`'s `P_max` budget. **The
+ * > offline seal is the one exception and is not a second evidence path (spec
+ * > 1.4.24, M38)** ... The permission is seal-scoped: it does **not** extend to
+ * > the `§5.3` completeness gate, which stays observations-only."*
  *
  * `AL7` burns a seed on any breach, so these are the tests that have to hold
  * even when everything else is being rewritten.
@@ -63,13 +66,34 @@ describe("AL2 — **/ground_truth*.jsonl", () => {
 });
 
 describe("AL8 — **/recon_report*.jsonl", () => {
-  it("is reachable only from the probe dispatch, under P_max", () => {
-    const path = "bench/dev/recon_report.jsonl";
+  const path = "bench/dev/recon_report.jsonl";
+
+  it("is reachable from the probe dispatch, under P_max", () => {
     expect(() => assertReadable(path, "PROBE_DISPATCH")).not.toThrow();
+  });
+
+  it("is reachable from the offline seal, which §9 step 4 requires to hash it", () => {
+    // Spec 1.4.24 (M38). AL8's binding prohibition names ENGINE AND ORACLE code
+    // and the seal is neither; §9 step 5 makes a missing recon_report_sha256 a
+    // SEAL FAILURE, which is satisfiable only if the seal can open the file.
+    // "Hashing is not reachability: the seal spends no P_max, runs before any
+    // agent exists, and a SHA-256 digest carries no constituent identifier."
+    expect(() => assertReadable(path, "SEAL")).not.toThrow();
+  });
+
+  it("is refused on the agent path", () => {
     expect(() => assertReadable(path, AGENT)).toThrow(PathGuardError);
-    // AL8 unlocks ONE artifact for ONE zone; the generator's trust zone is not
-    // it, and letting the oracle's own pre-agent pass reach the report would
-    // void PREREGISTRATION.md §5.3's expressibility scoping (§10 V22).
+  });
+
+  it("is still refused in GENERATOR_TRUST — the widening §A.31 rejected", () => {
+    // The load-bearing assertion of the whole amendment. DECISION_BRIEF.md
+    // §A.31 rejected widening GENERATOR_TRUST to cover this artifact, because
+    // that zone is claimed by BOTH the §5.3 completeness gate and the seal, and
+    // §5.3 / §10 V22 require the gate never to hold the report: an oracle or
+    // gate holding it would void §5.3's expressibility scoping and make the gate
+    // tautological. "A distinct seal permission keeps it structural" — and this
+    // is the test that makes "structural" a property of the code rather than of
+    // which call sites happen to exist today.
     expect(() => assertReadable(path, "GENERATOR_TRUST")).toThrow(PathGuardError);
   });
 
@@ -79,6 +103,64 @@ describe("AL8 — **/recon_report*.jsonl", () => {
       expect.unreachable("the guard admitted a barred artifact");
     } catch (error) {
       expect((error as PathGuardError).rule).toBe("AL8");
+    }
+  });
+
+  it("names both routes in the refusal, so a legitimate reader learns its zone", () => {
+    try {
+      assertReadable(path, AGENT);
+      expect.unreachable("the guard admitted a barred artifact");
+    } catch (error) {
+      expect((error as PathGuardError).message).toContain("PROBE_DISPATCH and SEAL");
+    }
+  });
+});
+
+describe("SEAL carries AL8's exception and nothing else", () => {
+  /**
+   * The zone names a **permission**, not a caller. `assay seal` reads ground
+   * truth in `GENERATOR_TRUST` — `AL2`'s route, unchanged since `apps/cli`
+   * landed and withdrawn by `AL5` under `--sealed` — and reads the recon report
+   * in `SEAL`. Keeping them apart is what stops a caller reaching ground truth
+   * by declaring itself the seal.
+   */
+  it("does not unlock ground truth", () => {
+    expect(() => assertReadable("bench/dev/ground_truth.jsonl", "SEAL")).toThrow(PathGuardError);
+  });
+
+  it("leaves AL2's own unlock exactly where it was", () => {
+    expect(() => assertReadable("bench/dev/ground_truth.jsonl", "GENERATOR_TRUST")).not.toThrow();
+  });
+});
+
+describe("the permission matrix, in full", () => {
+  const GROUND_TRUTH = "bench/dev/ground_truth.jsonl";
+  const RECON_REPORT = "bench/dev/recon_report.jsonl";
+
+  /** Every pair the four zones and the two artifacts can form. */
+  const ADMITTED: Readonly<Record<ReadZone, readonly string[]>> = {
+    AGENT: [],
+    PROBE_DISPATCH: [RECON_REPORT],
+    GENERATOR_TRUST: [GROUND_TRUTH],
+    SEAL: [RECON_REPORT],
+  };
+
+  it("admits exactly three of the eight pairs, and refuses the other five", () => {
+    for (const zone of ["AGENT", "PROBE_DISPATCH", "GENERATOR_TRUST", "SEAL"] as const) {
+      for (const path of [GROUND_TRUTH, RECON_REPORT]) {
+        const label = `${zone} -> ${path}`;
+        if (ADMITTED[zone].includes(path)) {
+          expect(() => assertReadable(path, zone), label).not.toThrow();
+        } else {
+          expect(() => assertReadable(path, zone), label).toThrow(PathGuardError);
+        }
+      }
+    }
+  });
+
+  it("leaves an unrestricted artifact readable from every zone", () => {
+    for (const zone of ["AGENT", "PROBE_DISPATCH", "GENERATOR_TRUST", "SEAL"] as const) {
+      expect(() => assertReadable("bench/dev/observations.jsonl", zone), zone).not.toThrow();
     }
   });
 });
@@ -118,19 +200,23 @@ describe("AL5 — the --sealed flag", () => {
    * printed. Under `--sealed` the `GENERATOR_TRUST` unlock is withdrawn and no
    * zone may reach the artifact.
    */
-  it("withdraws AL2's unlock for every zone", () => {
+  it("withdraws AL2's unlock for every zone, the new one included", () => {
     const sealed = { sealed: true };
-    for (const zone of ["AGENT", "PROBE_DISPATCH", "GENERATOR_TRUST"] as const) {
+    for (const zone of ["AGENT", "PROBE_DISPATCH", "GENERATOR_TRUST", "SEAL"] as const) {
       expect(() => assertReadable("bench/test/ground_truth.jsonl", zone, sealed), zone).toThrow(
         PathGuardError,
       );
     }
   });
 
-  it("leaves AL8's single route alone — --sealed is about ground truth", () => {
-    expect(() =>
-      assertReadable("bench/dev/recon_report.jsonl", "PROBE_DISPATCH", { sealed: true }),
-    ).not.toThrow();
+  it("leaves both of AL8's routes alone — --sealed is about ground truth", () => {
+    // AL5's withdrawal is scoped to AL2 (guard.ts tests `artifact.rule ===
+    // "AL2"`). §6.2 gives the recon report settlement_id, entity_id and
+    // settled_at and "nothing else", so it holds no ground-truth field for the
+    // flag to keep out of the output.
+    const sealed = { sealed: true };
+    expect(() => assertReadable("bench/dev/recon_report.jsonl", "PROBE_DISPATCH", sealed)).not.toThrow();
+    expect(() => assertReadable("bench/dev/recon_report.jsonl", "SEAL", sealed)).not.toThrow();
   });
 });
 
@@ -140,6 +226,15 @@ describe("the declaration matches the rules it cites", () => {
     expect(RESTRICTED_ARTIFACTS.map((a) => a.glob)).toEqual([
       "**/ground_truth*.jsonl",
       "**/recon_report*.jsonl",
+    ]);
+  });
+
+  it("gives ground truth one zone and the recon report two", () => {
+    // A single ReadZone per artifact could not express AL8 after spec 1.4.24,
+    // and expressing it by widening GENERATOR_TRUST is what §A.31 rejected.
+    expect(RESTRICTED_ARTIFACTS.map((a) => [...a.unlockedFor])).toEqual([
+      ["GENERATOR_TRUST"],
+      ["PROBE_DISPATCH", "SEAL"],
     ]);
   });
 

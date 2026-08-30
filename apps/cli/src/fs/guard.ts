@@ -12,6 +12,12 @@ import { CliError, EXIT } from "../errors.js";
  *        **\/recon_report*.jsonl. Enforced by the same runtime path guard as
  *        AL2 and by an ESLint rule. The artifact is reachable ONLY through the
  *        probe executor, under RECONCILIATION_SPEC.md §6.2's P_max budget.
+ *        The offline seal is the one exception and is not a second evidence
+ *        path (spec 1.4.24, M38): §9 step 4 requires it to hash the file, it
+ *        is neither engine nor oracle, it spends no P_max, and a digest
+ *        carries no constituent identifier into any decision. The permission
+ *        is seal-scoped: it does NOT extend to the §5.3 completeness gate,
+ *        which stays observations-only.
  * ```
  *
  * **Why the guard lives here and can live nowhere else.** Both rules name
@@ -24,22 +30,23 @@ import { CliError, EXIT } from "../errors.js";
  * filesystem I/O, so this is the only process point at which a read of either
  * artifact can occur, and therefore the only point at which one can be refused.
  *
- * **Why the guard is keyed on the consumer and not on the path alone.** Both
- * artifacts have exactly one legitimate reader, and a guard that refused the
- * path outright would refuse those too:
+ * **Why the guard is keyed on the consumer and not on the path alone.** Each
+ * artifact has a named legitimate reader, and a guard that refused the path
+ * outright would refuse those too:
  *
  * ```
  *   ground_truth*.jsonl   the completeness gate, which ARCHITECTURE.md §10 runs
  *                         "inside the generator's trust zone, offline, before
- *                         any agent exists"
+ *                         any agent exists" — and the seal, in that same zone
  *   recon_report*.jsonl   the §6.2 probe, and AL8 says "ONLY through the probe
- *                         executor, under P_max"
+ *                         executor, under P_max"; and, from spec 1.4.24 (M38),
+ *                         the offline seal, which §9 step 4 requires to hash it
  * ```
  *
  * Every read therefore declares the zone the bytes are being acquired **for**,
  * and the guard answers a question about that pair. A caller cannot widen its
  * own zone: `ReadZone` is a closed union, the zone is an argument at the call
- * site, and `tests/discipline.test.ts` asserts that every zone but the two
+ * site, and `tests/discipline.test.ts` asserts that every zone but the
  * privileged ones is used from a command that has no route to the restricted
  * artifact.
  */
@@ -60,8 +67,15 @@ export interface GuardPolicy {
 /**
  * Who the bytes are being read for.
  *
- * The three values are the three trust zones the specification already draws;
- * no fourth is invented here.
+ * Three of these are the trust zones the specification already draws. `SEAL` is
+ * the fourth, added at spec 1.4.24 (`DATA_MODEL.md §22.2` M38), and it exists
+ * because `DECISION_BRIEF.md §A.31` **rejected** the one-line alternative of
+ * widening `GENERATOR_TRUST` to cover the recon report: that zone is claimed by
+ * *both* the `§5.3` completeness gate and the seal, and `§5.3` / `§10` V22
+ * require the gate never to hold the report. Widening the shared zone *"would
+ * have left that guarantee resting on the fact that no gate call site happens to
+ * use it today. A distinct seal permission keeps it structural."* A fourth zone
+ * is therefore not an invention but the shape that rejection has.
  */
 export type ReadZone =
   /**
@@ -78,10 +92,29 @@ export type ReadZone =
   /**
    * `ARCHITECTURE.md §10`'s *"generator's trust zone, offline, before any agent
    * exists"* — the completeness gate and the seal's artifact hashing. Ground
-   * truth is unlocked unless `--sealed`; the recon report is not, because `AL8`
-   * gives it exactly one route and this is not it.
+   * truth is unlocked unless `--sealed`; the recon report is not, and spec
+   * 1.4.24 kept it that way on purpose — see `SEAL` below.
    */
-  | "GENERATOR_TRUST";
+  | "GENERATOR_TRUST"
+  /**
+   * `PREREGISTRATION.md §9`'s offline seal, and nothing else. `AL8`'s single
+   * named exception, added at spec 1.4.24 (M38): `§9` step 4 hashes
+   * `recon_report.jsonl` and step 5 makes its absence a **SEAL FAILURE**, which
+   * is satisfiable only if the seal can open the file.
+   *
+   * `AL8`'s binding prohibition names **engine and oracle code** and the seal is
+   * neither; its *"reachable only through the probe executor"* governs the
+   * evidence path an **agent** may use. *"Hashing is not reachability: the seal
+   * spends no `P_max`, runs before any agent exists, and a SHA-256 digest
+   * carries no `constituent_entity_id` into any decision."*
+   *
+   * **Ground truth is not unlocked here.** The seal reads it in
+   * `GENERATOR_TRUST`, the route `AL2` has permitted since `apps/cli` landed,
+   * and `AL5` withdraws that route under `--sealed`. This zone carries `AL8`'s
+   * new permission and only that one, so a caller cannot reach ground truth by
+   * declaring itself the seal.
+   */
+  | "SEAL";
 
 /** The two artifacts `AL2` and `AL8` name, as the rules spell their globs. */
 export const RESTRICTED_ARTIFACTS = Object.freeze([
@@ -94,7 +127,12 @@ export const RESTRICTED_ARTIFACTS = Object.freeze([
      * discriminating power is in the final path segment.
      */
     match: /^ground_truth.*\.jsonl$/i,
-    unlockedFor: "GENERATOR_TRUST" as ReadZone,
+    /**
+     * One zone, unchanged by spec 1.4.24. `ARCHITECTURE.md §10`'s trust zone
+     * covers both readers `AL2` admits — the `§5.3` completeness gate and the
+     * seal's ground-truth hashing — so nothing here needed a second entry.
+     */
+    unlockedFor: Object.freeze(["GENERATOR_TRUST"]) as readonly ReadZone[],
     why:
       "ARCHITECTURE.md §10 runs the completeness gate inside the generator's " +
       "trust zone, offline, before any agent exists.",
@@ -103,10 +141,21 @@ export const RESTRICTED_ARTIFACTS = Object.freeze([
     rule: "AL8",
     glob: "**/recon_report*.jsonl",
     match: /^recon_report.*\.jsonl$/i,
-    unlockedFor: "PROBE_DISPATCH" as ReadZone,
+    /**
+     * **Two** zones, and deliberately not one widened zone. `AL8` gives the
+     * probe its single evidence route; spec 1.4.24 (M38) adds the offline seal,
+     * whose permission is *"seal-scoped and distinct from the probe's — it does
+     * not extend to `GENERATOR_TRUST`, so the `§5.3` completeness gate can never
+     * reach the artifact and `§10` V22's asymmetry is preserved structurally"*.
+     * Two entries here is what makes that separation a fact about the code.
+     */
+    unlockedFor: Object.freeze(["PROBE_DISPATCH", "SEAL"]) as readonly ReadZone[],
     why:
       "PREREGISTRATION.md §6.2 AL8: reachable ONLY through the probe executor, " +
-      "under RECONCILIATION_SPEC.md §6.2's P_max budget.",
+      "under RECONCILIATION_SPEC.md §6.2's P_max budget, and — spec 1.4.24, " +
+      "M38 — by PREREGISTRATION.md §9's offline seal, which step 4 requires to " +
+      "hash the file. The seal's permission does not extend to GENERATOR_TRUST, " +
+      "so §5.3's completeness gate can never reach the artifact.",
   }),
 ] as const);
 
@@ -155,6 +204,17 @@ function segmentOf(path: string): string {
 }
 
 /**
+ * `zone X`, or `zones X and Y` — a refusal names every route that would work.
+ *
+ * A guard that says only "refused" teaches a caller nothing, and `AL7` burns a
+ * seed on a breach: the cheapest way to make a legitimate reader declare the
+ * right zone is to have the refusal tell it which zones exist.
+ */
+function zonesOf(zones: readonly ReadZone[]): string {
+  return `${zones.length === 1 ? "zone" : "zones"} ${zones.join(" and ")}`;
+}
+
+/**
  * Decide a read, and throw if the rules refuse it.
  *
  * Called by `io.ts` on **every** read, before the file is opened. Returning a
@@ -184,13 +244,13 @@ export function assertReadable(
       );
     }
 
-    if (zone === artifact.unlockedFor) return;
+    if (artifact.unlockedFor.includes(zone)) return;
 
     throw new PathGuardError(
       artifact.rule,
       zone,
       path,
-      `${artifact.glob} is reachable only from zone ${artifact.unlockedFor}. ${artifact.why}`,
+      `${artifact.glob} is reachable only from ${zonesOf(artifact.unlockedFor)}. ${artifact.why}`,
     );
   }
 }

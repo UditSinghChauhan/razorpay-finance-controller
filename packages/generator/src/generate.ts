@@ -8,6 +8,14 @@
  *     emit      -> OBSERVATIONS + text   (emit.ts, incl. F05's withholding)
  *     degrade   -> degraded observations (degrade.ts, observations only)
  *
+ * A fifth artifact hangs off the first stage rather than the last:
+ *
+ *     recon report -> §6.2's probe surface (recon-report.ts, from TRUE STATE)
+ *
+ * It is deliberately **not** downstream of `emit` or `degrade` —
+ * `RECONCILIATION_SPEC.md §6.2` requires it to hold a row `F05` withheld from
+ * the observations, and to keep a `settlement_id` `F08` nulled on them.
+ *
  * `§3` rule 2: "Ground truth is never authored as an annotation. There is no
  * `correct_answer` field written by a human or a model. There is no
  * `is_ambiguous` label." Everything in `GroundTruth` below is a byproduct of the
@@ -28,6 +36,7 @@ import { TARGET_RECORD_COUNT } from "./composition.js";
 import { degrade, type DegradationRecord } from "./degrade.js";
 import { emit } from "./emit.js";
 import { GT_VERSION, HELD_OUT_FAMILIES, type FamilyId } from "./frozen.js";
+import { buildReconReport, type ReconReportRow } from "./recon-report.js";
 import { isDeclaredSeed } from "./seeds.js";
 import { simulate, type TrueState } from "./simulate.js";
 import {
@@ -62,6 +71,19 @@ export interface GeneratedFamily {
   readonly observations: readonly Observation[];
   readonly untrusted_text: readonly UntrustedText[];
   readonly ground_truth: GroundTruth;
+  /**
+   * `RECONCILIATION_SPEC.md §6.2`'s PG-side recon report, as rows.
+   *
+   * Persisted by `apps/cli` as `bench/<split>/recon_report.jsonl`, which is why
+   * this is **data and not bytes**: `ARCHITECTURE.md §3` gives that app all
+   * filesystem I/O, and its `encodeJsonl` already serializes every other
+   * artifact — *"the ordering that matters is the ordering the producing
+   * package chose"*, and `recon-report.ts` chose it.
+   *
+   * Not derived from `observations` and not derivable from them: it is
+   * pre-`F05` and pre-operator by construction. See `recon-report.ts`.
+   */
+  readonly recon_report: readonly ReconReportRow[];
   /** The true state, for the generator's own tests. Never persisted. */
   readonly true_state: TrueState;
 }
@@ -120,6 +142,9 @@ export function generateFamily(family: FamilyId, seed: number, options: Generate
     observations: degraded.observations,
     untrusted_text: degraded.untrusted_text,
     ground_truth: buildGroundTruth(state, journal, degraded.degradations),
+    // `state`, not `emission` and not `degraded`: §6.2's report holds the F05
+    // row the observations do not, and keeps the `settlement_id` F08 nulled.
+    recon_report: buildReconReport(state),
     true_state: state,
   });
 }
