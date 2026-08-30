@@ -2,8 +2,11 @@
 
 **Track:** 04 — AI Finance Controller
 **Status:** Specification. Frozen scope for implementation.
-**Spec version:** 1.4.23
+**Spec version:** 1.4.24
 **Date:** 2026-08-27
+
+**At spec 1.4.24** this document is unchanged apart from the version header. See
+`DECISION_BRIEF.md §A.31`.
 
 **At spec 1.4.23** this document is unchanged apart from the version header. See
 `DECISION_BRIEF.md §A.30`.

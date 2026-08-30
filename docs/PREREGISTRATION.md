@@ -1,6 +1,6 @@
 # PREREGISTRATION — ASSAY Benchmark v1.0.4
 
-**Spec version:** 1.4.23 · **Benchmark version:** 1.0.4
+**Spec version:** 1.4.24 · **Benchmark version:** 1.0.4
 
 **Status: FROZEN on commit. Amendments require a version bump and a new seal.**
 **Date frozen:** 2026-08-23 · **Amended:** 2026-08-24 (benchmark 1.0.1),
@@ -1759,7 +1759,7 @@ to inspection. This is the reason the adversarial suite must be authored early
 | AL5 | The CLI's `--sealed` flag refuses to print, log or write any ground-truth field; only aggregate metrics are emitted. |
 | AL6 | Prompt text may not contain examples derived from any TEST record. |
 | AL7 | If a TEST record is inspected for any reason, **or if any item on the `§6.1` forbidden list for held-out families is breached**, that seed is burned: it is discarded and replaced, and the burn is recorded in the manifest. |
-| AL8 | Neither engine nor oracle code may read a file matching `**/recon_report*.jsonl`. Enforced by the same runtime path guard as `AL2` and by an ESLint rule. The artifact is reachable **only** through the probe executor, under `RECONCILIATION_SPEC.md §6.2`'s `P_max` budget. Added at spec 1.4.22; see `§5.1` and `§10` V22. |
+| AL8 | Neither engine nor oracle code may read a file matching `**/recon_report*.jsonl`. Enforced by the same runtime path guard as `AL2` and by an ESLint rule. The artifact is reachable **only** through the probe executor, under `RECONCILIATION_SPEC.md §6.2`'s `P_max` budget. **The offline seal is the one exception and is not a second evidence path (spec 1.4.24, M38):** `§9` step 4 requires it to hash the file, it is neither engine nor oracle, it spends no `P_max`, and a digest carries no constituent identifier into any decision — exactly the access `AL2` already grants the seal over ground truth. The permission is seal-scoped: it does **not** extend to the `§5.3` completeness gate, which stays observations-only. Added at spec 1.4.22; see `§5.1` and `§10` V22. |
 
 **`AL7`'s replacement rule, added at spec 1.4.1 `[ASSAY-MODEL]`.** `AL7` says a
 burned seed *"is discarded and replaced"* and does not say how. Choosing a
