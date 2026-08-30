@@ -1,0 +1,19 @@
+{
+  "name": "@assay/llm",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "ASSAY LLM adjudicator — the LlmProvider interface, its deterministic providers, the four bounded roles and the three verification layers",
+  "license": "UNLICENSED",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@assay/domain": "workspace:*",
+    "@assay/ledger": "workspace:*",
+    "zod": "4.4.3"
+  }
+}

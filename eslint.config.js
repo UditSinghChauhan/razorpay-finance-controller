@@ -211,16 +211,117 @@ export default tseslint.config(
     },
   },
 
+  // --- packages/llm · §L.1 rule 2 + the offline no-network guarantee -------
+  //
+  // Rule 2: "No LLM output schema may contain a numeric field. A CI lint fails
+  // the build if one appears." The deferred note this block replaces expected a
+  // custom rule; `no-restricted-syntax` expresses it directly, and a stock rule
+  // is the better outcome — there is no plugin to keep in step with the ESLint
+  // API, and the selectors below cannot be satisfied by a schema that merely
+  // looks non-numeric.
+  //
+  // This is the half of the enforcement that catches a schema WRITTEN here.
+  // A schema PASSED IN from elsewhere is caught at runtime by
+  // packages/llm/src/verify/schema.ts, which walks the zod tree on every call —
+  // §6.5 types `invoke`'s `schema` as an arbitrary ZodType, so a lint over this
+  // package alone could never be the whole control.
+  //
+  // The second group is the `--llm=offline` guarantee. §6.5 gives that provider
+  // "Network: none" and §L.1 rule 10 makes the full pipeline pass under it, so
+  // the two built providers must have no network reachable at all. Banning the
+  // transports outright is stronger than trusting a code path not to take them,
+  // and it is what makes T0-11's "runs from a clean checkout with no API key"
+  // structural. The two metered providers are §H tier H2 and are not built
+  // here; the phase that builds them scopes this group to exclude their files.
+  //
+  // Scoped to `src/`, not to the package. `tests/` must be able to CONSTRUCT a
+  // numeric schema in order to assert that the guard rejects it — a test that
+  // cannot express the forbidden thing cannot prove it is forbidden, which is
+  // the same reason packages/money's type-level suite writes the float
+  // assignment it exists to reject. Nothing ships from `tests/`: the role
+  // schemas live in `src/roles/`, this block covers them, and
+  // `tests/discipline.test.ts` independently asserts that each shipped schema
+  // passes `assertNoNumericField`.
+  {
+    files: ["packages/llm/src/**"],
+    linterOptions: {
+      // §L.1 rule 2 is listed among "invariants that may never be violated". A
+      // boundary a one-line `eslint-disable` can lift is not enforced.
+      noInlineConfig: true,
+    },
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        ...["number", "int", "int32", "uint32", "float32", "float64", "bigint", "nan", "date"].map(
+          (numeric) => ({
+            selector: `MemberExpression[object.name='z'][property.name='${numeric}']`,
+            message:
+              `DECISION_BRIEF.md §L.1 rule 2: no LLM output schema may contain a ` +
+              `number-typed field (z.${numeric}). Where a quantity is needed the model ` +
+              `returns an IDENTIFIER and deterministic code looks up the value ` +
+              `(ARCHITECTURE.md §4 boundary 2).`,
+          }),
+        ),
+        {
+          // `raw` rather than `value`: on a numeric Literal `value` is a number
+          // and esquery's regex operand is a string test, so `[value=/…/]` never
+          // matches. `raw` is the source text and always is one.
+          // Descendant, not child: `z.literal(-1)` parses as a UnaryExpression
+          // wrapping the Literal, so a `>` combinator misses every negative.
+          selector: "CallExpression[callee.property.name='literal'] Literal[raw=/^[0-9]/]",
+          message:
+            "DECISION_BRIEF.md §L.1 rule 2: z.literal(<number>) is a number-typed " +
+            "field in an LLM output schema. Use a string identifier.",
+        },
+        {
+          selector: "CallExpression[callee.property.name='literal'] Literal[bigint]",
+          message:
+            "DECISION_BRIEF.md §L.1 rule 2: z.literal(<bigint>) is a number-typed " +
+            "field in an LLM output schema. Use a string identifier.",
+        },
+        // `no-restricted-imports` does not inspect dynamic `import()`, which
+        // would otherwise leave a one-line bypass of the no-network guarantee —
+        // the same hole the engine block closes the same way.
+        ...["http", "https", "net", "tls", "dgram", "http2"].map((mod) =>
+          dynamicImportBan(
+            `/^(node:)?${mod}$/`,
+            "ARCHITECTURE.md §6.5: the providers built at Phase 8 (`offline`, `replay`) " +
+              "are Network: none. DECISION_BRIEF.md §C T0-11 requires the full pipeline " +
+              "to run from a clean checkout with no API key.",
+          ),
+        ),
+      ],
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            "http", "https", "net", "tls", "dgram", "http2", "undici", "node-fetch", "axios",
+          ].map((mod) => ({
+            name: mod,
+            message:
+              "ARCHITECTURE.md §6.5 gives the `offline` provider Network: none, and " +
+              "§L.1 rule 10 makes the full pipeline pass under --llm=offline. The two " +
+              "providers built at Phase 8 reach no network at all.",
+          })),
+          patterns: [
+            {
+              group: ["node:http", "node:https", "node:net", "node:tls", "node:dgram", "node:http2"],
+              message:
+                "ARCHITECTURE.md §6.5: the providers built at Phase 8 (`offline`, " +
+                "`replay`) are Network: none. DECISION_BRIEF.md §C T0-11 requires the " +
+                "full pipeline to run from a clean checkout with no API key.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // -------------------------------------------------------------------------
   // Deferred, and deliberately not written yet:
   //
   //   * The §L.1 rule 3 allowlist for packages/eval/src/gates/
   //     consistency-gate.ts, the single file permitted to import both engine
   //     and oracle. It lands with packages/eval (Phase 10).
-  //
-  //   * The §L.1 rule 2 schema lint: "No LLM output schema may contain a
-  //     numeric field. A CI lint fails the build if one appears." This needs a
-  //     custom rule and cannot be expressed with a stock one; it lands with
-  //     packages/llm (Phase 8) and is that phase's acceptance criterion.
   // -------------------------------------------------------------------------
 );
