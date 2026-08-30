@@ -211,6 +211,108 @@ export default tseslint.config(
     },
   },
 
+  // --- packages/probe · purity, and the §T7 control surface ----------------
+  //
+  // Spec 1.4.23 makes this package the sole constructor of a probe call and the
+  // single owner of §T7's four controls. Two properties keep that true.
+  //
+  // PURITY. §L.2 places `probe` between `engine S4-S5` and `llm`, which is only
+  // available because the loop consumes an R3 proposal as a VALUE. An import of
+  // packages/llm would make the build order cyclic; an import of the oracle or
+  // the generator would breach AL1/AL2's spirit for a package that sits on the
+  // agent path. A clock or a random draw would break metric 23, since the PROBE
+  // event body enters the hashed body (DATA_MODEL.md §16).
+  //
+  // NO TRANSPORT. §T7's SSRF control is a property rather than a check only
+  // while no URL, host or socket exists in this path. Banning the transports
+  // outright is what makes that structural.
+  //
+  // Scoped to `src/`, not the package. The suite that ASSERTS purity has to read
+  // this package's own source as text, which is filesystem I/O — the point
+  // packages/engine's discipline suite already makes: "The engine itself
+  // performs no I/O; a test asserting that fact necessarily does."
+  {
+    files: ["packages/probe/src/**"],
+    linterOptions: { noInlineConfig: true },
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            "http", "https", "net", "tls", "dgram", "http2", "fs", "path", "undici", "axios",
+          ].map((mod) => ({
+            name: mod,
+            message:
+              "packages/probe is pure: no filesystem and no network. The caller " +
+              "performs the dispatch (ARCHITECTURE.md §3 gives apps/cli all " +
+              "filesystem I/O; spec 1.4.23, §A.30).",
+          })),
+          patterns: [
+            {
+              group: [
+                "node:http", "node:https", "node:net", "node:tls", "node:dgram",
+                "node:http2", "node:fs", "node:fs/promises", "node:path",
+              ],
+              message:
+                "packages/probe is pure: no filesystem and no network (spec 1.4.23).",
+            },
+            {
+              group: ["@assay/llm", "@assay/llm/*", "**/packages/llm/**"],
+              message:
+                "packages/probe may not import packages/llm. DECISION_BRIEF.md §L.2 " +
+                "places `probe` BEFORE `llm`, which is only available because the " +
+                "loop consumes an R3 proposal as a value rather than calling R3.",
+            },
+            {
+              group: GENERATOR,
+              message:
+                "packages/probe may not import packages/generator. It holds " +
+                "GroundTruth (DATA_MODEL.md §1); this package sits on the agent path.",
+            },
+            {
+              group: ORACLE,
+              message:
+                "packages/probe may not import packages/oracle. The oracle is the " +
+                "observations-only reference (PREREGISTRATION.md §5.1, AL8).",
+            },
+            { group: UNTRUSTED_TEXT, message: UNTRUSTED_TEXT_MSG },
+          ],
+        },
+      ],
+      "no-restricted-globals": [
+        "error",
+        {
+          name: "Date",
+          message:
+            "packages/probe must be deterministic: the PROBE event body enters " +
+            "the hashed body (DATA_MODEL.md §16) and metric 23 requires two runs " +
+            "over identical inputs to agree.",
+        },
+      ],
+      "no-restricted-properties": [
+        "error",
+        {
+          object: "Math",
+          property: "random",
+          message: "packages/probe must be deterministic (DATA_MODEL.md §16).",
+        },
+      ],
+      "no-restricted-syntax": [
+        "error",
+        ...["http", "https", "net", "tls", "fs"].map((mod) =>
+          dynamicImportBan(
+            `/^(node:)?${mod}$/`,
+            "packages/probe is pure: no filesystem and no network (spec 1.4.23).",
+          ),
+        ),
+        dynamicImportBan(
+          "/llm/",
+          "packages/probe may not import packages/llm (DECISION_BRIEF.md §L.2).",
+        ),
+      ],
+    },
+  },
+
   // --- packages/llm · §L.1 rule 2 + the offline no-network guarantee -------
   //
   // Rule 2: "No LLM output schema may contain a numeric field. A CI lint fails

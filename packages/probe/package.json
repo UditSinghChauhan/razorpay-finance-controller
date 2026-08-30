@@ -1,0 +1,19 @@
+{
+  "name": "@assay/probe",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "ASSAY probe loop — the pure §6.2 state machine: P_max, pre-call I6, the sole constructor of a probe call, and the PROBE event body",
+  "license": "UNLICENSED",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@assay/domain": "workspace:*",
+    "@assay/engine": "workspace:*",
+    "@assay/ledger": "workspace:*"
+  }
+}
