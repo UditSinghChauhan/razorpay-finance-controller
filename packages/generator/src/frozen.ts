@@ -367,10 +367,10 @@ export const SEEDS_PER_CONFIGURATION = 5;
 export const K_MAX = 22;
 
 /** `DATA_MODEL.md §18`: the manifest's `benchmark_version`. */
-export const BENCHMARK_VERSION = "1.0.3";
+export const BENCHMARK_VERSION = "1.0.4";
 
 /** `DATA_MODEL.md §1`: `GroundTruth.gt_version`. */
 export const GT_VERSION = "1.1.0";
 
 /** `PREREGISTRATION.md` header: the specification version this package was written against. */
-export const SPEC_VERSION = "1.4.21";
+export const SPEC_VERSION = "1.4.22";
