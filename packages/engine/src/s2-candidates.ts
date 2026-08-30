@@ -289,22 +289,27 @@ function c5(members: readonly Member[]): ClauseVerdict {
 }
 
 /**
- * `C6` — exact tie-out, **allocation-wide**: `Σ credit − Σ debit = target.amount`
- * with **zero tolerance in paise**.
+ * `C6` — exact tie-out: `Σ credit − Σ debit = target.amount` with **zero
+ * tolerance in paise**, over the allocation `evaluate` supplies.
  *
- * The sum runs over the candidate's members **together with the target's
- * already-anchored members**. `§3` removes anchored lines from the *search
- * space*, not from the settlement they belong to, and `I4` makes a settlement
- * equal to its allocated lines — so a candidate that proposed only the
- * unanchored remainder and tied it out against the full `target.amount` would
- * be checking the wrong identity.
+ * **The empty member set is EVALUATED, not skipped.** `Σ` over `∅` is `0`, so
+ * the clause is satisfied only where `target.amount` is itself `0`. It is not
+ * *"not evaluated"*: `§4.1` reserves that for a clause whose **comparand** is
+ * absent — its sole use is `C2`'s refund half, *"where the named payment has no
+ * observation in the dataset"* — and `C6`'s comparand is `target.amount`, which
+ * is non-nullable. `§7`'s `I4` states the identical identity over the same
+ * allocation and skips only when there is no settlement target in scope
+ * (`s5-validate.ts`'s `i4`), never on an empty member set; a candidate this
+ * clause declined to evaluate at `S2` is one `I4` would reject at `S5`.
+ *
+ * The contrast with `i3` is the shape: a **per-member** clause with nothing to
+ * range over is genuinely unevaluated, while an **aggregate-against-the-target**
+ * clause always has its comparand and is therefore always evaluable.
  */
 function c6(members: readonly Member[], ctx: EvaluationContext): ClauseVerdict {
-  const all = [...ctx.target.anchored_members, ...members];
-  if (all.length === 0) return "NOT_EVALUATED";
   let credit = 0;
   let debit = 0;
-  for (const m of all) {
+  for (const m of members) {
     credit += m.payload.credit;
     debit += m.payload.debit;
   }
@@ -351,15 +356,16 @@ function c8(members: readonly Member[]): ClauseVerdict {
  * Reads members' own `settled_at` only — never the target's clock, which `§4.1`
  * explicitly refuses to re-base onto. Vacuous for a `bank_line` target and for
  * a candidate of fewer than two members.
+ *
+ * Ranges over the allocation `evaluate` supplies, anchored members included.
  */
 function coSettlementCoherent(
   members: readonly Member[],
   ctx: EvaluationContext,
 ): boolean {
   if (ctx.target.kind !== "settlement") return true;
-  const all = [...ctx.target.anchored_members, ...members];
   let seen: number | null = null;
-  for (const m of all) {
+  for (const m of members) {
     const s = m.payload.settled_at;
     if (s === null) return false;
     if (seen === null) seen = s;
@@ -372,17 +378,38 @@ function coSettlementCoherent(
 // Evaluation
 // ---------------------------------------------------------------------------
 
-/** Evaluate `C1`-`C8` and co-settlement coherence over one proposed member set. */
+/**
+ * Evaluate `C1`-`C8` and co-settlement coherence over one proposed member set.
+ *
+ * **Every clause ranges over the whole allocation — the proposed members
+ * together with the target's already-anchored ones.** `DATA_MODEL.md §11` fixes
+ * the scope at the field the clauses filter: `Candidate.member_obs_ids` is
+ * *"the whole allocation, ANCHORED members INCLUDED"*. `§4.1` then quantifies
+ * every clause over that set — `C1` *"across all members and the target"*,
+ * `C3` *"for every member"*, `C5` *"per-line"*, `C7` *"no member"*, `C8`
+ * *"for members claimed as settled"* — so a clause evaluated over the proposed
+ * subset alone would be filtering a different set from the one the candidate is
+ * defined as, and an anchored line could carry a foreign currency, an inverted
+ * timestamp, a corrupt arithmetic identity or a prior allocation through the
+ * filter untested.
+ *
+ * `§3` removes anchored lines from the **search space**, not from the
+ * settlement they belong to — the reasoning `C6` has carried since it was
+ * written, and which is general rather than particular to `C6`. The union is
+ * built once, here, so no clause can disagree with another about its own scope.
+ */
 export function evaluate(
   members: readonly Member[],
   ctx: EvaluationContext,
 ): Admissibility {
+  const all: readonly Member[] = [...ctx.target.anchored_members, ...members];
+
   const clauses: ClauseResult[] = [
-    { id: "C1", half: null, verdict: c1(members), expectedNonBinding: false },
+    { id: "C1", half: null, verdict: c1(all), expectedNonBinding: false },
     {
       id: "C2",
       half: "refund",
-      verdict: c2Refund(members, ctx),
+      verdict: c2Refund(all, ctx),
       expectedNonBinding: false,
     },
     {
@@ -397,20 +424,20 @@ export function evaluate(
     {
       id: "C3",
       half: "ordering",
-      verdict: c3Ordering(members),
+      verdict: c3Ordering(all),
       expectedNonBinding: false,
     },
     {
       id: "C3",
       half: "bank-arrival",
-      verdict: c3BankArrival(members, ctx),
+      verdict: c3BankArrival(all, ctx),
       expectedNonBinding: false,
     },
-    { id: "C4", half: null, verdict: c4(members), expectedNonBinding: false },
-    { id: "C5", half: null, verdict: c5(members), expectedNonBinding: false },
-    { id: "C6", half: null, verdict: c6(members, ctx), expectedNonBinding: false },
-    { id: "C7", half: null, verdict: c7(members, ctx), expectedNonBinding: false },
-    { id: "C8", half: null, verdict: c8(members), expectedNonBinding: true },
+    { id: "C4", half: null, verdict: c4(all), expectedNonBinding: false },
+    { id: "C5", half: null, verdict: c5(all), expectedNonBinding: false },
+    { id: "C6", half: null, verdict: c6(all, ctx), expectedNonBinding: false },
+    { id: "C7", half: null, verdict: c7(all, ctx), expectedNonBinding: false },
+    { id: "C8", half: null, verdict: c8(all), expectedNonBinding: true },
   ];
 
   const failedSet = new Set<ConstraintId>();
@@ -421,7 +448,7 @@ export function evaluate(
     if (c.expectedNonBinding) failedEnbSet.add(c.id);
   }
 
-  const coherent = coSettlementCoherent(members, ctx);
+  const coherent = coSettlementCoherent(all, ctx);
 
   return {
     admissible: failedSet.size === 0 && coherent,

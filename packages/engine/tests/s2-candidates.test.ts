@@ -476,3 +476,101 @@ describe("candidate generation", () => {
     expect(g.candidates).toEqual([{ member_obs_ids: [obsId(1), obsId(9)] }]);
   });
 });
+
+describe("C6 over the EMPTY member set — evaluated, not skipped", () => {
+  /**
+   * `§4.1`'s `C6` is `Σ credit(members) − Σ debit(members) = target.amount`, and
+   * `Σ` over `∅` is `0`. The clause is therefore satisfied only where
+   * `target.amount` is itself `0`.
+   *
+   * `§4.1` reserves *"not evaluated"* for a clause whose **comparand** is
+   * absent — its sole use in the document is `C2`'s refund half, *"where the
+   * named payment has no observation in the dataset"* — and `C6`'s comparand is
+   * `target.amount`, which is non-nullable. `§7`'s `I4` states the same
+   * identity over the same allocation and this package's own `i4` skips only
+   * when there is no settlement target in scope, never on empty members.
+   */
+  it("FAILS against a non-zero target", () => {
+    expect(verdictOf(evaluate([], ctxFor({ amount: 98_000 })), "C6", null)).toBe("FAIL");
+  });
+
+  it("PASSES against a zero-amount target, which is the only tie-out available", () => {
+    expect(verdictOf(evaluate([], ctxFor({ amount: 0 })), "C6", null)).toBe("PASS");
+  });
+
+  it("makes the empty allocation INADMISSIBLE against a non-zero target", () => {
+    expect(evaluate([], ctxFor({ amount: 98_000 })).admissible).toBe(false);
+  });
+
+  it("agrees with I4, which rejects the same allocation at S5", () => {
+    // The defect this replaced was the engine contradicting ITSELF: S2 declined
+    // to evaluate what S5's `i4` rejects. Stated here as the property rather
+    // than the history, so a re-introduction fails on the invariant.
+    const amount = 98_000;
+    const s2 = verdictOf(evaluate([], ctxFor({ amount })), "C6", null);
+    expect(s2).toBe("FAIL");
+    expect(s2).not.toBe("NOT_EVALUATED");
+  });
+});
+
+describe("clause scope — every clause reads the whole allocation (DATA_MODEL §11)", () => {
+  /**
+   * `Candidate.member_obs_ids` is *"the whole allocation, ANCHORED members
+   * INCLUDED"*, and `§4.1` quantifies every clause over that set: `C1` *"across
+   * all members and the target"*, `C3` *"for every member"*, `C5` *"per-line"*,
+   * `C7` *"no member"*, `C8` *"for members claimed as settled"*.
+   *
+   * `§3` removes anchored lines from the SEARCH SPACE, not from the settlement
+   * they belong to. A clause evaluated over the proposed subset alone would
+   * filter a different set from the one the candidate is defined as.
+   */
+  it("C1 sees a foreign currency on an ANCHORED member", () => {
+    const anchored = reconLine(1, { settledAt: T0 + 2 * DAY });
+    const foreign = {
+      ...anchored,
+      payload: { ...anchored.payload, currency: "USD" },
+    } as unknown as Member;
+    const clean = reconLine(2, { settledAt: T0 + 2 * DAY });
+    const a = evaluate([clean], ctxFor({ anchored: [foreign] }));
+    expect(verdictOf(a, "C1", null)).toBe("FAIL");
+  });
+
+  it("C3-ordering sees an inverted timestamp on an ANCHORED member", () => {
+    const inverted = reconLine(1, { createdAt: T0 + 5 * DAY, settledAt: T0 + 2 * DAY });
+    const clean = reconLine(2, { settledAt: T0 + 2 * DAY });
+    const a = evaluate([clean], ctxFor({ anchored: [inverted] }));
+    expect(verdictOf(a, "C3", "ordering")).toBe("FAIL");
+  });
+
+  it("C5 sees a corrupt arithmetic identity on an ANCHORED member", () => {
+    // credit must equal amount - fee; 999_999 != 100_000 - 2_000.
+    const corrupt = reconLine(1, { credit: 999_999, settledAt: T0 + 2 * DAY });
+    const clean = reconLine(2, { settledAt: T0 + 2 * DAY });
+    const a = evaluate([clean], ctxFor({ anchored: [corrupt] }));
+    expect(verdictOf(a, "C5", null)).toBe("FAIL");
+  });
+
+  it("C7 sees a prior allocation on an ANCHORED member", () => {
+    // The most expensive error §4.1 names: double-counting a payment. An
+    // anchored member already in an accepted allocation must exclude.
+    const anchored = reconLine(1, { settledAt: T0 + 2 * DAY });
+    const clean = reconLine(2, { settledAt: T0 + 2 * DAY });
+    const a = evaluate(
+      [clean],
+      ctxFor({ anchored: [anchored], allocated: [anchored.obs_id] }),
+    );
+    expect(verdictOf(a, "C7", null)).toBe("FAIL");
+  });
+
+  it("C6 is unchanged by the refactor — still summed over the union", () => {
+    // C6 already read the union; this pins that passing the union in did not
+    // double-count the anchored members.
+    const anchored = reconLine(1, { amount: 100_000, fee: 2_000, settledAt: T0 + 2 * DAY });
+    const proposed = reconLine(2, { amount: 100_000, fee: 2_000, settledAt: T0 + 2 * DAY });
+    const a = evaluate(
+      [proposed],
+      ctxFor({ anchored: [anchored], amount: 98_000 + 98_000 }),
+    );
+    expect(verdictOf(a, "C6", null)).toBe("PASS");
+  });
+});
