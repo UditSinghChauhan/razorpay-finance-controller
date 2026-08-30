@@ -17,7 +17,7 @@ import type { Command, CommandContext } from "./types.js";
  * frozen `§4.1` composition and the 10,000-20,000 record band — and throws
  * `SEAL FAILURE` on either. Neither check is re-implemented here.
  *
- * **Everything this command decides is a digest or a path.** The three artifact
+ * **Everything this command decides is a digest or a path.** The four artifact
  * hashes are `sha256` over the committed bytes, so `EVALUATION_SPEC.md §7`'s
  * reproducibility guarantee is checkable with `sha256sum`; `constraint_set_hash`
  * is the digest of `packages/domain`'s canonical serialization. `families` is
@@ -36,6 +36,19 @@ import type { Command, CommandContext } from "./types.js";
  * agent exists"*. Under `--sealed` the guard withdraws that unlock, so
  * `assay seal --sealed` is refused by `AL5` rather than silently hashing a file
  * the flag exists to keep out of the output.
+ *
+ * **The recon report is read in zone `SEAL`, and that is a different zone on
+ * purpose.** `§9` step 4 hashes `recon_report.jsonl` and step 5 makes its
+ * absence a **SEAL FAILURE**, so this command has to be able to open it; `AL8`
+ * bars **engine and oracle** code and the seal is neither (spec 1.4.24, M38),
+ * and *"hashing is not reachability — the seal spends no `P_max`, runs before
+ * any agent exists, and a SHA-256 digest carries no `constituent_entity_id` into
+ * any decision"*. The zone is deliberately **not** `GENERATOR_TRUST`:
+ * `DECISION_BRIEF.md §A.31` rejected widening that zone because it is claimed by
+ * the `§5.3` completeness gate as well, and `§5.3` / `§10` V22 require the gate
+ * never to hold the report. `AL5` does not withdraw this unlock — it is scoped
+ * to ground-truth fields, and `§6.2` gives the report `settlement_id`,
+ * `entity_id` and `settled_at` and *"nothing else"*.
  */
 
 const MANIFEST = "manifest.json";
@@ -58,6 +71,7 @@ async function run(context: CommandContext): Promise<void> {
   const observationsPath = requireFlag(context.args, "observations");
   const groundTruthPath = requireFlag(context.args, "ground-truth");
   const oracleLabelsPath = requireFlag(context.args, "oracle-labels");
+  const reconReportPath = requireFlag(context.args, "recon-report");
   const outDir = stringFlag(context.args, "out") ?? ".";
 
   const createdAtFlag = stringFlag(context.args, "created-at");
@@ -84,6 +98,9 @@ async function run(context: CommandContext): Promise<void> {
     oracle_labels_sha256: sha256Text(
       readText({ path: oracleLabelsPath, zone: "AGENT", policy }),
     ),
+    recon_report_sha256: sha256Text(
+      readText({ path: reconReportPath, zone: "SEAL", policy }),
+    ),
     constraint_set_hash: sha256Text(canonicalConstraintSet()),
     sealed_at: sealedAtFlag === null ? null : readUnixSeconds(sealedAtFlag, "sealed-at"),
     seal_signature: signature,
@@ -96,6 +113,11 @@ async function run(context: CommandContext): Promise<void> {
   context.out(`families            ${manifest.families.join(", ")}`);
   context.out(`constraint_set_hash ${manifest.constraint_set_hash}`);
   context.out(`observations_sha256 ${manifest.observations_sha256}`);
+  // Echoed beside observations because §9 step 5 makes its absence a SEAL
+  // FAILURE and step 4 is a manual `sha256` an operator checks by eye. A digest
+  // is not a ground-truth field and carries no constituent identifier (M38), so
+  // printing it is not an AL5 question.
+  context.out(`recon_report_sha256 ${manifest.recon_report_sha256}`);
   context.out(`sealed_at           ${manifest.sealed_at === null ? "(not sealed)" : String(manifest.sealed_at)}`);
 }
 
@@ -107,6 +129,7 @@ export const sealCommand: Command = {
     observations: { kind: "string", describe: "Path to the committed observations.jsonl." },
     "ground-truth": { kind: "string", describe: "Path to the committed ground_truth.jsonl." },
     "oracle-labels": { kind: "string", describe: "Path to the committed ambiguity_labels.jsonl." },
+    "recon-report": { kind: "string", describe: "Path to the committed recon_report.jsonl (§9 step 4)." },
     "generator-commit": { kind: "string", describe: "Commit SHA of the generator (§9)." },
     "spec-commit": { kind: "string", describe: "Commit SHA of the specification (§9)." },
     "created-at": { kind: "string", describe: "Unix seconds. Default: the wall clock." },

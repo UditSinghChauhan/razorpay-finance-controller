@@ -5,7 +5,7 @@ layer. `ARCHITECTURE.md §3`: *"Must be independently runnable and
 seed-deterministic. Kept out of the engine so no engine code can ever import
 ground truth — an import lint enforces this."*
 
-Written against **specification 1.4.21 / benchmark 1.0.3**.
+Written against **specification 1.4.24 / benchmark 1.0.4**.
 
 ## What this package guarantees
 
@@ -32,6 +32,11 @@ Written against **specification 1.4.21 / benchmark 1.0.3**.
    `UntrustedText`; the frozen schemas are strict, so a leak is a parse error.
 7. **This package writes no file.** `assay generate` belongs to `apps/cli`;
    `PREREGISTRATION.md §9` sequences it after the seal tag.
+8. **The `§6.2` recon report is built from the true state, not the
+   observations.** `RECONCILIATION_SPEC.md §6.2` requires it to hold a row `F05`
+   withheld from the observations and to keep a `settlement_id` `F08` nulled on
+   them, so it cannot be derived from what an agent sees. It is produced as
+   **rows**, ordered by `entity_id` ascending; `apps/cli` serializes them.
 
 ## Module map
 
@@ -49,10 +54,50 @@ Written against **specification 1.4.21 / benchmark 1.0.3**.
 | `simulate.ts` | The forward simulation. True state only |
 | `truth-journal.ts` | `§17.1`/`§17.2` **truth side** -> `true_journal`, `true_balances` |
 | `emit.ts` | True state -> observations + quarantined text; `F05`'s withholding |
+| `recon-report.ts` | True state -> `RECONCILIATION_SPEC.md §6.2`'s PG-side recon report rows, ordered by `entity_id` |
 | `degrade.ts` | The six exercised operators and the four refusals |
 | `seeds.ts` | `§6.1`'s split table and `§6.2` `AL7`'s successor rule |
 | `manifest.ts` | `BenchmarkScenario` / `BenchmarkManifest` (`DATA_MODEL.md §18`) |
 | `generate.ts` | `generateFamily(family, seed)` — the entry point |
+
+## The `§6.2` recon report
+
+`ARCHITECTURE.md §3` assigns this package *"the PG-side recon report `§6.2`'s
+probe reads (spec 1.4.22)"*. `generateFamily` returns it on `recon_report`:
+
+```ts
+interface ReconReportRow {
+  settlement_id: string | null;   // the batch that carried the line
+  entity_id: string;              // pay_… | rfnd_… | adj_…  — total, never null
+  settled_at: number | null;      // Unix seconds; settlement-scoped (§6, M18)
+}
+```
+
+**Three fields and nothing else** (`§6.2`). One row per `ReconLine` the
+simulation produced — captured payments, every refund, every adjustment —
+ordered by **`entity_id` ascending**, ratified at spec 1.4.24 (`DATA_MODEL.md
+§22.2` M38). An uncaptured payment produces no `ReconLine`, so it contributes no
+row; a row whose `settlement_id` and `settled_at` are both `null` is emitted like
+any other, and is **unreachable rather than excluded** — `settlement_id` is the
+only query key.
+
+**It is built from the true state, and both asymmetries with `observations.jsonl`
+are deliberate.** `F05` withholds a constituent `recon_line` *observation*, so
+*"the report may return an `entity_id` for which no observation exists"*, which
+is what makes `DATA_MODEL.md §12`'s partial identifier relation exercisable at
+all. `F08`'s `DROP_SETTLEMENT_ID` models *"**merchant-side** recon copies"*, so
+the report keeps the `settlement_id` the observation lost and *"the key never
+fails on a conforming dataset"*. The second is structural rather than
+remembered: `degrade()` cannot take a `TrueState`.
+
+**The rows are data; the bytes are `apps/cli`'s.** This package performs no I/O,
+so it does not serialize and does not hash. The order exists only so those bytes
+— and therefore `BenchmarkManifest.recon_report_sha256`, which `buildManifest`
+takes as an **input** — are stable at a seed (`PREREGISTRATION.md §7`, `§9`
+steps 4-5).
+
+**`M31` is not resolved here.** The report carries `settled_at`; the field a
+`fetch_settlement_recon` query is date-scoped on stays open.
 
 ## Specification seams
 

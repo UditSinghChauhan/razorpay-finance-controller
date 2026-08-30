@@ -1,4 +1,5 @@
 import type { Sha256, UnixSeconds } from "@assay/domain";
+import type { ReconReportRow } from "@assay/generator";
 import type { Paise } from "@assay/money";
 import type { EventActor, JournalLine, LedgerEventDraft, RunId } from "@assay/ledger";
 
@@ -88,6 +89,40 @@ export function draft(n: number): LedgerEventDraft {
     journal_lines: p5Lines(45_231_000 + n),
     certificate: null,
   };
+}
+
+/**
+ * `RECONCILIATION_SPEC.md §6.2`'s recon report, in the order the generator emits
+ * it: `entity_id` **ascending**, ratified at spec 1.4.24 (`DATA_MODEL.md §22.2`
+ * M38). `adj_` < `pay_` < `rfnd_` in code-unit order, which is the order the
+ * producing package sorts by and the order `apps/cli` must not disturb.
+ *
+ * The middle row is `§4.2`'s UNSETTLED member — `settlement_id` and `settled_at`
+ * both `null` — which the same amendment fixed as **included**: such a line
+ * *"is a `ReconLine` the simulation produced"*, and that its only query key is
+ * `null` makes it unreachable rather than excluded.
+ *
+ * Hand-built and not generated. `PREREGISTRATION.md §9` sequences every
+ * generation after the seal tag, so this suite produces no benchmark data.
+ */
+export function reconReportRows(): readonly ReconReportRow[] {
+  return Object.freeze([
+    Object.freeze({
+      settlement_id: id("setl_", 1),
+      entity_id: entityId("adj_", 3),
+      settled_at: 1_787_000_100,
+    }),
+    Object.freeze({
+      settlement_id: null,
+      entity_id: entityId("pay_", 1),
+      settled_at: null,
+    }),
+    Object.freeze({
+      settlement_id: id("setl_", 2),
+      entity_id: entityId("rfnd_", 2),
+      settled_at: 1_787_000_200,
+    }),
+  ]);
 }
 
 /** A collector for `dispatch`'s two output streams. */

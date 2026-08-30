@@ -8,9 +8,12 @@
  * family that cannot state why it occurs in production is a manufactured puzzle."
  *
  * **No hash is computed here.** `§9` sequences hashing after generation and
- * after the oracle gate; `buildManifest` takes the four digests and the two
+ * after the oracle gate; `buildManifest` takes the five digests and the two
  * commits as inputs so that nothing in this package can produce a manifest that
- * claims a dataset it never saw.
+ * claims a dataset it never saw. `recon_report_sha256` is the fifth (spec
+ * 1.4.22, M36) and is an input for exactly the same reason as its siblings —
+ * this package writes no file, so it has no bytes of its own to digest, even
+ * though `recon-report.ts` produces the rows they are made of.
  */
 
 import type { Sha256 } from "@assay/domain";
@@ -93,6 +96,19 @@ export interface BenchmarkManifest {
   readonly observations_sha256: Sha256;
   readonly ground_truth_sha256: Sha256;
   readonly oracle_labels_sha256: Sha256;
+  /**
+   * `bench/<split>/recon_report.jsonl`, added at spec 1.4.22 (M36).
+   *
+   * `DATA_MODEL.md §18`: *"a manifest that pins the observations but not the
+   * probe surface would let two runs over 'the same' benchmark answer probes
+   * differently. It is required and non-null from benchmark v1.0.4"*, and
+   * `PREREGISTRATION.md §9` step 5 makes its absence a **SEAL FAILURE**,
+   * *"because §6.2's probe has no source without it and `SE5` would silently
+   * score 0 on every candidate"*. Spec 1.4.24 (M38) settles who may compute it:
+   * `AL8` bars engine and oracle code, and *"the offline seal is the one
+   * exception and is not a second evidence path"*.
+   */
+  readonly recon_report_sha256: Sha256;
   readonly constraint_set_hash: Sha256;
   readonly sealed_at: number | null;
   readonly seal_signature: string | null;
@@ -110,6 +126,8 @@ export interface ManifestInputs {
   readonly observations_sha256: Sha256;
   readonly ground_truth_sha256: Sha256;
   readonly oracle_labels_sha256: Sha256;
+  /** `§9` step 4 hashes the file; nothing here can compute it. See the field above. */
+  readonly recon_report_sha256: Sha256;
   readonly constraint_set_hash: Sha256;
   readonly sealed_at?: number | null;
   readonly seal_signature?: string | null;
@@ -150,6 +168,7 @@ export function buildManifest(inputs: ManifestInputs): BenchmarkManifest {
     observations_sha256: inputs.observations_sha256,
     ground_truth_sha256: inputs.ground_truth_sha256,
     oracle_labels_sha256: inputs.oracle_labels_sha256,
+    recon_report_sha256: inputs.recon_report_sha256,
     constraint_set_hash: inputs.constraint_set_hash,
     sealed_at: inputs.sealed_at ?? null,
     seal_signature: inputs.seal_signature ?? null,

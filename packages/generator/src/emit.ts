@@ -33,7 +33,7 @@ import { POSTED_AT } from "./frozen.js";
 import { Minter } from "./mint.js";
 import { PERIOD_TO } from "./period.js";
 import { STREAMS, substream } from "./prng.js";
-import type { SimSettlement, TrueState } from "./simulate.js";
+import { settlementsByMember, type TrueState } from "./simulate.js";
 
 /** An observation plus the free text stripped from it. */
 export interface Emission {
@@ -56,18 +56,14 @@ export function emit(state: TrueState): Emission {
   const minter = new Minter(substream(state.seed, state.family_id, STREAMS.ID_OBS));
   const f05 = substream(state.seed, state.family_id, STREAMS.F05);
 
-  const settlementOfPayment = new Map<number, SimSettlement>();
-  const settlementOfRefund = new Map<number, SimSettlement>();
-  const settlementOfAdjustment = new Map<number, SimSettlement>();
-  for (const settlement of state.settlements) {
-    for (const member of settlement.members) {
-      const table =
-        member.kind === "payment" ? settlementOfPayment
-        : member.kind === "refund" ? settlementOfRefund
-        : settlementOfAdjustment;
-      table.set(member.index, settlement);
-    }
-  }
+  // The same inversion `recon-report.ts` reads, so the `settlement_id` and
+  // `settled_at` an observation carries and the ones the `§6.2` report carries
+  // cannot drift apart. Built once, in `simulate.ts`, beside the type it reads.
+  const {
+    payment: settlementOfPayment,
+    refund: settlementOfRefund,
+    adjustment: settlementOfAdjustment,
+  } = settlementsByMember(state);
 
   // --- F05: which recon lines are withheld (§4.2) --------------------------
   const withheld = new Set<number>();

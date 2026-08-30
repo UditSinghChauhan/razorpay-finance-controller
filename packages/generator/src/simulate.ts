@@ -178,6 +178,44 @@ export interface TrueState {
   readonly ledger_entries: readonly SimLedgerEntry[];
 }
 
+/** `SimSettlement.members`, inverted: which settlement carried each member. */
+export interface SettlementIndex {
+  readonly payment: ReadonlyMap<number, SimSettlement>;
+  readonly refund: ReadonlyMap<number, SimSettlement>;
+  readonly adjustment: ReadonlyMap<number, SimSettlement>;
+}
+
+/**
+ * Invert `SimSettlement.members` once, for every consumer that needs it.
+ *
+ * This is a **projection of the true state and not a new fact**: `members`
+ * already names every allocated constituent, and the inversion only reads it.
+ * It is extracted here — beside the type it inverts — because two modules need
+ * the same relation and `emit.ts`'s `settled_at` / `settlement_id` must agree
+ * line-for-line with `recon-report.ts`'s (`RECONCILIATION_SPEC.md §6.2`). Two
+ * constructions of one relation are two things that can disagree.
+ *
+ * **A member absent from every map is `PREREGISTRATION.md §4.2`'s UNSETTLED
+ * member** — the one "a member the batch cannot carry ... is NOT moved to
+ * another batch" rule leaves with `settlement_id: null`, `settled: false` and
+ * `settled_at: null`. Absence is the representation; no sentinel is invented.
+ */
+export function settlementsByMember(state: TrueState): SettlementIndex {
+  const payment = new Map<number, SimSettlement>();
+  const refund = new Map<number, SimSettlement>();
+  const adjustment = new Map<number, SimSettlement>();
+  for (const settlement of state.settlements) {
+    for (const member of settlement.members) {
+      const table =
+        member.kind === "payment" ? payment
+        : member.kind === "refund" ? refund
+        : adjustment;
+      table.set(member.index, settlement);
+    }
+  }
+  return Object.freeze({ payment, refund, adjustment });
+}
+
 // ---------------------------------------------------------------------------
 // The simulation
 // ---------------------------------------------------------------------------

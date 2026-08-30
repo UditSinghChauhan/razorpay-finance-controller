@@ -40,7 +40,8 @@ export { assertOrderRefsInjective, buildReceipt, receiptToOrderRef } from "./rec
 export { type FamilyMechanics, FAMILY_MECHANICS } from "./families.js";
 
 export {
-  type TrueState, NegativeSettlementError, simulate,
+  type SettlementIndex, type TrueState, NegativeSettlementError, settlementsByMember,
+  simulate,
 } from "./simulate.js";
 
 export {
@@ -49,6 +50,13 @@ export {
 
 export { type Emission, emit } from "./emit.js";
 export { type DegradationRecord, type Degraded, degrade } from "./degrade.js";
+
+/**
+ * `RECONCILIATION_SPEC.md §6.2`'s PG-side recon report. `apps/cli` writes it to
+ * `bench/<split>/recon_report.jsonl`; this package produces the rows and their
+ * order, and performs no I/O.
+ */
+export { type ReconReportRow, buildReconReport } from "./recon-report.js";
 
 export {
   type GeneratedFamily, type GenerateOptions, type GroundTruth, generateFamily,

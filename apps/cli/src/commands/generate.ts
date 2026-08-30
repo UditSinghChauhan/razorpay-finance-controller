@@ -22,22 +22,27 @@ import type { Command, CommandContext } from "./types.js";
  * would guess in the direction that costs a seed. It therefore fails closed and
  * names the procedure instead.
  *
- * **The `§6.2` probe surface is not produced, and cannot be from here.**
+ * **The `§6.2` probe surface is written here and decided elsewhere.**
  * `ARCHITECTURE.md §3` assigns *"the PG-side recon report `§6.2`'s probe reads
- * (spec 1.4.22)"* to `packages/generator`, and `RECONCILIATION_SPEC.md §6.2`
- * fixes its content — *"one row per `ReconLine` the simulation produced,
- * carrying `settlement_id`, `entity_id` and `settled_at` and **nothing
- * else**"*. No such emitter exists in that package. Deriving the rows here
- * would mean reconstructing, in `apps/cli`, an artifact whose defining property
- * is that `PREREGISTRATION.md §4.2`'s `F05` withholds a constituent from the
- * observation set but **not** from the report — that is simulation state, and
- * `apps/cli` does not hold it. The command reports the gap and writes what the
- * generator does produce.
+ * (spec 1.4.22)"* to `packages/generator`, and `GeneratedFamily.recon_report`
+ * now carries the rows — *"data and not bytes"*, because that package *"writes
+ * no file"* and `§3` gives this one all filesystem I/O. Nothing about the rows
+ * is decided below. Membership is `§6.2`'s (*"one row per `ReconLine` the
+ * simulation produced"*, including the unsettled ones, derived at spec 1.4.24),
+ * and the order is `entity_id` ascending, **ratified** at spec 1.4.24
+ * (`DATA_MODEL.md §22.2` M38) — so the rows arrive sorted and frozen and are
+ * **not** re-sorted here: `artifacts/jsonl.ts` states the rule this command
+ * obeys, that *"the ordering that matters is the ordering the producing package
+ * chose"*. Deriving the rows here was never available anyway: the artifact's
+ * defining property is that `PREREGISTRATION.md §4.2`'s `F05` withholds a
+ * constituent from the observation set but **not** from the report, which is
+ * simulation state `apps/cli` does not hold.
  */
 
 const OBSERVATIONS = "observations.jsonl";
 const GROUND_TRUTH = "ground_truth.jsonl";
 const UNTRUSTED_TEXT = "untrusted_text.jsonl";
+const RECON_REPORT = "recon_report.jsonl";
 
 function readSplit(raw: string): Split {
   if (raw === "train" || raw === "dev") return raw;
@@ -91,18 +96,18 @@ async function run(context: CommandContext): Promise<void> {
     context.sink.write(join(familyDir, OBSERVATIONS), encodeJsonl(generated.observations));
     context.sink.write(join(familyDir, UNTRUSTED_TEXT), encodeJsonl(generated.untrusted_text));
     context.sink.write(join(familyDir, GROUND_TRUTH), encodeJsonl([generated.ground_truth]));
+    // `RECONCILIATION_SPEC.md §6.2`'s probe surface, under the same familyDir as
+    // the other three and through the same `encodeJsonl`. Split-independent by
+    // construction: `split` is read once, above, to locate the directory and to
+    // check §6.1's frozen table, and no artifact below is conditioned on it.
+    context.sink.write(join(familyDir, RECON_REPORT), encodeJsonl(generated.recon_report));
 
     context.out(
       `${family} seed ${String(seed)}  ${String(generated.observations.length)} observations, ` +
-        `${String(generated.untrusted_text.length)} quarantined text rows`,
+        `${String(generated.untrusted_text.length)} quarantined text rows, ` +
+        `${String(generated.recon_report.length)} recon report rows`,
     );
   }
-
-  context.out(
-    `BLOCKED: recon_report.jsonl was not written. ARCHITECTURE.md §3 assigns the PG-side ` +
-      `recon report to packages/generator and no emitter exists there, so ` +
-      `RECONCILIATION_SPEC.md §6.2's fetch_settlement_recon has no surface on this dataset.`,
-  );
 }
 
 export const generateCommand: Command = {

@@ -372,5 +372,40 @@ export const BENCHMARK_VERSION = "1.0.4";
 /** `DATA_MODEL.md §1`: `GroundTruth.gt_version`. */
 export const GT_VERSION = "1.1.0";
 
-/** `PREREGISTRATION.md` header: the specification version this package was written against. */
-export const SPEC_VERSION = "1.4.22";
+/**
+ * `PREREGISTRATION.md` header: the specification version this package was
+ * written against.
+ *
+ * **1.4.22 -> 1.4.24, and what was re-checked to say so.** The constant read
+ * 1.4.22 while the documents read 1.4.24, and the gap was real rather than
+ * clerical: the 1.4.22 bump (`BENCHMARK_VERSION` 1.0.3 -> 1.0.4) carried that
+ * amendment's **version provenance** and none of its work, so the package
+ * claimed a version whose obligation it did not meet. Each intervening version,
+ * and what it required here:
+ *
+ *   - **1.4.22 (M36)** — the one version that DID bind this package.
+ *     `ARCHITECTURE.md §3` assigns it *"the PG-side recon report `§6.2`'s probe
+ *     reads"*, and `DATA_MODEL.md §18` adds `recon_report_sha256`. Neither
+ *     existed. `recon-report.ts` now produces the rows — `§6.2`'s three columns
+ *     and nothing else, pre-`F05` and pre-operator by construction — and
+ *     `manifest.ts` carries the digest as an **input**, the same way its four
+ *     siblings are, this package computing no hash and writing no file.
+ *   - **1.4.23 (M37)** — required nothing. It creates `packages/probe` and its
+ *     own register row derives the exclusion in terms: the loop is *"not
+ *     `packages/generator`'s (`AL1`/`AL2`)"*. No constant here moves.
+ *   - **1.4.24 (M38)** — the report's row **order** (`entity_id` ascending) and
+ *     that **unsettled rows are included**; both are implemented and both are
+ *     property-tested. Its third property, that *"the offline seal may read the
+ *     artifact"*, is `apps/cli`'s: it is a permission over a **file**, and this
+ *     package performs no I/O, so it satisfies `AL8` the strong way — there is
+ *     no read for the path guard to intercept. `§18`'s `BenchmarkManifest` is
+ *     unchanged at 1.4.24; the field arrived at 1.4.22.
+ *
+ * **Nothing below moves with it.** `BENCHMARK_VERSION` stays 1.0.4 and
+ * `GT_VERSION` 1.1.0, as 1.4.23 and 1.4.24 both state; no population, seed,
+ * family, rate or `§7` threshold changes; `constraint_set_hash` is untouched
+ * (`C1`-`C8` are `packages/domain`'s and are unmodified); and `M31`'s
+ * date-scoping field **remains open** — the report carries `settled_at`, and how
+ * a `date` argument filters is the dispatch's business, not the artifact's.
+ */
+export const SPEC_VERSION = "1.4.24";

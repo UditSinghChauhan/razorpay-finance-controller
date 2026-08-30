@@ -19,6 +19,7 @@ const inputs = (families: readonly FamilyId[], seeds: readonly number[]) => ({
   observations_sha256: digest,
   ground_truth_sha256: digest,
   oracle_labels_sha256: digest,
+  recon_report_sha256: digest,
   constraint_set_hash: hashCanonical(JSON.parse(canonicalConstraintSet()) as never),
 });
 
@@ -92,6 +93,23 @@ describe("§18 BenchmarkManifest", () => {
     expect(manifest.seeds).toStrictEqual([9105, 9101, 9102, 9103, 9104]);
     expect(manifest.burns).toStrictEqual([
       { burned: 9100, successor: 9105, reason: "HELD_OUT_FORBIDDEN_LIST_BREACH" },
+    ]);
+  });
+
+  it("carries recon_report_sha256 between oracle_labels_sha256 and constraint_set_hash", () => {
+    // `DATA_MODEL.md §18` positions the field, spec 1.4.22 (M36) added it, and
+    // `PREREGISTRATION.md §9` step 5 makes its absence a SEAL FAILURE "because
+    // §6.2's probe has no source without it and SE5 would silently score 0 on
+    // every candidate". It is an INPUT: this package computes no digest, having
+    // no file of its own to hash.
+    const block = SEED_BLOCKS[1];
+    if (block === undefined) throw new Error("missing block");
+    const manifest = buildManifest(inputs(block.families, block.seeds));
+    expect(manifest.recon_report_sha256).toBe(digest);
+    expect(Object.keys(manifest)).toStrictEqual([
+      "benchmark_version", "created_at", "generator_commit", "spec_commit", "families", "seeds",
+      "record_counts", "observations_sha256", "ground_truth_sha256", "oracle_labels_sha256",
+      "recon_report_sha256", "constraint_set_hash", "sealed_at", "seal_signature", "burns",
     ]);
   });
 
