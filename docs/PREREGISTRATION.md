@@ -1,10 +1,11 @@
-# PREREGISTRATION — ASSAY Benchmark v1.0.3
+# PREREGISTRATION — ASSAY Benchmark v1.0.4
 
-**Spec version:** 1.4.21 · **Benchmark version:** 1.0.3
+**Spec version:** 1.4.22 · **Benchmark version:** 1.0.4
 
 **Status: FROZEN on commit. Amendments require a version bump and a new seal.**
 **Date frozen:** 2026-08-23 · **Amended:** 2026-08-24 (benchmark 1.0.1),
-2026-08-25 (benchmark 1.0.2) and 2026-08-26 (benchmark 1.0.3) — see below
+2026-08-25 (benchmark 1.0.2), 2026-08-26 (benchmark 1.0.3) and
+2026-08-30 (benchmark 1.0.4) — see below
 · **Sealed at:** _(pending — see §9)_
 
 **Amendment 1.1.1 (pre-seal, factual correction).** Applied before the seal and
@@ -56,7 +57,7 @@ to pass; it also raises the figure for the `A2-NOABSTAIN` ablation, against whic
 ASSAY's headline comparison is drawn. The defect it corrects is stated in §8 and
 in `DECISION_BRIEF.md §A.6`. `§4.1` (families and composition), `§4.2` (generation
 parameters), `§4.3` (degradation operators), `§5.1`/`§5.2`/`§5.4` (the oracle),
-`§6.1`'s split and seed table, `§6.2`'s AL1–AL7 and **every threshold in §7** are
+`§6.1`'s split and seed table, `§6.2`'s AL1–AL8 and **every threshold in §7** are
 **unchanged** — the data-generating process is identical to benchmark v1.0.0 and
 v1.0.1. Full enumeration and the post-hoc-optimization defence are in
 `DECISION_BRIEF.md §A.6`.
@@ -102,7 +103,7 @@ and reported on every run** as `unresolved_value_inr_multiview`, labelled
 
 `§4.1` (families and composition), `§4.2` (generation parameters), `§4.3`
 (degradation operators), `§5` (the oracle), `§6.1`'s split and seed table,
-`§6.2`'s AL1–AL7 and **every threshold in §7** are **unchanged** — the
+`§6.2`'s AL1–AL8 and **every threshold in §7** are **unchanged** — the
 data-generating process is identical to benchmark v1.0.0, v1.0.1 and v1.0.2, and
 no `AccountCode`, constraint or posting rule was added.
 
@@ -841,6 +842,7 @@ exists to prevent.
 | Transaction volumes, merchant behaviour, distributions | **Synthetic.** Programmatically generated. |
 | Bank statements, merchant ledgers | **Synthetic.** No real bank data exists in the test account. |
 | Settlement and recon records | **Synthetic.** The test account returns `count: 0` for both endpoints. |
+| PG-side recon report (`bench/<split>/recon_report.jsonl`, spec 1.4.22) | **Synthetic.** Emitted by the generator from the same simulation, before `F05` withholding and before any `§4.3` operator. It is a probe surface, never an `Observation`, and never ingested. |
 
 **Required disclosure, to appear verbatim in every report and demo:**
 
@@ -1415,9 +1417,12 @@ reporting rather than a corruption of an observation.
                No operator ever observes the gap and none can widen it.
   what remains the payment, order and ledger_entry observations for that
                capture; the settlement observation carrying its FULL
-               amount; and true_journal's P1 posting for the capture --
+               amount; true_journal's P1 posting for the capture --
                the true state is not degraded (§4.3), so truth still
-               books it.
+               books it; and, from spec 1.4.22, the row in the committed
+               PG-side recon report, which is the ONLY place the withheld
+               line survives on the agent side and is reachable solely
+               through §6.2's fetch_settlement_recon under P_max.
   schema       nothing is malformed. A row is absent, not corrupt. I4
                fails from the engine's view because the settlement's
                amount exceeds the sum of the lines it can see, which is
@@ -1549,7 +1554,27 @@ the generator and the reconciliation engine.
 The Ambiguity Oracle (`packages/oracle`) reads **observation files only**. It
 cannot read ground truth: a runtime path guard throws on any read matching
 `**/ground_truth*.jsonl`, and an ESLint rule forbids importing
-`packages/generator`. Its input is exactly what every agent receives.
+`packages/generator`. `AL8` bars it from the PG-side recon report on the same
+mechanism.
+
+**The oracle's input is the observation set, and from spec 1.4.22 that is a
+smaller universe than ASSAY's — deliberately `[ASSAY-MODEL]`, register row M36.**
+Through spec 1.4.21 this section closed *"Its input is exactly what every agent
+receives"*, which held while no evidence channel reached past the observations.
+`RECONCILIATION_SPEC.md §6.2`'s `fetch_settlement_recon` now reads a committed
+PG-side recon report, so ASSAY may hold — under a budget of `P_max = 3` per
+component — evidence the oracle does not. **The oracle is not required to receive
+that evidence, and must not receive it** (§5.3). No claim is made that the oracle
+and ASSAY hold byte-identical inputs once a probe has run.
+
+**What is claimed instead is narrower, and is what the metrics rest on.** The
+oracle is the **best abstention policy achievable from the observations**, defined
+independently of anything ASSAY does or acquires — its labels are a function of
+the observation set alone and can never depend on a probe result. And **every
+agent still receives the same files as every other agent**, so
+`EVALUATION_SPEC.md §2`'s *"differences attributable to the agent alone"* is
+unaffected. The asymmetry is between the oracle and the agents, not among the
+agents.
 
 ### 5.2 Independence from the engine
 
@@ -1734,6 +1759,7 @@ to inspection. This is the reason the adversarial suite must be authored early
 | AL5 | The CLI's `--sealed` flag refuses to print, log or write any ground-truth field; only aggregate metrics are emitted. |
 | AL6 | Prompt text may not contain examples derived from any TEST record. |
 | AL7 | If a TEST record is inspected for any reason, **or if any item on the `§6.1` forbidden list for held-out families is breached**, that seed is burned: it is discarded and replaced, and the burn is recorded in the manifest. |
+| AL8 | Neither engine nor oracle code may read a file matching `**/recon_report*.jsonl`. Enforced by the same runtime path guard as `AL2` and by an ESLint rule. The artifact is reachable **only** through the probe executor, under `RECONCILIATION_SPEC.md §6.2`'s `P_max` budget. Added at spec 1.4.22; see `§5.1` and `§10` V22. |
 
 **`AL7`'s replacement rule, added at spec 1.4.1 `[ASSAY-MODEL]`.** `AL7` says a
 burned seed *"is discarded and replaced"* and does not say how. Choosing a
@@ -1778,7 +1804,7 @@ it auditable.
 Synthetic data generated at run time from a private seed cannot be in a model's
 pre-training corpus, which removes the usual benchmark-contamination concern.
 What it does **not** remove is *developer* contamination — tuning against the
-test split. Rules AL1–AL7 target that, because it is the real risk here.
+test split. Rules AL1–AL8 target that, because it is the real risk here.
 
 ---
 
@@ -2168,6 +2194,25 @@ strictly no larger than before and that still contains every true allocation.
 `target_record_count`, `batch_value_paise` and `close_threshold_paise` are
 unmoved, and **benchmark v1.0.3 is unchanged.**
 
+**Dependency statement for the spec-1.4.22 probe-source ratification.** No metric
+on this list is redefined, none is added, none is removed and the numbering does
+not move: the list is **28** metrics before and after. What changes is that
+`RECONCILIATION_SPEC.md §6.2`'s `fetch_settlement_recon` gains a source, so
+`SE5` can contribute for the first time and `DISCRIMINATED` becomes reachable
+(`§10` V20 records that it was not, pre-probe).
+
+**Values move, definitions do not.** Metrics **1**, **2**, **3**, **4**, **8**
+and **12** take different figures because a decision path that could not fire
+now can. Metrics **4** and **8** additionally acquire a **reporting obligation**
+rather than a definitional change: each is published beside the probe count, so a
+reduced `abstention_recall` or a negative `gap_to_oracle` is attributable to the
+probe channel rather than left to inference (`EVALUATION_SPEC.md §4.3`, `§4.13`).
+The oracle's labels are **unaffected** — `AL8` keeps it observations-only, and
+`§5.1` states why the asymmetry is intentional. `constraint_set_hash` does not
+move, `C1`–`C8` and `SE1`–`SE5` are untouched, and no threshold changes.
+**Benchmark version moves 1.0.3 → 1.0.4**, because the committed benchmark
+surface gains an artifact.
+
 **Stopping rule:** the sealed test run is executed **once** per benchmark
 version. Its output is reported whatever it says. If a bug is found after the
 seal, the fix requires a new benchmark version with fresh seeds, and **both**
@@ -2176,12 +2221,16 @@ results are reported, with the reason for the re-run.
 ## 9. Seal procedure
 
 ```
-  1. Freeze code:  git tag -s bench-v1.0.3 -m "ASSAY benchmark v1.0.3 seal"
+  1. Freeze code:  git tag -s bench-v1.0.4 -m "ASSAY benchmark v1.0.4 seal"
   2. Generate:     assay generate --split test --seeds 9000-9004,9100-9104
   3. Oracle:       assay oracle --split test          # completeness gate MUST pass
-  4. Hash:         sha256 observations.jsonl ground_truth.jsonl oracle_labels.jsonl
+  4. Hash:         sha256 observations.jsonl ground_truth.jsonl oracle_labels.jsonl \
+                          recon_report.jsonl                      # spec 1.4.22
   5. Commit hashes into benchmark_manifest.json      # ground truth itself NOT committed
-     # `benchmark_version` must read "1.0.3" (DATA_MODEL.md §18)
+     # `benchmark_version` must read "1.0.4" (DATA_MODEL.md §18)
+     # `recon_report_sha256` must be present and non-null (spec 1.4.22);
+     #   its absence is a SEAL FAILURE, because §6.2's probe has no source
+     #   without it and SE5 would silently score 0 on every candidate
      # `record_counts` must match the frozen §4.1 composition; a mismatch, or a
      # per-(split,seed) total outside 10,000-20,000, is a SEAL FAILURE
      # `true_balances` must equal the projection of `true_journal` for every
@@ -2205,7 +2254,7 @@ Stated here, before results, so they cannot be presented later as afterthoughts.
 |---|---|---|---|
 | V1 | Generator and solver share the author's assumptions | Oracle independent of both (§5.1–5.2); completeness **and** consistency gates; frozen, individually justified constraints; family-level holdout | **Real and not eliminated.** If the shared constraint *declaration* misrepresents production, everything is consistently wrong. |
 | V2 | Synthetic data does not resemble production | Real API contracts and value sets (§2), Razorpay's documented fee/GST convention and published 2% / 18% rates (§4.2), distributions from public payment-industry norms | **High.** No external validity is claimed. Note specifically that the bank statement and merchant ledger are entirely invented, that no bank-holiday calendar is modelled, and that a single merchant profile is simulated. |
-| V3 | Developer tunes against the test split | AL1–AL7; sealed hashes; held-out families; single sealed run | Moderate — self-enforced |
+| V3 | Developer tunes against the test split | AL1–AL8; sealed hashes; held-out families; single sealed run | Moderate — self-enforced |
 | V4 | Baselines are strawmen | `B2-LLM-DIRECT` is the *obvious* approach, not a weakened one, given equal prompt effort and token budget; ablations A1–A3 are same-system controls | Low for ablations, moderate for baselines |
 | V5 | Harm function chosen to flatter ASSAY | Harm frozen here; two independent harm measures reported; cost parameters swept | Low |
 | V6 | Abstention thresholds tuned for the headline | τ and ε frozen; sensitivity sweep required; raising τ moves cases into a separately reported bucket | Low |
@@ -2224,6 +2273,7 @@ Stated here, before results, so they cannot be presented later as afterthoughts.
 | V19 | The frozen population cannot satisfy the `CLOSED` half of `S12`, so metric 11 is structurally degenerate | Derived from frozen parameters, not from a measured result. `§4.1` realizes `§4.2`'s 30% clean `bank_ref` share exactly at `realize(30/100, 31) = 9` per family instance, leaving **at least 22 unanchored bank lines per family instance** — a floor rather than an exact count, since `F04`'s `DUPLICATE_ROW` and `F08`'s `MANGLE_UTR` perturb it **upward only**. `RECONCILIATION_SPEC.md §3` makes `AN2` the only bank-side anchor and `DATA_MODEL.md §11.1` leaves a `bank_line` target no admissible member, so no second route exists. Each unanchored line reaches `E03` → `P5` (`DATA_MODEL.md §17.1.1`) and enters `unresolved_value_paise` at its full `amount` (`DATA_MODEL.md §14.1`). Against `RECONCILIATION_SPEC.md §10.3`'s 0.5% of `batch_value_paise` the bank-side numerator alone is of the order of 138× the threshold, so `period_status` is `OPEN` for every conforming dataset the frozen composition produces | **Accepted and disclosed; governed by a disposition this specification declared in advance.** `DECISION_BRIEF.md §F` F9 states that if the falsification check finds *"all families close, or none does"*, the outcome *"is **reported as a finding** in the threats-to-validity section and the run proceeds to the seal unchanged"*, and that *"the threshold may **NOT** be adjusted in response to what the check shows"*. This row is that report, written from the derivation rather than awaiting the run; `F9`'s dev run remains the declared confirmation. **`S12`'s `CLOSED` half is not satisfied and is reported failed; its `OPEN` half is satisfied**, and `S12`'s own stated purpose — *"a close gate that has never **refused to close** is an untested close gate"* — is met, since the gate refuses on every run. Metric 11 is reported with its cause; metrics 12, 13 and 14 remain meaningful and `BLOCKED` must still be 0. **`CLOSED` is not universally unreachable**: a conforming dataset with a sufficiently higher clean-`bank_ref` share would close, so the bar is `§4.2`'s composition and not `C1`–`C8`. `DECISION_BRIEF.md §I`'s Aug 27 row already separates the two things being measured — the gate's three outcomes are exercised **on constructed inputs**, while *"the DEV-seed outcome distribution is recorded for `§F` F9 and is not a completion gate"*. The derivation above references no seed; it was separately illustrated on seeds outside `§6.1`'s split table, which are **not benchmark results** and carry no `AL7` consequence |
 | V20 | `SE1`'s 3500 bps is permanently inactive, and pre-probe discrimination is unreachable | **Derived:** `SE1` compares `settlement.utr` with its `AN2` bank line's `bank_ref` (`DATA_MODEL.md §22.2` M8) — both target-scoped, so it takes one value across every candidate of a target and can neither order candidates nor move the ε-gap, which `RECONCILIATION_SPEC.md §4.2` gives as the score's only two uses. It could rank only for a `bank_line` target, and `DATA_MODEL.md §11.1` (spec 1.4.4) gave that target the empty candidate set. `§11`'s worked example corroborates: its stated `Δs = 400 bps` with `SE3` deciding and a verdict of `ABSTAINED` is reproducible only if `SE1` contributes equally to both candidates. **This section's V18 disclosed 1.4.4's bank-side consequences — metric 27, the completeness gate, `B8` — and did not record this one.** With `SE1` inactive and `SE2`/`SE4`/`SE5` probe-gated, pre-probe `Δs ≤ **469 bps** < ε under the spec-1.4.13 formulation — restated from the `1250 bps` published at spec 1.4.10, which was computed from `C4`'s full `[1, 7]`-day domain under a formula since corrected. `1250` was a true upper bound and nothing published under it is falsified; the frozen `T+1`–`T+3` cycle simply never populates that domain's tails, so the bound that holds is `469` | **Accepted and disclosed rather than repaired.** The weight is **not** reallocated and the row is **not** removed: `AL3` freezes the `SE1`–`SE5` weights, and `RECONCILIATION_SPEC.md §4.1`'s standing treatment of a declared-but-inert clause — `C8`, and `C2`'s adjustment half — is to retain it and report that it does nothing rather than delete it. The effective evidence budget is `SE2`+`SE3`+`SE4`+`SE5` = 6500 bps, of which 5000 is probe-gated. **No metric definition is amended and no threshold moved**; this row reports a consequence and redefines nothing. `SE5` remains undefined and is untouched at spec 1.4.10 |
 | V21 | `SE4`'s 1000 bps separates no candidates on v1.0.0 data | **Derived, from six frozen facts.** `memo` is quarantined (`DATA_MODEL.md §0` rule 4, `§8`, `§10`) and **no** `RECONCILIATION_SPEC.md §6.2` probe returns it — the closed enum holds no ledger-entry probe, and `DATA_MODEL.md §3` gives `receipt` an explicit probe-reachability sentence that `memo` has no counterpart to. `MerchantLedgerEntry` (`§8`) carries no structural method or card-network field. `fetch_payment` supplies `method`, which `§10`'s `payment` observation already carries structurally. `card_network` has no Payment-side field at all, spec 1.1.1 having placed the card attributes on `ReconLine` *"when they are settlement-recon columns"*. No **exercised** `§4.3` operator perturbs `method` or `card_network` — `DROP_FIELD` could and is declared not exercised. And `§4.2`'s `F06` construction draws *"identical method — ONCE from the frozen mix"* for **both** members of a collision pair, so the family that manufactures equal-credit ambiguity leaves `SE4` nothing to separate | **Accepted and disclosed rather than repaired**, on the `C8` precedent in `RECONCILIATION_SPEC.md §4.1`. The row and its **1000 bps are retained, not reallocated and not removed**; `AL3` freezes the `SE1`–`SE5` weights and nothing is renormalised. `§6.2`'s `fetch_payment` route is unchanged, the probe enum stays closed, and **no `fetch_ledger_entry` probe is added** — that would open a closed enum and put a merchant-controlled surface (`THREAT_MODEL.md §T1`) inside the probe budget. **The agreement function is left undefined**, being unnecessary while the signal is non-discriminating. **No metric definition is amended and no threshold moved.** With `SE1` inactive (V20) and `SE4` non-binding, the evidence budget that is both live and defined was recorded at spec 1.4.11 as `SE2` + `SE3` = 3500 of 10000 bps with `SE5`'s 2000 undefined; `SE5` is defined at spec 1.4.16, and at spec 1.4.20 `SE2` is declared expected-non-binding on v1.0.0 data (M34), so the budget that is live and defined is `SE3` + `SE5` = **3500** of 10000 — the same figure by a different route. All five weights stand unchanged and unreallocated at 3500 / 2000 / 1500 / 1000 / 2000 |
+| V22 | The probe reaches evidence the Ambiguity Oracle cannot see, so ASSAY may correctly resolve a case the oracle labels truly ambiguous | **Derived, and older than the probe source.** `RECONCILIATION_SPEC.md §6`'s `DISCRIMINATED` branch **accepts** an allocation when `Δs ≥ ε`, while `§5.4`'s ambiguity definition carries **no `Δs` term** — so every `DISCRIMINATED` decision is, by the oracle's own definition, a commit on a truly-ambiguous case, and has been since spec 1.0.0. `§10` V20 shows the branch was **unreachable** pre-probe (`Δs ≤ 469 bps < ε = 1500`), and spec 1.4.20 leaves `SE5`'s 2000 bps as the only route above `ε`, so spec 1.4.22's probe source does not create the asymmetry — it makes an already-frozen branch reachable. Consequences: `abstention_recall` falls, `silent_guess_value_inr` becomes non-zero for correct decisions, and `gap_to_oracle` may go **negative**, which `EVALUATION_SPEC.md §4.13` shows is arithmetically valid since the oracle policy pays `C_review` on the whole truly-ambiguous set | **Ratified as intentional, and corrected in prose rather than repaired in formula.** The oracle stays a **fixed observations-only reference**: `AL8` bars it from the recon report, its labels can never depend on a probe result, and `§5.3`'s completeness gate keeps its observations-only scope. Letting the oracle read the artifact was **considered and rejected** — `§5.3`'s expressibility scoping exists *because* `F05` withholds a line, and an oracle holding the report would void that scoping and make the gate tautological, destroying the independence `ARCHITECTURE.md §7` exists to establish. **No metric formula, definition, number or count changes**; the 28-metric list stands. Two sentences written before the branch was reachable are corrected: `§5.1`'s *"Its input is exactly what every agent receives"* and `EVALUATION_SPEC.md §4.3`'s *"had no evidential right to make"*. Metrics 4 and 8 are reported beside the probe count so the provenance of the difference is visible. **No exploratory second reference model is added** — `DECISION_BRIEF.md §L.4` would force it to `EXPLORATORY`, where it could support no claim |
 
 **The claim ASSAY is entitled to make, and no more:**
 

@@ -1,7 +1,7 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.21 · **Date:** 2026-08-28
+**Spec version:** 1.4.22 · **Date:** 2026-08-28
 **Reviewer role:** principal architect / skeptical reviewer
 
 **At spec 1.4.6** §A.13 records one definition, taken at a governance gate held
@@ -1612,6 +1612,87 @@ this amendment — `S4` remains unimplemented.
 
 ---
 
+### A.29 Spec 1.4.22 / benchmark 1.0.4 — the probe that had no source
+
+**The decisions.** `RECONCILIATION_SPEC.md §6.2` names `fetch_settlement_recon`'s
+source: the **committed PG-side recon report** `bench/<split>/recon_report.jsonl`,
+carrying `settlement_id`, `entity_id` and `settled_at`, with `settlement_id` as
+its only query key. The Ambiguity Oracle is **barred** from it (`AL8`) and remains
+observations-only. Two sentences written before the consequence was reachable are
+corrected. Register row M36; threat row `PREREGISTRATION.md §10` V22.
+
+**The probe had a source class and no source.** `DATA_MODEL.md §12` has said since
+spec 1.4.14 that this probe queries the PG's own report *"rather than the
+observation set"*, and derived the identifier relation's **partiality** from it:
+`PREREGISTRATION.md §4.2`'s `F05` withholds one constituent `recon_line`
+**observation** at emission, so a returned `entity_id` may have no observation. No
+observation-backed source can satisfy that derivation — the withheld row is absent
+from `observations.jsonl` by construction. What was missing was never the class. It
+was a file.
+
+**`settlement_utr` was considered and refused — for the second time.** The
+alternative was to read the observation set and fall back to
+`ReconLine.settlement_utr` matched against `Settlement.utr` where
+`DROP_SETTLEMENT_ID` had nulled the key. `§A.17` (spec 1.4.10, M24) evaluated
+**exactly that field-pair** as `SE1`'s member-scoped reading and rejected it:
+*"`settlement_utr` is read by no normative rule anywhere."* `§A.17` had already
+noticed the survival fact the fallback relies on — *"`DROP_SETTLEMENT_ID` nulls
+only `settlement_id` … in the singular"*. Adopting it would have falsified a
+sentence M24's derivation rests on, by implementation rather than by amendment.
+**And it is unnecessary:** `§4.3` models the operator as *"**Merchant-side** recon
+copies that lack the PG's batch identifier"* and `§4.1`'s `F08` as *"absent from
+**the merchant's copy**"*, so the PG's own report retains the key and it never
+fails.
+
+**V22 — the asymmetry is older than the source, and it is intentional.** Naming a
+source makes `SE5` able to contribute, and `§10` V20 shows `DISCRIMINATED` was
+**unreachable** pre-probe (`Δs ≤ 469 bps < ε`). So ASSAY can now resolve a case the
+oracle, reading observations only, calls truly ambiguous — `abstention_recall`
+falls, `silent_guess_value_inr` counts correct decisions, and `gap_to_oracle` may
+go **negative**. *Derived:* this asymmetry is **not created here**.
+`RECONCILIATION_SPEC.md §6`'s `DISCRIMINATED` branch **accepts** when `Δs ≥ ε`
+while `PREREGISTRATION.md §5.4`'s ambiguity definition carries **no `Δs` term**, so
+every `DISCRIMINATED` decision has been a commit on an oracle-ambiguous case since
+spec 1.0.0; spec 1.4.22 makes a frozen branch reachable, nothing more. *Ratified:*
+the asymmetry is **intentional** — the oracle stays a fixed observations-only
+reference and its labels can never depend on a probe result.
+
+**Letting the oracle read the artifact was rejected on frozen grounds.**
+`PREREGISTRATION.md §5.3` scopes the completeness gate to **expressible** targets
+precisely *because* `F05` withholds a line. An oracle holding the report would make
+those targets expressible, void the scoping, and reduce the gate to a tautology —
+checking the constraint set against an answer key rather than against reality, and
+destroying the independence `ARCHITECTURE.md §7` exists to establish. `AL8` makes
+the bar structural rather than a convention.
+
+**What changed is prose, not formulas.** `PREREGISTRATION.md §5.1` closed with
+*"Its input is exactly what every agent receives"*, true while no channel reached
+past the observations and false afterwards. `EVALUATION_SPEC.md §4.3` glossed
+`silent_guess_value_inr` as *"decisions the system made that it had no evidential
+right to make"*, which `Δs ≥ ε` already contradicted. Both are corrected in place
+with the superseded wording quoted, and `§4.13` now states that a negative
+`gap_to_oracle` is valid and requires metrics 4 and 8 to be reported beside the
+probe count. **No metric formula, definition, number or count changes**; the frozen
+list stays at **28**; `DISCRIMINATED` is not redefined; **no exploratory second
+reference model is added**, `§L.4` would force it to `EXPLORATORY` where it could
+support no claim.
+
+**What moves and what does not.** `BENCHMARK_VERSION` **1.0.3 → 1.0.4**, because
+the committed benchmark surface gains an artifact. `constraint_set_hash` does
+**not** move — `C1`–`C8` are untouched. `GT_VERSION` stays **1.1.0**;
+`GroundTruth`'s shape is unchanged. The generated population is unchanged: same
+seeds, families, rates, `target_record_count` and composition, and
+`observations_sha256` does not move. `SE1`–`SE5` and every `§7` threshold are
+untouched. **No dataset is invalidated — none exists**: `bench/` is absent, `runs/`
+holds only `.gitkeep`, no manifest, run or root hash has been produced and no
+`bench-v1.0.3` tag was ever cut.
+
+**Nothing is built here.** The artifact is specified and scheduled, not written; no
+probe executor and no probe loop exist. **Role C remains open** — where the loop
+lives, and who owns `P_max` enforcement, pre-call `I6` re-checking, dispatch and
+`PROBE` `LedgerEvent` emission. `DATA_MODEL.md §22.2` M31's undecided
+date-scoping field and M33's unstated `widen_temporal_window` bound both stand.
+
 ## B. Locked project definition
 
 > **ASSAY is a settlement reconciliation controller for Razorpay-shaped payment
@@ -1692,6 +1773,13 @@ a choice, cut anything else first.
 ---
 
 ## E. Benchmark changes in this revision
+
+0. **A PG-side recon report is committed, and the benchmark version moves to
+   1.0.4** (spec 1.4.22, `§A.29`). `RECONCILIATION_SPEC.md §6.2`'s
+   `fetch_settlement_recon` reads it; `AL8` bars the engine and the oracle from
+   it, so the oracle stays a fixed observations-only reference and its labels
+   never depend on a probe result. `constraint_set_hash`, `GT_VERSION`, the
+   generated population and every metric definition are unchanged.
 
 1. **Ambiguity ground truth is oracle-derived, twice-gated.** Completeness
    (truth ∈ oracle solutions) catches a constraint set that is too strict;
@@ -1940,8 +2028,11 @@ razorpay-finance-controller/
 │
 ├── bench/
 │   ├── benchmark_manifest.json     # committed, includes GT + constraint-set hashes
+│   │                               #   + recon_report_sha256 (spec 1.4.22)
 │   ├── dev/                        # observations + ground truth, committed
+│   │   └── recon_report.jsonl      # PG-side probe surface; engine+oracle barred (AL8)
 │   └── test/                       # observations committed; ground_truth.jsonl GITIGNORED
+│       └── recon_report.jsonl      # committed; AL4/AL7 inspection discipline applies
 │
 ├── fixtures/llm-cache/             # committed; makes replay-mode runs reproducible
 └── runs/                           # gitignored run artifacts

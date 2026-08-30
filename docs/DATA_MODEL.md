@@ -1,6 +1,14 @@
 # DATA_MODEL — ASSAY
 
-**Spec version:** 1.4.21 · **Date:** 2026-08-28
+**Spec version:** 1.4.22 · **Date:** 2026-08-28
+
+**At spec 1.4.22** this document names `fetch_settlement_recon`'s source in `§12`,
+adds `recon_report_sha256` to `§18`'s `BenchmarkManifest`, records that the recon
+report is **not** an `Observation` and adds no `§10` triple, and registers the
+decision as M36 (`§22.2`). **No field, entity, account, posting rule, exception
+class, invariant or metric definition changes**; `C1`–`C8` are untouched so
+`constraint_set_hash` does not move, and `GT_VERSION` stays 1.1.0. Benchmark
+v1.0.3 → **v1.0.4**. See `DECISION_BRIEF.md §A.29`.
 
 All schemas are normative. The implementation agent must not add, rename or
 retype fields without a spec version bump.
@@ -747,6 +755,15 @@ triple is not a row below.
 | `settlement` | `pg_settlements` | `Settlement` |
 | `dispute` | `pg_disputes` | `Dispute` |
 
+**The PG-side recon report is not an `Observation`, and this table is unchanged
+by spec 1.4.22.** `RECONCILIATION_SPEC.md §6.2`'s `fetch_settlement_recon` reads
+`bench/<split>/recon_report.jsonl`, which is a **probe response surface**: it is
+never ingested, never assigned an `obs_id`, never given a terminal state, and
+never counted in any coverage numerator or denominator. It therefore enters no
+`(kind, source_system, payload)` triple above, and no row is added. `Evidence`
+(§12) still records a probe result with `produced_by: "deterministic"`, since the
+executor rather than the model performs the call.
+
 `pg_settlements` and `pg_disputes` were added in spec 1.3.0. Benchmark v1.0.0 and
 v1.0.1 declared six source systems against nine kinds, so `settlement`,
 `adjustment` and `dispute` observations had no source they could carry — a
@@ -1074,6 +1091,17 @@ constituent `recon_line` at emission"* while the settlement itself is emitted, s
 return an `entity_id` for which **no observation exists**. The relation is
 therefore a partial function from returned entity ids to observation ids, and the
 gap is a designed property of the benchmark rather than a defect.
+
+**The source is named at spec 1.4.22, register row M36.** This section's *"rather
+than the observation set"* has denoted a source **class** since spec 1.4.14 and no
+document named a file; `RECONCILIATION_SPEC.md §6.2` now does —
+`bench/<split>/recon_report.jsonl`, carrying `settlement_id`, `entity_id` and
+`settled_at`. The partiality this section derived is therefore **exercisable
+rather than hypothetical**, and the spec-1.4.16 rule for a returned id with no
+observation — excluded from `R*` entirely, neither numerator nor denominator — is
+**unchanged and now reachable**. Nothing above is edited: the relation, its
+one-to-one property on a conforming dataset, and its partiality all stand exactly
+as spec 1.4.14 committed them.
 
 **Any rule that compares the two namespaces must state what it does with a
 returned `entity_id` that has no observation.** This section establishes the
@@ -1803,11 +1831,20 @@ interface BenchmarkManifest {
   observations_sha256: Sha256;
   ground_truth_sha256: Sha256;     // committed BEFORE any test run
   oracle_labels_sha256: Sha256;
+  recon_report_sha256: Sha256;     // the committed PG-side probe surface (1.4.22)
   constraint_set_hash: Sha256;     // the frozen hard-constraint definitions
   sealed_at: UnixSeconds | null;
   seal_signature: string | null;   // signed git tag name
 }
 ```
+
+**`recon_report_sha256` was added at spec 1.4.22 `[ASSAY-MODEL]`, register row
+M36.** `RECONCILIATION_SPEC.md §6.2`'s `fetch_settlement_recon` reads a committed
+artifact, and a manifest that pins the observations but not the probe surface
+would let two runs over "the same" benchmark answer probes differently. It is
+required and non-null from benchmark v1.0.4; `PREREGISTRATION.md §9` step 5 makes
+its absence a seal failure. `benchmark_version` reads `"1.0.4"` from that
+amendment. `constraint_set_hash` is **unchanged**, `C1`–`C8` being untouched.
 
 `real_world_justification` is a required field, not documentation. A scenario
 family that cannot state why it occurs in production is a manufactured puzzle,
@@ -2113,6 +2150,7 @@ reference beats endpoint reference beats product guide beats pricing page.
 | M33 | `widen_temporal_window` is **expected-non-binding on v1.0.0 data** and its numeric hard bound remains **unstated**; the probe keeps its place in the closed five-probe enum (`RECONCILIATION_SPEC.md §6.2`, `THREAT_MODEL.md §T7`, spec 1.4.19) | **Derived:** `PREREGISTRATION.md §4.2` admits only `T+1`/`T+2`/`T+3`, the spec-1.4.7 clock grid puts `lag_days ∈ (n, n + 0.875]`, and `§4.3`'s `SHIFT_TIMESTAMP` is declared **not exercised**, so the true lag range is `(1, 3.875]` days against `C4`'s `[1, 7]` — **headroom 3.125 days**, `C4` excludes no true member, the widening needed for completeness is **zero days**, and any `days > 0` strictly enlarges the admissible set with allocations the truth does not require. **Ratified:** retaining the probe and its closed-enum position while reporting that it separates nothing, on `§4.1`'s `C8` precedent and the `SE1` (1.4.10) / `SE4` (1.4.11) treatments; and **declining to fabricate the missing figure** — `§7`'s frozen block and `§6.2` AL3's enumeration both omit it and neither gains a constant here. **Not settled:** the numeric bound; whether `R3` may propose the probe — expected-non-binding is **not** a prohibition; and the engine's handling of a proposed-but-unnecessary widen beyond `§6.2`'s logging, its `P_max` cost and spec 1.4.15's bar on feeding `SE5`. `days` keeps `integer > 0` with **no schema ceiling**, exactly as spec 1.4.12 defined it |
 | M34 | `SE2` is **expected-non-binding on v1.0.0 data**; its 2000-bps weight is retained and unreallocated (`RECONCILIATION_SPEC.md §4.2`, spec 1.4.20) | **Derived:** `SE2`'s comparands are `order_ref` and `receipt`; `receipt` is reachable through `§6.2`'s `fetch_order` and `§12`'s `ProbeResultDetail`, but `order_ref` exists only on `MerchantLedgerEntry` (§8) and **no frozen clause pairs a `MerchantLedgerEntry` with a candidate, component, target or probed order**. `AN5` — `merchant_ledger.order_ref === order.receipt` — was the only such route and is retired at spec 1.4.1 (`RECONCILIATION_SPEC.md §3`); with it gone §11.1 makes `ledger_entry` not member-eligible and §17.1.1 not a target, so *"every merchant ledger entry reaches `E13_LEDGER_ONLY`"*. `PREREGISTRATION.md §10` V12 states the same fact as *"ASSAY consumes three sources and ties out two"*. **Ratified:** retaining the row and its 2000 bps rather than reallocating or removing them, on `§4.1`'s `C8` precedent already applied to `SE1` (1.4.10) and `SE4` (1.4.11); and the **narrower** *expected-non-binding on v1.0.0 data* formulation rather than `SE1`'s *permanently inactive*, since `SE2`'s status follows from a missing clause a future amendment could supply, not from a structural property of the candidate language. **Not settled:** any future pairing or aggregation rule for `order_ref` ↔ `receipt`, and any fetch route outside `§6.2`'s closed five-probe enum. `constraint_set_hash` does not move; no weight is renormalised; `DISCRIMINATED` stays reachable, `SE5`'s 2000 exceeding `ε` alone |
 | M35 | An exact `evidence_score_bps` tie between feasible solutions is resolved by the **lexicographically smallest canonical allocation key** — the solution's `(target_id, member_obs_id)` pairs, sorted, serialised `target_id | member_obs_id` and joined by `;` — and the same order fixes `solution_a` before `solution_b` (`RECONCILIATION_SPEC.md §6`, spec 1.4.21) | **Derived — ties are reachable:** with `SE1` inactive (1.4.10), `SE2` (1.4.20) and `SE4` (1.4.11) expected-non-binding and `SE5` zero pre-probe, `evidence_score_bps` is `SE3` alone, which reads member lag only; members sharing a capture day and cycle carry identical `lag_days`, and `PREREGISTRATION.md §4.2`'s `F06` constructs *"identical amount, drawn ONCE and used for both; identical method; same simulated day"*. **Derived — an ordering is required:** `Δs = 0 < ε` sends a tie to `AMBIGUOUS` or `IMMATERIALLY_AMBIGUOUS`, whose rule is *"accept best"*, which fixes `Decision.chosen_candidate_id` and the `source_entity_id`s `G3` partitions by, while `solution_a`/`solution_b` enter the hashed body (§13, §16); metric 23 needs identical root hashes and §16 forbids depending on *"iteration order over an unordered collection"*, so **enumeration order cannot be the tie-break**. **Ratified:** this particular key — §16 demands determinism but names no ordering, and nothing else ranks equal-scored allocations. `member_obs_ids` alone is **insufficient**: a component may hold several targets (§5), two targets of equal amount admit the identical member set, and §5 defers `C7` coupling to *"a single serialized pass after all components are solved"*, so both are feasible at solve time and their member sets collide. The key adds no new quantity — `target_id` and `member_obs_ids` are §11 fields — and ids match `^prefix_[A-Za-z0-9]{14}$`, so neither separator can occur inside one and the encoding is injective. **Unchanged:** the ranking criterion itself, `ε`, `τ`, every `SE` weight and `C1`–`C8`; the rule applies only after exact equality and never enters the score |
+| M36 | `fetch_settlement_recon`'s source is the committed PG-side recon report `bench/<split>/recon_report.jsonl`, carrying `settlement_id`, `entity_id` and `settled_at`; `settlement_id` is its only query key; the Ambiguity Oracle is barred from the artifact and remains observations-only (`RECONCILIATION_SPEC.md §6.2`, `PREREGISTRATION.md §5.1`/`§6.2` AL8, spec 1.4.22) | **Derived — the source class:** §12 has stated since spec 1.4.14 that the probe queries the PG's own report *"rather than the observation set"* and derived the identifier relation's partiality from it; `PREREGISTRATION.md §4.2` removes the `F05` line **at emission**, so no observation-backed source can satisfy that derivation. **Derived — no fallback is needed:** `§4.3` gives `DROP_SETTLEMENT_ID` as *"Merchant-side recon copies that lack the PG's batch identifier"* and `§4.1`'s `F08` as *"absent from the merchant's copy"*, so the PG's report retains `settlement_id` and the key never fails. **Derived — the oracle asymmetry is not new:** `RECONCILIATION_SPEC.md §6`'s `DISCRIMINATED` branch accepts when `Δs ≥ ε` while `PREREGISTRATION.md §5.4`'s ambiguity definition carries no `Δs` term, so ASSAY committing on an oracle-ambiguous case is frozen behaviour from spec 1.0.0; `§10` V20 shows only that it was unreachable pre-probe. **Ratified:** the artifact's location, its three columns, committing it for both splits, and the asymmetry as **intentional** — the oracle stays a fixed observations-only reference. **Rejected:** an observation-backed source with a `settlement_utr` fallback, which would make that field a normative probe comparand against `DECISION_BRIEF.md §A.17`'s finding (M24) that it *"is read by no normative rule anywhere"*; and letting the oracle read the artifact, which would void `PREREGISTRATION.md §5.3`'s expressibility scoping and make the completeness gate tautological. **Documentation correction, not a semantic change:** `PREREGISTRATION.md §5.1`'s *"Its input is exactly what every agent receives"* and `EVALUATION_SPEC.md §4.3`'s *"had no evidential right to make"*. **Not decided:** the field a query is date-scoped on (M31 stands); `R3`'s probe-selection policy; the owner of the probe loop. **Unchanged:** every metric formula, definition and number, the 28-metric list, `C1`–`C8`, `constraint_set_hash`, `SE1`–`SE5` and every §7 threshold. `BENCHMARK_VERSION` moves 1.0.3 → 1.0.4; `GT_VERSION` stays 1.1.0 |
 
 ### 22.3 `[NOT-CLAIMED]` — considered and deliberately not asserted
 

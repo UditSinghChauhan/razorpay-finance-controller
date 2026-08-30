@@ -1,6 +1,13 @@
 # EVALUATION_SPEC — ASSAY
 
-**Spec version:** 1.4.21 · **Date:** 2026-08-28
+**Spec version:** 1.4.22 · **Date:** 2026-08-28
+
+**At spec 1.4.22** `§4.3`'s gloss on `silent_guess_value_inr` and `§2`'s
+input description are corrected, and `§4.13` records that a **negative
+`gap_to_oracle` is valid** and requires metrics 4 and 8 to be reported beside the
+probe count. **No metric formula, definition, number or count changes** — the
+frozen list stays at **28** — and `DISCRIMINATED` is not redefined. See
+`DECISION_BRIEF.md §A.29`.
 
 Every metric answers the question: **what decision does this number let someone
 make?** A metric that does not change anyone's behaviour is not reported.
@@ -124,6 +131,13 @@ Rules:
 - **No agent ever sees ground truth or oracle labels.** Enforced structurally
   (`PREREGISTRATION.md §6.2`, AL1–AL2). The completeness gate runs offline inside
   the generator's trust zone, before any agent exists.
+- **An agent's inputs are the observation files plus, from spec 1.4.22, the
+  PG-side recon report reachable only through `RECONCILIATION_SPEC.md §6.2`'s
+  probe under `P_max`.** The protocol line above reads *"observations only"* in
+  the sense that matters — no ground truth, no oracle labels — and the recon
+  report is neither. The **oracle** remains observations-only and is barred from
+  the report by `AL8` (`PREREGISTRATION.md §5.1`, §5.3), so the oracle's
+  reference universe is deliberately smaller than the agents'.
 - **Every configuration runs on ≥ 5 seeds.** Single-run numbers are banned from
   the report; a figure without a confidence interval is not a result.
 - **All agents run on byte-identical observation files.** Same input, same
@@ -346,9 +360,38 @@ Two derived diagnostics:
   silent_guess_value_inr    = Σ value(truly_ambiguous \ abstained)
 ```
 
-`silent_guess_value_inr` is the rupee value of decisions the system made that it
-had no evidential right to make. **This is the number the whole project is
-about.**
+`silent_guess_value_inr` is the rupee value of decisions the system committed on
+cases the oracle finds ambiguous **from the observations alone**. **This is the
+number the whole project is about** — and from spec 1.4.22 it is read with one
+qualification.
+
+**It is not, on its own, a count of unjustified guesses.** Through spec 1.4.21
+this line read *"decisions the system made that it had no evidential right to
+make"*, which held while the observations were the only evidence any agent could
+reach. Two frozen mechanisms make that gloss too strong. First,
+`RECONCILIATION_SPEC.md §6`'s `DISCRIMINATED` branch **accepts** an allocation
+when the evidence gap `Δs ≥ ε`, while `PREREGISTRATION.md §5.4`'s ambiguity
+definition carries **no `Δs` term** — so every `DISCRIMINATED` decision falls in
+this set by construction, and has since spec 1.0.0. Second, from spec 1.4.22
+`§6.2`'s `fetch_settlement_recon` supplies bounded supplemental evidence the
+oracle is barred from (`PREREGISTRATION.md §6.2` `AL8`), so a probe-resolved
+decision can be **correct and well-evidenced** while the oracle, reading
+observations only, still calls the case ambiguous. Neither mechanism is a defect
+and neither is being changed here.
+
+**What the figure measures, stated exactly.** The value ASSAY committed on cases
+that are undecidable **from the observations**. Two populations sit inside it and
+figures already reported beside it separate them: `balance_harm_inr` (§4.4)
+prices the decisions that were actually wrong, and the probe count (§4.13) shows
+how much of the remainder was bought with evidence. A high
+`silent_guess_value_inr` with **zero probes spent and non-zero balance harm** is
+the failure this metric exists to catch. The same figure with **probes spent and
+zero harm** is the system doing what `§6.2` designed the budget for, and must be
+reported as such rather than as a guess.
+
+**The formula is unchanged**, as are `over_abstention_cost_inr`, the 28-metric
+list of `PREREGISTRATION.md §8` and its numbering. `DISCRIMINATED` is not
+redefined.
 
 ### 4.4 Financial harm — two measures, reported separately
 
@@ -649,6 +692,28 @@ observations.
 is the information simply not present in the data?" A small gap means the
 information limit has been reached and further work should go into acquiring
 better evidence, not better algorithms.
+
+**A negative gap is valid, and it means something specific `[ASSAY-MODEL]`,
+supplied at spec 1.4.22, register row M36.** `net_cost_inr` (§4.5) charges
+`C_review` on every abstention, and the oracle policy abstains on the whole
+truly-ambiguous set. ASSAY, having spent probe budget under
+`RECONCILIATION_SPEC.md §6.2`, may abstain on strictly fewer while keeping
+balance harm at zero, so it can cost less than the reference. The formula's sign
+is unconstrained and nothing here changes it. The reading is: **ASSAY exceeded
+the best policy achievable from the observations alone, by spending bounded
+supplemental evidence acquired outside them.** That is the action this metric's
+own decision prompt recommends — *"acquiring better evidence"* — so measuring it
+is the point rather than an anomaly.
+
+**Metrics 4 and 8 are therefore reported beside the probe count.** Every report
+carries, per agent and per split, the number of probes spent and the number of
+abstentions they resolved (`§6.2`'s *"abstentions resolved per probe spent"*),
+so a reader can attribute a negative gap or a reduced `abstention_recall` to the
+probe channel rather than infer it. Without that line the provenance of the
+difference is invisible, and the two metrics would appear to disagree with §4.3
+for no stated reason. **No metric definition changes and no metric is added**:
+the probe count is reporting provenance for figures already on
+`PREREGISTRATION.md §8`'s list, not a new quantity that could support a claim.
 
 ---
 

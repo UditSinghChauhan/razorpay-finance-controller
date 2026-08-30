@@ -1,6 +1,11 @@
 # THREAT_MODEL — ASSAY
 
-**Spec version:** 1.4.21 · **Date:** 2026-08-28
+**Spec version:** 1.4.22 · **Date:** 2026-08-28
+
+**At spec 1.4.22** `§T7` records that `fetch_settlement_recon`'s source is a
+committed read-only artifact with no network call, which **strengthens** its SSRF
+and spend controls and weakens none. **No control, threat or mitigation was
+removed or weakened.** See `DECISION_BRIEF.md §A.29`.
 
 Every control answers: **what specific failure does this prevent?** Controls that
 cannot name a failure are removed.
@@ -282,6 +287,17 @@ named below is separately blocked — spec 1.4.15 derived that a
 `widen_temporal_window` result may **not** feed `SE5`, precisely so that a
 relaxation cannot raise the evidence score of the candidates it admitted. The bound
 remains **open**, as does whether `R3` may propose the probe at all.
+
+**The probe's source is a committed read-only artifact, from spec 1.4.22.**
+`RECONCILIATION_SPEC.md §6.2` ratifies `fetch_settlement_recon`'s source as
+`bench/<split>/recon_report.jsonl` — three columns, no network call, no URL and
+no host anywhere in the path. **This strengthens the controls above and weakens
+none**: on a conforming run *"SSRF-style redirection"* has no reachable target
+because there is no request to redirect, and *"unbounded API spend"* is bounded
+twice over, by `P_max` and by the absence of any metered call. The artifact is
+barred from `packages/engine` and `packages/oracle` by `PREREGISTRATION.md §6.2`
+`AL8` and is reachable only through the probe executor, so bulk access is a lint
+and path-guard failure rather than a judgement call.
 
 **Prevents.** SSRF-style redirection, unbounded API spend, and quiet constraint
 relaxation to manufacture a match.

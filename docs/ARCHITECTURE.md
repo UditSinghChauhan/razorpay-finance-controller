@@ -1,6 +1,13 @@
 # ARCHITECTURE — ASSAY
 
-**Spec version:** 1.4.21 · **Date:** 2026-08-28
+**Spec version:** 1.4.22 · **Date:** 2026-08-28
+
+**At spec 1.4.22** `§3`'s generator row, `§7.1` and `§10`'s pipeline record the
+PG-side recon report that `RECONCILIATION_SPEC.md §6.2`'s probe reads. **The
+oracle is barred from it** (`PREREGISTRATION.md §6.2` `AL8`) and stays
+observations-only, because `§7.3`'s completeness gate is scoped to expressible
+targets precisely *because* `F05` withholds a line. **No component, boundary,
+package, interface or trust boundary changes.** See `DECISION_BRIEF.md §A.29`.
 
 **At spec 1.4.6** this document is unchanged apart from the version header. `§7`'s
 oracle description is unaffected; `DATA_MODEL.md §11` now defines the component
@@ -156,7 +163,7 @@ carries.
 |---|---|---|
 | `packages/money` | `Paise` branded integer type; add/sub/split/allocate; no float ever | Money bugs are the highest-severity class here. Isolating them makes them property-testable and makes float arithmetic a *type error*, not a review comment. |
 | `packages/domain` | Zod schemas; ID grammars; canonical JSON; **`constraints.decl.ts`** — the declarative constraint table; **stage `S0` orchestration over already-read source data, ratified at spec 1.4.18** | One definition of truth for shapes and constraints, shared by generator, engine, oracle and eval. The declarative table is what lets engine and oracle be two independent implementations of one specification (§7). |
-| `packages/generator` | Forward business simulation to observations + hidden ground truth; degradation operators | Must be independently runnable and seed-deterministic. Kept out of the engine so no engine code can ever import ground truth — an import lint enforces this. |
+| `packages/generator` | Forward business simulation to observations + hidden ground truth; degradation operators; **the PG-side recon report `§6.2`'s probe reads (spec 1.4.22)** | Must be independently runnable and seed-deterministic. Kept out of the engine so no engine code can ever import ground truth — an import lint enforces this. |
 | `packages/oracle` | Exhaustive enumeration of evidence-admissible allocations from **observations only** | Deliberately a second, slow, naive implementation. Its whole value is being *not* the engine and *not* the generator. See §7. |
 | `packages/engine` | Stages S1–S5. Pure functions, no I/O, no network | Purity makes the core replayable and property-testable, and makes the LLM absence from the arithmetic path structurally verifiable. |
 | `packages/llm` | **`LlmProvider` interface + four providers**; four bounded roles; response cache; output verification | Single choke point. Every model call goes through one interface, so swapping providers — or removing the model entirely — is configuration, not a rewrite. See §6.5. |
@@ -504,6 +511,20 @@ The oracle reads **only the observation files**. It cannot read ground truth: a
 runtime path guard throws on any read of `**/ground_truth*.jsonl`, and an ESLint
 rule forbids `packages/oracle` from importing `packages/generator`.
 
+**It is also barred from the PG-side recon report, added at spec 1.4.22.**
+`PREREGISTRATION.md §6.2` `AL8` guards `**/recon_report*.jsonl` on the same
+mechanism, so `RECONCILIATION_SPEC.md §6.2`'s probe evidence can never reach the
+oracle and its labels can never depend on a probe result. **This is deliberate
+and the reason is `§7.3`'s completeness gate**: `PREREGISTRATION.md §5.3` scopes
+that gate to *expressible* targets precisely **because** `F05` withholds a
+constituent line, and an oracle holding the report would make those targets
+expressible, void the scoping, and reduce the gate to a tautology — it would be
+checking a constraint set against an answer key rather than against reality. The
+oracle is therefore a **fixed observations-only reference** and the probe channel
+is supplemental to ASSAY; `PREREGISTRATION.md §5.1` and `§10` V22 record the
+asymmetry as intentional, and `EVALUATION_SPEC.md §4.3` and `§4.13` state how the
+metrics are read under it.
+
 ### 7.2 Independence from the engine
 
 Full independence would require two people who never spoke. What is achievable,
@@ -671,6 +692,9 @@ actually asks.
   generator --seed S --families F --split dev|test
         │
         ├──▶ observations.jsonl        (given to every agent)
+        ├──▶ recon_report.jsonl        (PG-side probe surface, spec 1.4.22;
+        │                               reachable ONLY through §6.2's probe
+        │                               under P_max; engine + oracle barred, AL8)
         └──▶ ground_truth.jsonl        (sealed for the test split)
                     │
   oracle ◀──────────┘ observations ONLY ──▶ ambiguity_labels.jsonl
