@@ -1,6 +1,16 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.4.21 · **Date:** 2026-08-28
+**Spec version:** 1.4.22 · **Date:** 2026-08-28
+
+**At spec 1.4.22** `§6.2` ratifies `fetch_settlement_recon`'s **source**: the
+committed PG-side recon report `bench/<split>/recon_report.jsonl`, with
+`settlement_id` as its only query key and **no `settlement_utr` fallback**.
+`DATA_MODEL.md §12` had named the source class since spec 1.4.14; what was
+missing was a file able to hold a row the observations do not. **No constraint,
+signal, weight, threshold or outcome rule changes** — `C1`–`C8`, `SE1`–`SE5`,
+`τ`, `ε`, `P_max` and `§6`'s four outcomes are untouched, and
+`constraint_set_hash` does not move. Benchmark v1.0.3 → **v1.0.4**. See
+`DECISION_BRIEF.md §A.29`.
 
 The matching algorithm, the ambiguity definition, and the rules that decide
 accept / reject / abstain. This is the technical core of the project.
@@ -899,6 +909,46 @@ All probes are read-only, allowlist-constrained, and logged. If probes exhaust
 without discriminating, the certificate records `PROBE_BUDGET_EXHAUSTED`. The
 metric `abstentions resolved per probe spent` measures whether the LLM's probe
 selection beats a static priority list (`A3-NOLLM`).
+
+**`fetch_settlement_recon`'s source, ratified at spec 1.4.22 `[ASSAY-MODEL]`,
+register row M36.** The probe queries the **committed PG-side recon report** —
+`bench/<split>/recon_report.jsonl`, one row per `ReconLine` the simulation
+produced, carrying `settlement_id`, `entity_id` and `settled_at` and **nothing
+else**. It does **not** query the observation set.
+
+*Derived, not chosen.* `DATA_MODEL.md §12` has stated since spec 1.4.14 that this
+probe reads the PG's own date-scoped recon report *"rather than the observation
+set"*, and derived the identifier relation's **partiality** from exactly that:
+`PREREGISTRATION.md §4.2`'s `F05` withholds one constituent `recon_line`
+**observation** at emission, so the report may return an `entity_id` for which no
+observation exists. No observation-backed source can satisfy that derivation,
+because the withheld row is absent from `observations.jsonl` by construction.
+What was missing was never the source *class* — it was a file able to hold a row
+the observations do not. `DATA_MODEL.md §12`'s spec-1.4.16 treatment of such an
+id — **excluded from `R*` entirely, neither numerator nor denominator** — is
+unchanged and is now reachable rather than hypothetical.
+
+*`settlement_id` is the only query key, and no fallback is added.* A line whose
+`settlement_id` was nulled by `§4.3`'s `DROP_SETTLEMENT_ID` still carries it in
+the report, because that operator models *"**Merchant-side** recon copies that
+lack the PG's batch identifier"* (`§4.3`) and `F08` states the loss as *"absent
+from **the merchant's copy**"* (`§4.1`). The key therefore never fails on a
+conforming dataset. **`settlement_utr` is not a probe comparand**, and
+`DECISION_BRIEF.md §A.17`'s finding that it *"is read by no normative rule
+anywhere"* (spec 1.4.10, register row M24) **stands unchanged**.
+
+*The oracle does not receive this evidence, and must not.* `PREREGISTRATION.md
+§6.2` `AL8` bars `packages/engine` and `packages/oracle` from the artifact;
+`§5.3`'s completeness gate is scoped to expressible targets **because** `F05`
+withholds a line, and an oracle holding the report would void that scoping and
+make the gate tautological. The asymmetry is intentional and is recorded at
+`PREREGISTRATION.md §5.1`, `§10` V22 and `EVALUATION_SPEC.md §4.3`.
+
+*Unchanged by this ratification.* The closed five-probe enum; `P_max = 3`;
+`SE5`'s scope (1.4.15), score (1.4.16) and union aggregation (1.4.17); `SE1`–`SE5`
+weights; `C1`–`C8` and `constraint_set_hash`; every `§7` threshold; and the field
+a query is date-scoped on, which `DATA_MODEL.md §22.2` M31 leaves undecided and
+which is **not** settled here.
 
 **`widen_temporal_window` is expected-non-binding on v1.0.0 data, recorded at spec
 1.4.19 `[ASSAY-MODEL]`, register row M33.** `THREAT_MODEL.md §T7` states that this
