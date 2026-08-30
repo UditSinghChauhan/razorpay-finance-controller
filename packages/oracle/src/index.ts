@@ -60,6 +60,7 @@ export {
   type CandidateContext,
   type Candidate,
   emptyContext,
+  oracleContext,
   checkC1,
   checkC2,
   checkC3,
@@ -115,6 +116,8 @@ export {
   type TrueAllocation,
   type CompletenessOutcome,
   type CompletenessFinding,
+  type CompletenessFamilyCounts,
   type CompletenessResult,
+  UNDECLARED_FAMILY,
   completenessGate,
 } from "./completeness-gate.js";

@@ -30,6 +30,33 @@ importers:
         specifier: 4.1.10
         version: 4.1.10(@types/node@22.20.1)(vite@8.2.1(@types/node@22.20.1))
 
+  apps/cli:
+    dependencies:
+      '@assay/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@assay/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine
+      '@assay/generator':
+        specifier: workspace:*
+        version: link:../../packages/generator
+      '@assay/ledger':
+        specifier: workspace:*
+        version: link:../../packages/ledger
+      '@assay/llm':
+        specifier: workspace:*
+        version: link:../../packages/llm
+      '@assay/money':
+        specifier: workspace:*
+        version: link:../../packages/money
+      '@assay/oracle':
+        specifier: workspace:*
+        version: link:../../packages/oracle
+      '@assay/probe':
+        specifier: workspace:*
+        version: link:../../packages/probe
+
   packages/domain:
     dependencies:
       '@assay/money':
@@ -50,6 +77,27 @@ importers:
       '@assay/money':
         specifier: workspace:*
         version: link:../money
+
+  packages/eval:
+    dependencies:
+      '@assay/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@assay/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@assay/generator':
+        specifier: workspace:*
+        version: link:../generator
+      '@assay/ledger':
+        specifier: workspace:*
+        version: link:../ledger
+      '@assay/money':
+        specifier: workspace:*
+        version: link:../money
+      '@assay/oracle':
+        specifier: workspace:*
+        version: link:../oracle
 
   packages/generator:
     dependencies:

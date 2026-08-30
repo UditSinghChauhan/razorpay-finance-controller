@@ -5,7 +5,7 @@ only**. `ARCHITECTURE.md §3`: *"Deliberately a second, slow, naive
 implementation. Its whole value is being *not* the engine and *not* the
 generator."*
 
-Written against **specification 1.4.21 / benchmark 1.0.3**.
+Written against **specification 1.4.23 / benchmark 1.0.4**.
 
 ## What this package guarantees
 
@@ -14,9 +14,12 @@ Written against **specification 1.4.21 / benchmark 1.0.3**.
    **argument**; `apps/cli` performs the read.
 2. **It performs no I/O.** No filesystem, network or process import anywhere in
    `src/`. `PREREGISTRATION.md §6.2` `AL2` requires a runtime guard against
-   reading a `ground_truth*.jsonl` path — there is nothing here for such a guard
-   to intercept, which is stronger than passing one. Asserted in
-   `tests/discipline.test.ts`.
+   reading a `ground_truth*.jsonl` path, and `AL8` the same against
+   `recon_report*.jsonl` — there is nothing here for either guard to intercept,
+   which is stronger than passing one. Asserted in `tests/discipline.test.ts`,
+   and from spec 1.4.23 enforced in CI as well: `eslint.config.js` bans the
+   filesystem and network transports outright under `packages/oracle/src/`, which
+   is the ESLint half `AL8` names.
 3. **Its output is a pure function of its input.** No clock, no `Math.random`,
    no iteration over an unordered collection. Rotating the observation array
    changes no solution and no label — the oracle's analogue of `I9`, property-tested.
@@ -41,19 +44,21 @@ Written against **specification 1.4.21 / benchmark 1.0.3**.
 | `frozen.ts` | Every frozen parameter, transcribed with its clause. Transcribed rather than imported because `AL1` bars importing the generator — the duplication is what `§5.3` compares |
 | `conventions.ts` | The convention register; `UNRATIFIED` is pinned by a test |
 | `universe.ts` | `DATA_MODEL.md §11.1`'s candidate universe — the member and target contribution mappings |
-| `predicates.ts` | `C1`–`C8` as naive per-candidate booleans, one function each |
+| `predicates.ts` | `C1`–`C8` as naive per-candidate booleans, one function each; and `oracleContext`, the oracle's own reading of `C2`'s referent set |
 | `anchors.ts` | `AN1` and `AN2`; `AN5` is retired by `§3` and has no code path |
 | `enumerate.ts` | Co-settlement coherence classes, and exhaustive enumeration under the budgets |
 | `components.ts` | `RECONCILIATION_SPEC.md §5`'s union-find decomposition, and `Component.total_value_paise` — the base `τ` is taken against |
 | `classify.ts` | Counterfactual projection, materiality, `τ`, `§5.4`'s label, and `labelAll` — enumerate → decompose → classify |
-| `completeness-gate.ts` | `§5.3`, pure, with truth passed in and expressibility scoping |
+| `completeness-gate.ts` | `§5.3`, pure, with truth passed in, expressibility scoping, and the per-family breakdown `§5.3` requires |
 
 ## What is deliberately absent
 
 **The consistency gate.** `DECISION_BRIEF.md §L.1` rule 3 places it in
 `packages/eval/src/gates/consistency-gate.ts`, *"the single file permitted to
-import both engine and oracle"*. `checkAll`, `Verdict` and `ConstraintVerdicts`
-are exported for it to call.
+import both engine and oracle"*. It **landed at spec 1.4.23** with
+`packages/eval`, and calls `checkAll`, `checkC3Ordering`, `checkC3BankArrival`,
+`isAdmissible` and `oracleContext` from here. Nothing moved into this package for
+it: the gate imports the oracle, never the reverse.
 
 **A bank-line candidate search.** `DATA_MODEL.md §11.1` derives that a settlement
 is not a member-eligible kind, so a `bank_line` target has no admissible member
@@ -127,6 +132,32 @@ of behaviour**; what changed is which document is recorded as the authority.
   above as `O-MATERIALITY-IMPL`. Bundling them had let a citation-worthy decision
   inherit a null basis, and the old row warranted itself by **measurement**,
   which is the wrong kind of evidence for what the specification means.
+
+### Two gaps closed at spec 1.4.23, when `packages/eval` came to call
+
+**`oracleContext` — `C2`'s referent set had no builder, and the reading was
+narrower than the declaration.** `labelAll` and `enumerateAll` both demand a
+`CandidateContext` and this package shipped no way to construct one but
+`emptyContext`, so every caller had to invent the oracle's reading of `C2` for
+itself. Worse, the reading this package documented — *"the recon line its
+`payment_id` names"* — was **narrower than the shared declaration**.
+`RECONCILIATION_SPEC.md §4.1` (spec 1.4.8, `DATA_MODEL.md §22.2` M22) makes the
+referent *"the payment its `payment_id` names"* over **both** views, the
+`recon_line` governing where both are present, with absence *"from the dataset"*
+leaving the clause unevaluated. `PREREGISTRATION.md §4.2`'s `F05` withholds a
+constituent recon line while its `payment` observation survives, so on exactly
+the rows `F05` degrades the oracle would have left `C2` unevaluated while the
+engine evaluated it — a divergence `§5.3`'s consistency gate would have reported
+against this package. `oracleContext` implements the declared rule, written
+against `§4.1` directly and importing nothing from `packages/engine`.
+
+**The completeness gate reported no per-family breakdown.** `§5.3` requires the
+gate to report the inexpressible targets *"with their cause and count, **per
+family**, in the same artifact as the pass"*, and `CompletenessResult` carried
+only totals. `TrueAllocation.family` is now **required** rather than optional —
+a field a caller may omit is a report the caller may omit — and `by_family`
+carries the two exclusion classes apart, per `§5.3`'s *"They are not
+interchangeable and are counted separately"*.
 
 ### `O-TAU-BASE` was the fifth, and spec 1.4.6 ratified it
 

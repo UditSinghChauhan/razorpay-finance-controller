@@ -17,12 +17,13 @@ import {
   emptyContext,
   isAdmissible,
   memberContribution,
+  oracleContext,
   targetContribution,
   type Candidate,
   type MemberContribution,
   type TargetContribution,
 } from "../src/index.js";
-import { DAY, ORDER, PAY, RFND, SETL, T0, reconLine, settlement } from "./fixtures.js";
+import { DAY, ORDER, PAY, RFND, SETL, T0, payment, reconLine, settlement } from "./fixtures.js";
 
 const member = (o: ReturnType<typeof reconLine>): MemberContribution => {
   const m = memberContribution(o);
@@ -155,6 +156,19 @@ describe("C6 — exact tie-out, zero tolerance", () => {
     const r = member(reconLine({ entity: RFND(1), type: "refund", amount: 476 }));
     expect(checkC6(candidate([p, r], 500))).toBe("SATISFIED");
   });
+
+  it("evaluates the EMPTY member set, satisfied only by a zero-amount target", () => {
+    // `Σ` over `∅` is `0`, so the clause is evaluable and excludes wherever the
+    // target is non-zero. This module's reading was already correct; the pin is
+    // here because `packages/engine` was corrected TO it (its `c6` had returned
+    // NOT_EVALUATED on this input, excluding nothing), and a differential
+    // finding must never be closed by relaxing the side that was right.
+    //
+    // `§4.1` reserves "not evaluated" for an absent COMPARAND — its sole use is
+    // C2's refund half — and C6's comparand is `target.amount`, non-nullable.
+    expect(checkC6(candidate([], 976))).toBe("NOT_SATISFIED");
+    expect(checkC6(candidate([], 0))).toBe("SATISFIED");
+  });
 });
 
 describe("C7 and C8", () => {
@@ -195,5 +209,85 @@ describe("checkAll — §5.2's naive contract", () => {
     const verdicts = checkAll(candidate([m], 976, null), emptyContext());
     expect(verdicts.C2).toBe("NON_BINDING");
     expect(isAdmissible(verdicts)).toBe(true);
+  });
+});
+
+describe("oracleContext — §4.1's declared referent set for C2", () => {
+  it("reads a payment's order_id from its recon line", () => {
+    const parent = reconLine({
+      entity: PAY(1),
+      type: "payment",
+      amount: 1000,
+      fee: 24,
+      order_id: ORDER(1),
+    });
+    const ctx = oracleContext([parent]);
+    expect(ctx.orderIdByEntity.get(PAY(1))).toBe(ORDER(1));
+  });
+
+  it("falls back to the payment OBSERVATION when no recon line carries it (F05's shape)", () => {
+    // §4.2's F05 withholds the constituent recon line while the payment
+    // observation survives, so this view is the only one available on exactly
+    // the rows F05 degrades. A builder that read recon lines alone would leave
+    // C2 unevaluated there while the engine evaluated it.
+    const ctx = oracleContext([payment(PAY(2), 1000, ORDER(2))]);
+    expect(ctx.orderIdByEntity.has(PAY(2))).toBe(true);
+    expect(ctx.orderIdByEntity.get(PAY(2))).toBe(ORDER(2));
+  });
+
+  it("lets the recon_line GOVERN where both views are present (§4.1, M22)", () => {
+    const parent = reconLine({
+      entity: PAY(3),
+      type: "payment",
+      amount: 1000,
+      fee: 24,
+      order_id: ORDER(3),
+    });
+    const disagreeing = payment(PAY(3), 1000, ORDER(4));
+    // Both orderings of the input must give the recon line's answer, or the
+    // precedence would be an accident of array order rather than a rule.
+    expect(oracleContext([parent, disagreeing]).orderIdByEntity.get(PAY(3))).toBe(ORDER(3));
+    expect(oracleContext([disagreeing, parent]).orderIdByEntity.get(PAY(3))).toBe(ORDER(3));
+  });
+
+  it("omits an identifier no observation names, so C2 stays unevaluated (E10's business)", () => {
+    expect(oracleContext([]).orderIdByEntity.has(PAY(9))).toBe(false);
+  });
+
+  it("keys only on payment rows: a refund row does not answer for a payment", () => {
+    const refundRow = reconLine({
+      entity: RFND(1),
+      type: "refund",
+      amount: 500,
+      order_id: ORDER(5),
+      payment_id: PAY(5),
+    });
+    const ctx = oracleContext([refundRow]);
+    expect(ctx.orderIdByEntity.has(PAY(5))).toBe(false);
+    expect(ctx.orderIdByEntity.has(RFND(1))).toBe(false);
+  });
+
+  it("carries C7's allocated set through, and copies it", () => {
+    const allocated = new Set([PAY(1)]);
+    const ctx = oracleContext([], allocated);
+    allocated.add(PAY(2));
+    expect(ctx.allocatedEntities.has(PAY(1))).toBe(true);
+    expect(ctx.allocatedEntities.has(PAY(2))).toBe(false);
+  });
+
+  it("makes C2 BIND on a refund whose parent survives only as a payment observation", () => {
+    // The end-to-end consequence of the fallback: without it this candidate's
+    // C2 verdict is NON_BINDING and the engine's is FAIL, which is exactly the
+    // divergence §5.3's consistency gate exists to name.
+    const refundRow = reconLine({
+      entity: RFND(2),
+      type: "refund",
+      amount: 500,
+      order_id: ORDER(7),
+      payment_id: PAY(7),
+    });
+    const ctx = oracleContext([payment(PAY(7), 1000, ORDER(8))]);
+    expect(checkC2(candidate([member(refundRow)], 500), ctx)).toBe("NOT_SATISFIED");
+    expect(checkC2(candidate([member(refundRow)], 500), emptyContext())).toBe("SATISFIED");
   });
 });

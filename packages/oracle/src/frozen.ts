@@ -91,5 +91,16 @@ export const BPS_DENOMINATOR = 10_000;
  * The specification version this package is written against.
  *
  * Bumped with the documents, exactly as `packages/generator/src/frozen.ts` does.
+ *
+ * **1.4.21 -> 1.4.23, and what was re-checked to say so.** Spec 1.4.22 added
+ * `RECONCILIATION_SPEC.md §6.2`'s PG-side recon report and
+ * `PREREGISTRATION.md §6.2` `AL8`, which bars this package from it; spec 1.4.23
+ * added `packages/probe`. Neither touches a constraint, a budget or a label
+ * definition, so **no constant in this file moves**. What `AL8` requires of the
+ * oracle is an absence, and this package satisfies it the strong way — it
+ * performs no I/O at all, so there is no read for `AL8`'s path guard to
+ * intercept — with `eslint.config.js` now carrying the ESLint half `AL8` names.
+ * `PREREGISTRATION.md §5.1` states why the resulting asymmetry between the
+ * oracle's universe and an agent's is deliberate; `§10` V22 records it.
  */
-export const SPEC_VERSION = "1.4.21";
+export const SPEC_VERSION = "1.4.23";

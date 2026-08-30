@@ -55,6 +55,46 @@ const UNTRUSTED_TEXT = [
   "**/schemas/untrusted-text.js",
 ];
 
+/** `packages/llm` — the four bounded roles behind one provider interface. */
+const LLM = ["@assay/llm", "@assay/llm/*", "**/packages/llm/**"];
+
+/** `packages/probe` — the §6.2 loop, whose channel belongs to the agent. */
+const PROBE = ["@assay/probe", "@assay/probe/*", "**/packages/probe/**"];
+
+const PROTECTED_ARTIFACT_MSG =
+  "packages/engine and packages/oracle perform no I/O at all. " +
+  "PREREGISTRATION.md §6.2 AL2 bars both from reading **/ground_truth*.jsonl " +
+  "and AL8 bars both from **/recon_report*.jsonl, 'enforced by the same " +
+  "runtime path guard as AL2 and by an ESLint rule'. Banning the transport is " +
+  "stronger than banning the path: it makes the guard vacuous by construction. " +
+  "ARCHITECTURE.md §3 gives apps/cli all filesystem I/O; the caller reads and " +
+  "passes values in.";
+
+const EVAL_ENGINE_MSG =
+  "packages/eval may not import packages/engine. ARCHITECTURE.md §10 puts every " +
+  "agent behind ONE interface so that 'ablations are configuration flags rather " +
+  "than forked codebases -- which is what makes them valid controls'; a scorer " +
+  "that orchestrated stages would be a second agent. The single permitted " +
+  "exception is packages/eval/src/gates/consistency-gate.ts, allowlisted by " +
+  "path below (DECISION_BRIEF.md §L.1 rule 3).";
+
+const EVAL_LLM_MSG =
+  "packages/eval may not import packages/llm. EVALUATION_SPEC.md §4.11 measures " +
+  "the model's contribution through offline_parity; a measurement layer holding " +
+  "LLM policy would be measuring itself. The provider is the AGENT's, behind " +
+  "ARCHITECTURE.md §6.5's interface.";
+
+const EVAL_PROBE_MSG =
+  "packages/eval may not import packages/probe. RECONCILIATION_SPEC.md §6.2's " +
+  "channel belongs to the agent, under P_max, and PREREGISTRATION.md §6.2 AL8 " +
+  "keeps the recon report off every other path. EVALUATION_SPEC.md §4.13 has " +
+  "eval read back the probe COUNT, which arrives on the run as a value.";
+
+const EVAL_UNTRUSTED_TEXT_MSG =
+  "packages/eval may not import the quarantined text store (DATA_MODEL.md §10). " +
+  "Metric 18 attributes abstentions to quarantined text; the attribution is " +
+  "REPORTED by the party that read the text, never derived by the scorer.";
+
 const GENERATOR_MSG =
   "packages/engine and packages/oracle may not import packages/generator. " +
   "It holds GroundTruth (DATA_MODEL.md §1). DECISION_BRIEF.md §L.1 rule 3; " +
@@ -76,6 +116,36 @@ const UNTRUSTED_TEXT_MSG =
   "prompt-injection defence is that the deterministic core *cannot* read " +
   "hostile text, not that it chooses not to (DATA_MODEL.md §10, " +
   "THREAT_MODEL.md §T1). DECISION_BRIEF.md §L.1 rule 3.";
+
+const CLI_NO_NETWORK_MSG =
+  "apps/cli reaches no network. DECISION_BRIEF.md §C T0-11 requires the full " +
+  "pipeline to run from a clean checkout with no API key, and §L.1 rule 10 " +
+  "makes every acceptance test pass under --llm=offline. This package SELECTS " +
+  "the provider, so a transport reachable here would put a live call one " +
+  "configuration mistake from the demo path. The two metered providers are §H " +
+  "tier H2 and live in packages/llm, never here.";
+
+const CLI_FS_DOOR_MSG =
+  "apps/cli performs all filesystem I/O (ARCHITECTURE.md §3) and performs it " +
+  "in ONE place: src/fs/. PREREGISTRATION.md §6.2's AL2/AL8 runtime path guard " +
+  "runs in src/fs/io.ts before every read, and a second door would make it a " +
+  "guard nobody passes through. Route the read through readText/readLines with " +
+  "the ReadZone the bytes are for.";
+
+/** Transports, as bare specifiers and as `node:`-prefixed patterns. */
+const CLI_NETWORK_PATHS = [
+  "http", "https", "net", "tls", "dgram", "http2", "undici", "node-fetch", "axios",
+];
+const CLI_NETWORK_PATTERNS = [
+  "node:http", "node:https", "node:net", "node:tls", "node:dgram", "node:http2",
+];
+const CLI_NETWORK_DYNAMIC = ["http", "https", "net", "tls", "dgram", "http2"];
+
+/** The filesystem door's own modules — legal in src/fs/, nowhere else in src/. */
+const CLI_FS_PATHS = ["fs", "path", "crypto", "os", "child_process"];
+const CLI_FS_PATTERNS = [
+  "node:fs", "node:fs/promises", "node:path", "node:crypto", "node:os", "node:child_process",
+];
 
 /**
  * `no-restricted-imports` does not inspect dynamic `import()`, which would
@@ -419,11 +489,266 @@ export default tseslint.config(
     },
   },
 
-  // -------------------------------------------------------------------------
-  // Deferred, and deliberately not written yet:
+  // --- AL8 + AL2 · engine and oracle read no protected artifact ------------
   //
-  //   * The §L.1 rule 3 allowlist for packages/eval/src/gates/
-  //     consistency-gate.ts, the single file permitted to import both engine
-  //     and oracle. It lands with packages/eval (Phase 10).
-  // -------------------------------------------------------------------------
+  // PREREGISTRATION.md §6.2 AL2: "Neither engine nor oracle code may read a file
+  // matching **/ground_truth*.jsonl. Enforced by a runtime path guard that
+  // throws." AL8, added at spec 1.4.22: "Neither engine nor oracle code may read
+  // a file matching **/recon_report*.jsonl. Enforced by the same runtime path
+  // guard as AL2 AND BY AN ESLINT RULE."
+  //
+  // This block is that ESLint rule, and it is stronger than a path check. Both
+  // packages are pure by declaration — ARCHITECTURE.md §3 gives packages/engine
+  // "no I/O, no network" and apps/cli all filesystem I/O — so the enforceable
+  // property is not "does not read THOSE paths" but "cannot read ANY path".
+  // Banning the transports outright makes AL2's and AL8's guards vacuous by
+  // construction, which is the same argument packages/probe's block makes for
+  // §T7's SSRF control and which packages/oracle's own README already claims:
+  // "there is nothing here for such a guard to intercept, which is stronger
+  // than passing one."
+  //
+  // The recon report is reachable ONLY through RECONCILIATION_SPEC.md §6.2's
+  // probe under P_max, and the engine legitimately RECEIVES probe results as
+  // values (s4-solve.ts's `recon_reports` input). Nothing here touches that: a
+  // value passed in is not a read, and the ban is on the transport.
+  //
+  // Scoped to `src/`, not the package, for the reason packages/probe's block
+  // states: the suites that ASSERT purity read their own package's source as
+  // text, which is filesystem I/O.
+  {
+    files: ["packages/engine/src/**", "packages/oracle/src/**"],
+    linterOptions: { noInlineConfig: true },
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            "fs", "path", "http", "https", "net", "tls", "dgram", "http2",
+            "child_process", "undici", "node-fetch", "axios",
+          ].map((mod) => ({
+            name: mod,
+            message: PROTECTED_ARTIFACT_MSG,
+          })),
+          patterns: [
+            {
+              group: [
+                "node:fs", "node:fs/promises", "node:path", "node:http", "node:https",
+                "node:net", "node:tls", "node:dgram", "node:http2", "node:child_process",
+              ],
+              message: PROTECTED_ARTIFACT_MSG,
+            },
+          ],
+        },
+      ],
+      "no-restricted-syntax": [
+        "error",
+        ...["fs", "http", "https", "net", "tls", "child_process"].map((mod) =>
+          dynamicImportBan(`/^(node:)?${mod}$/`, PROTECTED_ARTIFACT_MSG),
+        ),
+      ],
+    },
+  },
+
+  // --- packages/eval · the measurement layer's import discipline -----------
+  //
+  // §L.1 rule 3 names packages/eval/src/gates/consistency-gate.ts as "the single
+  // permitted exception" to the engine <-> oracle bans, "which must import both
+  // engine and oracle to compare them; it is allowlisted BY PATH in the lint
+  // config and may contain no logic other than the differential test". The
+  // deferral note this block replaces scheduled it for Phase 10, which is now.
+  //
+  // The allowlist needs two halves, and this is the first: a general ban, so
+  // that there is something for the exception to be an exception TO. Without it
+  // the "single permitted file" would be single by convention.
+  //
+  // What is banned, and why each ban is load-bearing:
+  //
+  //   @assay/engine  — ARCHITECTURE.md §10 has every agent behind ONE interface
+  //                    "so ablations are configuration flags rather than forked
+  //                    codebases -- which is what makes them valid controls".
+  //                    A scorer that could orchestrate stages would be a second
+  //                    agent, and its ablations would not be controls.
+  //   @assay/llm     — same argument, and §4.11's offline_parity measures the
+  //                    model's contribution. A measurement layer holding LLM
+  //                    policy would be measuring itself.
+  //   @assay/probe   — RECONCILIATION_SPEC.md §6.2's channel is the AGENT's,
+  //                    under P_max. §4.13 has eval read back the probe COUNT,
+  //                    which arrives on the run rather than from the loop.
+  //   untrusted_text — DATA_MODEL.md §10. Metric 18 attributes abstentions to
+  //                    quarantined text; the attribution is reported by the
+  //                    party that read the text, never derived by the scorer.
+  //
+  // packages/generator is deliberately NOT banned. AL1 binds the engine and the
+  // oracle; EVALUATION_SPEC.md §4.2 scores agent edges "against ground truth"
+  // and §4.4 projects proj_truth from true_journal. A scorer that could not see
+  // the answer key could not mark the paper. packages/eval/src/truth.ts confines
+  // the import to one module and tests/discipline.test.ts counts it.
+  {
+    files: ["packages/eval/**"],
+    linterOptions: {
+      // §L.1 rule 3 is among "the invariants that may never be violated", and a
+      // boundary a one-line `eslint-disable` can lift is not enforced. The same
+      // reason the engine and oracle blocks above refuse inline configuration.
+      noInlineConfig: true,
+    },
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            { group: ENGINE, message: EVAL_ENGINE_MSG },
+            { group: LLM, message: EVAL_LLM_MSG },
+            { group: PROBE, message: EVAL_PROBE_MSG },
+            { group: UNTRUSTED_TEXT, message: EVAL_UNTRUSTED_TEXT_MSG },
+          ],
+        },
+      ],
+      "no-restricted-syntax": [
+        "error",
+        dynamicImportBan("/engine/", EVAL_ENGINE_MSG),
+        dynamicImportBan("/llm/", EVAL_LLM_MSG),
+        dynamicImportBan("/probe/", EVAL_PROBE_MSG),
+        dynamicImportBan("/untrusted-text/", EVAL_UNTRUSTED_TEXT_MSG),
+      ],
+    },
+  },
+
+  // --- §L.1 rule 3's allowlist · the single permitted exception ------------
+  //
+  // "The single permitted exception is packages/eval/src/gates/
+  // consistency-gate.ts, which must import both engine and oracle to compare
+  // them; it is allowlisted by path in the lint config and may contain no logic
+  // other than the differential test."
+  //
+  // This is the second half. It is a CONFIG-LEVEL override rather than a
+  // file-level `eslint-disable`, because the block above sets noInlineConfig and
+  // an allowlist a file grants itself is not an allowlist. Flat config applies
+  // objects in order and the last matching one wins per rule, so this block
+  // restates `no-restricted-imports` and `no-restricted-syntax` for exactly one
+  // path — WITHOUT the ENGINE group and WITH everything else intact. @assay/llm,
+  // @assay/probe and untrusted_text stay banned here: rule 3's exception is
+  // about engine and oracle, and widening it to the rest would grant the
+  // differential test permissions the differential test does not need.
+  //
+  // packages/oracle needs no entry: nothing bars packages/eval from importing
+  // it. §L.2 builds `oracle` before `eval`, and the metric modules legitimately
+  // read the oracle's labels (§4.3). What rule 3 forbids is the ENGINE reaching
+  // the oracle and the oracle reaching the ENGINE; this file is where the two
+  // verdicts are placed side by side, and it is the only place they may be.
+  {
+    files: ["packages/eval/src/gates/consistency-gate.ts"],
+    linterOptions: { noInlineConfig: true },
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            { group: LLM, message: EVAL_LLM_MSG },
+            { group: PROBE, message: EVAL_PROBE_MSG },
+            { group: UNTRUSTED_TEXT, message: EVAL_UNTRUSTED_TEXT_MSG },
+            {
+              group: GENERATOR,
+              message:
+                "packages/eval/src/gates/consistency-gate.ts may not import " +
+                "packages/generator. §L.1 rule 3 permits this ONE file to import engine " +
+                "and oracle and says it 'may contain no logic other than the " +
+                "differential test'. Ground truth is not part of that test: §5.3's " +
+                "consistency gate compares two IMPLEMENTATIONS, and §5.3's " +
+                "COMPLETENESS gate is the one that reads truth. Ground truth reaches " +
+                "packages/eval through src/truth.ts only.",
+            },
+          ],
+        },
+      ],
+      "no-restricted-syntax": [
+        "error",
+        dynamicImportBan("/llm/", EVAL_LLM_MSG),
+        dynamicImportBan("/probe/", EVAL_PROBE_MSG),
+        dynamicImportBan("/untrusted-text/", EVAL_UNTRUSTED_TEXT_MSG),
+        dynamicImportBan("/generator/", GENERATOR_MSG),
+      ],
+    },
+  },
+
+  // --- apps/cli · no network, ever -----------------------------------------
+  //
+  // DECISION_BRIEF.md §C T0-11: "Full pipeline runs from a clean checkout with
+  // no API key", and §L.1 rule 10 makes every acceptance test pass under
+  // --llm=offline. This package is where the provider is SELECTED
+  // (ARCHITECTURE.md §6.5), which is exactly why the transport is banned here
+  // rather than trusted here: selection code that could also open a socket puts
+  // a live call one configuration mistake away from the demo path.
+  //
+  // Scoped to the whole package, tests included, because the guarantee is about
+  // the binary a reviewer runs, not about one directory. Verified clean at the
+  // time of writing: no import of a transport exists anywhere under apps/cli.
+  {
+    files: ["apps/cli/**"],
+    linterOptions: { noInlineConfig: true },
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: CLI_NETWORK_PATHS.map((mod) => ({
+            name: mod,
+            message: CLI_NO_NETWORK_MSG,
+          })),
+          patterns: [{ group: CLI_NETWORK_PATTERNS, message: CLI_NO_NETWORK_MSG }],
+        },
+      ],
+      "no-restricted-syntax": [
+        "error",
+        ...CLI_NETWORK_DYNAMIC.map((mod) =>
+          dynamicImportBan(`/^(node:)?${mod}$/`, CLI_NO_NETWORK_MSG),
+        ),
+      ],
+    },
+  },
+
+  // --- apps/cli · one filesystem door --------------------------------------
+  //
+  // ARCHITECTURE.md §3 gives apps/cli "all filesystem I/O". PREREGISTRATION.md
+  // §6.2's AL2/AL8 runtime path guard is what makes that permission safe, and
+  // it runs in src/fs/io.ts before every read — so a second door would make it
+  // a guard nobody passes through.
+  //
+  // Scoped to src/ and excluding src/fs/, for the reason packages/probe's and
+  // packages/engine's blocks already state: the suite that ASSERTS the property
+  // has to read the package's own source, which is filesystem I/O. Tests are
+  // therefore outside this block and keep their node:fs access.
+  //
+  // The network paths are REPEATED here rather than inherited. Flat config
+  // applies objects in order and the last matching one WINS PER RULE — it does
+  // not merge — so for files matching both blocks this object's
+  // `no-restricted-imports` replaces the one above. Dropping the transports
+  // here would silently reopen them under src/.
+  {
+    files: ["apps/cli/src/**"],
+    ignores: ["apps/cli/src/fs/**"],
+    linterOptions: { noInlineConfig: true },
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            ...CLI_FS_PATHS.map((mod) => ({ name: mod, message: CLI_FS_DOOR_MSG })),
+            ...CLI_NETWORK_PATHS.map((mod) => ({ name: mod, message: CLI_NO_NETWORK_MSG })),
+          ],
+          patterns: [
+            { group: CLI_FS_PATTERNS, message: CLI_FS_DOOR_MSG },
+            { group: CLI_NETWORK_PATTERNS, message: CLI_NO_NETWORK_MSG },
+          ],
+        },
+      ],
+      "no-restricted-syntax": [
+        "error",
+        ...CLI_FS_PATHS.map((mod) =>
+          dynamicImportBan(`/^(node:)?${mod}$/`, CLI_FS_DOOR_MSG),
+        ),
+        ...CLI_NETWORK_DYNAMIC.map((mod) =>
+          dynamicImportBan(`/^(node:)?${mod}$/`, CLI_NO_NETWORK_MSG),
+        ),
+      ],
+    },
+  },
 );

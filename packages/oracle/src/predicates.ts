@@ -25,7 +25,7 @@
  *      predicates are not.
  */
 
-import { CONSTRAINT_IDS, type ConstraintId } from "@assay/domain";
+import { CONSTRAINT_IDS, type ConstraintId, type Observation } from "@assay/domain";
 
 import { SETTLEMENT_WINDOW_SECONDS } from "./frozen.js";
 import type { MemberContribution, TargetContribution } from "./universe.js";
@@ -48,14 +48,24 @@ export type ConstraintVerdicts = Readonly<Record<ConstraintId, Verdict>>;
 /**
  * The facts a predicate needs that are not carried by the candidate itself.
  *
- * `C2`'s refund half is referential — it reads the recon line a refund's
+ * `C2`'s refund half is referential — it reads the parent a refund's
  * `payment_id` names, which may not be a member — and `C7` is about allocations
  * already committed elsewhere in the run. Both are supplied by the caller rather
  * than looked up here, so this module holds no observation set and cannot
- * accidentally widen what a predicate reads.
+ * accidentally widen what a predicate reads. {@link oracleContext} builds the
+ * context from a dataset; it takes the observations as a parameter and retains
+ * none of them.
  */
 export interface CandidateContext {
-  /** `entity_id` → `order_id`, over every recon-line-shaped observation. */
+  /**
+   * The parent's `order_id`, keyed by the identifier a refund's `payment_id`
+   * names. Absent from the map means **no observation in the dataset names it**,
+   * which `§4.1` makes `E10_REFUND_ORPHAN`'s business rather than `C2`'s.
+   *
+   * Built by {@link oracleContext}, which implements `§4.1`'s declared referent
+   * set. It is a caller-supplied map rather than an observation set so that this
+   * module holds no dataset and cannot widen what a predicate reads.
+   */
   readonly orderIdByEntity: ReadonlyMap<string, string | null>;
   /** Entities already belonging to an accepted allocation (`C7`). */
   readonly allocatedEntities: ReadonlySet<string>;
@@ -64,6 +74,78 @@ export interface CandidateContext {
 /** An empty context, for candidates evaluated outside a committed run. */
 export function emptyContext(): CandidateContext {
   return { orderIdByEntity: new Map(), allocatedEntities: new Set() };
+}
+
+/**
+ * Build the context `C2` and `C7` read, from an observation set.
+ *
+ * **Why this exists.** `labelAll` and `enumerateAll` both demand a
+ * `CandidateContext` and, through spec 1.4.23, this package shipped no way to
+ * construct one but {@link emptyContext}. Every caller therefore had to invent
+ * the oracle's reading of `C2`'s referent set for itself — including
+ * `packages/eval`'s differential test, where an invented reading would be
+ * compared against the engine's declared one and the gate would report a
+ * divergence between the oracle and its own caller. The reading is the oracle's,
+ * so it is built here.
+ *
+ * **`§4.1`'s referent set, in full, and written against `§4.1` directly.**
+ * *"The refund member's own `order_id` must equal the `order_id` of **the
+ * payment** its `payment_id` names ... Where the named payment has **no
+ * observation in the dataset** the clause is not evaluated and excludes nothing;
+ * that absence is `E10_REFUND_ORPHAN`. Where both a `recon_line` carrying that
+ * `entity_id` and a `payment` observation carrying that `id` are present, the
+ * `recon_line` governs."* (`DATA_MODEL.md §22.2` M22 registers the same rule.)
+ *
+ * Two views can carry the parent's `order_id`, and both are in the set:
+ *
+ *   - a `recon_line`-shaped observation whose `payload.entity_id` is the named
+ *     identifier — a payment's recon row carries the payment's own id there;
+ *   - a `payment`-kind observation whose `payload.id` is that identifier.
+ *
+ * The precedence matters and is not cosmetic: `PREREGISTRATION.md §4.2`'s `F05`
+ * withholds a constituent recon line while its `payment` observation survives,
+ * so the second view is the **only** one available on exactly the rows `F05`
+ * degrades. A builder that read recon lines alone would leave `C2` unevaluated
+ * there while the engine evaluated it, and `§5.3`'s consistency gate exists to
+ * catch precisely that divergence.
+ *
+ * Nothing is imported from `packages/engine`, which writes the same clause its
+ * own way; `PREREGISTRATION.md §5.2` requires two implementations of one
+ * declaration and `AL1` refuses the import.
+ *
+ * @param observations  the dataset. Read for `C2`'s referent set only.
+ * @param allocatedEntities `C7`'s already-allocated entities, which are a
+ *   property of the run's committed decisions rather than of the observation
+ *   set, so the caller states them.
+ */
+export function oracleContext(
+  observations: readonly Observation[],
+  allocatedEntities: ReadonlySet<string> = new Set(),
+): CandidateContext {
+  const fromReconLine = new Map<string, string | null>();
+  const fromPayment = new Map<string, string | null>();
+
+  for (const observation of observations) {
+    if (observation.kind === "recon_line" || observation.kind === "adjustment") {
+      // Only a payment row's entity_id is a payment identifier. A refund row
+      // carries its own rfnd_ id there, and keying on it would let a refund
+      // answer for a payment that does not exist.
+      if (observation.payload.type === "payment") {
+        fromReconLine.set(observation.payload.entity_id, observation.payload.order_id);
+      }
+    } else if (observation.kind === "payment") {
+      fromPayment.set(observation.payload.id, observation.payload.order_id);
+    }
+  }
+
+  // The recon line governs, so it is written last and overwrites.
+  const merged = new Map<string, string | null>(fromPayment);
+  for (const [id, orderId] of fromReconLine) merged.set(id, orderId);
+
+  return Object.freeze({
+    orderIdByEntity: merged,
+    allocatedEntities: new Set(allocatedEntities),
+  });
 }
 
 /** One candidate: a member set proposed as the members of one target. */
@@ -93,8 +175,11 @@ export function checkC1(candidate: Candidate): Verdict {
  *
  * **Refund half, binding.** `conventions.ts` `O-C2-REFUND` implements the
  * referential reading: a refund member's own `order_id` must equal the
- * `order_id` of the recon line its `payment_id` names, where that line is in the
- * observation set. A refund whose named parent is absent is not excluded on that
+ * `order_id` of **the payment** its `payment_id` names, where an observation of
+ * that payment is in the dataset. Two views can carry it and both are in `§4.1`'s
+ * referent set, the `recon_line` governing where both are present;
+ * {@link oracleContext} builds the map and carries the derivation. A refund whose
+ * named parent is absent from the dataset entirely is not excluded on that
  * ground — absence is `E10`'s business, not `C2`'s.
  *
  * **Adjustment half, non-binding.** `§4.1` declares it a generation invariant:

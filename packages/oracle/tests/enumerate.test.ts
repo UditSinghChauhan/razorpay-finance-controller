@@ -5,6 +5,7 @@ import {
   anchoredEntities,
   classify,
   completenessGate,
+  UNDECLARED_FAMILY,
   emptyContext,
   enumerateAll,
   isMemberEligibleKind,
@@ -168,7 +169,7 @@ describe("the completeness gate — §5.3", () => {
     const { a, b, setl, observations } = dataset();
     const results = enumerateAll(observations, emptyContext());
     const gate = completenessGate(results, [
-      { target_id: setl.payload.id, member_obs_ids: [a.obs_id, b.obs_id], expressible: true },
+      { target_id: setl.payload.id, member_obs_ids: [a.obs_id, b.obs_id], expressible: true, family: "F01" },
     ]);
     expect(gate.passed).toBe(true);
     expect(gate.targets_in_scope).toBe(1);
@@ -179,7 +180,7 @@ describe("the completeness gate — §5.3", () => {
     const results = enumerateAll(observations, emptyContext());
     const gate = completenessGate(results, [
       // a alone does not tie out, so it is not among the solutions
-      { target_id: setl.payload.id, member_obs_ids: [a.obs_id], expressible: true },
+      { target_id: setl.payload.id, member_obs_ids: [a.obs_id], expressible: true, family: "F01" },
     ]);
     expect(gate.passed).toBe(false);
     expect(gate.failures[0]?.outcome).toBe("TRUE_ALLOCATION_ABSENT");
@@ -190,7 +191,7 @@ describe("the completeness gate — §5.3", () => {
     const { setl, observations } = dataset();
     const results = enumerateAll(observations, emptyContext());
     const gate = completenessGate(results, [
-      { target_id: setl.payload.id, member_obs_ids: ["obs_withheld"], expressible: false },
+      { target_id: setl.payload.id, member_obs_ids: ["obs_withheld"], expressible: false, family: "F05" },
     ]);
     expect(gate.passed).toBe(true);
     expect(gate.scoped_out_inexpressible).toBe(1);
@@ -201,12 +202,87 @@ describe("the completeness gate — §5.3", () => {
     const { setl, observations } = dataset();
     const results = enumerateAll(observations, emptyContext());
     const gate = completenessGate(results, [
-      { target_id: setl.payload.id, member_obs_ids: ["obs_not_a_solution"], expressible: true },
+      { target_id: setl.payload.id, member_obs_ids: ["obs_not_a_solution"], expressible: true, family: "F01" },
     ]);
     expect(gate.passed).toBe(false);
   });
 
   it("reports a refund's parent join without needing it: RFND ids are unused here", () => {
     expect(RFND(1).startsWith("rfnd_")).toBe(true);
+  });
+
+  it("breaks the two exclusion classes down PER FAMILY (§5.3)", () => {
+    // §5.3: the gate "reports the inexpressible ones with their cause and
+    // count, PER FAMILY, in the same artifact as the pass". A total alone
+    // cannot say whether F05 accounts for all of them, which is the question
+    // the clause exists to answer.
+    const { a, b, setl, observations } = dataset();
+    const results = enumerateAll(observations, emptyContext());
+    const gate = completenessGate(results, [
+      {
+        target_id: setl.payload.id,
+        member_obs_ids: [a.obs_id, b.obs_id],
+        expressible: true,
+        family: "F01",
+      },
+      { target_id: "setl_absent_0001", member_obs_ids: [], expressible: false, family: "F05" },
+      { target_id: "setl_absent_0002", member_obs_ids: [], expressible: false, family: "F05" },
+    ]);
+
+    expect(gate.passed).toBe(true);
+    expect(gate.scoped_out_inexpressible).toBe(2);
+    expect(gate.by_family.map((r) => r.family)).toEqual(["F01", "F05"]);
+    expect(gate.by_family[0]).toMatchObject({ targets_in_scope: 1, scoped_out_inexpressible: 0 });
+    expect(gate.by_family[1]).toMatchObject({ targets_in_scope: 0, scoped_out_inexpressible: 2 });
+  });
+
+  it("buckets an undeclared family under a named key rather than silently", () => {
+    const { a, b, setl, observations } = dataset();
+    const results = enumerateAll(observations, emptyContext());
+    const gate = completenessGate(results, [
+      {
+        target_id: setl.payload.id,
+        member_obs_ids: [a.obs_id, b.obs_id],
+        expressible: true,
+        family: null,
+      },
+    ]);
+    expect(gate.by_family.map((r) => r.family)).toEqual([UNDECLARED_FAMILY]);
+  });
+
+  it("counts a budget-exhausted target apart from an inexpressible one (§5.3)", () => {
+    // "They are not interchangeable and are counted separately": one says the
+    // observations are insufficient, the other says the oracle is.
+    const gate = completenessGate(
+      [
+        {
+          target_id: "setl_intractable01",
+          target_kind: "settlement",
+          status: "C_ORACLE_EXCEEDED",
+          solutions: [],
+          pool_size: 40,
+          candidates_enumerated: 0,
+          excluded_by: {},
+          non_binding: {},
+        },
+      ],
+      [
+        {
+          target_id: "setl_intractable01",
+          member_obs_ids: ["obs_x"],
+          expressible: true,
+          family: "F06",
+        },
+      ],
+    );
+    expect(gate.passed).toBe(true);
+    expect(gate.scoped_out_budget_exhausted).toBe(1);
+    expect(gate.scoped_out_inexpressible).toBe(0);
+    expect(gate.by_family[0]).toMatchObject({
+      family: "F06",
+      scoped_out_budget_exhausted: 1,
+      scoped_out_inexpressible: 0,
+      targets_in_scope: 0,
+    });
   });
 });
