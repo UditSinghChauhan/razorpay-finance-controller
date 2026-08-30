@@ -1,0 +1,22 @@
+{
+  "name": "@assay/eval",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "ASSAY measurement layer — the two hard gates, the agent interface, metric computation, bootstrap CIs and report generation",
+  "license": "UNLICENSED",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@assay/domain": "workspace:*",
+    "@assay/engine": "workspace:*",
+    "@assay/generator": "workspace:*",
+    "@assay/ledger": "workspace:*",
+    "@assay/money": "workspace:*",
+    "@assay/oracle": "workspace:*"
+  }
+}

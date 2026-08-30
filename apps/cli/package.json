@@ -1,0 +1,27 @@
+{
+  "name": "@assay/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "ASSAY command line — the only package that touches the filesystem; acquires source data and drives the already-built pipeline",
+  "license": "UNLICENSED",
+  "bin": {
+    "assay": "./src/main.ts"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@assay/domain": "workspace:*",
+    "@assay/engine": "workspace:*",
+    "@assay/generator": "workspace:*",
+    "@assay/ledger": "workspace:*",
+    "@assay/llm": "workspace:*",
+    "@assay/money": "workspace:*",
+    "@assay/oracle": "workspace:*",
+    "@assay/probe": "workspace:*"
+  }
+}

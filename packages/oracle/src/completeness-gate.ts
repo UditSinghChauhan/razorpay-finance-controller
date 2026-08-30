@@ -48,7 +48,26 @@ export interface TrueAllocation {
    * caller holds both ground truth and the observation set.
    */
   readonly expressible: boolean;
+  /**
+   * The `PREREGISTRATION.md §4.1` scenario family this target was generated
+   * under, or `null` where the caller declares none.
+   *
+   * **Required, not optional, because `§5.3` is.** The gate *"reports the
+   * inexpressible ones with their cause and count, **per family**, in the same
+   * artifact as the pass"*, and a field a caller can omit is a report the caller
+   * can omit. It is typed `string` rather than `FamilyId` because `AL1` bars
+   * this package from importing `packages/generator`, where that union lives —
+   * the same reason `frozen.ts` transcribes rather than imports.
+   *
+   * `null` buckets under {@link UNDECLARED_FAMILY} and is visible in the result,
+   * so a caller that supplied no family sees that it did not rather than
+   * receiving a breakdown that quietly has one bucket.
+   */
+  readonly family: string | null;
 }
+
+/** The `by_family` key a target with no declared family is counted under. */
+export const UNDECLARED_FAMILY = "(undeclared)";
 
 /** Why one target failed, or why it was not in scope. */
 export type CompletenessOutcome =
@@ -61,6 +80,8 @@ export type CompletenessOutcome =
 /** One target's gate result. */
 export interface CompletenessFinding {
   readonly target_id: string;
+  /** The family the caller declared, or {@link UNDECLARED_FAMILY}. */
+  readonly family: string;
   readonly outcome: CompletenessOutcome;
   /**
    * The constraints that rejected the true allocation, when it was enumerated
@@ -69,6 +90,26 @@ export interface CompletenessFinding {
    * reviewer to read the whole declaration.
    */
   readonly excluded_by: readonly string[];
+}
+
+/**
+ * One family's counts — `§5.3`'s *"per family"* half.
+ *
+ * The two exclusion classes are separate fields because `§5.3` requires it:
+ * *"Two exclusion classes, reported apart. **Inexpressible** — a true member has
+ * no member-eligible observation — says the observations are insufficient.
+ * **Budget-exhausted**, if `§5.2`'s bounds are reached, says the oracle is. They
+ * are not interchangeable and are counted separately."* A single
+ * `scoped_out` total would conflate a statement about the data with a statement
+ * about the oracle.
+ */
+export interface CompletenessFamilyCounts {
+  readonly family: string;
+  readonly targets_total: number;
+  readonly targets_in_scope: number;
+  readonly scoped_out_inexpressible: number;
+  readonly scoped_out_budget_exhausted: number;
+  readonly failures: number;
 }
 
 /** The gate's verdict over a dataset. */
@@ -80,6 +121,14 @@ export interface CompletenessResult {
   readonly scoped_out_budget_exhausted: number;
   readonly failures: readonly CompletenessFinding[];
   readonly findings: readonly CompletenessFinding[];
+  /**
+   * `§5.3`'s per-family breakdown, ascending by family.
+   *
+   * *"reports the inexpressible ones with their cause and count, per family, in
+   * the same artifact as the pass"* — so it is a field of this result and not a
+   * separate call a reporter might forget to make.
+   */
+  readonly by_family: readonly CompletenessFamilyCounts[];
 }
 
 /**
@@ -112,10 +161,12 @@ export function completenessGate(
   let budgetExhausted = 0;
 
   for (const t of truth) {
+    const family = t.family ?? UNDECLARED_FAMILY;
     if (!t.expressible) {
       inexpressible += 1;
       findings.push({
         target_id: t.target_id,
+        family,
         outcome: "SCOPED_OUT_INEXPRESSIBLE",
         excluded_by: [],
       });
@@ -126,6 +177,7 @@ export function completenessGate(
       inScope += 1;
       findings.push({
         target_id: t.target_id,
+        family,
         outcome: "TARGET_NOT_ENUMERATED",
         excluded_by: [],
       });
@@ -135,6 +187,7 @@ export function completenessGate(
       budgetExhausted += 1;
       findings.push({
         target_id: t.target_id,
+        family,
         outcome: "SCOPED_OUT_BUDGET_EXHAUSTED",
         excluded_by: [],
       });
@@ -146,6 +199,7 @@ export function completenessGate(
     const found = result.solutions.some((s) => sortedKey(s.member_obs_ids) === wanted);
     findings.push({
       target_id: t.target_id,
+      family,
       outcome: found ? "PASS" : "TRUE_ALLOCATION_ABSENT",
       excluded_by: found ? [] : namesOfExcluders(result),
     });
@@ -160,7 +214,66 @@ export function completenessGate(
     scoped_out_budget_exhausted: budgetExhausted,
     failures: Object.freeze(failures),
     findings: Object.freeze(findings),
+    by_family: tallyByFamily(findings),
   });
+}
+
+/**
+ * `§5.3`'s per-family tally, ascending by family name.
+ *
+ * Ordered rather than emitted in first-seen order because the result is
+ * serialised into the gate artifact `§5.3` requires the pass to be reported in,
+ * and an artifact whose row order depends on how the caller happened to sort
+ * ground truth is not byte-reproducible — which `EVALUATION_SPEC.md §7` asks of
+ * every published number.
+ */
+function tallyByFamily(
+  findings: readonly CompletenessFinding[],
+): readonly CompletenessFamilyCounts[] {
+  const rows = new Map<string, {
+    targets_total: number;
+    targets_in_scope: number;
+    scoped_out_inexpressible: number;
+    scoped_out_budget_exhausted: number;
+    failures: number;
+  }>();
+
+  for (const finding of findings) {
+    let row = rows.get(finding.family);
+    if (row === undefined) {
+      row = {
+        targets_total: 0,
+        targets_in_scope: 0,
+        scoped_out_inexpressible: 0,
+        scoped_out_budget_exhausted: 0,
+        failures: 0,
+      };
+      rows.set(finding.family, row);
+    }
+    row.targets_total += 1;
+    switch (finding.outcome) {
+      case "SCOPED_OUT_INEXPRESSIBLE":
+        row.scoped_out_inexpressible += 1;
+        break;
+      case "SCOPED_OUT_BUDGET_EXHAUSTED":
+        row.scoped_out_budget_exhausted += 1;
+        break;
+      case "PASS":
+        row.targets_in_scope += 1;
+        break;
+      case "TRUE_ALLOCATION_ABSENT":
+      case "TARGET_NOT_ENUMERATED":
+        row.targets_in_scope += 1;
+        row.failures += 1;
+        break;
+    }
+  }
+
+  return Object.freeze(
+    [...rows.entries()]
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([family, row]) => Object.freeze({ family, ...row })),
+  );
 }
 
 /**
