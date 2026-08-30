@@ -1,7 +1,7 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.23 · **Date:** 2026-08-28
+**Spec version:** 1.4.24 · **Date:** 2026-08-28
 **Reviewer role:** principal architect / skeptical reviewer
 
 **At spec 1.4.6** §A.13 records one definition, taken at a governance gate held
@@ -1769,6 +1769,77 @@ live-API semantics; any new metric; and `§6`'s undecided
 `A2_MIDDLE_CASE_UNSPECIFIED` seam, which is **surfaced rather than replaced** — no
 new terminal reason is invented for a loop that stopped on `NO_USEFUL_PROBE` with
 budget remaining.
+
+### A.31 Spec 1.4.24 / benchmark 1.0.4 — three properties the recon report needed
+
+**The decision.** `RECONCILIATION_SPEC.md §6.2` fixes three properties of the
+PG-side recon report that spec 1.4.22 named the artifact without settling: rows are
+ordered by **`entity_id` ascending**; rows whose `settlement_id` and `settled_at`
+are `null` are **included**; and the **offline seal may read** the artifact to
+compute `recon_report_sha256`. Register row M38. Nothing is generated: no dataset
+existed when this was written, which is why the order could still be chosen at all.
+
+**Two of the three are derivations and are recorded as such.** The null rows follow
+from two frozen sentences meeting: `PREREGISTRATION.md §4.2` emits a member its
+batch cannot carry as *"UNSETTLED"* with `settlement_id: null`, and `DATA_MODEL.md
+§6` fixes `settled_at` as *"`null` exactly when no settlement carried the line"* —
+so such a line is a `ReconLine` the simulation produced, and `§6.2`'s *"one row per
+`ReconLine` the simulation produced"* admits it. The counter-argument — that
+`settlement_id` is *"its only query key"*, so the row is unreachable — confuses
+**membership** with **reachability**; `§6.2` states the two as independent sentences
+and neither qualifies the other. The report already holds a row the observations do
+not, which is `F05`'s whole point; holding one no query returns is the same species
+of fact.
+
+The seal read follows from `AL8`'s own scope. Its binding sentence names **engine
+and oracle code**, and it is verbatim `AL2`'s — under which the seal already hashes
+`ground_truth.jsonl` inside `ARCHITECTURE.md §10`'s *"generator's trust zone,
+offline, before any agent exists"*, at a call site that has existed since `apps/cli`
+landed. `AL8`'s *"reachable **only** through the probe executor, under `P_max`"* is
+a statement about the evidence path available to an **agent**: `EVALUATION_SPEC.md
+§2` uses that exact phrase to define *"an agent's inputs"*, and `ARCHITECTURE.md §4`
+boundary 1 uses it of quarantined text that the generator nonetheless writes to a
+file nobody claims it may not write. Opening bytes to digest them is not making them
+reachable — the seal spends no `P_max`, runs before any agent exists, and a SHA-256
+carries no `constituent_entity_id` into any decision.
+
+**The order is a RATIFICATION, and the record says so.** No frozen rule determined
+it. `PREREGISTRATION.md §7` requires a regeneration at the same seed to be
+byte-identical, which constrains **determinism** but not the **choice** — any
+deterministic order satisfies it. Three candidate derivations were tested and all
+fail: the observation emission order is frozen nowhere and is in any case undefined
+for this artifact, since an `F05`-withheld row has no position in the observation
+stream; `DATA_MODEL.md §0`'s canonical traversal is scoped to `true_journal` by its
+own words and keys on `seq` and `account`, neither of which this artifact carries;
+and `§16`'s ordering governs `LedgerEvent`. Choosing was therefore unavoidable, and
+choosing silently because a candidate happened to be deterministic would have been
+the failure this register exists to prevent.
+
+`entity_id` ascending is chosen because it is **total and never null** in this
+artifact, so it needs no null-ordering rule — which ordering by `settled_at` or
+`settlement_id` would, both being nullable here, and each of which would have forced
+a second ratification about where nulls sort. It also matches the nearest existing
+conventions: `DATA_MODEL.md §0` breaks its own ties by `source_entity_id` ascending,
+and the oracle and engine already sort identifier sets ascending. **The order
+carries no meaning**: `§6.2`'s query selects on `settlement_id` and `SE5` is a set
+measure, so no rule reads a row's position. It is fixed only so the bytes, and
+therefore `recon_report_sha256`, are stable.
+
+**What was rejected.** Widening `GENERATOR_TRUST` to cover the artifact — the
+one-line alternative to a seal-scoped permission. It was rejected because that zone
+is claimed by **both** the completeness gate and the seal, and `PREREGISTRATION.md
+§5.3` and `§10` V22 require the completeness gate never to hold the report: an
+oracle or gate holding it would void `§5.3`'s expressibility scoping and make the
+gate tautological. Widening the shared zone would have left that guarantee resting
+on the fact that no gate call site happens to use it today. A distinct seal
+permission keeps it structural.
+
+**What does not change.** Every metric formula, definition and number; the 28-metric
+list; `C1`–`C8` and therefore `constraint_set_hash`; `SE1`–`SE5`; every `§7`
+threshold; `§18`'s `BenchmarkManifest`; the population, seeds, families and rates;
+`BENCHMARK_VERSION` 1.0.4; and `GT_VERSION` 1.1.0. **`M31`'s date-scoping field
+remains open** and is not resolved here — it governs `fetch_settlement_recon`'s
+`date` argument, which is the dispatch's business rather than the artifact's.
 
 ## B. Locked project definition
 

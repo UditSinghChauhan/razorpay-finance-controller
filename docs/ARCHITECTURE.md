@@ -1,6 +1,9 @@
 # ARCHITECTURE — ASSAY
 
-**Spec version:** 1.4.23 · **Date:** 2026-08-28
+**Spec version:** 1.4.24 · **Date:** 2026-08-28
+
+**At spec 1.4.24** this document is unchanged apart from the version header. See
+`DECISION_BRIEF.md §A.31`.
 
 **At spec 1.4.23** `§3` gains a row for `packages/probe` and `§6.6` states the
 proposal/execution seam. **No trust boundary, data flow, interface or existing

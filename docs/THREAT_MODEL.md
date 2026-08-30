@@ -1,6 +1,9 @@
 # THREAT_MODEL — ASSAY
 
-**Spec version:** 1.4.23 · **Date:** 2026-08-28
+**Spec version:** 1.4.24 · **Date:** 2026-08-28
+
+**At spec 1.4.24** this document is unchanged apart from the version header. See
+`DECISION_BRIEF.md §A.31`.
 
 **At spec 1.4.23** `§T7` records that its four controls now have a single owner,
 `packages/probe`, which is the only constructor of a probe call. **This

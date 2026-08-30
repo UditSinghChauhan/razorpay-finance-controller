@@ -1,6 +1,15 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.4.23 · **Date:** 2026-08-28
+**Spec version:** 1.4.24 · **Date:** 2026-08-28
+
+**At spec 1.4.24** `§6.2` fixes three properties of the recon report the spec-1.4.22
+amendment named but did not settle: its **row order** (`entity_id` ascending), that
+**unsettled rows are included**, and that the **offline seal may read the artifact**
+to compute `recon_report_sha256`. **No constraint, signal, weight, threshold or
+outcome rule changes**; `C1`–`C8`, `SE1`–`SE5`, `τ`, `ε`, `P_max` and `§6`'s four
+outcomes are untouched, `constraint_set_hash` does not move, `GT_VERSION` stays
+1.1.0 and benchmark v1.0.4 is unchanged. `M31`'s date-scoping field **remains
+open**. See `DECISION_BRIEF.md §A.31`.
 
 **At spec 1.4.23** `§6.2` names the owner of the probe **loop**: `packages/probe`,
 a pure state machine holding `P_max` accounting, the pre-call `I6` check, the sole
@@ -922,6 +931,47 @@ register row M36.** The probe queries the **committed PG-side recon report** —
 `bench/<split>/recon_report.jsonl`, one row per `ReconLine` the simulation
 produced, carrying `settlement_id`, `entity_id` and `settled_at` and **nothing
 else**. It does **not** query the observation set.
+
+**Row order, ratified at spec 1.4.24 `[ASSAY-MODEL]`, register row M38.** Rows are
+ordered by **`entity_id` ascending**, so that a regeneration at the same seed is
+byte-identical as `PREREGISTRATION.md §7` requires of every generator artifact.
+`entity_id` is total over the report and never null, so the order is a total order
+and **no null-ordering rule is introduced**. Ordering by `settled_at` or
+`settlement_id` would need one, both being nullable here; and `DATA_MODEL.md §0`'s
+canonical traversal is scoped to `true_journal` and keys on `seq` and `account`,
+which this artifact does not carry. The order is a **serialization property and
+carries no meaning**: `§6.2`'s query selects on `settlement_id` and `SE5` is a set
+measure, so no rule reads a row's position.
+
+**Unsettled rows are included, derived at spec 1.4.24, register row M38.** A row
+whose `settlement_id` and `settled_at` are both `null` is emitted like any other.
+`PREREGISTRATION.md §4.2` states that a member its batch cannot carry *"is emitted
+UNSETTLED"* with `settlement_id: null`, and `DATA_MODEL.md §6` fixes `settled_at`
+as *"`null` exactly when no settlement carried the line"* — so such a line **is** a
+`ReconLine` the simulation produced, and the membership rule above admits it. That
+`settlement_id` is *"its only query key"* makes the row **unreachable**, which is
+not the same as excluded: this section states membership and reachability as two
+independent facts and neither qualifies the other. The report already holds a row
+the observations do not (`F05`); it may equally hold one no query returns.
+**Uncaptured payments are a different case and remain absent**: they produce no
+`ReconLine` at all, so there is no row to include or omit.
+
+**The offline seal may read the artifact, derived at spec 1.4.24, register row
+M38.** `PREREGISTRATION.md §9` step 4 requires `recon_report_sha256` and step 5
+makes its absence a **SEAL FAILURE**, which is satisfiable only if the seal can
+open the file. `AL8`'s binding prohibition names **engine and oracle code**, and
+the seal is neither — the identical scope in `AL2` already lets the seal hash
+`ground_truth.jsonl` inside `ARCHITECTURE.md §10`'s *"generator's trust zone,
+offline, before any agent exists"*. `AL8`'s *"reachable **only** through the probe
+executor, under `P_max`"* governs the **evidence path an agent may use**, as
+`EVALUATION_SPEC.md §2` uses the same phrase to define *"an agent's inputs"* and as
+`ARCHITECTURE.md §4` boundary 1 already uses it of quarantined text that the
+generator nonetheless writes to a file. **Hashing is not reachability**: the seal
+spends no `P_max`, runs before any agent exists, and a SHA-256 digest carries no
+`constituent_entity_id` into any decision. The permission is **seal-scoped and
+distinct from the probe's** — it does not extend to `GENERATOR_TRUST`, so the
+`§5.3` completeness gate can never reach the artifact and `§10` V22's asymmetry is
+preserved structurally.
 
 *Derived, not chosen.* `DATA_MODEL.md §12` has stated since spec 1.4.14 that this
 probe reads the PG's own date-scoped recon report *"rather than the observation
