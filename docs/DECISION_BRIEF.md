@@ -1,7 +1,7 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.22 · **Date:** 2026-08-28
+**Spec version:** 1.4.23 · **Date:** 2026-08-28
 **Reviewer role:** principal architect / skeptical reviewer
 
 **At spec 1.4.6** §A.13 records one definition, taken at a governance gate held
@@ -1693,6 +1693,83 @@ lives, and who owns `P_max` enforcement, pre-call `I6` re-checking, dispatch and
 `PROBE` `LedgerEvent` emission. `DATA_MODEL.md §22.2` M31's undecided
 date-scoping field and M33's unstated `widen_temporal_window` bound both stand.
 
+### A.30 Spec 1.4.23 / benchmark 1.0.4 — the loop nobody owned
+
+**The decision.** A new package, `packages/probe`, owns the `RECONCILIATION_SPEC.md
+§6.2` probe loop as a **pure state machine**: `P_max` accounting, the pre-call `I6`
+existence check, construction of the closed five-probe call, and assembly of the
+`PROBE` `LedgerEvent` body. It performs **no I/O** and does not call `R3`. It is
+inserted in `§L.2` between `engine S4–S5` and `llm`; no existing position moves.
+Register row M37.
+
+**This is a RATIFICATION, not a derivation, and the record says so plainly.**
+Frozen text derives a great deal — that the loop is not the engine's (`§3`'s *"no
+I/O, no network"*, and `§L.2` builds it before `llm`), not the oracle's (`AL1`,
+`AL8`), not the generator's (`AL1`/`AL2`), not `domain`'s (no I/O, builds at
+position two), not `ledger`'s, and not `apps/api`'s. It also derives that three of
+the responsibilities already have owners and are **already built**: `apps/cli`
+acquires the data surface (`§3`'s *"all filesystem I/O"*, and spec 1.4.22 made that
+surface a file), `packages/domain` validates the result
+(`ProbeResultDetailSchema`), and `packages/engine`'s `S4` re-solves
+(`SolveInput` already carries `recon_reports`, `probe_attempts` and
+`observationIdForEntityId`). **What no frozen clause determines is where the
+remaining loop state lives**, and creating a package to hold it is a choice.
+
+**Why `§A.25`'s preference against creating a package does not forbid this.**
+`§A.25` chose `packages/domain` for `S0` and gave *"no new package is created"* as a
+deciding reason. That was a **tie-breaker among viable homes**, not a prohibition:
+its force came from `domain` *"already hold[ing] every per-record part `S0`
+performs"*. Here no existing package holds the parts. `packages/llm`'s `§3` row is
+the provider interface, the four roles, the cache and output verification;
+`packages/eval`'s is measurement; `packages/engine`'s excludes I/O and builds too
+early. `§A.25` also **rejected `apps/cli` for `S0` on a count that applies again** —
+*"it does not appear in `§L.2`'s build order at all"* — and here that count is
+sharper, because `packages/eval`'s agent runner must drive the same pipeline
+(`ARCHITECTURE.md §10`) and cannot import an app, so a loop in `apps/cli` would be
+**forked**, against `§10`'s own validity argument. `§A.25` weighed the same three
+options and reached a different answer because the facts differ; applying its
+tie-breaker where its premise fails would be cargo-culting the conclusion.
+
+**Purity is load-bearing, not stylistic.** The loop emits a request and consumes a
+response, so it imports `engine`, `domain` and `ledger` types and **nothing else** —
+which is what lets it sit before `llm` and keeps the build order acyclic. It is the
+pattern `§L.1` rule 4 already runs for `journal.ts`, *"a pure posting function over
+a **proposed** allocation"*, and the one `S4` runs when it returns an undecided seam
+rather than a fabricated default.
+
+**Security: the four `§T7` controls stop being split.** `packages/probe` is the
+**only** constructor of a probe call, and the call is a closed union over `§6.2`'s
+five probes with **no URL or host type anywhere in the path** — so on spec 1.4.22's
+filesystem-backed surface `§T7`'s SSRF control is a property rather than a check.
+Pre-call `I6` lives here, separate from `packages/llm`'s boundary-2 allowlist as
+`§L.1` rule 8 requires (*"independently of any allowlist check"*) and separate from
+`S5`'s post-hoc `I6`. `P_max` is counted here against `packages/engine`'s frozen
+constant. A caller that skipped the loop would have **no way to build a probe call**.
+
+**One layer, not two.** `§6.2` names a committed file as the source; `§C` T0-11
+requires the pipeline to run *"from a clean checkout with no API key"*; and `§H`
+puts a live Razorpay adapter at tier **H3** with *"near-zero evaluative value"*. **No
+frozen text requires an abstraction over a future live API**, so none is built.
+
+**The name is an implementation convention.** The repository establishes none.
+`probe` follows the short-domain-noun convention of `money`, `domain`, `engine`,
+`ledger`, `oracle`, `llm` and `eval`, and names the section it implements. Nothing
+turns on it.
+
+**Nothing observable moves.** No population parameter, seed, split, family,
+`target_record_count`, rate, threshold or metric definition changes; the frozen
+metric list stays at **28**; `C1`–`C8` and `SE1`–`SE5` are untouched so
+`constraint_set_hash` does not move; **`BENCHMARK_VERSION` stays 1.0.4** and
+`GT_VERSION` stays **1.1.0**; no benchmark artifact changes and no data exists to
+regenerate. Spec 1.4.22's probe source is preserved verbatim.
+
+**What this does NOT settle.** `R3`'s probe-selection policy; the recon endpoint's
+date-scoping field (M31); `THREAT_MODEL.md §T7`'s numeric `days` bound (M33); any
+live-API semantics; any new metric; and `§6`'s undecided
+`A2_MIDDLE_CASE_UNSPECIFIED` seam, which is **surfaced rather than replaced** — no
+new terminal reason is invented for a loop that stopped on `NO_USEFUL_PROBE` with
+budget remaining.
+
 ## B. Locked project definition
 
 > **ASSAY is a settlement reconciliation controller for Razorpay-shaped payment
@@ -2009,6 +2086,10 @@ razorpay-finance-controller/
 │   ├── engine/       src/{s1-anchor.ts,s2-candidates.ts,
 │   │                      s3-decompose.ts,s4-solve.ts,s5-validate.ts,
 │   │                      constraints/C1..C8.ts,invariants/I1..I9.ts}
+│   ├── probe/        src/{call.ts,        # the closed five-probe call; sole ctor
+│   │                      loop.ts,        # P_max, pre-call I6, transitions
+│   │                      event.ts}       # the PROBE LedgerEvent body
+│   │                 # pure: no I/O, no network, no clock, no llm import
 │   ├── llm/          src/{provider.ts,                    # the LlmProvider interface
 │   │                      providers/{offline,replay,anthropic,openai-compatible}.ts,
 │   │                      roles/{r1..r4}.ts,
@@ -2102,8 +2183,16 @@ with a version bump, not a judgement call at the keyboard.
 ### L.2 Build order (do not reorder)
 
 `money` → `domain (incl. S0)` → `ledger Layer A` → `generator` → `engine S1–S3` →
-`ledger Layer B` → `engine S4–S5` → `llm (provider + offline + replay)` →
-`oracle` → `eval` → `api` → `web` → seal → sealed run.
+`ledger Layer B` → `engine S4–S5` → **`probe`** →
+`llm (provider + offline + replay)` → `oracle` → `eval` → `api` → `web` → seal →
+sealed run.
+
+**`probe` was inserted at spec 1.4.23 and no existing position moved.** It sits
+after `engine S4–S5` because it reads that stage's `SolveResult` and its `P_MAX`
+constant, and **before `llm`** because it does **not** call `R3` — it consumes a
+proposal as a value, so it needs no `llm` import and the graph stays acyclic. That
+purity is what makes the position available; a loop that called `R3` would have to
+build after `llm` and no scope-compatible slot exists there. See `§A.30`.
 
 Each package depends only on those before it, so the dependency graph is acyclic
 in build order and every stage is independently testable. Note `llm` precedes

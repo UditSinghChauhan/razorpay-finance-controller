@@ -1,6 +1,11 @@
 # ARCHITECTURE — ASSAY
 
-**Spec version:** 1.4.22 · **Date:** 2026-08-28
+**Spec version:** 1.4.23 · **Date:** 2026-08-28
+
+**At spec 1.4.23** `§3` gains a row for `packages/probe` and `§6.6` states the
+proposal/execution seam. **No trust boundary, data flow, interface or existing
+package responsibility changes**, and benchmark v1.0.4 is unchanged. See
+`DECISION_BRIEF.md §A.30`.
 
 **At spec 1.4.22** `§3`'s generator row, `§7.1` and `§10`'s pipeline record the
 PG-side recon report that `RECONCILIATION_SPEC.md §6.2`'s probe reads. **The
@@ -166,6 +171,7 @@ carries.
 | `packages/generator` | Forward business simulation to observations + hidden ground truth; degradation operators; **the PG-side recon report `§6.2`'s probe reads (spec 1.4.22)** | Must be independently runnable and seed-deterministic. Kept out of the engine so no engine code can ever import ground truth — an import lint enforces this. |
 | `packages/oracle` | Exhaustive enumeration of evidence-admissible allocations from **observations only** | Deliberately a second, slow, naive implementation. Its whole value is being *not* the engine and *not* the generator. See §7. |
 | `packages/engine` | Stages S1–S5. Pure functions, no I/O, no network | Purity makes the core replayable and property-testable, and makes the LLM absence from the arithmetic path structurally verifiable. |
+| `packages/probe` | The `§6.2` probe **loop**, as a pure state machine: `P_max` accounting, pre-call `I6`, construction of the closed five-probe call, and the `PROBE` event body (spec 1.4.23) | The one place `THREAT_MODEL.md §T7`'s four controls meet. It is the **only** constructor of a probe call, so a caller cannot dispatch around them. Pure and I/O-free, so the caller owns the read and the append — the split spec 1.4.18 already made for `S0`. |
 | `packages/llm` | **`LlmProvider` interface + four providers**; four bounded roles; response cache; output verification | Single choke point. Every model call goes through one interface, so swapping providers — or removing the model entirely — is configuration, not a rewrite. See §6.5. |
 | `packages/ledger` | **Layer A** append-only hash-chained audit events; **Layer B** double-entry projection; close gate | Append-only semantics, the trial-balance invariant and the Suspense identity are properties of this package, not conventions its callers must remember. |
 | `packages/eval` | Metrics, bootstrap CIs, baselines, ablations, report generation | Must run against any agent behind one interface, so ablations are configuration, not forked code. |
@@ -492,6 +498,37 @@ the same interface:
   demo guarantee and invalidate the ablation.
 - **`meteredCost === true` providers are refused in CI** by configuration, so no
   test run can incur spend.
+
+### 6.6 The proposal / execution seam `[ASSAY-MODEL]`
+
+`RECONCILIATION_SPEC.md §6.2` separates two actors in one sentence: *"The LLM
+(`R3`) proposes one probe from a closed enum; **deterministic code executes it**
+and re-runs the solve."* Spec 1.4.23 names the deterministic half and keeps it
+apart from both the model and the I/O.
+
+```
+  packages/llm      R3 proposes            a value, schema- and allowlist-checked
+        │
+        ▼
+  packages/probe    validates + constructs  P_max · pre-call I6 · closed enum
+        │                                   the ONLY constructor of a probe call
+        ▼
+  apps/cli          dispatches              the read; §3's "all filesystem I/O"
+        │
+        ▼
+  packages/domain   validates the result    ProbeResultDetail
+        │
+        ▼
+  packages/engine   S4 re-solves            pure, from accumulated evidence
+        │
+        ▼
+  packages/ledger   appends the PROBE event body packages/probe assembled
+```
+
+**Nothing in that chain performs two jobs**, and the middle box holds no I/O. The
+pattern is the one `§L.1` rule 4 already runs for `journal.ts` — *"a pure posting
+function over a **proposed** allocation"* — and the one `S4` runs when it returns
+an undecided seam rather than a fabricated default.
 
 ## 7. The Ambiguity Oracle — independent of both generator and engine
 

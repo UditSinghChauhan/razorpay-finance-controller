@@ -1,6 +1,6 @@
 # PREREGISTRATION — ASSAY Benchmark v1.0.4
 
-**Spec version:** 1.4.22 · **Benchmark version:** 1.0.4
+**Spec version:** 1.4.23 · **Benchmark version:** 1.0.4
 
 **Status: FROZEN on commit. Amendments require a version bump and a new seal.**
 **Date frozen:** 2026-08-23 · **Amended:** 2026-08-24 (benchmark 1.0.1),

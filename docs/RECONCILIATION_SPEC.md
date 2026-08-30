@@ -1,6 +1,13 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.4.22 · **Date:** 2026-08-28
+**Spec version:** 1.4.23 · **Date:** 2026-08-28
+
+**At spec 1.4.23** `§6.2` names the owner of the probe **loop**: `packages/probe`,
+a pure state machine holding `P_max` accounting, the pre-call `I6` check, the sole
+constructor of the closed five-probe call, and the `PROBE` event body. It performs
+**no I/O** and does not call `R3`. **No constraint, signal, weight, threshold or
+outcome rule changes**, `§6`'s `A2_MIDDLE_CASE_UNSPECIFIED` seam is surfaced rather
+than replaced, and benchmark v1.0.4 is unchanged. See `DECISION_BRIEF.md §A.30`.
 
 **At spec 1.4.22** `§6.2` ratifies `fetch_settlement_recon`'s **source**: the
 committed PG-side recon report `bench/<split>/recon_report.jsonl`, with
@@ -943,6 +950,48 @@ anywhere"* (spec 1.4.10, register row M24) **stands unchanged**.
 withholds a line, and an oracle holding the report would void that scoping and
 make the gate tautological. The asymmetry is intentional and is recorded at
 `PREREGISTRATION.md §5.1`, `§10` V22 and `EVALUATION_SPEC.md §4.3`.
+
+**The probe loop's owner, ratified at spec 1.4.23 `[ASSAY-MODEL]`, register row
+M37.** `packages/probe` owns the loop this section describes, as a **pure state
+machine**. It performs **no I/O of any kind** and does not call `R3`: it consumes
+an `R3` proposal as a value, and it emits a validated probe call and a `PROBE`
+event body that its caller dispatches and appends.
+
+```
+  packages/probe owns          P_max accounting per component
+                               pre-call I6 over every probe argument
+                               construction of the closed five-probe call --
+                                 it is the ONLY constructor of one
+                               assembly of the PROBE LedgerEvent body
+
+  packages/probe does NOT own  R3's selection policy      (open, below)
+                               the model call             packages/llm
+                               the data-surface read      apps/cli
+                               result schema validation   packages/domain
+                               the re-solve                packages/engine S4
+                               the ledger append           packages/ledger
+```
+
+*Why a separate owner, and why not an existing one.* `§3` gives `packages/engine`
+*"no I/O, no network"* and `DECISION_BRIEF.md §L.2` builds it **before** `llm`, so
+the engine cannot drive this. `packages/llm`'s `§3` row is the provider interface,
+the four roles, the cache and output verification — a loop is none of them, and
+placing `P_max` and the pre-call `I6` check inside the package that calls the model
+would put a control and the party it constrains inside one boundary, against `§4`
+boundary 2. `packages/eval` is scoped to measurement, and hosting the run loop there
+would put the system under test inside the thing measuring it. `apps/cli` performs
+the read but is absent from `§L.2`'s build order, so a loop there could not be
+imported by `packages/eval`'s agent runner and would have to be **forked** — against
+`ARCHITECTURE.md §10`'s *"ablations are configuration flags rather than forked
+codebases, which is what makes them valid controls."*
+
+*The seam `§6` already defines is preserved and not replaced.* Where the loop stops
+without discriminating, the certificate reason is whatever
+`packages/engine`'s `certificateReason(attempts)` returns — `EVIDENCE_TIE` at zero
+attempts, `PROBE_BUDGET_EXHAUSTED` at `P_max`, and the **undecided**
+`A2_MIDDLE_CASE_UNSPECIFIED` seam in between. **No new terminal reason is invented
+for a loop that stopped on `NO_USEFUL_PROBE` with budget remaining**; that gap is
+`§6`'s and remains open.
 
 *Unchanged by this ratification.* The closed five-probe enum; `P_max = 3`;
 `SE5`'s scope (1.4.15), score (1.4.16) and union aggregation (1.4.17); `SE1`–`SE5`

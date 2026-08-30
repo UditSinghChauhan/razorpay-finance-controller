@@ -1,6 +1,10 @@
 # EVALUATION_SPEC — ASSAY
 
-**Spec version:** 1.4.22 · **Date:** 2026-08-28
+**Spec version:** 1.4.23 · **Date:** 2026-08-28
+
+**At spec 1.4.23** this document is unchanged apart from the version header. **No
+metric formula, definition, number or count changes** — the frozen list stays at
+**28**. See `DECISION_BRIEF.md §A.30`.
 
 **At spec 1.4.22** `§4.3`'s gloss on `silent_guess_value_inr` and `§2`'s
 input description are corrected, and `§4.13` records that a **negative

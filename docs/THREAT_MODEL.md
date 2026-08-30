@@ -1,6 +1,11 @@
 # THREAT_MODEL — ASSAY
 
-**Spec version:** 1.4.22 · **Date:** 2026-08-28
+**Spec version:** 1.4.23 · **Date:** 2026-08-28
+
+**At spec 1.4.23** `§T7` records that its four controls now have a single owner,
+`packages/probe`, which is the only constructor of a probe call. **This
+strengthens `§T7` and weakens nothing; no control, threat or mitigation was
+removed.** See `DECISION_BRIEF.md §A.30`.
 
 **At spec 1.4.22** `§T7` records that `fetch_settlement_recon`'s source is a
 committed read-only artifact with no network call, which **strengthens** its SSRF
@@ -298,6 +303,15 @@ twice over, by `P_max` and by the absence of any metered call. The artifact is
 barred from `packages/engine` and `packages/oracle` by `PREREGISTRATION.md §6.2`
 `AL8` and is reachable only through the probe executor, so bulk access is a lint
 and path-guard failure rather than a judgement call.
+
+**The four controls have one owner from spec 1.4.23.** `packages/probe` holds the
+closed enum, the pre-call `I6` argument check, `P_max` accounting and the `PROBE`
+event body, and is the **only** constructor of a probe call — so they cannot be
+split such that a caller dispatches around them. The call type is a closed union
+over `§6.2`'s five probes with **no URL or host field anywhere in it**. Pre-call
+`I6` is deliberately separate from `packages/llm`'s boundary-2 allowlist, as
+`DECISION_BRIEF.md §L.1` rule 8 requires (*"independently of any allowlist
+check"*), and from `S5`'s post-hoc `I6`.
 
 **Prevents.** SSRF-style redirection, unbounded API spend, and quiet constraint
 relaxation to manufacture a match.
