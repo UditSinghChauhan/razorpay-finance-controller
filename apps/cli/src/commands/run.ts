@@ -33,12 +33,12 @@ import type { Command, CommandContext } from "./types.js";
  *                  semantics; deriving them here would put S1/S2 semantics in
  *                  apps/cli, which ARCHITECTURE.md §3 forbids.
  *
- *   §6.2 probe     Two independent blocks. R3 propose_probe is §H tier H1 and
- *                  unbuilt (packages/llm: "R3 ... declared and not built"), and
- *                  packages/probe consumes a proposal as a value, so there is no
- *                  proposal source. And the surface itself does not exist: no
- *                  emitter for recon_report.jsonl exists in packages/generator,
- *                  which ARCHITECTURE.md §3 assigns it.
+ *   §6.2 probe     NOT a blocker from spec 1.4.25. R3 is built (packages/llm
+ *                  roles/r3.ts, §H tier H1), packages/generator emits
+ *                  recon_report.jsonl (spec 1.4.24), and src/probe/ composes
+ *                  §6.6's chain -- dispatch, domain validation, acceptResult,
+ *                  re-solve, PROBE event body. It is reachable only once S1->S2
+ *                  can hand it a SolveInput, which is the row above.
  *
  *   ledger write   DECISION_BRIEF.md §L.1 rule 4 gives packages/ledger "exactly
  *                  one write path"; that package's header records that the
@@ -72,11 +72,11 @@ async function run(context: CommandContext): Promise<void> {
     `§3 assigns S0's orchestration to packages/domain over source data apps/cli has already ` +
       `read, and records that "domain's S0 orchestration is scheduled, not written". No entry ` +
       `point exists to hand the bytes to, and apps/cli "performs no S0 transform itself". ` +
-      `Three further stages are blocked behind it: packages/engine exports no Target or ` +
-      `EvaluationContext constructor from S1's AnchorResult; R3 (§H tier H1) is unbuilt so ` +
-      `packages/probe has no proposal source and packages/generator emits no ` +
-      `recon_report.jsonl for it to read; and packages/ledger's mutating write path and ` +
-      `ARCHITECTURE.md §8's SQLite persistence do not exist.`,
+      `Two further stages are blocked behind it: packages/engine exports no Target or ` +
+      `EvaluationContext constructor from S1's AnchorResult; and packages/ledger's mutating ` +
+      `write path and ARCHITECTURE.md §8's SQLite persistence do not exist. The §6.2 probe ` +
+      `loop is NOT among them from spec 1.4.25 -- R3, the dispatch and §6.6's composition ` +
+      `are built and tested; they need a SolveInput this command cannot yet produce.`,
   );
 }
 
