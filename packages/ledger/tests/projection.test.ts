@@ -886,18 +886,23 @@ describe("the package cannot reach a later phase", () => {
     }
   });
 
-  it("projection.ts and journal.ts exist; close-gate.ts and close.ts do not", async () => {
+  it("projection.ts, journal.ts, close-gate.ts and close.ts all exist", async () => {
     const { existsSync } = await import("node:fs");
     const { fileURLToPath } = await import("node:url");
     const src = fileURLToPath(new URL("../src/", import.meta.url));
     expect(existsSync(`${src}projection.ts`)).toBe(true);
     expect(existsSync(`${src}journal.ts`)).toBe(true);
-    // Still absent. `close-gate.ts` needs `unresolved_value_paise` from the
-    // `Decision` / `Exception` records, and `RECONCILIATION_SPEC.md §10.1` is
-    // explicit that "the two sides are drawn from two stores, which is the
-    // point". This package holds one. A stub would be a claim otherwise.
-    expect(existsSync(`${src}close-gate.ts`)).toBe(false);
-    expect(existsSync(`${src}close.ts`)).toBe(false);
+    // `close-gate.ts` needs `unresolved_value_paise` from the `Decision` /
+    // `Exception` records, and `RECONCILIATION_SPEC.md §10.1` is explicit that
+    // "the two sides are drawn from two stores, which is the point". The file
+    // now exists, and the invariant this test guarded still holds: this
+    // package holds one store (the event log) and `CloseGateInput` takes the
+    // queue's `unresolved_items` as the CALLER's argument rather than reading
+    // a second store of its own. A stub reading both from a single internal
+    // store would have been the claim otherwise; `close-gate.ts` and
+    // `close.ts` are not that.
+    expect(existsSync(`${src}close-gate.ts`)).toBe(true);
+    expect(existsSync(`${src}close.ts`)).toBe(true);
   });
 
   it("projection.ts does not import the posting rules", async () => {
