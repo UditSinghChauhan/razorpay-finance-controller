@@ -366,8 +366,21 @@ export const SEEDS_PER_CONFIGURATION = 5;
 /** `§7`: `K_max (component bound) = 22 members`. Bounds the driver via batch size. */
 export const K_MAX = 22;
 
-/** `DATA_MODEL.md §18`: the manifest's `benchmark_version`. */
-export const BENCHMARK_VERSION = "1.0.4";
+/**
+ * `DATA_MODEL.md §18`: the manifest's `benchmark_version`.
+ *
+ * **1.0.4 -> 1.0.5 at spec 1.4.25** (register rows M39, M40). The pre-registered
+ * parameter set gains `PREREGISTRATION.md §7`'s `A3-NOLLM` probe priority policy
+ * and `DATA_MODEL.md §13` gains a fourth certificate reason, so
+ * `PREREGISTRATION.md §9` step 5 now requires this field to read `"1.0.5"`.
+ *
+ * **Nothing this package produces changes.** No population, seed, family, rate,
+ * `§7` threshold or artifact byte moves; `§18`'s `BenchmarkManifest` **shape** is
+ * unchanged and this constant is the only field of it that this amendment
+ * touches; `constraint_set_hash` is `packages/domain`'s and is unmodified; and
+ * `GT_VERSION` stays 1.1.0. No dataset exists to regenerate.
+ */
+export const BENCHMARK_VERSION = "1.0.5";
 
 /** `DATA_MODEL.md §1`: `GroundTruth.gt_version`. */
 export const GT_VERSION = "1.1.0";
@@ -407,5 +420,19 @@ export const GT_VERSION = "1.1.0";
  * (`C1`-`C8` are `packages/domain`'s and are unmodified); and `M31`'s
  * date-scoping field **remains open** — the report carries `settled_at`, and how
  * a `date` argument filters is the dispatch's business, not the artifact's.
+ *
+ * **1.4.24 -> 1.4.25 (M39, M40) — required nothing of this package except the
+ * version constants.** The amendment freezes `PREREGISTRATION.md §7`'s `A3-NOLLM`
+ * probe priority policy, adds `DATA_MODEL.md §13`'s fourth certificate reason
+ * `NO_USEFUL_PROBE_AVAILABLE`, bars `R3` from proposing `widen_temporal_window`,
+ * and records a rejected-proposal loop convention. Each belongs to a package this
+ * one does not touch: the policy is `packages/llm`'s `offline` `R3`, the reason is
+ * `packages/ledger`'s union and `packages/engine`'s `certificateReason`, and the
+ * convention is the probe loop's. **`BENCHMARK_VERSION` moves 1.0.4 -> 1.0.5**
+ * because `PREREGISTRATION.md §9` step 5 pins it; nothing else here moves. No
+ * `§7` threshold this package reads changes -- `K_MAX` and
+ * `SEEDS_PER_CONFIGURATION` are untouched -- and the `§4.1` composition, the
+ * `§6.1` seed table, `GT_VERSION` and the recon report's spec-1.4.24 row order are
+ * all unchanged.
  */
-export const SPEC_VERSION = "1.4.24";
+export const SPEC_VERSION = "1.4.25";

@@ -1,9 +1,11 @@
 # EVALUATION_SPEC — ASSAY
 
-**Spec version:** 1.4.24 · **Date:** 2026-08-28
+**Spec version:** 1.4.25 · **Date:** 2026-08-31
 
-**At spec 1.4.24** this document is unchanged apart from the version header. See
-`DECISION_BRIEF.md §A.31`.
+**At spec 1.4.25** `§3.2`'s `A3-NOLLM` row records that the ablation's `R3` probe
+policy is **pre-registered** at `PREREGISTRATION.md §7`. **No metric formula,
+definition, number or count changes** — the frozen list stays at **28**, and no
+metric is added. Benchmark v1.0.4 → **v1.0.5**. See `DECISION_BRIEF.md §A.32`.
 
 **At spec 1.4.23** this document is unchanged apart from the version header. **No
 metric formula, definition, number or count changes** — the frozen list stays at
@@ -187,7 +189,21 @@ in exactly one respect, so the difference is attributable.
 |---|---|---|
 | `A1-NOVALIDATE` | Stage S5 invariants I1–I9 | *The deterministic validator prevents real financial error.* Expected: higher `balance_harm_inr`, hallucinated IDs admitted, trial balance breaks, runs end `BLOCKED`. |
 | `A2-NOABSTAIN` | Abstention; always commits the top candidate | *Abstention is worth its cost.* Expected: coverage 100%, sharply higher harm and net cost, Suspense near zero — the "100% matched, 0 exceptions" failure mode, reproduced deliberately. |
-| `A3-NOLLM` | All four LLM roles → the `offline` provider | *The LLM contributes measurably.* **This may fail, and failing is a legitimate result.** |
+| `A3-NOLLM` | All four LLM roles → the `offline` provider | *The LLM contributes measurably.* **This may fail, and failing is a legitimate result.** From spec 1.4.25 its `R3` probe policy is **pre-registered** (`PREREGISTRATION.md §7`, `AL3`, register row M39), so the control's probe spend is fixed before any figure exists. |
+
+**`A3`'s `R3` policy is pre-registered, and this is what keeps the row above an
+ablation `[ASSAY-MODEL]`, spec 1.4.25, register row M39.** `§3.2` requires an
+ablation to differ from ASSAY *"in exactly one respect, so the difference is
+attributable"*. Through spec 1.4.24 the `offline` provider's `R3` — which
+`ARCHITECTURE.md §6.5` calls a *"static probe priority list"* and
+`RECONCILIATION_SPEC.md §6.2` makes the comparand of *"abstentions resolved per
+probe spent"* — was **stated nowhere**, so an implementer would have supplied it,
+and `A3` would have differed from ASSAY in two respects: the provider, and a
+hand-authored policy able to move `A3`'s figures for metrics 1, 2, 3, 4, 6, 8 and 9.
+`PREREGISTRATION.md §7` now fixes it, `AL3` binds it, `DECISION_BRIEF.md §L.1`
+rule 12 lists it and `§L.4` forbids revising it from a result. **No metric
+definition changes and no metric is added**: this fixes an input to figures already
+on `PREREGISTRATION.md §8`'s list of 28.
 
 **`A3-NOLLM` is exactly `ASSAY --llm=offline`**, which means the `offline_parity`
 comparison for ASSAY (metric 24) and the `A3` ablation are the same measurement

@@ -1,6 +1,14 @@
 # THREAT_MODEL — ASSAY
 
-**Spec version:** 1.4.24 · **Date:** 2026-08-28
+**Spec version:** 1.4.25 · **Date:** 2026-08-31
+
+**At spec 1.4.25** `§T7` records that `R3` **may not propose
+`widen_temporal_window`** — the one probe that relaxes a constraint is now
+unreachable through the model, which **strengthens** this section's controls and
+weakens none. The enum stays **closed at five** for the executor, and `§T7`'s
+promised numeric hard bound **remains unspecified** rather than being supplied.
+**No control, threat or mitigation was removed or weakened.** See
+`DECISION_BRIEF.md §A.32`.
 
 **At spec 1.4.24** this document is unchanged apart from the version header. See
 `DECISION_BRIEF.md §A.31`.
@@ -294,7 +302,9 @@ population and no relaxation can rescue an allocation `C4` excluded. The attack
 named below is separately blocked — spec 1.4.15 derived that a
 `widen_temporal_window` result may **not** feed `SE5`, precisely so that a
 relaxation cannot raise the evidence score of the candidates it admitted. The bound
-remains **open**, as does whether `R3` may propose the probe at all.
+remains **open**, as does whether `R3` may propose the probe at all. *(The second
+half was settled in the negative at spec 1.4.25, register row M40 — see below. The
+bound itself is still unstated.)*
 
 **The probe's source is a committed read-only artifact, from spec 1.4.22.**
 `RECONCILIATION_SPEC.md §6.2` ratifies `fetch_settlement_recon`'s source as
@@ -315,6 +325,30 @@ over `§6.2`'s five probes with **no URL or host field anywhere in it**. Pre-cal
 `I6` is deliberately separate from `packages/llm`'s boundary-2 allowlist, as
 `DECISION_BRIEF.md §L.1` rule 8 requires (*"independently of any allowlist
 check"*), and from `S5`'s post-hoc `I6`.
+
+**`R3` may not propose `widen_temporal_window`, from spec 1.4.25 (register row
+M40).** The bound this section promised is still not stated by any document, and
+this amendment does not supply it. What it does instead is remove the attack's
+reachable path: the only probe that relaxes a constraint is **no longer proposable
+by the model**, because its sole argument is `days` and `DECISION_BRIEF.md §L.1`
+rule 2 forbids a numeric field in any LLM output schema — a rule left **unchanged
+and unweakened**. `R3`'s output is the four id-argument probes plus
+`NO_USEFUL_PROBE`, every field string-typed. **This strengthens the controls above
+and weakens none**: *"quiet constraint relaxation to manufacture a match"* now has
+no proposer, in addition to the spec-1.4.15 bar on a widen result feeding `SE5` and
+M33's arithmetic showing `C4` excludes no true member on this population. **The enum
+stays closed at five** — the executor's enum and the set of actions one proposer may
+name are different sets, and narrowing the former would change
+`DATA_MODEL.md §12`'s `ProbeResultDetail` and this section's SSRF surface, which
+this amendment does not do. **The numeric hard bound remains open**; it is now
+unreachable through `R3` rather than specified.
+
+**The control arm's probe policy is pre-registered, from spec 1.4.25 (register row
+M39).** `PREREGISTRATION.md §7` fixes `A3-NOLLM`'s priority order, its
+lexicographically-smallest argument selection and its stop rule. That is an
+evaluation-integrity control rather than a security control, but it closes a
+related hole in this section's spirit: an unstated policy would leave a decision
+parameter of a scored agent outside `AL3` and `DECISION_BRIEF.md §L.4`.
 
 **Prevents.** SSRF-style redirection, unbounded API spend, and quiet constraint
 relaxation to manufacture a match.

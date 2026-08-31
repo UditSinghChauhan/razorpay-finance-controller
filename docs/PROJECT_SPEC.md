@@ -2,8 +2,14 @@
 
 **Track:** 04 — AI Finance Controller
 **Status:** Specification. Frozen scope for implementation.
-**Spec version:** 1.4.24
-**Date:** 2026-08-27
+**Spec version:** 1.4.25
+**Date:** 2026-08-31
+
+**At spec 1.4.25** this document is unchanged apart from the version header. **No
+success criterion moves** and `§6`'s account of what the AI does is unaffected:
+`R3`'s proposable action set narrows by one probe and its control arm's policy is
+frozen, neither of which changes a criterion. Benchmark v1.0.4 → **v1.0.5**. See
+`DECISION_BRIEF.md §A.32`.
 
 **At spec 1.4.24** this document is unchanged apart from the version header. See
 `DECISION_BRIEF.md §A.31`.

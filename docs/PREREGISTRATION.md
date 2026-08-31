@@ -1,11 +1,11 @@
-# PREREGISTRATION — ASSAY Benchmark v1.0.4
+# PREREGISTRATION — ASSAY Benchmark v1.0.5
 
-**Spec version:** 1.4.24 · **Benchmark version:** 1.0.4
+**Spec version:** 1.4.25 · **Benchmark version:** 1.0.5
 
 **Status: FROZEN on commit. Amendments require a version bump and a new seal.**
 **Date frozen:** 2026-08-23 · **Amended:** 2026-08-24 (benchmark 1.0.1),
-2026-08-25 (benchmark 1.0.2), 2026-08-26 (benchmark 1.0.3) and
-2026-08-30 (benchmark 1.0.4) — see below
+2026-08-25 (benchmark 1.0.2), 2026-08-26 (benchmark 1.0.3),
+2026-08-30 (benchmark 1.0.4) and 2026-08-31 (benchmark 1.0.5) — see below
 · **Sealed at:** _(pending — see §9)_
 
 **Amendment 1.1.1 (pre-seal, factual correction).** Applied before the seal and
@@ -796,6 +796,66 @@ to regenerate. `packages/engine` is neither created nor modified — `S4` remain
 unimplemented — and `packages/oracle`, `packages/domain`, `packages/ledger` and
 `constraints.decl.ts` are untouched. Historical amendment records are preserved
 verbatim.
+
+**Amendment 1.4.25 / benchmark 1.0.5 (pre-seal, one control policy frozen and one
+terminal reason closed).** Applied before the seal, before any dataset was
+generated, before `R3` exists in any form and before any H1, dev or benchmark
+result was observed. Three governance decisions and one implementation
+convention; register rows **M39** and **M40**; record at `DECISION_BRIEF.md §A.32`.
+
+**B1 — the `A3-NOLLM` probe priority policy is RATIFIED and frozen (M39).**
+`ARCHITECTURE.md §6.5` gives the `offline` provider's `R3` as a *"static probe
+priority list"* and `RECONCILIATION_SPEC.md §6.2` makes that list the comparand of
+*"whether the LLM's probe selection beats a static priority list (`A3-NOLLM`)"* —
+and **no document stated the list**. It is stated in `§7` below, added to `AL3`'s
+enumeration and to `DECISION_BRIEF.md §L.1` rule 12, so that `§L.4`'s bar on
+result-driven change reaches it. **This is a ratification, not a derivation**: no
+frozen clause determines an ordering, and the record says so rather than dressing a
+choice as a consequence. It is frozen **now**, while no result exists that could
+have informed it, because the control arm's policy decides `A3`'s probe spend and
+therefore its figures for metrics **1, 2, 3, 4, 6, 8** and **9** — an outcome-bearing
+parameter of a scored control agent left outside the freeze would make `§10` V4's
+*"same-system controls"* rating unearned.
+
+**B2 — the `A2` middle case is closed (M40).** `DATA_MODEL.md §13`'s
+`AmbiguityCertificate.reason` gains a **fourth and final** member,
+`NO_USEFUL_PROBE_AVAILABLE`, for a loop that terminates with budget remaining. The
+state becomes reachable the moment `R3` exists in either arm, and
+`RECONCILIATION_SPEC.md §6.2` left the gap open at spec 1.4.23 expressly for the
+phase that made it reachable to close. **No fourth unrelated reason is added**, no
+existing reason changes meaning, and the certificate is still emitted **iff**
+`ABSTAINED`.
+
+**B3 — `R3` may not propose `widen_temporal_window`, and this is a recorded
+ratification (M40).** `DECISION_BRIEF.md §L.1` rule 2 forbids a numeric field in any
+LLM output schema and is **unchanged and unweakened**; whether `R3` may propose this
+probe was expressly unsettled at `RECONCILIATION_SPEC.md §6.2`, `THREAT_MODEL.md
+§T7` and register row M33. A settled invariant governs an unsettled question, so the
+question resolves in the only direction that preserves the invariant. **No `days`
+constant is invented, no numeric field is added, and `§7` gains no `days` bound** —
+M33's figure stays unspecified and the probe stays in the executor's closed
+five-probe enum for non-`R3` callers.
+
+**N1 — implementation convention, clearly labelled as one.** Where
+`packages/probe` rejects a **well-formed** proposal before budget is spent, the loop
+terminates for that component; it does not re-issue the identical proposal, the
+attempt count is unchanged, and the terminal reason follows from the resulting loop
+state under B2's rule. **This is a convention, not a frozen constant and not a
+metric**: it writes no new value anywhere, adds nothing to `§7` or to `AL3`, and is
+recorded at `ARCHITECTURE.md §12` beside the other failure dispositions.
+
+**Nothing else moves.** `C1`–`C8` and `I1`–`I9` are untouched and
+`constraint_set_hash` does not move; the `SE1`–`SE5` weights stay at 3500 / 2000 /
+1500 / 1000 / 2000; `τ`, `ε = 1500`, `K_max`, `C_max`, `P_max = 3`, `C_review`,
+`C_exception`, `k_sigma`, `queue_top_n` and the close policy are unchanged; **no
+metric definition is amended, none is added and none is removed** — the frozen list
+stays at **28**; no seed, split, family, rate or `target_record_count` moves;
+`GT_VERSION` stays **1.1.0** with no dataset in existence to regenerate. Benchmark
+version moves **1.0.4 → 1.0.5** because a frozen control-arm parameter and a
+certificate value both enter the pre-registered surface. `packages/engine`,
+`packages/ledger`, `packages/probe`, `packages/llm`, `packages/domain` and
+`apps/cli` are **not modified by this amendment**; `packages/generator` carries the
+version constants only. Historical amendment records are preserved verbatim.
 
 ---
 
@@ -1754,7 +1814,7 @@ to inspection. This is the reason the adversarial suite must be authored early
 |---|---|
 | AL1 | `packages/engine` may not import `packages/generator` or `packages/oracle`; `packages/oracle` may not import `packages/engine` or `packages/generator`. Enforced by ESLint `no-restricted-imports`, checked in CI. |
 | AL2 | Neither engine nor oracle code may read a file matching `**/ground_truth*.jsonl`. Enforced by a runtime path guard that throws. |
-| AL3 | Every constant in §7 — τ, ε, the SE1–SE5 weights, `K_max`, `C_max`, `P_max`, `C_review`, `C_exception`, the close policy bounds, `k_sigma` and `queue_top_n` — is fixed before the seal and immutable after it. |
+| AL3 | Every constant in §7 — τ, ε, the SE1–SE5 weights, `K_max`, `C_max`, `P_max`, `C_review`, `C_exception`, the close policy bounds, `k_sigma` and `queue_top_n` — is fixed before the seal and immutable after it. **From spec 1.4.25 (register row M39) this enumeration also binds the `A3-NOLLM` probe priority policy in §7** — its priority order, its eligible-argument rule, its lexicographically-smallest argument selection and its stop rule. It is a decision parameter of the **control arm**, so it is additionally unadjustable on TRAIN and DEV, unlike the SE1–SE5 weights; see §7 and `DECISION_BRIEF.md §L.1` rule 12. |
 | AL4 | The developer may inspect TRAIN and DEV outputs without limit and TEST outputs **never** before the sealed run. |
 | AL5 | The CLI's `--sealed` flag refuses to print, log or write any ground-truth field; only aggregate metrics are emitted. |
 | AL6 | Prompt text may not contain examples derived from any TEST record. |
@@ -1848,6 +1908,34 @@ test split. Rules AL1–AL8 target that, because it is the real risk here.
       SE3 temporal_proximity        = 1500 bps  (0.15)
       SE4 method_agreement          = 1000 bps  (0.10)
       SE5 probe_corroboration       = 2000 bps  (0.20)
+
+  A3-NOLLM probe priority policy (RATIFIED at spec 1.4.25, register row M39;
+  ARCHITECTURE.md §6.5's "static probe priority list"; the comparand of
+  RECONCILIATION_SPEC.md §6.2's "abstentions resolved per probe spent"):
+
+      priority order      1. fetch_settlement_recon
+                          2. fetch_payment
+                          3. fetch_order
+                          4. fetch_refund
+                          widen_temporal_window is NOT proposable (M40)
+
+      eligible argument   an argument of the exact type that probe requires,
+                          present in the call's available-probe context, that
+                          passes the already-frozen deterministic validity and
+                          pre-call I6 checks (DECISION_BRIEF.md §L.1 rule 8)
+
+      argument selection  the LEXICOGRAPHICALLY SMALLEST eligible argument for
+                          that probe kind. Never enumeration order, never
+                          wall-clock order, never derived from model output.
+
+      stop rule           the first probe in priority order for which a
+                          constructible, valid argument exists; if none exists,
+                          NO_USEFUL_PROBE.
+
+  This policy is frozen on the same terms as every constant above: AL3 binds it,
+  DECISION_BRIEF.md §L.1 rule 12 lists it, and §L.4 therefore forbids changing it
+  on the basis of an observed result. It was fixed before R3 existed in any form
+  and before any H1 or dev figure was produced.
 ```
 
 These weights are set by judgement, not fitted. They may be adjusted on the
@@ -1855,6 +1943,19 @@ TRAIN and DEV splits before the seal; after the seal they are immutable. They
 influence only candidate *ranking* and the ε-gap — never admission, never an
 amount — so a poor choice of weights degrades abstention precision rather than
 producing a wrong allocation.
+
+**The `A3-NOLLM` probe priority policy is NOT covered by that permission, and the
+distinction is deliberate `[ASSAY-MODEL]`, spec 1.4.25, register row M39.** The
+sentence above scopes *"may be adjusted on the TRAIN and DEV splits before the
+seal"* to **the `SE1`–`SE5` weights**, which rank candidates inside one agent. The
+priority policy is a parameter of the **control arm** against which the system under
+test is measured, so adjusting it on any split — before or after the seal — would
+move the comparand of the very claim `§H` tier H1 exists to make. It is therefore
+frozen on the strictest terms available: fixed at spec 1.4.25 before `R3` existed,
+bound by `AL3`, listed in `DECISION_BRIEF.md §L.1` rule 12, and unadjustable on
+TRAIN, DEV or TEST. A defect in it is corrected only through a new benchmark version
+that states what was observed first (`DECISION_BRIEF.md §F` F9, `§L.4`), with both
+results reported.
 
 **Justification for `C_review` = ₹250:** approximately 15 minutes of a finance
 analyst's time at a fully-loaded rate of ~₹1,000/hour. This is an assumption, not
@@ -2213,6 +2314,28 @@ move, `C1`–`C8` and `SE1`–`SE5` are untouched, and no threshold changes.
 **Benchmark version moves 1.0.3 → 1.0.4**, because the committed benchmark
 surface gains an artifact.
 
+**Dependency statement for the spec-1.4.25 control-policy and terminal-reason
+amendment.** No metric on this list is redefined, none is added, none is removed and
+the numbering does not move: the list is **28** metrics before and after. Two things
+enter the pre-registered surface. First, `§7` gains the `A3-NOLLM` probe priority
+policy, which **fixes** rather than changes how `A3` spends `P_max`; before this
+amendment the policy was unstated, so `A3`'s figures for metrics **1**, **2**, **3**,
+**4**, **6**, **8** and **9** were not reproducible from the specification at all.
+Freezing it makes those figures determinate; it does not redefine them, and it moves
+no number that any committed artifact carries, there being none. Second,
+`DATA_MODEL.md §13`'s `AmbiguityCertificate.reason` gains
+`NO_USEFUL_PROBE_AVAILABLE`, which is a **certificate field value**, not a metric
+input: no metric on this list reads `reason`, and `metric 14`'s
+`close_gate_failures` and `metric 13`'s `suspense_identity_exact` are computed from
+gates and journal lines rather than from certificate reasons.
+
+**Definitions do not move and neither does the oracle.** `constraint_set_hash` does
+not move, `C1`–`C8` and `SE1`–`SE5` are untouched, no threshold changes, and the
+oracle's labels are unaffected — this amendment touches no observation, no
+constraint and no ambiguity definition. **Benchmark version moves 1.0.4 → 1.0.5**,
+because the pre-registered parameter set gains a control-arm policy and the
+certificate gains a legal value.
+
 **Stopping rule:** the sealed test run is executed **once** per benchmark
 version. Its output is reported whatever it says. If a bug is found after the
 seal, the fix requires a new benchmark version with fresh seeds, and **both**
@@ -2221,13 +2344,13 @@ results are reported, with the reason for the re-run.
 ## 9. Seal procedure
 
 ```
-  1. Freeze code:  git tag -s bench-v1.0.4 -m "ASSAY benchmark v1.0.4 seal"
+  1. Freeze code:  git tag -s bench-v1.0.5 -m "ASSAY benchmark v1.0.5 seal"
   2. Generate:     assay generate --split test --seeds 9000-9004,9100-9104
   3. Oracle:       assay oracle --split test          # completeness gate MUST pass
   4. Hash:         sha256 observations.jsonl ground_truth.jsonl oracle_labels.jsonl \
                           recon_report.jsonl                      # spec 1.4.22
   5. Commit hashes into benchmark_manifest.json      # ground truth itself NOT committed
-     # `benchmark_version` must read "1.0.4" (DATA_MODEL.md §18)
+     # `benchmark_version` must read "1.0.5" (DATA_MODEL.md §18)
      # `recon_report_sha256` must be present and non-null (spec 1.4.22);
      #   its absence is a SEAL FAILURE, because §6.2's probe has no source
      #   without it and SE5 would silently score 0 on every candidate

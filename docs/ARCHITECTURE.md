@@ -1,6 +1,15 @@
 # ARCHITECTURE — ASSAY
 
-**Spec version:** 1.4.24 · **Date:** 2026-08-28
+**Spec version:** 1.4.25 · **Date:** 2026-08-31
+
+**At spec 1.4.25** `§6`'s `R3` row states its **proposable action set** — the four
+id-argument probes plus `NO_USEFUL_PROBE`, `widen_temporal_window` excluded
+(`DECISION_BRIEF.md §L.1` rule 2, **unchanged and unweakened**); `§6.5`'s `offline`
+row points at the now-frozen `A3-NOLLM` priority policy in `PREREGISTRATION.md §7`;
+and `§12` gains one row for a rejected probe proposal. **No trust boundary, data
+flow, interface, provider or package responsibility changes**, and the probe enum
+stays **closed at five** for the executor. Benchmark v1.0.4 → **v1.0.5**. See
+`DECISION_BRIEF.md §A.32`.
 
 **At spec 1.4.24** this document is unchanged apart from the version header. See
 `DECISION_BRIEF.md §A.31`.
@@ -419,6 +428,29 @@ model is wrong or hostile?*
 
 - **Input:** the ambiguity certificate + list of available probes. **Output:** one
   call from a closed enum with allowlisted arguments, or `NO_USEFUL_PROBE`.
+- **The proposable action set, ratified at spec 1.4.25 `[ASSAY-MODEL]`, register
+  row M40.** Four of `RECONCILIATION_SPEC.md §6.2`'s five probes, plus the decline
+  — **every field string-typed**:
+
+  ```
+    { probe: "fetch_order",            order_id }
+    { probe: "fetch_payment",          payment_id }
+    { probe: "fetch_refund",           refund_id }
+    { probe: "fetch_settlement_recon", settlement_id, date }
+    { probe: "NO_USEFUL_PROBE" }
+  ```
+
+  `widen_temporal_window` is **not proposable by `R3`**: its only argument is
+  `days`, `DECISION_BRIEF.md §L.1` rule 2 forbids a numeric field in any LLM output
+  schema and is **unchanged and unweakened**, and `R3`'s authority over that probe
+  was expressly unsettled (`§6.2`, `THREAT_MODEL.md §T7`, register row M33) — so the
+  settled invariant governs. **The probe stays in the executor's closed enum of
+  five**; the actions one proposer may name and the calls `packages/probe` may
+  construct are different sets. `date` is an **opaque string** and is never parsed
+  by the model's consumer: `DATA_MODEL.md §22.2` M31 leaves the field a query is
+  date-scoped on undecided, and on spec 1.4.22's committed surface `settlement_id`
+  is the only query key, so the argument reaches only the `PROBE` event's
+  `inputs_hash`.
 - **Why not a rule:** this is sequential decision-making under uncertainty —
   which single lookup, out of many, most reduces ambiguity here. A static
   priority list is the deterministic baseline and it is measured against this
@@ -471,7 +503,7 @@ interface LlmProvider {
 
 | Provider | Network | Cost | Determinism | Purpose |
 |---|---|---|---|---|
-| `offline` | none | zero | **fully deterministic** | Rule-based implementation of all four roles: regex battery (R1), decision-tree classifier (R2), static probe priority list (R3), templated explainer (R4). The CI default and the guaranteed demo path. |
+| `offline` | none | zero | **fully deterministic** | Rule-based implementation of all four roles: regex battery (R1), decision-tree classifier (R2), static probe priority list (R3), templated explainer (R4). The CI default and the guaranteed demo path. **R3's list is frozen at `PREREGISTRATION.md §7` from spec 1.4.25 (M39)** — `fetch_settlement_recon` → `fetch_payment` → `fetch_order` → `fetch_refund`, lexicographically smallest eligible argument, first constructible entry wins, else `NO_USEFUL_PROBE`. |
 | `replay` | none | zero | **fully deterministic** | Serves committed responses from `fixtures/llm-cache/`, keyed by `sha256(provider ‖ model_id ‖ system_prompt_hash ‖ input_hash)`. Cache miss under `--strict-replay` is a hard error, never a silent live call. **All scored benchmark runs use this mode.** |
 | `anthropic` | yes | metered | not reproducible | `@anthropic-ai/sdk`, `messages.parse()` with `zodOutputFormat` for strict schemas, `thinking: {type:"adaptive"}`, prompt caching on the stable system prefix. |
 | `openai-compatible` | yes | metered | not reproducible | Any endpoint speaking the OpenAI chat-completions schema with JSON-schema response format — self-hosted, local runtime, or third-party. Present so no single vendor is load-bearing. |
@@ -498,7 +530,16 @@ the same interface:
   The only supported live path is a metered API credential.
 - **The `offline` provider is the same component as ablation `A3-NOLLM`.** It is
   built properly, not as a stub — a sabotaged offline path would both break the
-  demo guarantee and invalidate the ablation.
+  demo guarantee and invalidate the ablation. **From spec 1.4.25 its `R3` policy is
+  additionally pre-registered** (`PREREGISTRATION.md §7`, `AL3`,
+  `DECISION_BRIEF.md §L.1` rule 12), because that one role's output is the comparand
+  of `§6.2`'s *"beats a static priority list"* rather than an incidental component:
+  a list authored or revised after a figure was seen would move the thing the
+  measurement is against. `AL3` binds it and `§L.4` forbids changing it on the basis
+  of an observed result, on TRAIN, DEV or TEST alike. R1's regex battery and R2's
+  classifier are **not** pre-registered this way and do not need to be — their
+  outputs are verified against the input (substring grounding) or scored against a
+  known cause (metric 10), and neither is a denominator.
 - **`meteredCost === true` providers are refused in CI** by configuration, so no
   test run can incur spend.
 
@@ -784,6 +825,7 @@ a positive signal of confusion.
 |---|---|---|
 | LLM provider unreachable / rate-limited | Retry with backoff, then **fall back to the `offline` provider for that role** and log `LLM_UNAVAILABLE`. The run completes. | A finance close must not be blocked on a third-party API. Degradation is visible in the report as a raised abstention rate, not hidden. |
 | LLM returns invalid schema | Discard, one retry, then `offline` fallback for that call. Counted. | Never coerce or repair a malformed financial-adjacent response. |
+| **Probe proposal rejected by `packages/probe`** *(implementation convention, spec 1.4.25, `N1`)* | The proposal is well-formed but fails a pre-call control — `P_max`, pre-call `I6`, or an argument range. **Discard it, terminate the probe loop for that component, and take the terminal reason from the resulting state** (`DATA_MODEL.md §13`). `attempts` does not move: no probe was spent. Counted. | Re-issuing is not neutral. An unchanged loop state yields an unchanged `input_hash`, hence an unchanged `cache_key`, hence the **identical rejected proposal forever** under `--llm=replay` and `--llm=offline` alike. This row is a **convention, not a frozen constant or a metric** — it writes no value and adds nothing to `PREREGISTRATION.md §7`. |
 | `replay` cache miss under `--strict-replay` | Hard error. **Never a silent live call.** | A benchmark that quietly goes live is no longer reproducible, and the report would be false. |
 | Component exceeds `K_max` | `ABSTAIN` with reason `SEARCH_BOUND_EXCEEDED`. | The honest outcome. Silently truncating the search and returning "best found" is the exact failure ASSAY exists to prevent. |
 | Invariant violation on an accepted allocation | Reject the allocation, route to exception, continue the batch, record `invariants_failed`. | A single bad allocation must not abort a 10,000-record close. |
