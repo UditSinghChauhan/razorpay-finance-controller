@@ -226,8 +226,26 @@ describe("3 — no S1-S5 duplication", () => {
     for (const { rel, text } of sources) {
       const body = code(text);
       expect(body, rel).not.toMatch(/\b(checkC[1-8]|HARD_CONSTRAINTS|generateCandidates|isAdmissible)\b/);
+      // A composition root may CALL a stage; it may not BE one. `probe/run.ts`
+      // sequences §6.6's chain and invokes the engine's own `solve`, which is
+      // the whole of spec 1.4.25's composition — so the ban is on declaring a
+      // stage, not on calling one.
+      expect(body, rel).not.toMatch(/\b(function|const|let)\s+(anchor|decompose|solve|evaluate)\b/);
+      if (rel === "probe/run.ts") continue;
       expect(body, rel).not.toMatch(/\b(anchor|decompose|solve|evaluate)\s*\(/);
     }
+  });
+
+  it("obtains `solve` from packages/engine and re-implements nothing of S4", () => {
+    const run = sources.find((f) => f.rel === "probe/run.ts");
+    expect(run).toBeDefined();
+    const raw = run?.text ?? "";
+    const body = code(raw);
+    // Import shapes are read from the RAW source: `code()` strips string
+    // literals, so a module specifier is invisible to it.
+    expect(raw).toMatch(/import\s*\{[^}]*\bsolve\b[^}]*\}\s*from\s*"@assay\/engine"/s);
+    // None of S4's own work happens here: no scoring, no ranking, no tie-break.
+    expect(body).not.toMatch(/evidence_score_bps|canonical_key|delta_s_bps\s*=|materiality_paise\s*=/);
   });
 
   it("mints no ValidatedDecision and posts no journal line", () => {
@@ -239,11 +257,24 @@ describe("3 — no S1-S5 duplication", () => {
   });
 });
 
-describe("4 — no probe loop", () => {
-  it("constructs no probe call", () => {
+describe("4 — it dispatches the probe loop; it does not own it", () => {
+  it("constructs no probe call — the brand is never widened here", () => {
     // RECONCILIATION_SPEC.md §6.2, spec 1.4.23: packages/probe is "the ONLY
     // constructor of a probe call, so a caller cannot dispatch around them".
+    // Spec 1.4.25 gives this package the DISPATCH (§6.6), which takes a
+    // ValidatedProbeCall it cannot build: the brand is non-exported and there is
+    // no widening assertion anywhere in this package.
     for (const { rel, text } of sources) {
+      const body = code(text);
+      expect(body, `${rel} widens the probe-call brand`).not.toMatch(
+        /as\s+(unknown\s+as\s+)?ValidatedProbeCall/,
+      );
+    }
+  });
+
+  it("names a probe only under src/probe/, where §6.6 puts the dispatch", () => {
+    for (const { rel, text } of sources) {
+      if (rel.startsWith("probe/") || rel === "index.ts") continue;
       const body = code(text);
       for (const probe of [
         "fetch_order",
@@ -257,10 +288,45 @@ describe("4 — no probe loop", () => {
     }
   });
 
-  it("accounts for no probe budget and assembles no PROBE event", () => {
+  it("never names widen_temporal_window ANYWHERE — R3 may not propose it (M40)", () => {
+    // The dispatch answers a ValidatedProbeCall, and R3 cannot name the fifth
+    // probe. This package has no reason to mention it and does not.
     for (const { rel, text } of sources) {
-      expect(code(text), rel).not.toMatch(/probeEventBody|attempts_remaining|probes_attempted/);
+      expect(code(text), rel).not.toContain("widen_temporal_window");
     }
+  });
+
+  it("assembles no PROBE event body and accounts for no budget of its own", () => {
+    for (const { rel, text } of sources) {
+      const body = code(text);
+      // `probeEventBody` is packages/probe's (M37). This package may CALL it;
+      // declaring one here would fork the §16 body.
+      expect(body, rel).not.toMatch(/(function|const)\s+probeEventBody\b/);
+      expect(body, rel).not.toMatch(/\bP_MAX\b/);
+      if (rel.startsWith("probe/")) continue;
+      expect(body, rel).not.toMatch(/probeEventBody|attempts_remaining|probes_attempted/);
+    }
+  });
+
+  it("imports the loop's decisions rather than reproducing them", () => {
+    const run = sources.find((f) => f.rel === "probe/run.ts");
+    const raw = run?.text ?? "";
+    const body = code(raw);
+    for (const owned of ["decide", "offerR3Proposal", "acceptResult", "probeEventBody"]) {
+      expect(body, `probe/run.ts must import ${owned}`).toContain(owned);
+    }
+    expect(raw).toMatch(/from\s*"@assay\/probe"/);
+    // No budget arithmetic and no enum test is re-derived here: `validate`'s
+    // four controls are packages/probe's and are reached only through
+    // `offerR3Proposal`.
+    expect(body).not.toMatch(/attempts\s*>=|attempts\s*<\s*pMax|PROBE_KINDS|isR3ProposableKind/);
+    // `hasEntityId` IS called, and must be: PREREGISTRATION.md §7 defines an
+    // eligible argument as one passing "the already-frozen deterministic
+    // validity and pre-call I6 checks", so the context is filtered before R3
+    // sees it. packages/probe re-runs the same check independently afterwards,
+    // which is what §L.1 rule 8's "independently of any allowlist check"
+    // requires — the two are not redundant.
+    expect(body).toMatch(/hasEntityId\s*\(/);
   });
 });
 

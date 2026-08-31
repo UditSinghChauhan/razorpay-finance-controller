@@ -8,9 +8,12 @@
  * view over it. Everything demonstrable must be scriptable."*
  *
  * This package is a **composition root**. It contains no reconciliation logic:
- * no `S0` transform, no `S1`-`S5` stage, no probe loop, no close gate, no
- * `R3` policy. What it contains is the read, the write, the argument surface,
- * the provider selection and the dispatch.
+ * no `S0` transform, no `S1`-`S5` stage, no close gate, and **no `R3` policy** —
+ * `PREREGISTRATION.md §7`'s frozen list lives in `packages/llm`. What it contains
+ * is the read, the write, the argument surface, the provider selection, the
+ * `§6.2` dispatch and, from spec 1.4.25, the `§6.6` composition that joins them
+ * (`src/probe/`). The loop's decisions are `packages/probe`'s; this package
+ * sequences the calls and performs the one read.
  *
  * The surface below exists for `tests/`; the binary is `src/main.ts`.
  */
@@ -43,5 +46,23 @@ export { loadObservations } from "./artifacts/observations.js";
 export { loadLedgerEvents } from "./artifacts/ledger-events.js";
 export { loadReplayCache, ReplayCacheError } from "./artifacts/replay-cache.js";
 export { buildProvider, ProviderRefusedError, DEFAULT_REPLAY_CACHE_DIR } from "./providers.js";
+export {
+  DISPATCHABLE_PROBE_KINDS,
+  ProbeSourceUnavailableError,
+  dispatchProbe,
+  isDispatchable,
+  type ProbeDispatchOptions,
+} from "./probe/surface.js";
+export {
+  R3_CONTEXT_KINDS,
+  buildAvailableProbes,
+  runProbeLoop,
+  type AvailableProbeContext,
+  type BuildContextOptions,
+  type ProbeEventDraft,
+  type ProbeRunInput,
+  type ProbeRunResult,
+  type ProbeRunStop,
+} from "./probe/run.js";
 export { COMMANDS, T0_11_COMMANDS, findCommand, flagsFor, type Command, type CommandContext } from "./commands/index.js";
 export { usage, versionLine } from "./usage.js";

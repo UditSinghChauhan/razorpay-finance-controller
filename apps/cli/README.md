@@ -1,6 +1,6 @@
 # `@assay/cli`
 
-Written against **specification 1.4.24 / benchmark 1.0.4**.
+Written against **specification 1.4.25 / benchmark 1.0.5**.
 
 `assay generate · oracle · run · bench · close · verify · seal`
 (`DECISION_BRIEF.md §C` T0-11).
@@ -22,10 +22,14 @@ This package is a **composition root**. It holds no reconciliation logic at all.
   parsing, ingest invariants, text quarantine, normalization, provenance — are
   `packages/domain`'s. There is no schema, no `paise(`, no `ingest_hash`, no
   reference to a quarantined field anywhere in `src/`.
-- **No `S1`–`S5`, no probe loop, no `R3`.** No frozen threshold is re-spelled
-  here (`§L.1` rule 12), no constraint is evaluated, no probe call is
-  constructed (`packages/probe` is *"the ONLY constructor of one"*), and no
-  proposal policy is authored.
+- **No `S1`–`S5`, no probe *loop*, no `R3` policy.** No frozen threshold is
+  re-spelled here (`§L.1` rule 12), no constraint is evaluated, no stage is
+  declared, and **no probe call is constructed** — `packages/probe` is *"the ONLY
+  constructor of one"* and the brand is never widened in `src/`. From spec 1.4.25
+  this package performs the `§6.2` **dispatch** and composes `§6.6`'s chain
+  (`src/probe/`); the loop's decisions stay `packages/probe`'s and the proposal
+  policy stays `packages/llm`'s. `widen_temporal_window` is named nowhere in
+  `src/` at all — `R3` may not propose it (M40).
 - **No transport.** No `http`, `https`, `net`, `tls`, `dgram`, `http2`, `undici`,
   `node-fetch`, `axios` or `fetch(`. `--llm=offline` is the default and every
   `meteredCost` provider is refused, so `T0-11`'s *"clean checkout with no API
@@ -98,7 +102,7 @@ seal hashes are read in three zones — `observations.jsonl` and
 |---|---|---|
 | `generate` | **implemented** | — (`packages/generator` gained the recon report's rows at spec 1.4.24; before that, the command reported the missing emitter and wrote the other three artifacts) |
 | `oracle` | **implemented** | — (`packages/oracle` gained `oracleContext` at spec 1.4.23; before it, the command was blocked for want of a `CandidateContext` builder) |
-| `run` | provider selection implemented; pipeline **blocked** | `packages/domain` has no `S0` entry point (`§3`: *"scheduled, not written"*), then engine's missing `Target`/`EvaluationContext` constructor, then `R3` (`§H` H1), then the ledger write path |
+| `run` | provider selection and the `§6.2` probe loop implemented; full pipeline **blocked** | `packages/domain` has no `S0` entry point (`§3`: *"scheduled, not written"*), then engine's missing `Target`/`EvaluationContext` constructor, then the ledger write path. `R3` and the `§6.6` composition landed at spec 1.4.25 and are exercised by `tests/h1-integration.test.ts` over a hand-built `SolveInput` |
 | `bench` | **deferred** | `packages/eval` (`ARCHITECTURE.md §10`) |
 | `close` | **deferred** | `packages/ledger`'s `close-gate.ts` / `close.ts`, *"deliberately absent rather than stubbed"* |
 | `verify` | **implemented** for `G4` and `G2` | `G3` needs the close gate; the `assay.sqlite` route needs `better-sqlite3`, which is not a workspace dependency |
@@ -157,14 +161,28 @@ is the most literal reading of *"keyed by sha256(…)"*, and it makes each cache
 entry a separately reviewable committed file. Recorded as a convention so a later
 amendment supersedes it rather than contradicting a rule nobody wrote.
 
-## Known unresolved seam, carried and not closed
+## Known unresolved seams, carried and not closed
 
-`RECONCILIATION_SPEC.md §6.2`'s `widen_temporal_window(days)` takes a numeric
-argument while `DECISION_BRIEF.md §L.1` rule 2 forbids a numeric field in any LLM
-output schema. `R3` is `§H` tier H1 and unbuilt, and `§6.2` also leaves *whether
-`R3` may propose the probe* open (spec 1.4.19, M33). `packages/probe` records the
-tension; this package neither resolves it nor reaches it, since it authors no
-proposal source.
+**Three of `§6.2`'s five probes have no committed source.** Spec 1.4.22 (M36)
+ratified one for `fetch_settlement_recon` — `bench/<split>/recon_report.jsonl` —
+and **no document names one for `fetch_order`, `fetch_payment` or
+`fetch_refund`**: `DATA_MODEL.md §22.1`'s `D10`/`D11` describe endpoints rather
+than an artifact, and `§12` says the probe reads the PG's own report *"rather than
+the observation set"*. `src/probe/surface.ts` therefore **refuses** those three by
+naming the gap, and the available-probe context offers only what it can serve.
+That is a property of today's committed surface, **not** of
+`PREREGISTRATION.md §7`'s frozen policy, which ranks all four and is unchanged —
+its second, third and fourth entries are inert here for the same reason `§4.1`'s
+`C8` is inert: declared, reported, and not deleted.
+
+**`M31`'s date-scoping field stays open.** `§6.2`'s signature takes a `date`; the
+dispatch carries it into the `PROBE` event's `inputs_hash` and **never reads it**,
+because `settlement_id` is the artifact's only query key.
+
+**`§T7`'s numeric `days` bound stays unspecified.** Spec 1.4.25 (M40) settled that
+`R3` may not propose `widen_temporal_window` — `§L.1` rule 2 being unchanged and
+unweakened — which makes the bound unreachable through `R3` rather than supplying
+it. The executor's enum is still closed at five.
 
 ## Layout
 
