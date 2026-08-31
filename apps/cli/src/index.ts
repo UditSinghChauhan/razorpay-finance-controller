@@ -19,7 +19,10 @@
  */
 
 export { dispatch, type CliInvocation } from "./cli.js";
-export { parseArgs, boolFlag, stringFlag, requireFlag, type FlagSpec, type FlagSpecs, type ParsedArgs } from "./args.js";
+export {
+  parseArgs, boolFlag, stringFlag, requireFlag, parseSeedList, requireSeeds,
+  type FlagSpec, type FlagSpecs, type ParsedArgs,
+} from "./args.js";
 export { GLOBAL_FLAGS, resolveConfig, type CliConfig } from "./config.js";
 export { CliError, UsageError, UnavailableStageError, EXIT, type ExitCode } from "./errors.js";
 export {

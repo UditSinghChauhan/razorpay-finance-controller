@@ -1,6 +1,6 @@
-import { familiesFor, generateFamily, blockOf, type Split } from "@assay/generator";
+import { blockOf, buildDataset, mergeReconReports, type GeneratedDataset, type Split } from "@assay/generator";
 
-import { requireFlag, stringFlag } from "../args.js";
+import { requireFlag, requireSeeds, stringFlag } from "../args.js";
 import { UsageError } from "../errors.js";
 import { encodeJsonl } from "../artifacts/jsonl.js";
 import { join } from "../fs/io.js";
@@ -11,32 +11,46 @@ import type { Command, CommandContext } from "./types.js";
  *
  * `packages/generator`'s header states the split this command is the other half
  * of: *"**This package writes no file.** `assay generate` belongs to
- * `apps/cli`."* So the simulation, the ground truth, the degradation layer and
- * every frozen count are `packages/generator`'s, and the only things below are
- * argument handling, serialization and the write.
+ * `apps/cli`."* So the simulation, the ground truth, the degradation layer, the
+ * frozen counts **and the aggregation** are `packages/generator`'s, and the only
+ * things below are argument handling, serialization and the write.
+ *
+ * **The dataset unit is `(split, seed)`, ratified at spec 1.4.27
+ * (`DATA_MODEL.md §22.2` M42).** `PREREGISTRATION.md §4.1` has defined a dataset
+ * that way since benchmark v1.0.1 and `EVALUATION_SPEC.md §2` scores that way;
+ * **family is a composition dimension and never a file dimension**, so a seed's
+ * families are concatenated into one set of artifacts rather than written per
+ * family. `buildDataset` performs that concatenation — F01..F10 ascending, each
+ * family's own row order preserved, `source_line` re-based — because
+ * `ARCHITECTURE.md §3` bars this package from performing an `S0` transform and
+ * `RECONCILIATION_SPEC.md §2` step 5 makes provenance stamping `S0`'s. Nothing
+ * about the arrangement is decided here.
+ *
+ * ```
+ *   <out>/<split>/<seed>/observations.jsonl      dataset artifacts, (split, seed)
+ *   <out>/<split>/<seed>/untrusted_text.jsonl
+ *   <out>/<split>/<seed>/ground_truth.jsonl
+ *   <out>/<split>/recon_report.jsonl             §6.2 probe surface, SPLIT-scoped
+ * ```
  *
  * **`--split test` is refused.** `PREREGISTRATION.md §6.1` holds the test split
  * until the seal and `§9` sequences its generation *after* the seal tag; `AL7`
  * burns a seed on any breach. Whether the seal tag exists is a fact about the
  * repository that this process cannot establish, and a command that guessed
  * would guess in the direction that costs a seed. It therefore fails closed and
- * names the procedure instead.
+ * names the procedure instead. **Spec 1.4.27 does not lift this** — it settles
+ * the artifact unit, not the sequence.
  *
- * **The `§6.2` probe surface is written here and decided elsewhere.**
+ * **The `§6.2` probe surface is written once per split and decided elsewhere.**
  * `ARCHITECTURE.md §3` assigns *"the PG-side recon report `§6.2`'s probe reads
- * (spec 1.4.22)"* to `packages/generator`, and `GeneratedFamily.recon_report`
- * now carries the rows — *"data and not bytes"*, because that package *"writes
- * no file"* and `§3` gives this one all filesystem I/O. Nothing about the rows
- * is decided below. Membership is `§6.2`'s (*"one row per `ReconLine` the
- * simulation produced"*, including the unsettled ones, derived at spec 1.4.24),
- * and the order is `entity_id` ascending, **ratified** at spec 1.4.24
- * (`DATA_MODEL.md §22.2` M38) — so the rows arrive sorted and frozen and are
- * **not** re-sorted here: `artifacts/jsonl.ts` states the rule this command
- * obeys, that *"the ordering that matters is the ordering the producing package
- * chose"*. Deriving the rows here was never available anyway: the artifact's
- * defining property is that `PREREGISTRATION.md §4.2`'s `F05` withholds a
- * constituent from the observation set but **not** from the report, which is
- * simulation state `apps/cli` does not hold.
+ * (spec 1.4.22)"* to `packages/generator`, and M36 scopes it to the split. M42
+ * leaves it exactly there: it is *"never an `Observation`, and never ingested"*
+ * and `settlement_id`, its only query key, is unique across every family and
+ * seed — a lookup table has nothing to partition. `mergeReconReports` orders the
+ * merged rows `entity_id` ascending, which is M38's order holding over the file
+ * it was always for, and this command **re-orders nothing**:
+ * `artifacts/jsonl.ts` states the rule it obeys, that *"the ordering that matters
+ * is the ordering the producing package chose"*.
  */
 
 const OBSERVATIONS = "observations.jsonl";
@@ -57,19 +71,13 @@ function readSplit(raw: string): Split {
   throw new UsageError(`--split must be train or dev; received ${JSON.stringify(raw)}.`);
 }
 
-function readSeed(raw: string): number {
-  const seed = Number(raw);
-  if (!Number.isInteger(seed) || seed <= 0) {
-    throw new UsageError(`--seed must be a positive integer; received ${JSON.stringify(raw)}.`);
-  }
-  return seed;
-}
-
-async function run(context: CommandContext): Promise<void> {
-  const split = readSplit(requireFlag(context.args, "split"));
-  const seed = readSeed(requireFlag(context.args, "seed"));
-  const outRoot = stringFlag(context.args, "out") ?? "bench";
-
+/**
+ * `§6.1`'s split table is the sole authority on which seeds exist and where.
+ *
+ * Checked here rather than in the parser for the reason `args.ts` gives: a parser
+ * that also validated would be a second place the frozen table is interpreted.
+ */
+function checkSeed(seed: number, split: Split): void {
   const block = blockOf(seed);
   if (block === null) {
     throw new UsageError(
@@ -83,38 +91,51 @@ async function run(context: CommandContext): Promise<void> {
         `${split}. The split table is frozen and is not overridden from the command line.`,
     );
   }
+}
 
-  const dir = join(join(outRoot, split), String(seed));
+async function run(context: CommandContext): Promise<void> {
+  const split = readSplit(requireFlag(context.args, "split"));
+  const seeds = requireSeeds(context.args);
+  const outRoot = stringFlag(context.args, "out") ?? "bench";
 
-  for (const family of familiesFor(seed)) {
+  for (const seed of seeds) checkSeed(seed, split);
+
+  const splitDir = join(outRoot, split);
+  const datasets: GeneratedDataset[] = [];
+
+  for (const seed of seeds) {
     // `allow_declared_seed` is passed because this is the caller
     // packages/generator names for it: "a caller that genuinely means to build a
     // split — apps/cli's `assay generate` at seal time — passes this explicitly".
-    const generated = generateFamily(family, seed, { allow_declared_seed: true });
-    const familyDir = join(dir, family);
+    const dataset = buildDataset(seed, { allow_declared_seed: true });
+    datasets.push(dataset);
 
-    context.sink.write(join(familyDir, OBSERVATIONS), encodeJsonl(generated.observations));
-    context.sink.write(join(familyDir, UNTRUSTED_TEXT), encodeJsonl(generated.untrusted_text));
-    context.sink.write(join(familyDir, GROUND_TRUTH), encodeJsonl([generated.ground_truth]));
-    // `RECONCILIATION_SPEC.md §6.2`'s probe surface, under the same familyDir as
-    // the other three and through the same `encodeJsonl`. Split-independent by
-    // construction: `split` is read once, above, to locate the directory and to
-    // check §6.1's frozen table, and no artifact below is conditioned on it.
-    context.sink.write(join(familyDir, RECON_REPORT), encodeJsonl(generated.recon_report));
+    const seedDir = join(splitDir, String(seed));
+    context.sink.write(join(seedDir, OBSERVATIONS), encodeJsonl(dataset.observations));
+    context.sink.write(join(seedDir, UNTRUSTED_TEXT), encodeJsonl(dataset.untrusted_text));
+    context.sink.write(join(seedDir, GROUND_TRUTH), encodeJsonl(dataset.ground_truth));
 
     context.out(
-      `${family} seed ${String(seed)}  ${String(generated.observations.length)} observations, ` +
-        `${String(generated.untrusted_text.length)} quarantined text rows, ` +
-        `${String(generated.recon_report.length)} recon report rows`,
+      `${split} seed ${String(seed)}  ${dataset.families.join(",")}  ` +
+        `${String(dataset.observations.length)} observations, ` +
+        `${String(dataset.untrusted_text.length)} quarantined text rows, ` +
+        `${String(dataset.ground_truth.length)} ground-truth records`,
     );
   }
+
+  // Once per split, from every seed this invocation generated. §9 step 2 covers
+  // a split in one command, which is why one file can hold the whole surface.
+  const report = mergeReconReports(datasets);
+  context.sink.write(join(splitDir, RECON_REPORT), encodeJsonl(report));
+  context.out(`${split} recon_report  ${String(report.length)} rows (split-scoped, M36/M42)`);
 }
 
 export const generateCommand: Command = {
   name: "generate",
-  summary: "Run the forward simulation for one declared seed and write its artifacts.",
+  summary: "Run the forward simulation for the declared seeds and write their artifacts.",
   flags: {
-    seed: { kind: "string", describe: "A seed declared in PREREGISTRATION.md §6.1." },
+    seeds: { kind: "string", describe: "Declared seeds: \"2000-2004\" or \"9000-9004,9100-9104\"." },
+    seed: { kind: "string", describe: "One declared seed; the one-element case of --seeds." },
     split: { kind: "string", describe: "train | dev. test is held until the seal (§6.1)." },
     out: { kind: "string", describe: "Output root. Default: bench" },
   },

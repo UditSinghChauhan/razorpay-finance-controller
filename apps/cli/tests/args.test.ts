@@ -5,7 +5,9 @@ import {
   UsageError,
   boolFlag,
   parseArgs,
+  parseSeedList,
   requireFlag,
+  requireSeeds,
   resolveConfig,
   stringFlag,
   type FlagSpecs,
@@ -105,5 +107,59 @@ describe("resolveConfig — .env.example's surface", () => {
     expect(() =>
       resolveConfig(parseArgs(["bench", "--strict-replay", "--no-strict-replay"], SPECS), empty),
     ).toThrow(UsageError);
+  });
+});
+
+describe("--seeds — PREREGISTRATION.md §9 step 2's own grammar (spec 1.4.27)", () => {
+  it("reads §9 step 2's literal argument", () => {
+    // The grammar is the frozen text's, not an invention: §9 writes
+    // "9000-9004,9100-9104" and EVALUATION_SPEC.md §7 writes "2000-2004".
+    expect(parseSeedList("9000-9004,9100-9104")).toEqual([
+      9000, 9001, 9002, 9003, 9004, 9100, 9101, 9102, 9103, 9104,
+    ]);
+    expect(parseSeedList("2000-2004")).toEqual([2000, 2001, 2002, 2003, 2004]);
+  });
+
+  it("reads a single seed and a mixed list", () => {
+    expect(parseSeedList("2000")).toEqual([2000]);
+    expect(parseSeedList("2000,2003-2004")).toEqual([2000, 2003, 2004]);
+  });
+
+  it("returns seeds ascending whatever order they were written in", () => {
+    // The dataset unit is (split, seed) and each is generated once; the order
+    // the operator typed carries no meaning and must not reach an artifact.
+    expect(parseSeedList("2004,2000")).toEqual([2000, 2004]);
+  });
+
+  it("refuses a repeat rather than collapsing it", () => {
+    // A repeated seed would generate one dataset twice and quietly overwrite it.
+    expect(() => parseSeedList("2000,2000")).toThrow(/more than once/);
+    expect(() => parseSeedList("2000-2002,2001")).toThrow(/more than once/);
+  });
+
+  it("refuses a backwards range, an empty item and a non-integer", () => {
+    expect(() => parseSeedList("2004-2000")).toThrow(/backwards/);
+    expect(() => parseSeedList("2000,,2001")).toThrow(/empty item/);
+    expect(() => parseSeedList("two-thousand")).toThrow(/not a seed or a lo-hi range/);
+    expect(() => parseSeedList("")).toThrow();
+  });
+
+  it("checks NO membership — §6.1's table is the sole authority", () => {
+    // A parser that also validated would be a second place the frozen split
+    // table is interpreted. The commands check membership through `blockOf`.
+    expect(parseSeedList("4242")).toEqual([4242]);
+  });
+
+  it("takes --seeds or --seed, and refuses both at once", () => {
+    const specs = {
+      seeds: { kind: "string", describe: "" },
+      seed: { kind: "string", describe: "" },
+    } as const;
+    expect(requireSeeds(parseArgs(["x", "--seeds", "2000-2001"], specs))).toEqual([2000, 2001]);
+    expect(requireSeeds(parseArgs(["x", "--seed", "2000"], specs))).toEqual([2000]);
+    expect(() => requireSeeds(parseArgs(["x"], specs))).toThrow(/--seeds is required/);
+    expect(() =>
+      requireSeeds(parseArgs(["x", "--seeds", "2000", "--seed", "2001"], specs)),
+    ).toThrow(/name the same thing/);
   });
 });

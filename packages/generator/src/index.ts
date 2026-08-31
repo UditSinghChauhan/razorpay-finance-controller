@@ -67,6 +67,16 @@ export {
   SEED_BLOCKS, blockOf, familiesFor, isDeclaredSeed,
 } from "./seeds.js";
 
+/**
+ * The `(split, seed)` dataset — the committed artifact unit at spec 1.4.27
+ * (`DATA_MODEL.md §22.2` M42). `apps/cli` writes the rows to
+ * `bench/<split>/<seed>/`; the split-scoped probe surface is merged through
+ * `mergeReconReports` and written once, at `bench/<split>/recon_report.jsonl`.
+ */
+export {
+  type GeneratedDataset, aggregateFamilies, buildDataset, mergeReconReports,
+} from "./dataset.js";
+
 export {
   type BenchmarkManifest, type BenchmarkScenario, type ManifestInputs,
   benchmarkScenarios, buildManifest,

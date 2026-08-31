@@ -179,5 +179,18 @@ export const LEGACY_MAX_UNRESOLVED_ABS_PAISE = 5_000_000;
  * **Nothing below moves with it**, and neither does `metric-list.ts`.
  * `BENCHMARK_VERSION` and `GT_VERSION` are deliberately not restated here, as
  * this module's header says; they live in `packages/generator/src/frozen.ts`.
+ *
+ *   - **1.4.27 (M42, M43)** — M43 names `apps/cli` the executor of
+ *     `PREREGISTRATION.md §5.3`'s gates and keeps `gates/consistency-gate.ts`
+ *     **here**, unchanged and still holding *"no logic other than the differential
+ *     test"* (`DECISION_BRIEF.md §L.1` rule 3). What is new is a **caller**, not a
+ *     capability: `apps/cli` now supplies the pairs that module has always required,
+ *     and `gates/sample.ts` draws them. **The gate never receives ground truth** and
+ *     gains no parameter for it. M42 is an artifact-layout ratification and reaches
+ *     no metric. **No metric definition changes, none is added and none is removed**
+ *     — `metric-list.ts` stays at 28 and keeps its numbering, and
+ *     `oracle_gate.json` is a build product rather than a metric.
+ *
+ * **Nothing below moves with it**, and neither does `metric-list.ts`.
  */
-export const SPEC_VERSION = "1.4.26";
+export const SPEC_VERSION = "1.4.27";
