@@ -46,6 +46,10 @@
  */
 
 import type { ConstraintId, Observation } from "@assay/domain";
+
+// `§7`'s R, transcribed once in `frozen.ts` (spec 1.4.28, M44). Defined from
+// it rather than restated, so the declared size and the draw cannot drift.
+import { CONSISTENCY_SAMPLE_SIZE } from "../frozen.js";
 import {
   evaluate,
   isMember,
@@ -79,7 +83,7 @@ import {
  * gate does not draw the sample, so it cannot make one the right size; what it
  * can do is refuse to let a short run be reported as a full one.
  */
-export const DECLARED_SAMPLE_SIZE = 20_000;
+export const DECLARED_SAMPLE_SIZE = CONSISTENCY_SAMPLE_SIZE;
 
 /**
  * One `(target, member-set)` pair, stated in observations.

@@ -1,4 +1,4 @@
-import { drawPairs, consistencyGate } from "@assay/eval";
+import { CONSISTENCY_DRAW_SEED, consistencyGate, drawPairs } from "@assay/eval";
 import { blockOf, SPEC_VERSION, type Split } from "@assay/generator";
 import { completenessGate, labelAll, oracleContext } from "@assay/oracle";
 
@@ -58,13 +58,21 @@ import type { Command, CommandContext } from "./types.js";
  * `artifacts/gate.ts` drops every per-target record for that split and this
  * command prints counts.
  *
- * **The differential draw's seed is an operator input.** `§7` freezes
- * `R = 20,000` and freezes no sampler and no seed; spec 1.4.27 resolved neither
- * and recorded the gap as `§10` V24. Deriving one from the dataset seed would
- * have been a choice made silently because a candidate happened to be
- * deterministic. So `--consistency-seed` is **required on dev** and the command
- * fails closed without it, rather than inventing the parameter this repository
- * declined to freeze.
+ * **The differential draw is frozen, and this command supplies no part of it.**
+ * Spec 1.4.27 made `--consistency-seed` **required on dev** because `§7` froze
+ * `R` and nothing else; spec 1.4.28 (`DATA_MODEL.md §22.2` M44) freezes the whole
+ * draw into `§7` — sampler and seed together, `CONSISTENCY_DRAW_SEED = 417203` —
+ * so an official run needs no flag and takes none of its parameters from the
+ * command line. `AL3` binds them.
+ *
+ * **The override survives, and it is non-authoritative.** `--consistency-seed`
+ * now overrides the frozen seed **for local exploration only**: it is refused
+ * under `--sealed` and refused on the test split, it marks the artifact
+ * `authoritative: false`, and `oracle_gate.json` records both the seed used and
+ * the frozen seed it departed from. `AL4` lets a developer inspect DEV *"without
+ * limit"*, so exploring other draws is legitimate; what `AL3` forbids is choosing
+ * **which run counts** after seeing it, and an artifact that cannot pass itself
+ * off as official is what keeps those two apart.
  */
 
 const OBSERVATIONS = "observations.jsonl";
@@ -119,19 +127,31 @@ async function run(context: CommandContext): Promise<void> {
 
   for (const seed of seeds) checkSeed(seed, split);
 
-  if (runsConsistencyGate(split) && drawSeedRaw === null) {
+  // AL3 binds §7's draw from spec 1.4.28 (M44). An override is non-authoritative
+  // and may never reach a sealed or official run: --sealed is the flag §9 step 7
+  // uses for a scored run, and the test split has no consistency gate at all.
+  if (drawSeedRaw !== null && context.config.sealed) {
     throw new UsageError(
-      `--consistency-seed is required on the dev split. PREREGISTRATION.md §5.3 makes the ` +
-        `R = 20,000 differential test a hard build gate, and §7 freezes R while freezing NO ` +
-        `sampler and NO seed (§10 V24, spec 1.4.27). Deriving one from the dataset seed would ` +
-        `be a choice made silently because a candidate happened to be deterministic, so this ` +
-        `command fails closed instead. Supply a seed; it is recorded in oracle_gate.json.`,
+      `--consistency-seed is refused under --sealed. PREREGISTRATION.md §7 freezes the §5.3 ` +
+        `draw at CONSISTENCY_DRAW_SEED = ${String(CONSISTENCY_DRAW_SEED)} and AL3 binds it ` +
+        `(spec 1.4.28, register row M44); the override exists for local exploration only and ` +
+        `is non-authoritative. §L.4 forbids changing a §7 parameter on the basis of an ` +
+        `observed result.`,
     );
   }
-  const drawSeed = drawSeedRaw === null ? null : Number(drawSeedRaw);
-  if (drawSeed !== null && (!Number.isSafeInteger(drawSeed) || drawSeed <= 0)) {
+  if (drawSeedRaw !== null && !runsConsistencyGate(split)) {
+    throw new UsageError(
+      `--consistency-seed is meaningless on the ${split} split: PREREGISTRATION.md §5.3 draws ` +
+        `the differential sample from the dev split, so no consistency gate runs here.`,
+    );
+  }
+  const override = drawSeedRaw === null ? null : Number(drawSeedRaw);
+  if (override !== null && (!Number.isSafeInteger(override) || override <= 0)) {
     throw new UsageError(`--consistency-seed must be a positive integer.`);
   }
+  // §7's frozen seed unless a non-authoritative override was given.
+  const drawSeed = override ?? CONSISTENCY_DRAW_SEED;
+  const authoritative = override === null;
 
   const policy = { sealed: context.config.sealed };
   const failures: string[] = [];
@@ -161,7 +181,7 @@ async function run(context: CommandContext): Promise<void> {
     );
 
     let consistency: ConsistencyReport | null = null;
-    if (runsConsistencyGate(split) && drawSeed !== null) {
+    if (runsConsistencyGate(split)) {
       const pairs = drawPairs(observations, drawSeed);
       const result = consistencyGate(observations, pairs);
       consistency = Object.freeze({
@@ -169,6 +189,10 @@ async function run(context: CommandContext): Promise<void> {
         sample_size: result.sample_size,
         meets_declared_sample_size: result.meets_declared_sample_size,
         draw_seed: drawSeed,
+        // §7's value, recorded whether or not it was the one used, so a reader
+        // of the artifact can see a departure without holding the spec.
+        frozen_draw_seed: CONSISTENCY_DRAW_SEED,
+        authoritative,
         by_clause: result.by_clause,
         divergences: result.divergences,
         admissibility_divergences: result.admissibility_divergences,
@@ -217,6 +241,7 @@ async function run(context: CommandContext): Promise<void> {
       context.out(
         `  consistency       ${consistency.passed ? "PASS" : "FAIL"}  ` +
           `${String(consistency.sample_size)} pairs at draw seed ${String(consistency.draw_seed)}` +
+          `${consistency.authoritative ? " (§7 frozen)" : " (OVERRIDE — NOT AUTHORITATIVE)"}` +
           `${consistency.meets_declared_sample_size ? "" : " (BELOW declared R)"}`,
       );
     }
@@ -244,7 +269,9 @@ export const oracleCommand: Command = {
     bench: { kind: "string", describe: "Benchmark root. Default: bench" },
     "consistency-seed": {
       kind: "string",
-      describe: "Seed for the §5.3 differential draw. Required on dev; NOT frozen (§10 V24).",
+      describe:
+        "EXPLORATORY override of §7's frozen §5.3 draw seed. Local use only; refused " +
+        "under --sealed, and the gate artifact is marked non-authoritative.",
     },
   },
   run,

@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { CONSISTENCY_DRAW_SEED } from "@assay/eval";
 import { BENCHMARK_VERSION, TARGET_RECORD_COUNT, familiesFor } from "@assay/generator";
 import { afterAll, describe, expect, it } from "vitest";
 
@@ -166,14 +167,14 @@ describe("M42 — one BenchmarkManifest per (split, seed)", () => {
     expect(total).toBeLessThanOrEqual(20_000);
   });
 
-  it("reads benchmark_version 1.0.6", async () => {
+  it("reads benchmark_version 1.0.7", async () => {
     const root = splitRoot();
     const result = await run(sealable(root, 2000));
     const manifest = JSON.parse(
       result.sink.files.get(join(join(join(root, "dev"), "2000"), "benchmark_manifest.json")) ?? "{}",
     ) as { benchmark_version: string };
     expect(manifest.benchmark_version).toBe(BENCHMARK_VERSION);
-    expect(manifest.benchmark_version).toBe("1.0.6");
+    expect(manifest.benchmark_version).toBe("1.0.7");
   });
 
   it("gives every manifest of one split the SAME recon_report_sha256", async () => {
@@ -203,6 +204,86 @@ describe("M42 — one BenchmarkManifest per (split, seed)", () => {
     expect(two["recon_report_sha256"]).toBe(expected);
     // ...while the dataset digests differ, because the datasets do.
     expect(two["observations_sha256"]).not.toBe(one["observations_sha256"]);
+  });
+});
+
+describe("M44 — §7's frozen consistency draw, and its non-authoritative override", () => {
+  it("uses §7's frozen seed on an official dev run and marks it authoritative", async () => {
+    const root = tempDir();
+    emptyDataset(root, "dev", 2000);
+    const result = await run(["oracle", "--split", "dev", "--seeds", "2000", "--bench", root]);
+    expect(result.code).toBe(EXIT.OK);
+
+    const gate = JSON.parse(
+      result.sink.files.get(join(join(join(root, "dev"), "2000"), "oracle_gate.json")) ?? "{}",
+    ) as { consistency: { draw_seed: number; frozen_draw_seed: number; authoritative: boolean } };
+    expect(gate.consistency.draw_seed).toBe(CONSISTENCY_DRAW_SEED);
+    expect(gate.consistency.frozen_draw_seed).toBe(CONSISTENCY_DRAW_SEED);
+    expect(gate.consistency.authoritative).toBe(true);
+    expect(result.out).toContain("§7 frozen");
+  });
+
+  it("records the frozen seed beside an override, and marks the run NOT authoritative", async () => {
+    // AL4 lets a developer inspect DEV without limit, so exploring another draw
+    // is legitimate. What AL3 forbids is choosing WHICH run counts after seeing
+    // it -- so an overridden artifact must not be able to pass itself off.
+    const root = tempDir();
+    emptyDataset(root, "dev", 2000);
+    const result = await run([
+      "oracle", "--split", "dev", "--seeds", "2000", "--bench", root, "--consistency-seed", "99",
+    ]);
+    expect(result.code).toBe(EXIT.OK);
+
+    const gate = JSON.parse(
+      result.sink.files.get(join(join(join(root, "dev"), "2000"), "oracle_gate.json")) ?? "{}",
+    ) as { consistency: { draw_seed: number; frozen_draw_seed: number; authoritative: boolean } };
+    expect(gate.consistency.draw_seed).toBe(99);
+    expect(gate.consistency.frozen_draw_seed).toBe(CONSISTENCY_DRAW_SEED);
+    expect(gate.consistency.authoritative).toBe(false);
+    expect(result.out).toContain("NOT AUTHORITATIVE");
+  });
+
+  it("REFUSES an override under --sealed — an official run takes §7's seed", async () => {
+    const root = tempDir();
+    emptyDataset(root, "dev", 2000);
+    const result = await run([
+      "oracle", "--split", "dev", "--seeds", "2000", "--bench", root,
+      "--consistency-seed", "99", "--sealed",
+    ]);
+    expect(result.code).toBe(EXIT.USAGE);
+    expect(result.err).toContain("refused under --sealed");
+    expect(result.err).toContain(String(CONSISTENCY_DRAW_SEED));
+    expect(result.sink.files.size).toBe(0);
+  });
+
+  it("refuses an override on a split whose gate does not run", async () => {
+    const root = tempDir();
+    emptyDataset(root, "test", 9000);
+    const result = await run([
+      "oracle", "--split", "test", "--seeds", "9000", "--bench", root, "--consistency-seed", "99",
+    ]);
+    expect(result.code).toBe(EXIT.USAGE);
+    expect(result.err).toContain("dev split");
+    expect(result.sink.files.size).toBe(0);
+  });
+
+  it("gives every dev dataset the same frozen seed", async () => {
+    // §7: one seed across all DEV datasets. The samples differ because the pools
+    // do; the seed never does.
+    const root = tempDir();
+    for (const seed of [2000, 2001]) emptyDataset(root, "dev", seed);
+    const result = await run(["oracle", "--split", "dev", "--seeds", "2000-2001", "--bench", root]);
+    expect(result.code).toBe(EXIT.OK);
+    for (const seed of [2000, 2001]) {
+      const gate = JSON.parse(
+        result.sink.files.get(
+          join(join(join(root, "dev"), String(seed)), "oracle_gate.json"),
+        ) ?? "{}",
+      ) as { consistency: { draw_seed: number } };
+      // Not the dataset seed, and the same for both: M44's central property.
+      expect(gate.consistency.draw_seed).toBe(CONSISTENCY_DRAW_SEED);
+      expect(gate.consistency.draw_seed).not.toBe(seed);
+    }
   });
 });
 
