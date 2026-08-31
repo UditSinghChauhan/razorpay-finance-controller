@@ -1,6 +1,16 @@
 # ARCHITECTURE — ASSAY
 
-**Spec version:** 1.4.27 · **Date:** 2026-08-31
+**Spec version:** 1.4.28 · **Date:** 2026-08-31
+
+**At spec 1.4.28** `§7.3`'s consistency gate records that its **sampler and seed**
+are frozen at `PREREGISTRATION.md §7` (register row M44) — `R = 20,000` unchanged,
+per `(dev, seed)` dataset, `CONSISTENCY_DRAW_SEED = 417203` — closing the pair
+`§10`'s note called *"unspecified"*. **No trust boundary, data flow, interface,
+provider, role, package responsibility, probe enum or gate definition changes**;
+`§7.3`'s two gates keep their scope and their criterion, and `§11`'s vendored PRNG
+is reached through `Prng.fromSeed`, never through the generator's substream
+namespace. Benchmark v1.0.6 → **v1.0.7**. See `DECISION_BRIEF.md §A.35`,
+`PREREGISTRATION.md §10` **V25**.
 
 **At spec 1.4.27** `§10`'s pipeline records the committed artifact paths — dataset
 artifacts at `bench/<split>/<seed>/`, `recon_report.jsonl` **unchanged** at
@@ -670,6 +680,22 @@ constraint by constraint. Any disagreement fails the build and names the
 constraint. This is a differential test between two implementations, and it is
 what makes "the oracle is independent" a checked property rather than a claim.
 
+**The draw is frozen, sampler and seed together, at spec 1.4.28**
+(`PREREGISTRATION.md §7`, register row `DATA_MODEL.md §22.2` M44). `R` stays
+**20,000** and is drawn **per `(dev, seed)` dataset**;
+`CONSISTENCY_DRAW_SEED = 417203` is shared by every dev dataset; the member-set
+size is uniformly `1..4` drawn before the member indices; the target pool is every
+target-kind observation and the member pool every member-eligible one
+(`DATA_MODEL.md §11.1`), never the target's own allocation, since this section
+requires inadmissible pairs; `anchored` and `allocated` are always empty, a
+sampled pair being a test input rather than a real component; and exactly one PRNG
+word is consumed per index draw, so the stream position never depends on the
+values it produced. `AL3` binds all of it and it is unadjustable on TRAIN and DEV:
+a gate's pass criterion is not one of the `SE1`–`SE5` weights `PREREGISTRATION.md
+§7` permits adjusting. **A checked property whose sample the author picks after
+seeing it is not checked**, which is why the seed was fixed before any dev gate
+result existed.
+
 The two gates catch different faults: completeness catches a constraint set that
 is *too strict* (excludes the truth); consistency catches the engine and oracle
 *diverging* from the shared declaration. Neither alone is sufficient.
@@ -847,9 +873,21 @@ eval's. Ground truth reaches the completeness gate through zone `GENERATOR_TRUST
 alone and is withdrawn under `--sealed` by `AL5`; `recon_report.jsonl` reaches
 **neither** gate (`AL8`); and the consistency gate **never** receives ground truth.
 On the test split the gate writes aggregate counts only, `AL4` and `AL7` barring any
-record-level output. The `R = 20,000` draw's sampler and seed remain **unspecified**
-— `PREREGISTRATION.md §10` V24 — so the seed is an operator input and the command
-fails closed without one.
+record-level output.
+
+**The `R = 20,000` draw's sampler and seed are frozen from spec 1.4.28**
+(`DATA_MODEL.md §22.2` M44): `PREREGISTRATION.md §7` carries both — `R` unchanged,
+one independent draw per `(dev, seed)` dataset, `CONSISTENCY_DRAW_SEED = 417203`,
+the `1..4` member-set bound, the two pools, the empty `anchored`/`allocated`, the
+draw order and one PRNG word per index — and `AL3` binds them. They were fixed
+together because a seed selects a path through a stream and selects **pairs** only
+with the procedure that consumes it, so a frozen seed over a free sampler would
+fix nothing. §11's vendored PRNG is reached through `Prng.fromSeed`, never through
+the generator's `substream(seed, family, stream)` namespace: that space is one of
+generation **phases** and a gate is not one. The command defaults to the frozen
+seed; an override is non-authoritative and refused on a sealed or official run.
+`PREREGISTRATION.md §10` **V25** discloses what freezing costs — the sample is a
+fixed slice — and closes **V24**.
 
 ## 11. Technology choices and their justifications
 

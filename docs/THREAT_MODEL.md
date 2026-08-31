@@ -1,6 +1,20 @@
 # THREAT_MODEL — ASSAY
 
-**Spec version:** 1.4.27 · **Date:** 2026-08-31
+**Spec version:** 1.4.28 · **Date:** 2026-08-31
+
+**At spec 1.4.28** this document is unchanged apart from the version header. `§T7`'s
+controls, its closed enum of five and its unstated `days` bound are untouched: the
+amendment freezes the `PREREGISTRATION.md §5.3` **consistency draw** (register row
+M44), which is a build gate's sampler and reaches no probe, no agent input and no
+`§T7` surface. Two disclosures belong here nonetheless. **The draw's seed is a
+frozen constant and not a secret** — `CONSISTENCY_DRAW_SEED = 417203` is published
+in `PREREGISTRATION.md §7` — because the gate is a *self-check on ASSAY's own two
+implementations*, not an adversarial test: there is no party for whom knowing the
+sample is an advantage, and `§T5`'s insider cannot reach it, the gate running
+offline inside the generator's trust zone before any agent exists. **And the
+frozen sample bounds the gate's coverage**, which `PREREGISTRATION.md §10` **V25**
+states as a validity threat rather than a security one. See
+`DECISION_BRIEF.md §A.35`.
 
 **At spec 1.4.27** this document is unchanged apart from the version header. `§T7`'s
 controls are untouched and its `bench/<split>/recon_report.jsonl` **does not move** —
