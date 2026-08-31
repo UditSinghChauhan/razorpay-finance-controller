@@ -1,5 +1,6 @@
 import { AGENT_IDS, agentDeclaration, tier0Agents, type Agent, type AgentId } from "@assay/eval";
 
+import { ALL } from "../args.js";
 import { UsageError } from "../errors.js";
 import { a1Agent } from "./a1.js";
 import { a2Agent } from "./a2.js";
@@ -106,6 +107,52 @@ export function readAgentId(raw: string): AgentId {
       `${AGENT_IDS.join(", ")}. Note that §3 spells them in full -- "B0-IDONLY", not "B0" -- ` +
       `because the id is what a metrics.json is filed under (spec 1.4.29, M48).`,
   );
+}
+
+/**
+ * `PREREGISTRATION.md §9` step 7's `--agents all`, and the explicit list form.
+ *
+ * **A convention, not a ratification** — the treatment `args.ts` gives
+ * `--seeds all`, and for the same reason: `§9` step 7 and `EVALUATION_SPEC.md
+ * §7` both write `--agents all`, and **no document states an agent-argument
+ * grammar at all**, ratified or otherwise. A selector had to be designed
+ * regardless, so the only spelling either document uses is the one implemented.
+ *
+ * `all` is {@link TIER0_AGENTS}, not {@link ALL_AGENTS}: `EVALUATION_SPEC.md §2`
+ * loops `for agent in {ASSAY, B0, B2, A1, A2, A3} (+ B1 if built)`, so the sweep
+ * is the Tier-0 set and `B1-GREEDY` joins it by being built rather than by being
+ * named. Selecting `B1-GREEDY` explicitly is still permitted — `§3.1` declares
+ * it, and an explicit request is not the sweep.
+ *
+ * Order follows `AGENT_IDS`, never the order the caller typed: a run set whose
+ * order depended on an argument would make two spellings of one sweep produce
+ * two orderings of one report.
+ *
+ * @throws UsageError on an unknown id, an empty item or a repeat.
+ */
+export function selectAgents(raw: string): readonly Agent[] {
+  if (raw.trim() === ALL) return TIER0_AGENTS;
+
+  const chosen = new Set<AgentId>();
+  for (const item of raw.split(",")) {
+    const trimmed = item.trim();
+    if (trimmed === "") {
+      throw new UsageError(
+        `--agents: empty item in ${JSON.stringify(raw)}. Every item names an agent, or the ` +
+          `whole argument is "all" (PREREGISTRATION.md §9 step 7).`,
+      );
+    }
+    const id = readAgentId(trimmed);
+    if (chosen.has(id)) {
+      throw new UsageError(
+        `--agents: ${id} appears more than once in ${JSON.stringify(raw)}. A repeated agent ` +
+          `would be scored twice into one interval, and EVALUATION_SPEC.md §2 draws its CIs ` +
+          `over seeds rather than over repeats.`,
+      );
+    }
+    chosen.add(id);
+  }
+  return Object.freeze(ALL_AGENTS.filter((agent) => chosen.has(agent.id)));
 }
 
 export { agentDeclaration };

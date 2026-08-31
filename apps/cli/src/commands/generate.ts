@@ -1,4 +1,7 @@
-import { blockOf, buildDataset, mergeReconReports, type GeneratedDataset, type Split } from "@assay/generator";
+import {
+  SEED_BLOCKS, blockOf, buildDataset, mergeReconReports,
+  type GeneratedDataset, type Split,
+} from "@assay/generator";
 
 import { requireFlag, requireSeeds, stringFlag } from "../args.js";
 import { UsageError } from "../errors.js";
@@ -111,6 +114,17 @@ function checkSealAttestation(split: Split, attested: string | null): void {
 }
 
 /**
+ * What `--seeds all` expands to for one split (`§9` step 7's spelling).
+ *
+ * Read from `SEED_BLOCKS` rather than listed, for the same reason `checkSeed`
+ * gives below: `§6.1`'s table is frozen and has one reader. `test` spans two
+ * blocks — `9000-9004` and `9100-9104` — so this is a filter and not a lookup.
+ */
+function declaredSeeds(split: Split): readonly number[] {
+  return SEED_BLOCKS.filter((block) => block.split === split).flatMap((block) => [...block.seeds]);
+}
+
+/**
  * `§6.1`'s split table is the sole authority on which seeds exist and where.
  *
  * Checked here rather than in the parser for the reason `args.ts` gives: a parser
@@ -137,7 +151,7 @@ async function run(context: CommandContext): Promise<void> {
   const attested = stringFlag(context.args, "seal-tag");
   checkSealAttestation(split, attested);
 
-  const seeds = requireSeeds(context.args);
+  const seeds = requireSeeds(context.args, declaredSeeds(split));
   const outRoot = stringFlag(context.args, "out") ?? "bench";
 
   if (attested !== null) {
@@ -186,7 +200,10 @@ export const generateCommand: Command = {
   name: "generate",
   summary: "Run the forward simulation for the declared seeds and write their artifacts.",
   flags: {
-    seeds: { kind: "string", describe: "Declared seeds: \"2000-2004\" or \"9000-9004,9100-9104\"." },
+    seeds: {
+      kind: "string",
+      describe: "Declared seeds: \"2000-2004\", \"9000-9004,9100-9104\", or \"all\" (§9 step 7).",
+    },
     seed: { kind: "string", describe: "One declared seed; the one-element case of --seeds." },
     split: { kind: "string", describe: "train | dev | test. test needs --seal-tag (§6.1, M45)." },
     "seal-tag": {
