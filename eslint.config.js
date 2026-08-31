@@ -55,6 +55,27 @@ const UNTRUSTED_TEXT = [
   "**/schemas/untrusted-text.js",
 ];
 
+/**
+ * Stage `S0` — banned wherever the quarantine is, and for its reason.
+ *
+ * `RECONCILIATION_SPEC.md §2` gives `S0` the output `Observation[]` +
+ * **`UntrustedText[]`**, so the module that performs it *emits* the quarantined
+ * type. `s0-ingest.ts` says what follows: it "must NOT be re-exported from
+ * `src/index.ts`" because "re-exporting it from the package root would make
+ * that ban unenforceable, because the engine legitimately imports the rest of
+ * this package", and it therefore "needs its own subpath export —
+ * `@assay/domain/s0-ingest` — added to that ban group, for exactly the reason
+ * the quarantine has one". This is that group. A root re-export would route
+ * `UntrustedText` around both bans; a subpath keeps `S0` reachable by the
+ * composition root and unreachable by the packages `DATA_MODEL.md §10` forbids
+ * it to.
+ */
+const S0_INGEST = [
+  "@assay/domain/s0-ingest",
+  "**/domain/src/s0-ingest",
+  "**/domain/src/s0-ingest.js",
+];
+
 /** `packages/llm` — the four bounded roles behind one provider interface. */
 const LLM = ["@assay/llm", "@assay/llm/*", "**/packages/llm/**"];
 
@@ -116,6 +137,14 @@ const UNTRUSTED_TEXT_MSG =
   "prompt-injection defence is that the deterministic core *cannot* read " +
   "hostile text, not that it chooses not to (DATA_MODEL.md §10, " +
   "THREAT_MODEL.md §T1). DECISION_BRIEF.md §L.1 rule 3.";
+
+const S0_INGEST_MSG =
+  "This package may not import stage S0 (@assay/domain/s0-ingest). " +
+  "RECONCILIATION_SPEC.md §2 gives S0 the output Observation[] + " +
+  "UntrustedText[], so importing it reaches the quarantined text store by " +
+  "another name — the ban above, evaded. ARCHITECTURE.md §3 puts the read in " +
+  "apps/cli, which passes source records into S0 and hands packages/engine an " +
+  "already-parsed Observation[]; the engine begins at S1 (spec 1.4.18, M32).";
 
 const CLI_NO_NETWORK_MSG =
   "apps/cli reaches no network. DECISION_BRIEF.md §C T0-11 requires the full " +
@@ -221,6 +250,7 @@ export default tseslint.config(
             { group: GENERATOR, message: GENERATOR_MSG },
             { group: ORACLE, message: ORACLE_MSG },
             { group: UNTRUSTED_TEXT, message: UNTRUSTED_TEXT_MSG },
+            { group: S0_INGEST, message: S0_INGEST_MSG },
           ],
         },
       ],
@@ -229,6 +259,7 @@ export default tseslint.config(
         dynamicImportBan("/generator/", GENERATOR_MSG),
         dynamicImportBan("/oracle/", ORACLE_MSG),
         dynamicImportBan("/untrusted-text/", UNTRUSTED_TEXT_MSG),
+        dynamicImportBan("/s0-ingest/", S0_INGEST_MSG),
       ],
     },
   },
@@ -369,6 +400,7 @@ export default tseslint.config(
                 "observations-only reference (PREREGISTRATION.md §5.1, AL8).",
             },
             { group: UNTRUSTED_TEXT, message: UNTRUSTED_TEXT_MSG },
+            { group: S0_INGEST, message: S0_INGEST_MSG },
           ],
         },
       ],
@@ -560,6 +592,13 @@ export default tseslint.config(
               ],
               message: PROTECTED_ARTIFACT_MSG,
             },
+            // Repeated here, not merely declared in the packages/engine block
+            // above. Flat config REPLACES a rule's options when a later block
+            // sets the same rule, and this block matches packages/engine/src/**
+            // — so a `no-restricted-imports` declared only above does not reach
+            // the engine's own source. The `agents/**` block does the same thing
+            // for the same reason (spec 1.4.29). See the note on S0_INGEST.
+            { group: S0_INGEST, message: S0_INGEST_MSG },
           ],
         },
       ],
@@ -623,6 +662,7 @@ export default tseslint.config(
             { group: LLM, message: EVAL_LLM_MSG },
             { group: PROBE, message: EVAL_PROBE_MSG },
             { group: UNTRUSTED_TEXT, message: EVAL_UNTRUSTED_TEXT_MSG },
+            { group: S0_INGEST, message: S0_INGEST_MSG },
           ],
         },
       ],
@@ -632,6 +672,7 @@ export default tseslint.config(
         dynamicImportBan("/llm/", EVAL_LLM_MSG),
         dynamicImportBan("/probe/", EVAL_PROBE_MSG),
         dynamicImportBan("/untrusted-text/", EVAL_UNTRUSTED_TEXT_MSG),
+        dynamicImportBan("/s0-ingest/", S0_INGEST_MSG),
       ],
     },
   },
@@ -669,6 +710,7 @@ export default tseslint.config(
             { group: LLM, message: EVAL_LLM_MSG },
             { group: PROBE, message: EVAL_PROBE_MSG },
             { group: UNTRUSTED_TEXT, message: EVAL_UNTRUSTED_TEXT_MSG },
+            { group: S0_INGEST, message: S0_INGEST_MSG },
             {
               group: GENERATOR,
               message:
@@ -688,6 +730,7 @@ export default tseslint.config(
         dynamicImportBan("/llm/", EVAL_LLM_MSG),
         dynamicImportBan("/probe/", EVAL_PROBE_MSG),
         dynamicImportBan("/untrusted-text/", EVAL_UNTRUSTED_TEXT_MSG),
+        dynamicImportBan("/s0-ingest/", S0_INGEST_MSG),
         dynamicImportBan("/generator/", GENERATOR_MSG),
       ],
     },

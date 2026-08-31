@@ -853,17 +853,44 @@ describe("non-posting events", () => {
   });
 });
 
-describe("the package cannot reach a later phase", () => {
-  // The boundary this suite guards moved when journal.ts landed, and again at
-  // spec 1.4.9 when `ValidatedDecision` was DECLARED here without its write
-  // path. `journalFor` is a legitimate export; `closeGate` and any mutating
-  // write path are not. The `ValidatedDecision` clause is narrowed rather than
-  // dropped: what it was really guarding is that no RUNTIME construction
-  // surface exists, and that is now asserted positively below.
-  it("exports no close-gate and no close-report surface", async () => {
+describe("the package's public surface is exactly T0-6's", () => {
+  // The boundary this suite guards moved when journal.ts landed, again at spec
+  // 1.4.9 when `ValidatedDecision` was DECLARED here without its write path,
+  // and again now that Phase 2 landed `write.ts`, `close-gate.ts` and
+  // `close.ts` and wired them through this barrel. Two clauses below asserted
+  // ABSENCE while those modules were unwritten; §C's T0-6 — "Layer A hash chain
+  // + Layer B double-entry projection + close gate G1-G5" — now makes them
+  // present, so each is restated as the bound that actually governs a package
+  // that HAS them. Neither is dropped and neither is loosened: "no mutating
+  // write path" becomes "EXACTLY ONE, and it is named", which is what
+  // DECISION_BRIEF.md §L.1 rule 4 says, and it fails on a second one where the
+  // old form could only fail on the first.
+  it("exposes the close gate and the close attempt, and no third close path", async () => {
+    // §C T0-6 puts G1-G5 in this package, and RECONCILIATION_SPEC.md §10.4
+    // sequences them into one attempt. `attemptClose` is the only producer of a
+    // `CloseReport`, and it runs the gate first and unconditionally (§10.2), so
+    // a second close entry point is the way that guarantee would be lost.
+    const ledger: Record<string, unknown> = await import("@assay/ledger");
+    const close = Object.keys(ledger)
+      .filter((name) => /close/i.test(name))
+      .sort();
+
+    expect(close).toEqual([
+      "CLOSE_GATE_FINDING_CODES",
+      "CLOSE_GATE_IDS",
+      "attemptClose",
+      "closeGate",
+    ]);
+  });
+
+  it("exports no close-report builder that could bypass the gate", async () => {
+    // DATA_MODEL.md §20: a close report's "existence is a positive assertion
+    // that all five gates passed". A builder reachable without `attemptClose`
+    // would make it an assertion about nothing.
     const ledger: Record<string, unknown> = await import("@assay/ledger");
     for (const name of Object.keys(ledger)) {
-      expect(name).not.toMatch(/closeGate|closeReport/i);
+      expect(name).not.toMatch(/^(make|build|create|emit)Close/i);
+      expect(name).not.toMatch(/closeReport/i);
     }
   });
 
@@ -874,16 +901,40 @@ describe("the package cannot reach a later phase", () => {
     const ledger: Record<string, unknown> = await import("@assay/ledger");
     expect(Object.keys(ledger)).not.toContain("ValidatedDecision");
     for (const name of Object.keys(ledger)) {
-      // Nothing that would let a caller mint one either.
-      expect(name).not.toMatch(/validatedDecision|mintValidated|makeValidated/i);
+      // Nothing that would let a caller mint one either. The verbs are the
+      // assertion: through Phase 1 this read `/validatedDecision/i`, which was
+      // exact while NO export named the type at all, and became wrong the
+      // moment `postValidatedDecision` landed — a function that CONSUMES a
+      // `ValidatedDecision` and cannot produce one, since the brand is a
+      // non-exported unique symbol and the single widening lives in
+      // `packages/engine/src/s5-validate.ts`. Naming the constructor verbs
+      // keeps what the clause was guarding — no runtime construction surface —
+      // and still fails on the helper it was written to catch.
+      expect(name).not.toMatch(/^(mint|make|create|new|build|as)ValidatedDecision/i);
     }
   });
 
-  it("still exposes no mutating write path", async () => {
+  it("exposes EXACTLY ONE mutating write path, and it is postValidatedDecision", async () => {
+    // ARCHITECTURE.md §4 boundary 3: "packages/ledger exposes exactly one
+    // mutating function, and it accepts only a ValidatedDecision ... There is
+    // no other write path." The count is the assertion. `openWriteState` is
+    // excluded by the ^ anchor rather than by an exception: it builds the value
+    // the write threads and mutates nothing.
     const ledger: Record<string, unknown> = await import("@assay/ledger");
-    for (const name of Object.keys(ledger)) {
-      expect(name).not.toMatch(/^(write|persist|save|commit|post)[A-Z]/);
-    }
+    const mutators = Object.keys(ledger)
+      .filter((name) => /^(write|persist|save|commit|post)[A-Z]/.test(name))
+      .sort();
+
+    expect(mutators).toEqual(["postValidatedDecision"]);
+  });
+
+  it("routes persistence through an injected port and opens nothing itself", async () => {
+    // ARCHITECTURE.md §3 gives apps/cli all filesystem I/O, and §8's
+    // better-sqlite3 is in no manifest here. `LedgerStore` is a TYPE, so it
+    // leaves nothing on the runtime namespace: there is no adapter to import.
+    const ledger: Record<string, unknown> = await import("@assay/ledger");
+    expect(Object.keys(ledger)).not.toContain("LedgerStore");
+    expect(Object.keys(ledger)).not.toContain("LedgerCommit");
   });
 
   it("projection.ts, journal.ts, close-gate.ts and close.ts all exist", async () => {

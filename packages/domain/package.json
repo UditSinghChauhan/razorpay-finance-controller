@@ -13,6 +13,10 @@
     "./untrusted-text": {
       "types": "./src/schemas/untrusted-text.ts",
       "default": "./src/schemas/untrusted-text.ts"
+    },
+    "./s0-ingest": {
+      "types": "./src/s0-ingest.ts",
+      "default": "./src/s0-ingest.ts"
     }
   },
   "dependencies": {

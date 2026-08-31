@@ -54,6 +54,29 @@ export {
   type Target,
 } from "./s2-candidates.js";
 
+/**
+ * The `S1` → `S2` seam.
+ *
+ * `S2`'s `Target` and `EvaluationContext` are constructed here from `S1`'s
+ * `AnchorResult` and the observation set it was computed over — the one piece
+ * `apps/cli`'s `run` command recorded as missing: *"`packages/engine` exports
+ * `anchor()`, `generateCandidates()`, `decompose()`, `solve()` and
+ * `validate()`, and NO constructor for `S2`'s `Target` or `EvaluationContext`
+ * from `S1`'s `AnchorResult` … deriving them there would put `S1`/`S2`
+ * semantics in `apps/cli`, which `ARCHITECTURE.md §3` forbids."* It belongs on
+ * this barrel for that reason: the alternative to exporting it is every caller
+ * re-deriving `§3`'s anchor semantics outside the package that owns them.
+ */
+export {
+  buildSeam,
+  IncoherentAnchorStateError,
+  type AnchorResolution,
+  type AnchorResolvedTarget,
+  type AnchorStateIncoherence,
+  type Seam,
+  type SeamInput,
+} from "./s1-s2-seam.js";
+
 export {
   decompose,
   observationValue,
