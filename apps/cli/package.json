@@ -17,6 +17,7 @@
   "dependencies": {
     "@assay/domain": "workspace:*",
     "@assay/engine": "workspace:*",
+    "@assay/eval": "workspace:*",
     "@assay/generator": "workspace:*",
     "@assay/ledger": "workspace:*",
     "@assay/llm": "workspace:*",

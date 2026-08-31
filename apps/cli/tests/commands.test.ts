@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -137,40 +137,124 @@ describe("blocked commands name their owner and their citation", () => {
 });
 
 describe("assay oracle", () => {
-  it("labels an observation set and writes them where it says it did", async () => {
-    const dir = tempDir();
-    const observations = join(dir, "observations.jsonl");
-    // An empty dataset. PREREGISTRATION.md §6.1 forbids generating benchmark
-    // data before the seal, so this suite exercises the wiring and not the
-    // oracle's arithmetic, which packages/oracle's own suite owns.
-    writeFileSync(observations, "", "utf8");
+  /**
+   * An empty `(split, seed)` dataset at M42's paths.
+   *
+   * `PREREGISTRATION.md §6.1` forbids generating benchmark data before the seal,
+   * so this suite exercises the **wiring** and not the oracle's arithmetic or the
+   * gates' verdicts, which `packages/oracle` and `packages/eval` own. Empty files
+   * are not benchmark data.
+   */
+  function dataset(split: string, seed: number): string {
+    const root = tempDir();
+    const dir = join(join(root, split), String(seed));
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "observations.jsonl"), "", "utf8");
+    writeFileSync(join(dir, "ground_truth.jsonl"), "", "utf8");
+    return root;
+  }
 
-    const out = join(dir, "ambiguity_labels.jsonl");
-    const result = await run(["oracle", "--observations", observations, "--out", out]);
+  it("labels a (split, seed) dataset and writes labels and the gate where it says", async () => {
+    const root = dataset("dev", 2000);
+    const result = await run([
+      "oracle", "--split", "dev", "--seeds", "2000",
+      "--bench", root, "--consistency-seed", "7",
+    ]);
     expect(result.code).toBe(EXIT.OK);
-    expect(result.out).toContain("observations        0");
-    expect(result.sink.files.get(out)).toBe("\n");
+    expect(result.out).toContain("observations      0");
+
+    const seedDir = join(join(root, "dev"), "2000");
+    // M42's names, and §9 step 4's own spelling for the labels.
+    expect(result.sink.files.get(join(seedDir, "oracle_labels.jsonl"))).toBe("\n");
+    const gate = result.sink.files.get(join(seedDir, "oracle_gate.json"));
+    expect(gate).toBeDefined();
+    expect(JSON.parse(gate ?? "{}")).toMatchObject({ split: "dev", seed: 2000, passed: true });
   });
 
-  it("reads in zone AGENT, so AL8 keeps the probe surface out of it", async () => {
-    const dir = tempDir();
-    const barred = join(dir, "recon_report.jsonl");
-    writeFileSync(barred, "", "utf8");
+  it("runs the consistency gate on dev and NOT on test (§5.3 draws from dev)", async () => {
+    const dev = dataset("dev", 2000);
+    const onDev = await run([
+      "oracle", "--split", "dev", "--seeds", "2000", "--bench", dev, "--consistency-seed", "7",
+    ]);
+    expect(onDev.code).toBe(EXIT.OK);
+    const devGate = JSON.parse(
+      onDev.sink.files.get(join(join(join(dev, "dev"), "2000"), "oracle_gate.json")) ?? "{}",
+    ) as { consistency: { draw_seed: number } | null };
+    expect(devGate.consistency).not.toBeNull();
+    expect(devGate.consistency?.draw_seed).toBe(7);
 
-    const result = await run(["oracle", "--observations", barred]);
-    expect(result.code).toBe(EXIT.GUARD);
-    expect(result.err).toContain("AL8");
+    const test = dataset("test", 9000);
+    const onTest = await run(["oracle", "--split", "test", "--seeds", "9000", "--bench", test]);
+    expect(onTest.code).toBe(EXIT.OK);
+    expect(onTest.out).toContain("not run");
+    const testGate = JSON.parse(
+      onTest.sink.files.get(join(join(join(test, "test"), "9000"), "oracle_gate.json")) ?? "{}",
+    ) as { consistency: unknown };
+    expect(testGate.consistency).toBeNull();
+  });
+
+  it("fails closed on dev without --consistency-seed, because §7 freezes no seed", async () => {
+    // V24: §7 freezes R = 20,000 and freezes NO sampler and NO seed. Deriving one
+    // from the dataset seed would be a choice made silently; the command refuses.
+    const root = dataset("dev", 2000);
+    const result = await run(["oracle", "--split", "dev", "--seeds", "2000", "--bench", root]);
+    expect(result.code).toBe(EXIT.USAGE);
+    expect(result.err).toContain("V24");
     expect(result.sink.files.size).toBe(0);
   });
 
-  it("refuses ground truth too — the oracle is observations-only", async () => {
-    const dir = tempDir();
-    const barred = join(dir, "ground_truth.jsonl");
-    writeFileSync(barred, "", "utf8");
+  it("needs no consistency seed on test — the gate does not run there", async () => {
+    const root = dataset("test", 9000);
+    const result = await run(["oracle", "--split", "test", "--seeds", "9000", "--bench", root]);
+    expect(result.code).toBe(EXIT.OK);
+  });
 
-    const result = await run(["oracle", "--observations", barred]);
-    expect(result.code).toBe(EXIT.GUARD);
-    expect(result.err).toContain("AL2");
+  it("keeps test-split gate output aggregate only (AL4 / AL7)", async () => {
+    const root = dataset("test", 9000);
+    const result = await run(["oracle", "--split", "test", "--seeds", "9000", "--bench", root]);
+    const raw = result.sink.files.get(join(join(join(root, "test"), "9000"), "oracle_gate.json"));
+    expect(raw).toBeDefined();
+    // No record-level field survives the redaction: a finding naming a target
+    // would be an inspection of a TEST output, which AL7 burns the seed for.
+    expect(raw).not.toContain("target_id");
+    expect(raw).not.toContain("member_obs_ids");
+    expect(raw).toContain("failure_count");
+  });
+
+  it("keeps records on dev, where AL4 permits inspection without limit", async () => {
+    const root = dataset("dev", 2000);
+    const result = await run([
+      "oracle", "--split", "dev", "--seeds", "2000", "--bench", root, "--consistency-seed", "7",
+    ]);
+    const raw = result.sink.files.get(join(join(join(root, "dev"), "2000"), "oracle_gate.json"));
+    expect(raw).toBeDefined();
+    expect(raw).toContain("failures");
+    expect(raw).not.toContain("failure_count");
+  });
+
+  it("refuses a (split, seed) pair the frozen table does not assign", async () => {
+    const root = dataset("dev", 9000);
+    const result = await run(["oracle", "--split", "dev", "--seeds", "9000", "--bench", root]);
+    expect(result.code).toBe(EXIT.USAGE);
+    expect(result.err).toContain("test split");
+    expect(result.sink.files.size).toBe(0);
+  });
+
+  it("reads observations in zone AGENT, so AL8 keeps the probe surface out", async () => {
+    // The dataset path is derived, so the artifact NAME is the guard's subject.
+    // A dataset whose observations file is named recon_report.jsonl cannot be
+    // built through the command's own paths; this asserts the zone directly.
+    const root = tempDir();
+    const dir = join(join(root, "dev"), "2000");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "ground_truth.jsonl"), "", "utf8");
+    // observations.jsonl is absent: the read fails, and the point is that it is
+    // attempted in AGENT, never in a zone that could reach the probe surface.
+    const result = await run([
+      "oracle", "--split", "dev", "--seeds", "2000", "--bench", root, "--consistency-seed", "7",
+    ]);
+    expect(result.code).toBe(EXIT.FAILURE);
+    expect(result.err).toContain("observations.jsonl");
   });
 });
 
@@ -264,17 +348,27 @@ describe("assay seal", () => {
   const ARTIFACTS = [
     "observations.jsonl",
     "ground_truth.jsonl",
-    "ambiguity_labels.jsonl",
+    "oracle_labels.jsonl",
     "recon_report.jsonl",
   ] as const;
 
-  function dataset(): { dir: string; argv: string[] } {
+  const MANIFEST = "benchmark_manifest.json";
+
+  function dataset(gatePasses = true): { dir: string; argv: string[] } {
     const dir = tempDir();
     // Arbitrary bytes: seal hashes an artifact, it does not interpret one, and
     // this suite must not produce benchmark data (§6.1).
     for (const name of ARTIFACTS) {
       writeFileSync(join(dir, name), `${name}\n`, "utf8");
     }
+    // The §5.3 gate artifact. Spec 1.4.27 (M43) makes a passing completeness
+    // gate a seal precondition; seal reads the pass bit and interprets nothing
+    // else, so a minimal artifact is the right fixture.
+    writeFileSync(
+      join(dir, "oracle_gate.json"),
+      `${JSON.stringify({ completeness: { passed: gatePasses } }, null, 2)}\n`,
+      "utf8",
+    );
     return {
       dir,
       argv: [
@@ -286,9 +380,11 @@ describe("assay seal", () => {
         "--ground-truth",
         join(dir, "ground_truth.jsonl"),
         "--oracle-labels",
-        join(dir, "ambiguity_labels.jsonl"),
+        join(dir, "oracle_labels.jsonl"),
         "--recon-report",
         join(dir, "recon_report.jsonl"),
+        "--oracle-gate",
+        join(dir, "oracle_gate.json"),
         "--generator-commit",
         "b1460ef1bb334074fded46a8c1b428b729217ea5",
         "--spec-commit",
@@ -306,7 +402,7 @@ describe("assay seal", () => {
     const result = await run(argv);
     expect(result.code).toBe(EXIT.OK);
 
-    const written = result.sink.files.get(join(dir, "manifest.json"));
+    const written = result.sink.files.get(join(dir, MANIFEST));
     expect(written).toBeDefined();
     const manifest = JSON.parse(written ?? "{}") as Record<string, unknown>;
     expect(manifest["benchmark_version"]).toBe(BENCHMARK_VERSION);
@@ -323,8 +419,8 @@ describe("assay seal", () => {
     const { dir, argv } = dataset();
     const a = await run(argv);
     const b = await run(argv);
-    expect(a.sink.files.get(join(dir, "manifest.json"))).toBe(
-      b.sink.files.get(join(dir, "manifest.json")),
+    expect(a.sink.files.get(join(dir, MANIFEST))).toBe(
+      b.sink.files.get(join(dir, MANIFEST)),
     );
   });
 
@@ -345,7 +441,7 @@ describe("assay seal", () => {
     expect(result.code).toBe(EXIT.OK);
 
     const manifest = JSON.parse(
-      result.sink.files.get(join(dir, "manifest.json")) ?? "{}",
+      result.sink.files.get(join(dir, MANIFEST)) ?? "{}",
     ) as Record<string, unknown>;
     const expected = createHash("sha256")
       .update(readFileSync(join(dir, "recon_report.jsonl")))
