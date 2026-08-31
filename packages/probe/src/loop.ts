@@ -1,16 +1,19 @@
-import { P_MAX, type ReconReport, type SolveResult } from "@assay/engine";
-import type { CertificateReasonResult } from "@assay/engine";
+import { P_MAX, certificateReason, type ReconReport, type SolveResult } from "@assay/engine";
+import type { CertificateReason } from "@assay/ledger";
 import type { ProbeId } from "@assay/ledger";
 import type { FetchSettlementReconResult, ProbeResultDetail } from "@assay/domain";
 
 import {
   argumentEntityId,
   isNoUsefulProbe,
+  isR3ProposableKind,
   validate,
   type ObservationUniverse,
   type ProbeCallProposal,
   type ProbeProposal,
   type ProposalCheck,
+  type R3Proposal,
+  type RejectionReason,
   type ValidatedProbeCall,
 } from "./call.js";
 
@@ -58,12 +61,12 @@ export function initialState(comp_id: string): ProbeLoopState {
  * What the caller should do next.
  *
  * `STOP` carries `packages/engine`'s **own** `certificate_reason` rather than a
- * reason this module chose. `§6` defines three — `EVIDENCE_TIE` at zero attempts,
- * `PROBE_BUDGET_EXHAUSTED` at `P_max`, and the **undecided**
- * `A2_MIDDLE_CASE_UNSPECIFIED` seam in between — and spec 1.4.23 **surfaces that
- * seam rather than replacing it**. No new terminal reason is invented for a loop
- * that stopped on `NO_USEFUL_PROBE` with budget remaining; that gap is `§6`'s and
- * stays open.
+ * reason this module chose. `DATA_MODEL.md §13` defines four and
+ * `certificateReason` is total over `attempts` from spec 1.4.25: `EVIDENCE_TIE`
+ * at zero, `PROBE_BUDGET_EXHAUSTED` at `P_max`, and `NO_USEFUL_PROBE_AVAILABLE`
+ * strictly between — the `A2` middle case spec 1.4.23 surfaced and register row
+ * M40 closed. This module still **chooses none of them**: it forwards what the
+ * engine returned for the attempts actually spent.
  */
 export type LoopDecision =
   /** `solve` reached a determined outcome; no abstention is forced. */
@@ -71,7 +74,7 @@ export type LoopDecision =
   /** `§6.2`: budget remains and the case is still ambiguous. Ask `R3`. */
   | { readonly action: "PROBE"; readonly attempts_remaining: number }
   /** Emit the abstention with the engine's reason, whatever it says. */
-  | { readonly action: "STOP"; readonly certificate_reason: CertificateReasonResult };
+  | { readonly action: "STOP"; readonly certificate_reason: CertificateReason };
 
 /**
  * The loop's transition, given the latest `S4` result.
@@ -94,15 +97,62 @@ export function decide(
 }
 
 /**
- * Validate an `R3` proposal, or convert a decline into a stop.
+ * What the caller does with one proposal. **There is no "try again" branch, and
+ * that absence is the spec-1.4.25 `N1` convention expressed as a type.**
  *
- * A `NO_USEFUL_PROBE` proposal ends the loop with the engine's reason for the
- * attempts actually spent — which, in the middle case, is the undecided seam.
+ * `RECONCILIATION_SPEC.md §6.2`: *"Where `packages/probe` rejects a well-formed
+ * proposal before budget is spent, the loop terminates for that component, the
+ * proposal is not re-issued, `attempts` is unchanged, and the terminal reason
+ * follows from the resulting state."* The alternative is not neutral — an
+ * unchanged loop state yields an unchanged `input_hash`, hence an unchanged
+ * `cache_key`, hence the identical rejected proposal returned forever under
+ * `--llm=replay` and `--llm=offline` alike.
+ *
+ * `STOP` therefore covers both endings, distinguished by `rejection`:
+ *
+ * ```
+ *   rejection === null      the proposer declined  (NO_USEFUL_PROBE)
+ *   rejection !== null      a control refused it   (N1)
+ * ```
+ *
+ * In both cases `certificate_reason` is the engine's own, for the attempts
+ * **actually spent** — a rejected proposal spends none, so the reason is the same
+ * one the state already had.
  */
 export type ProposalOutcome =
-  | { readonly kind: "CALL"; readonly check: ProposalCheck }
-  | { readonly kind: "STOP"; readonly certificate_reason: CertificateReasonResult };
+  | { readonly kind: "CALL"; readonly call: ValidatedProbeCall }
+  | {
+      readonly kind: "STOP";
+      readonly certificate_reason: CertificateReason;
+      /** `null` when the proposer declined; the control that refused otherwise. */
+      readonly rejection: RejectionReason | null;
+      /** The offending argument, where one is identifiable. */
+      readonly argument: string | null;
+    };
 
+/**
+ * The reason for a stop at the attempts actually spent.
+ *
+ * `solve.certificate_reason` is non-null whenever an abstention is forced, which
+ * is the only situation the loop runs in. The fallback exists because
+ * `SolveResult` types the field nullable for the determined outcomes, and
+ * `EVIDENCE_TIE` is what `certificateReason(0)` returns for a loop that never
+ * spent a probe — this module invents nothing.
+ */
+function stopReason(solve: SolveResult, state: ProbeLoopState): CertificateReason {
+  /* c8 ignore next */
+  if (solve.certificate_reason !== null) return solve.certificate_reason;
+  /* c8 ignore next */
+  return certificateReason(state.attempts);
+}
+
+/**
+ * Validate a proposal from **any** proposer, or convert a decline into a stop.
+ *
+ * Accepts all five probes: `RECONCILIATION_SPEC.md §6.2`'s enum is closed at five
+ * for the executor, and spec 1.4.25 narrows only what `R3` may name. A caller
+ * driving `R3` uses {@link offerR3Proposal}, which refuses the fifth.
+ */
 export function offerProposal(
   state: ProbeLoopState,
   proposal: ProbeProposal,
@@ -111,12 +161,51 @@ export function offerProposal(
   pMax: number = P_MAX,
 ): ProposalOutcome {
   if (isNoUsefulProbe(proposal)) {
-    /* c8 ignore next */
-    if (solve.certificate_reason === null) return { kind: "STOP", certificate_reason: { determined: true, reason: "EVIDENCE_TIE" } };
-    return { kind: "STOP", certificate_reason: solve.certificate_reason };
+    return { kind: "STOP", certificate_reason: stopReason(solve, state), rejection: null, argument: null };
   }
   const call: ProbeCallProposal = proposal;
-  return { kind: "CALL", check: validate(call, universe, state.attempts, pMax) };
+  const check: ProposalCheck = validate(call, universe, state.attempts, pMax);
+  if (!check.ok) {
+    // N1: a refused proposal ends the component. No retry path exists.
+    return {
+      kind: "STOP",
+      certificate_reason: stopReason(solve, state),
+      rejection: check.reason,
+      argument: check.argument,
+    };
+  }
+  return { kind: "CALL", call: check.call };
+}
+
+/**
+ * Offer a proposal that came from `R3` (spec 1.4.25, register row M40).
+ *
+ * Identical to {@link offerProposal} but for one added control: a probe outside
+ * `R3_PROBE_KINDS` is refused as `NOT_R3_PROPOSABLE` rather than validated.
+ * `R3Proposal` already excludes `widen_temporal_window` at the type level, so
+ * this fires only for a value that crossed a runtime boundary — a provider
+ * response or a replay cache entry — which `ARCHITECTURE.md §4` boundary 2
+ * requires be treated as adversarial whatever its declared type claims.
+ *
+ * The refusal is `N1`-shaped like every other: it stops the component and does
+ * not retry.
+ */
+export function offerR3Proposal(
+  state: ProbeLoopState,
+  proposal: R3Proposal,
+  universe: ObservationUniverse,
+  solve: SolveResult,
+  pMax: number = P_MAX,
+): ProposalOutcome {
+  if (!isNoUsefulProbe(proposal) && !isR3ProposableKind(proposal.probe)) {
+    return {
+      kind: "STOP",
+      certificate_reason: stopReason(solve, state),
+      rejection: "NOT_R3_PROPOSABLE",
+      argument: proposal.probe,
+    };
+  }
+  return offerProposal(state, proposal, universe, solve, pMax);
 }
 
 /**

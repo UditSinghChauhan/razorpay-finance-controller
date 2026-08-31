@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
+import { CERTIFICATE_REASONS } from "@assay/ledger";
+
 import {
   EPSILON_BPS,
+  P_MAX,
   SE_WEIGHTS_BPS,
   canonicalAllocationKey,
   certificateReason,
@@ -388,10 +391,7 @@ describe("§6's outcome table", () => {
       input({ members: [member(1)], candidates: [cand([1])], exceeds: true }),
     );
     expect(r.outcome).toBe("INTRACTABLE");
-    expect(r.certificate_reason).toEqual({
-      determined: true,
-      reason: "SEARCH_BOUND_EXCEEDED",
-    });
+    expect(r.certificate_reason).toBe("SEARCH_BOUND_EXCEEDED");
     expect(r.best).toBeNull();
   });
 });
@@ -458,33 +458,35 @@ describe("the v1.4.21 canonical tie-break", () => {
   });
 });
 
-describe("A2 — probe endpoints and the unresolved middle", () => {
+describe("A2 — probe endpoints and the middle case, total from spec 1.4.25", () => {
   it("zero attempts => EVIDENCE_TIE", () => {
-    expect(certificateReason(0)).toEqual({
-      determined: true,
-      reason: "EVIDENCE_TIE",
-    });
+    expect(certificateReason(0)).toBe("EVIDENCE_TIE");
   });
 
   it("attempts === P_max => PROBE_BUDGET_EXHAUSTED", () => {
-    expect(certificateReason(3)).toEqual({
-      determined: true,
-      reason: "PROBE_BUDGET_EXHAUSTED",
-    });
+    expect(certificateReason(P_MAX)).toBe("PROBE_BUDGET_EXHAUSTED");
   });
 
-  it("SURFACES the 0 < attempts < P_max middle case instead of defaulting it", () => {
+  it("0 < attempts < P_max => NO_USEFUL_PROBE_AVAILABLE (M40)", () => {
     for (const n of [1, 2]) {
+      expect(certificateReason(n)).toBe("NO_USEFUL_PROBE_AVAILABLE");
+    }
+  });
+
+  it("is TOTAL over attempts and never returns an undecided seam", () => {
+    for (let n = -2; n <= P_MAX + 3; n += 1) {
       const r = certificateReason(n);
-      expect(r.determined).toBe(false);
-      expect(r).toEqual({
-        determined: false,
-        seam: "A2_MIDDLE_CASE_UNSPECIFIED",
-        attempts: n,
-      });
-      // It is emphatically NOT silently one of the two determined reasons.
-      expect(JSON.stringify(r)).not.toContain("EVIDENCE_TIE");
-      expect(JSON.stringify(r)).not.toContain("PROBE_BUDGET_EXHAUSTED");
+      expect(CERTIFICATE_REASONS).toContain(r);
+      expect(typeof r).toBe("string");
+    }
+    // A2_MIDDLE_CASE_UNSPECIFIED is retired, not defaulted: no value of
+    // `attempts` produces it and the type no longer admits it.
+    expect(CERTIFICATE_REASONS).not.toContain("A2_MIDDLE_CASE_UNSPECIFIED");
+  });
+
+  it("SEARCH_BOUND_EXCEEDED is §4.3's and is not produced by attempts", () => {
+    for (let n = -2; n <= P_MAX + 3; n += 1) {
+      expect(certificateReason(n)).not.toBe("SEARCH_BOUND_EXCEEDED");
     }
   });
 });

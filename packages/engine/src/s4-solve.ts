@@ -25,15 +25,20 @@ import type { Candidate, Member, Target } from "./s2-candidates.js";
  * orchestration outside calls `solve` again with more accumulated evidence.
  * Everything below is a function of its arguments alone.
  *
- * **Three branches are deliberately not decided here**, each surfaced as a
+ * **Two branches are deliberately not decided here**, each surfaced as a
  * value the caller cannot silently ignore rather than given an invented rule:
  *
  * 1. `Component.solve_status`'s `EMPTY` and `SOLVED` — `DATA_MODEL.md §11`
  *    declares the enum and **no document states a trigger for either**; `§4.3`
  *    defines only `INTRACTABLE`. This module therefore emits no `solve_status`.
- * 2. `0 < attempts < P_max` with `NO_USEFUL_PROBE` — the A2 middle case.
- *    Returned as `{ determined: false }`.
- * 3. `R3`'s probe-selection policy — not the engine's, and not modelled.
+ * 2. `R3`'s probe-selection policy — not the engine's, and not modelled. The
+ *    `A3-NOLLM` half is frozen at `PREREGISTRATION.md §7` and implemented in
+ *    `packages/llm`; the model arm's is `R3`'s own output.
+ *
+ * **The A2 middle case was the third and is decided from spec 1.4.25.**
+ * `0 < attempts < P_max` returns `DATA_MODEL.md §13`'s
+ * `NO_USEFUL_PROBE_AVAILABLE` (register row M40), so `certificateReason` is total
+ * and no caller has an undecided branch to confront.
  */
 
 // ---------------------------------------------------------------------------
@@ -66,25 +71,6 @@ export interface ScoredSolution {
   readonly canonical_key: string;
 }
 
-/**
- * Why a certificate was emitted — or, for the one case the specification does
- * not decide, an explicit refusal to say.
- *
- * `A2`'s two determined endpoints are `EVIDENCE_TIE` (zero attempts) and
- * `PROBE_BUDGET_EXHAUSTED` (`attempts === P_max`), and `§4.3` gives
- * `SEARCH_BOUND_EXCEEDED`. **The middle case — `0 < attempts < P_max`, the loop
- * having stopped because `R3` returned `NO_USEFUL_PROBE` — has no frozen
- * reason**, and `§6.2`'s *"if probes **exhaust**"* does not cover a budget that
- * still has room. Returning a discriminated union forces the caller to confront
- * that rather than receive a fabricated default.
- */
-export type CertificateReasonResult =
-  | { readonly determined: true; readonly reason: CertificateReason }
-  | {
-      readonly determined: false;
-      readonly seam: "A2_MIDDLE_CASE_UNSPECIFIED";
-      readonly attempts: number;
-    };
 
 export interface SolveResult {
   readonly outcome: SolveOutcome;
@@ -95,8 +81,15 @@ export interface SolveResult {
   /** `§6`: `max over AccountCode of |balance_best(acct) − balance_second(acct)|`. */
   readonly materiality_paise: number | null;
   readonly tau_paise: number;
-  /** Non-null exactly when the outcome forces an abstention certificate. */
-  readonly certificate_reason: CertificateReasonResult | null;
+  /**
+   * Non-null exactly when the outcome forces an abstention certificate.
+   *
+   * `DATA_MODEL.md §13`'s reason, directly. Through spec 1.4.24 this was a
+   * discriminated union that could refuse to answer, because the `A2` middle
+   * case had no frozen value; spec 1.4.25 supplies one, so the refusal branch is
+   * **removed rather than defaulted** and `certificateReason` below is total.
+   */
+  readonly certificate_reason: CertificateReason | null;
   /** Every feasible solution, ranked. */
   readonly ranked: readonly ScoredSolution[];
 }
@@ -439,10 +432,7 @@ export function solve(input: SolveInput): SolveResult {
       delta_s_bps: null,
       materiality_paise: null,
       tau_paise: tau,
-      certificate_reason: {
-        determined: true,
-        reason: "SEARCH_BOUND_EXCEEDED",
-      },
+      certificate_reason: "SEARCH_BOUND_EXCEEDED",
       ranked: Object.freeze([]),
     };
   }
@@ -554,22 +544,30 @@ export function solve(input: SolveInput): SolveResult {
 }
 
 /**
- * `A2`'s endpoints, and its unresolved middle.
+ * `A2`'s endpoints and its middle, **total over `attempts` from spec 1.4.25**.
  *
  * ```
- *   attempts === 0        EVIDENCE_TIE             derived
- *   attempts === P_max    PROBE_BUDGET_EXHAUSTED   §6.2, "if probes exhaust"
- *   0 < attempts < P_max  UNSPECIFIED              surfaced, never defaulted
+ *   attempts === 0        EVIDENCE_TIE                derived
+ *   attempts === P_max    PROBE_BUDGET_EXHAUSTED      §6.2, "if probes exhaust"
+ *   0 < attempts < P_max  NO_USEFUL_PROBE_AVAILABLE   §13, M40
  * ```
+ *
+ * `§4.3`'s `SEARCH_BOUND_EXCEEDED` is not produced here: it belongs to the
+ * `INTRACTABLE` outcome, which never reaches a probe loop, and `solve` sets it on
+ * that path.
+ *
+ * **Why the middle case needs no extra argument.** `RECONCILIATION_SPEC.md §6.2`
+ * maps it to *"the loop terminated because no usable probe remained"*, and that
+ * is the **only** way a component can come to rest strictly inside the budget:
+ * `packages/probe`'s `decide` keeps probing while the outcome is `AMBIGUOUS` and
+ * `attempts < P_max`, so a stop in that interval means either the proposer
+ * declined or a well-formed proposal was rejected (the spec-1.4.25 `N1`
+ * convention). This function is consulted only when the loop has stopped; a
+ * mid-loop call's value is discarded by `decide`, which reads `outcome` and
+ * `attempts` rather than this reason.
  */
-export function certificateReason(attempts: number): CertificateReasonResult {
-  if (attempts <= 0) return { determined: true, reason: "EVIDENCE_TIE" };
-  if (attempts >= P_MAX) {
-    return { determined: true, reason: "PROBE_BUDGET_EXHAUSTED" };
-  }
-  return {
-    determined: false,
-    seam: "A2_MIDDLE_CASE_UNSPECIFIED",
-    attempts,
-  };
+export function certificateReason(attempts: number): CertificateReason {
+  if (attempts <= 0) return "EVIDENCE_TIE";
+  if (attempts >= P_MAX) return "PROBE_BUDGET_EXHAUSTED";
+  return "NO_USEFUL_PROBE_AVAILABLE";
 }

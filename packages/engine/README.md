@@ -1,6 +1,6 @@
 # `@assay/engine`
 
-Written against **specification 1.4.19 / benchmark 1.0.3**.
+Written against **specification 1.4.25 / benchmark 1.0.5**.
 
 ASSAY's deterministic core — `RECONCILIATION_SPEC.md` stages **`S1`-`S5`**.
 `ARCHITECTURE.md §3`: *"Pure functions, no I/O, no network."*
@@ -160,13 +160,27 @@ driven outside; `solve` is called again with more accumulated evidence.
 - **`§6`'s outcomes** — `UNIQUE` · `IMMATERIALLY_AMBIGUOUS` · `DISCRIMINATED` ·
   `AMBIGUOUS`, plus `§4.3`'s `INTRACTABLE`.
 
-### Three branches deliberately not decided
+### Two branches deliberately not decided
 
 | Branch | How it surfaces |
 |---|---|
 | `solve_status` `EMPTY` / `SOLVED` | **no `solve_status` field is emitted** — `§4.3` defines only `INTRACTABLE` |
-| `0 < attempts < P_max` + `NO_USEFUL_PROBE` | `{ determined: false, seam: "A2_MIDDLE_CASE_UNSPECIFIED" }` |
 | `R3` probe selection | not modelled; the engine never chooses a probe |
+
+### The A2 middle case, closed at spec 1.4.25
+
+`certificateReason(attempts)` is **total** and returns `DATA_MODEL.md §13`'s reason
+directly; the discriminated union that could refuse to answer is **removed rather
+than defaulted**.
+
+| `attempts` | reason |
+|---|---|
+| `0` | `EVIDENCE_TIE` |
+| `0 < attempts < P_max` | `NO_USEFUL_PROBE_AVAILABLE` — register row M40 |
+| `>= P_max` | `PROBE_BUDGET_EXHAUSTED` |
+
+`§4.3`'s `SEARCH_BOUND_EXCEEDED` is not produced by this function: it belongs to
+the `INTRACTABLE` outcome, which never reaches a probe loop.
 
 ## `S5` — the validation gate (`RECONCILIATION_SPEC.md §7`)
 

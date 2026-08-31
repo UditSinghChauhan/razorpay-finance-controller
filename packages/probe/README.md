@@ -1,6 +1,6 @@
 # `@assay/probe`
 
-Written against **specification 1.4.23 / benchmark 1.0.4**.
+Written against **specification 1.4.25 / benchmark 1.0.5**.
 
 The `RECONCILIATION_SPEC.md §6.2` probe **loop**, as a **pure state machine**.
 Ratified at spec 1.4.23 — `DATA_MODEL.md §22.2` **M37**, `DECISION_BRIEF.md
@@ -29,7 +29,7 @@ All asserted in `tests/discipline.test.ts` by reading the package's own source.
 
 | Owns | Does **not** own |
 |---|---|
-| `P_max` accounting | `R3`'s selection policy — open, `§6.2` |
+| `P_max` accounting | `R3`'s selection policy — `A3-NOLLM`'s is frozen at `PREREGISTRATION.md §7` (M39) and implemented in `packages/llm`; the model arm's is `R3`'s own output |
 | pre-call `I6` over every argument | the model call — `packages/llm` |
 | construction of the closed five-probe call | the data-surface read — `apps/cli` |
 | the `PROBE` `LedgerEvent` body | result schema validation — `packages/domain` |
@@ -39,11 +39,27 @@ All asserted in `tests/discipline.test.ts` by reading the package's own source.
 ## The seam it preserves
 
 `STOP` carries **`packages/engine`'s own** `certificate_reason`, never one this
-package chose. `§6` defines three — `EVIDENCE_TIE` at zero attempts,
-`PROBE_BUDGET_EXHAUSTED` at `P_max`, and the **undecided**
-`A2_MIDDLE_CASE_UNSPECIFIED` seam in between. **No new terminal reason is
-invented** for a loop that stopped on `NO_USEFUL_PROBE` with budget remaining;
-that gap is `§6`'s and stays open.
+package chose. `DATA_MODEL.md §13` defines four and `certificateReason` is
+**total** over `attempts` from spec 1.4.25:
+
+```
+  attempts == 0          EVIDENCE_TIE
+  attempts == P_max      PROBE_BUDGET_EXHAUSTED
+  0 < attempts < P_max   NO_USEFUL_PROBE_AVAILABLE     M40, spec 1.4.25
+```
+
+The middle value closes `§6`'s `A2` seam, which spec 1.4.23 surfaced and left open
+*"for the phase that made it reachable"* — `R3` is that phase. **This package
+still mints none of the four**: a discipline test fails the build if any code here
+spells a reason literal.
+
+**A rejected proposal ends the component — the `N1` convention, spec 1.4.25.**
+Where a **well-formed** proposal fails a pre-call control, `offerProposal` returns
+`STOP` rather than a retryable rejection: `attempts` is unchanged, nothing is
+dispatched, and there is **no outcome shape a caller could loop on**. The
+alternative is not neutral — an unchanged loop state yields an unchanged
+`input_hash`, hence an unchanged `cache_key`, hence the identical rejected
+proposal returned forever under `--llm=replay` and `--llm=offline` alike.
 
 ## Public API
 
@@ -92,13 +108,23 @@ call nobody validated — the bypass the brand exists to prevent, one step later
 
 ## Discrepancies found while implementing
 
-**`§6.2`'s `widen_temporal_window(days)` and `§L.1` rule 2 are in tension.** The
-probe's argument is a number, so an `R3` output schema expressing it would carry a
-numeric field — which rule 2 forbids in *"any LLM output schema"*. This package
-does not resolve it: it accepts `days` on a **proposal** (which is not a schema)
-and range-checks it as `DATA_MODEL.md §12`'s `integer > 0`. `R3` is `§H` tier H1
-and unbuilt, so the tension is recorded rather than settled, and `§6.2` also
-leaves *whether `R3` may propose this probe at all* open (spec 1.4.19, M33).
+**`§6.2`'s `widen_temporal_window(days)` and `§L.1` rule 2 were in tension, and
+spec 1.4.25 resolved it (M40).** The probe's argument is a number, so an `R3`
+output schema expressing it would carry a numeric field, which rule 2 forbids in
+*"any LLM output schema"*. Because rule 2 is **settled and inviolable** while
+`R3`'s authority over the probe was expressly **unsettled** (`§6.2`, `§T7`, M33),
+the settled invariant governs: **`R3` may not propose it**, and rule 2 is
+unchanged and unweakened.
+
+This package holds **both** halves of that, deliberately. `validate` still
+constructs a `widen_temporal_window` call for a **non-`R3`** caller and still
+range-checks `days` as `DATA_MODEL.md §12`'s `integer > 0` — the executor's enum
+is closed at **five** and `THREAT_MODEL.md §T7`'s surface is unchanged. What is
+narrowed is the `R3` entry point: `R3Proposal` excludes the probe at the type
+level and `offerR3Proposal` refuses it at runtime as `NOT_R3_PROPOSABLE`, because
+a value crossing from a provider or a replay cache is adversarial whatever its
+declared type claims. **No `days` constant is invented and `§T7`'s hard bound
+remains unspecified** — now unreachable through `R3` rather than supplied.
 
 **`ProbeProposal` arguments are plain strings; `ProbeResultDetail`'s are branded.**
 Deliberate, and the asymmetry is the point: a proposal arrives from `R3` and is

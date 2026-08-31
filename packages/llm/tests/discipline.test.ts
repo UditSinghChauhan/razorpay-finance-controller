@@ -168,37 +168,66 @@ describe("declared package boundaries", () => {
   });
 });
 
-describe("Phase 8 scope is declared honestly, not stubbed", () => {
-  it("all four roles are declared; only R1 and R2 are implemented", () => {
+describe("scope is declared honestly, not stubbed", () => {
+  it("all four roles are declared; R1, R2 and R3 are implemented, R4 is not", () => {
     expect([...ROLE_IDS]).toEqual(["R1", "R2", "R3", "R4"]);
-    expect([...IMPLEMENTED_ROLE_IDS]).toEqual(["R1", "R2"]);
+    expect([...IMPLEMENTED_ROLE_IDS]).toEqual(["R1", "R2", "R3"]);
   });
 
-  it("no R3 module, no probe loop, no probe executor exists here", () => {
+  it("R3 exists from spec 1.4.25; R4 does not, and neither does a probe loop", () => {
     const rel = files.map((f) => f.slice(SRC.length + 1).replaceAll("\\", "/"));
-    expect(rel).not.toContain("roles/r3.ts");
+    expect(rel).toContain("roles/r3.ts");
     expect(rel).not.toContain("roles/r4.ts");
-    for (const f of rel) expect(f).not.toMatch(/probe|executor/i);
+    // §6.2 has R3 PROPOSE and "deterministic code execute it and re-run the
+    // solve". The proposer lives here from spec 1.4.25; the loop, the executor
+    // and the dispatch do not, and no file may be named for one.
+    for (const f of rel) expect(f).not.toMatch(/loop|executor|dispatch/i);
   });
 
-  it("no source file implements a probe enum or a probe call", () => {
-    // RECONCILIATION_SPEC §6.2 has R3 propose and "deterministic code execute
-    // it and re-run the solve". Neither actor exists at Phase 8, and the
-    // probe-execution owner is an open governance question — so this package
-    // must not quietly become the answer.
+  it("proposes a probe but implements none of the executor's parts", () => {
+    // packages/probe owns P_max, the pre-call I6 check, the sole constructor of
+    // a probe call and the PROBE event body (M37). Naming a probe in R3's
+    // output schema is the proposal; importing any of the executor's parts
+    // would make this package the executor.
     for (const { file, text } of sources) {
       const body = code(text);
+      for (const owned of [
+        "PROBE_KINDS",
+        "ProbeResultDetail",
+        "ValidatedProbeCall",
+        "probeEventBody",
+        "P_MAX",
+        "@assay/probe",
+      ]) {
+        expect(body.includes(owned), `${file} references ${owned}`).toBe(false);
+      }
+    }
+  });
+
+  it("no CODE anywhere names widen_temporal_window — R3 may not propose it (M40)", () => {
+    // DECISION_BRIEF.md §L.1 rule 2 forbids a numeric field in an LLM output
+    // schema and `days` is `integer > 0` (DATA_MODEL.md §12). The probe stays in
+    // the EXECUTOR's closed enum of five and is unreachable from here: no code
+    // path names it, so no schema, no offline branch and no fallback can emit
+    // it. `roles/r3.ts` records WHY in prose, which is the point of the record.
+    for (const { file, text } of sources) {
+      expect(code(text).includes("widen_temporal_window"), `${file}`).toBe(false);
+      expect(code(text).includes("days"), `${file} names a days field`).toBe(false);
+    }
+  });
+
+  it("the four probe names appear only where R3's contract needs them", () => {
+    const allowed = new Set(["roles/r3.ts", "provider.ts", "index.ts"]);
+    for (const { file, text } of sources) {
+      const rel = file.slice(SRC.length + 1).replaceAll("\\", "/");
+      if (allowed.has(rel)) continue;
       for (const probe of [
         "fetch_settlement_recon",
         "fetch_order",
         "fetch_payment",
         "fetch_refund",
-        "widen_temporal_window",
-        "PROBE_KINDS",
-        "ProbeResultDetail",
-        "P_MAX",
       ]) {
-        expect(body.includes(probe), `${file} references ${probe}`).toBe(false);
+        expect(code(text).includes(probe), `${rel} references ${probe}`).toBe(false);
       }
     }
   });

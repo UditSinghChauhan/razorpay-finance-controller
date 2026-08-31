@@ -144,18 +144,27 @@ describe("§T7's controls are here and are not bypassable", () => {
   });
 });
 
-describe("the §6 seam is surfaced, not replaced", () => {
-  it("no new certificate reason is invented anywhere in the package", () => {
+describe("the §6 seam is forwarded, never chosen here", () => {
+  it("no certificate reason is minted anywhere in the package", () => {
+    // DATA_MODEL.md §13's four reasons are packages/ledger's and
+    // packages/engine's `certificateReason` is their only producer. Spec 1.4.25
+    // added a fourth; this package still mints none, and a literal reason
+    // string in this package's code would mean it had started choosing.
     for (const { file, text } of sources) {
       const body = code(text);
-      // The three frozen reasons may be referenced; a fourth may not be minted.
-      expect(body, `${file}`).not.toMatch(/NO_USEFUL_PROBE_[A-Z_]+|PROBE_[A-Z_]*_UNRESOLVED/);
+      expect(body, `${file}`).not.toMatch(
+        /"(EVIDENCE_TIE|SEARCH_BOUND_EXCEEDED|PROBE_BUDGET_EXHAUSTED|NO_USEFUL_PROBE_AVAILABLE)"/,
+      );
+      expect(body, `${file}`).not.toMatch(/PROBE_[A-Z_]*_UNRESOLVED|A2_MIDDLE_CASE/);
     }
   });
 
-  it("the undecided seam is passed through by name", () => {
+  it("the engine's reason is forwarded by name, and its producer is imported", () => {
     const loop = readFileSync(join(SRC, "loop.ts"), "utf8");
-    expect(loop).toContain("A2_MIDDLE_CASE_UNSPECIFIED");
     expect(loop).toContain("certificate_reason");
+    // The middle case is closed at spec 1.4.25 (M40), so the value comes from
+    // `certificateReason` rather than from a seam this package surfaces.
+    expect(loop).toContain("certificateReason");
+    expect(loop).not.toContain("A2_MIDDLE_CASE_UNSPECIFIED");
   });
 });
