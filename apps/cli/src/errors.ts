@@ -52,6 +52,37 @@ export class UsageError extends CliError {
 }
 
 /**
+ * An agent whose pipeline dependency is not built (spec 1.4.29, M47).
+ *
+ * Distinct from {@link UnavailableStageError} because an agent is not a command:
+ * it names the component `EVALUATION_SPEC.md §3` says it *is*, and the package
+ * that owes the piece it cannot run without. Same exit code, because
+ * `errors.ts`'s own rule holds — a stage that has not been built has **not**
+ * failed, and reporting it as a failure would invite the one repair the
+ * ownership rules forbid.
+ */
+export class AgentUnavailableError extends CliError {
+  /** `EVALUATION_SPEC.md §3`'s id. */
+  readonly agentId: string;
+  /** The package or module that owns the missing work. */
+  readonly blockedBy: string;
+
+  constructor(agentId: string, blockedBy: string, citation: string, detail: string) {
+    super(
+      `agent ${agentId}: blocked on ${blockedBy}. ${detail} (${citation}). ` +
+        `apps/cli composes the agents and implements no stage of the pipeline, so this is ` +
+        `reported rather than worked around: EVALUATION_SPEC.md §3.2 makes an ablation a ` +
+        `control only while it differs from ASSAY in exactly one respect, and a stand-in ` +
+        `built here would be a second difference nobody recorded.`,
+      EXIT.UNAVAILABLE,
+    );
+    this.name = "AgentUnavailableError";
+    this.agentId = agentId;
+    this.blockedBy = blockedBy;
+  }
+}
+
+/**
  * A command whose surface is defined but whose dependency is not built.
  *
  * Carries the blocking dependency and the citation that assigns it to another

@@ -80,5 +80,9 @@ export {
   type ProbeRunStop,
 } from "./probe/run.js";
 export { COMMANDS, T0_11_COMMANDS, findCommand, flagsFor, type Command, type CommandContext } from "./commands/index.js";
+export {
+  ALL_AGENTS, TIER0_AGENTS, agentById, isAgentId, readAgentId,
+} from "./agents/index.js";
+export { AgentUnavailableError } from "./errors.js";
 export { SEAL_TAG, checkSealTag } from "./seal-tag.js";
 export { usage, versionLine } from "./usage.js";
