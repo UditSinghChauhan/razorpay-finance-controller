@@ -13,33 +13,53 @@
  * composition root holds no logic either — so the draw lives here, beside the
  * gate it feeds and outside the file rule 3 constrains.
  *
- * ## What is frozen here, and what is emphatically not
+ * ## The whole draw is frozen, sampler and seed together
  *
- * `PREREGISTRATION.md §7` freezes `R = 20,000` and **freezes nothing about the
- * draw** — no sampler, no seed. Spec 1.4.27 declined to resolve it and recorded
- * the gap as `PREREGISTRATION.md §10` **V24**: deriving a seed from the dataset
- * seed was available, cheap and deterministic, and would have been *"a choice
- * made silently because a candidate happened to be deterministic"*, which is the
- * failure `DATA_MODEL.md §22.2` exists to prevent and which M38's own record
- * names in terms.
+ * Spec 1.4.27 left both open and made `apps/cli` fail closed rather than derive a
+ * seed. **Spec 1.4.28 (`DATA_MODEL.md §22.2` M44) freezes them into
+ * `PREREGISTRATION.md §7`, bound by `AL3`:**
  *
- * **So this module chooses no seed.** {@link drawPairs} takes one, and
- * `apps/cli` fails closed without it. The seed is recorded beside the result so a
- * gate run always names the draw that produced it. When governance ratifies a
- * sampler this file is where it lands; until then it implements a draw and
- * asserts nothing about its being *the* draw.
+ * ```
+ *   R                     20,000 pairs, UNCHANGED, per (dev, seed) dataset
+ *   CONSISTENCY_DRAW_SEED 417203, shared by every dev dataset
+ *   member-set size       uniformly 1..4, drawn BEFORE the member indices
+ *   target pool           every target-kind observation in the dataset
+ *   member pool           every member-eligible observation (§11.1)
+ *   anchored/allocated    always empty
+ *   draw order            target index, then member-set size, then members
+ *   PRNG consumption      exactly one word per index draw
+ * ```
  *
- * **The PRNG is `packages/generator`'s vendored xorshift128+.**
- * `ARCHITECTURE.md §11` vendors it precisely so a Node upgrade cannot silently
- * change a benchmark quantity, and `packages/eval` already depends on that
- * package. `Math.random` would make a gate run unreproducible even once the seed
- * is ratified.
+ * **Both had to be frozen, and freezing only the seed would have frozen
+ * nothing.** A seed selects a path through a PRNG stream; it selects **pairs**
+ * only in combination with the procedure that consumes the stream. Change the
+ * member-set bound, the draw order, either pool, or the words consumed per pair,
+ * and the same seed draws a different sample. `ARCHITECTURE.md §7.3` names *"the
+ * sampler and seed"* as one object and `§7` now carries both — so **this module
+ * holds no literal of its own**; every parameter comes from `frozen.ts`.
+ *
+ * **`417203` is a ratification, not a derivation.** Deriving from a `§6.1`
+ * dataset seed was available and rejected: at least four derivations exist and no
+ * document selects among them, `substream(seed, family, stream)` is the
+ * generator's **phase** namespace and a gate is not a generation phase, and a
+ * `§6.1` seed is fixed by `§7` for **generation**. What makes the value
+ * legitimate is that it was fixed **before any dev gate result existed**.
+ *
+ * **The PRNG is `packages/generator`'s vendored xorshift128+, reached through
+ * `Prng.fromSeed` and never through `substream`.** `ARCHITECTURE.md §11` vendors
+ * it precisely so a Node upgrade cannot silently change a benchmark quantity, and
+ * `EVALUATION_SPEC.md §5.2`'s bootstrap already reaches it the same way — sharing
+ * the algorithm, not the seed space. `Math.random` would make a gate run
+ * unreproducible outright.
  */
 
 import type { Observation } from "@assay/domain";
 import { Prng } from "@assay/generator";
 import { isTargetKind, memberContribution } from "@assay/oracle";
 
+import {
+  CONSISTENCY_DRAW_SEED, CONSISTENCY_MEMBER_SET_MAX, CONSISTENCY_SAMPLE_SIZE,
+} from "../frozen.js";
 import type { DifferentialPair } from "./consistency-gate.js";
 
 /** `§5.3`'s bank-side referent for one target, as the caller determined it. */
@@ -57,12 +77,17 @@ export interface DrawOptions {
    * is legitimate and means the half is out of scope on every drawn target.
    */
   readonly bank?: ReadonlyMap<string, BankReferent>;
-  /** How many pairs to draw. Defaults to `§7`'s frozen `R`. */
+  /**
+   * How many pairs to draw. Defaults to `§7`'s frozen `R`.
+   *
+   * An override for a caller that is not running the gate — a property test, say.
+   * `§7` fixes `R` and `AL3` binds it, so an official run never passes this.
+   */
   readonly size?: number;
 }
 
-/** `§7`: `R = 20,000`. Restated from `consistency-gate.ts`'s own constant. */
-export { DECLARED_SAMPLE_SIZE } from "./consistency-gate.js";
+/** `§7`'s `R`, re-exported from the one place it is transcribed. */
+export { CONSISTENCY_SAMPLE_SIZE, CONSISTENCY_DRAW_SEED, CONSISTENCY_MEMBER_SET_MAX };
 
 /**
  * Draw `size` `(target, member-set)` pairs from one dataset.
@@ -84,14 +109,17 @@ export { DECLARED_SAMPLE_SIZE } from "./consistency-gate.js";
  * `meets_declared_sample_size: false` rather than this module inventing a pair.
  *
  * @param observations the dataset the pairs are drawn from.
- * @param seed the draw's seed. **Not frozen** — `PREREGISTRATION.md §10` V24.
+ * @param seed the draw's seed. Defaults to `§7`'s frozen
+ *   {@link CONSISTENCY_DRAW_SEED}; a caller supplies one only for
+ *   **non-authoritative** local exploration, which `apps/cli` refuses on a
+ *   sealed or official run (`AL3`, M44).
  */
 export function drawPairs(
   observations: readonly Observation[],
-  seed: number,
+  seed: number = CONSISTENCY_DRAW_SEED,
   options: DrawOptions = {},
 ): readonly DifferentialPair[] {
-  const size = options.size ?? 20_000;
+  const size = options.size ?? CONSISTENCY_SAMPLE_SIZE;
   const bank = options.bank ?? new Map<string, BankReferent>();
 
   const targets = observations.filter((o) => isTargetKind(o.kind));
@@ -106,11 +134,11 @@ export function drawPairs(
     /* c8 ignore next */
     if (target === undefined) continue;
 
-    // A member set of 1..4, small enough that most draws are cheap to compare
-    // and large enough that C6's sum has something to reject. The bound is this
-    // module's and is not a §7 threshold: it parameterises the draw, which §7
-    // does not freeze, and K_max (22) bounds a COMPONENT rather than a sample.
-    const count = 1 + prng.below(4);
+    // §7's member-set bound, frozen at spec 1.4.28 (M44) WITH the seed: change
+    // it and the same seed draws a different sample. Drawn BEFORE the member
+    // indices, which is part of what §7 fixes -- the draw order decides the
+    // stream path as much as the bound does.
+    const count = 1 + prng.below(CONSISTENCY_MEMBER_SET_MAX);
     const members: Observation[] = [];
     for (let m = 0; m < count; m += 1) {
       const member = pool[prng.below(pool.length)];

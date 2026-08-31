@@ -100,6 +100,67 @@ export const CONFIDENCE_LEVEL_BPS = 9_500;
 /** Basis-point denominator. One bp is 1e-4 (`DATA_MODEL.md §0` rule 5). */
 export const BPS_DENOMINATOR = 10_000;
 
+// ---------------------------------------------------------------------------
+// §5.3's consistency draw — RATIFIED at spec 1.4.28, register row M44
+// ---------------------------------------------------------------------------
+
+/**
+ * `R` — the `PREREGISTRATION.md §5.3` differential sample size.
+ *
+ * `§7`: *"`R = 20,000` pairs, UNCHANGED, per (dev, seed) dataset"*. The figure
+ * itself predates spec 1.4.28 and is **not** changed by M44; what M44 adds is
+ * that `§7` now carries it as a frozen constant rather than only `§5.3` prose,
+ * and that `AL3` binds it.
+ *
+ * `gates/consistency-gate.ts` exports the same figure as `DECLARED_SAMPLE_SIZE`,
+ * the name `§5.3`'s *"meets the declared sample size"* reporting uses; that
+ * constant is defined from this one so the two cannot drift.
+ */
+export const CONSISTENCY_SAMPLE_SIZE = 20_000;
+
+/**
+ * `CONSISTENCY_DRAW_SEED` — the `§5.3` draw's seed (`§7`, M44).
+ *
+ * **This value is a RATIFICATION and it is not derivable.** No frozen rule
+ * determined it. At least four derivations from a `§6.1` dataset seed were
+ * available — `fromSeed(s)`, `fromSeed(s + 1)`, `substream(s, family, stream)`,
+ * `fromSeed(sha256(s))` — and **no document selects among them**, so any of them
+ * would have been a choice wearing a derivation's clothes. Two further grounds
+ * closed that route: `substream(seed, family, stream)` is the **generator's phase
+ * namespace** and a gate is not a generation phase, and a `§6.1` seed is fixed by
+ * `§7` for **generation**.
+ *
+ * **What makes it legitimate is when it was fixed, not how it was computed.** It
+ * was frozen at a governance gate **before any dev consistency-gate result
+ * existed** — `bench/` absent, no dev dataset generated, the gate never run — so
+ * nothing observed could have informed it. `AL3` binds it and
+ * `DECISION_BRIEF.md §L.4` makes a later change on the basis of an observed
+ * result a spec violation rather than a judgement call.
+ *
+ * **It is one seed for every dev dataset.** The five dev datasets carry different
+ * observation pools, so one seed still yields five different samples; what it
+ * fixes is the index sequence, which is the most auditable form available.
+ *
+ * `PREREGISTRATION.md §10` **V25** discloses the cost: a frozen sample is a fixed
+ * slice, so *"the gate passed"* means *"passed on this sample"*.
+ */
+export const CONSISTENCY_DRAW_SEED = 417_203;
+
+/**
+ * The `§5.3` draw's member-set bound (`§7`, M44).
+ *
+ * `§7`: *"member-set size uniformly `1..4`, drawn BEFORE the member indices"*.
+ * Frozen **with** the seed rather than after it, because a seed selects a path
+ * through a PRNG stream and selects **pairs** only in combination with the
+ * procedure consuming it — change this bound and the same seed draws a different
+ * sample. That is why `ARCHITECTURE.md §7.3` names *"the sampler and seed"* as
+ * one object.
+ *
+ * Not confusable with a `§7` component bound: `K_max = 22` bounds a
+ * **component**, this bounds a **drawn pair**.
+ */
+export const CONSISTENCY_MEMBER_SET_MAX = 4;
+
 /**
  * `k_sigma` for the abstention spike detector (`PREREGISTRATION.md §7`,
  * `THREAT_MODEL.md §T9` M2).
@@ -190,7 +251,17 @@ export const LEGACY_MAX_UNRESOLVED_ABS_PAISE = 5_000_000;
  *     no metric. **No metric definition changes, none is added and none is removed**
  *     — `metric-list.ts` stays at 28 and keeps its numbering, and
  *     `oracle_gate.json` is a build product rather than a metric.
+ *   - **1.4.28 (M44)** — the `PREREGISTRATION.md §5.3` consistency draw is
+ *     **frozen into `§7`** and bound by `AL3`: `R = 20,000` unchanged and now
+ *     per `(dev, seed)`, `CONSISTENCY_DRAW_SEED = 417203`, the `1..4` member-set
+ *     bound, the two pools, the empty `anchored`/`allocated`, the draw order and
+ *     one PRNG word per index draw. **This one DOES reach this file's scope**,
+ *     and is the first `§7` parameter added here since the module was written:
+ *     the three constants above are its transcription, and `gates/sample.ts`
+ *     carries no literal of its own. **No metric definition changes, none is
+ *     added and none is removed** — `metric-list.ts` stays at 28, and the gate is
+ *     not a metric.
  *
  * **Nothing below moves with it**, and neither does `metric-list.ts`.
  */
-export const SPEC_VERSION = "1.4.27";
+export const SPEC_VERSION = "1.4.28";

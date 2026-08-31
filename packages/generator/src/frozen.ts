@@ -394,8 +394,18 @@ export const K_MAX = 22;
  * seed, family, rate or `§7` threshold changes; `§18`'s `BenchmarkManifest`
  * **shape** is unchanged; `constraint_set_hash` is `packages/domain`'s and is
  * unmodified; `GT_VERSION` stays 1.1.0. No dataset exists to regenerate.
+ *
+ * **1.0.6 -> 1.0.7 at spec 1.4.28** (register row M44). A decision parameter
+ * enters `PREREGISTRATION.md §7`, the pre-registered surface: the `§5.3`
+ * consistency draw, sampler and seed together. `§9` step 5 now requires this
+ * field to read `"1.0.7"`. **Nothing this package produces changes** — the draw
+ * belongs to `packages/eval`'s build gate, reaches no generated artifact, and
+ * uses `Prng.fromSeed` rather than this package's `substream(seed, family,
+ * stream)` namespace, which is a space of generation phases. No population, seed,
+ * family, rate or `§7` threshold this package reads moves; `GT_VERSION` stays
+ * 1.1.0 and no artifact byte changes.
  */
-export const BENCHMARK_VERSION = "1.0.6";
+export const BENCHMARK_VERSION = "1.0.7";
 
 /** `DATA_MODEL.md §1`: `GroundTruth.gt_version`. */
 export const GT_VERSION = "1.1.0";
@@ -480,5 +490,17 @@ export const GT_VERSION = "1.1.0";
  * operators and `GT_VERSION` are unchanged; `constraint_set_hash` is
  * `packages/domain`'s and is unmodified; the recon report's spec-1.4.24 row order
  * holds unchanged over the merged split artifact, which is what M38's order was for.
+ *
+ * **1.4.27 -> 1.4.28 (M44) — required nothing of this package but the version
+ * constants.** The amendment freezes `PREREGISTRATION.md §5.3`'s consistency draw
+ * into `§7`. It belongs to `packages/eval`'s gate and touches nothing here: no
+ * `§6.1` seed is reused, `STREAMS` gains no name, and `substream(seed, family,
+ * stream)` is deliberately NOT the derivation -- that namespace is this package's
+ * space of generation **phases**, and a build gate is not one. The draw reaches
+ * `ARCHITECTURE.md §11`'s vendored PRNG through `Prng.fromSeed`, sharing the
+ * algorithm and no seed space. **`BENCHMARK_VERSION` moves 1.0.6 -> 1.0.7**
+ * because `§9` step 5 pins it; no population, seed, family, rate, `§7` threshold
+ * this package reads, composition figure or artifact byte moves, and
+ * `GT_VERSION` stays 1.1.0.
  */
-export const SPEC_VERSION = "1.4.27";
+export const SPEC_VERSION = "1.4.28";

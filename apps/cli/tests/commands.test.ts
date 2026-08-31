@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { CONSISTENCY_DRAW_SEED } from "@assay/eval";
 import { BENCHMARK_VERSION } from "@assay/generator";
 import { afterAll, describe, expect, it } from "vitest";
 
@@ -181,6 +182,8 @@ describe("assay oracle", () => {
       onDev.sink.files.get(join(join(join(dev, "dev"), "2000"), "oracle_gate.json")) ?? "{}",
     ) as { consistency: { draw_seed: number } | null };
     expect(devGate.consistency).not.toBeNull();
+    // An explicit override: exercised here because this test is about WHICH gate
+    // runs, and a non-frozen seed makes the assertion independent of §7's value.
     expect(devGate.consistency?.draw_seed).toBe(7);
 
     const test = dataset("test", 9000);
@@ -193,14 +196,17 @@ describe("assay oracle", () => {
     expect(testGate.consistency).toBeNull();
   });
 
-  it("fails closed on dev without --consistency-seed, because §7 freezes no seed", async () => {
-    // V24: §7 freezes R = 20,000 and freezes NO sampler and NO seed. Deriving one
-    // from the dataset seed would be a choice made silently; the command refuses.
+  it("needs no --consistency-seed on dev: §7's frozen seed is the default", async () => {
+    // Spec 1.4.28 (M44) closed V24. §7 carries the whole draw, AL3 binds it, and
+    // an official run takes no draw parameter from the command line.
     const root = dataset("dev", 2000);
     const result = await run(["oracle", "--split", "dev", "--seeds", "2000", "--bench", root]);
-    expect(result.code).toBe(EXIT.USAGE);
-    expect(result.err).toContain("V24");
-    expect(result.sink.files.size).toBe(0);
+    expect(result.code).toBe(EXIT.OK);
+    const gate = JSON.parse(
+      result.sink.files.get(join(join(join(root, "dev"), "2000"), "oracle_gate.json")) ?? "{}",
+    ) as { consistency: { draw_seed: number; authoritative: boolean } | null };
+    expect(gate.consistency?.draw_seed).toBe(CONSISTENCY_DRAW_SEED);
+    expect(gate.consistency?.authoritative).toBe(true);
   });
 
   it("needs no consistency seed on test — the gate does not run there", async () => {

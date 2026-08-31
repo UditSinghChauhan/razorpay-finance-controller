@@ -63,10 +63,22 @@ export interface ConsistencyReport {
   readonly sample_size: number;
   readonly meets_declared_sample_size: boolean;
   /**
-   * The draw's seed. **Not frozen** — `PREREGISTRATION.md §10` V24 — so it is
-   * recorded here, and a gate run always names the draw that produced it.
+   * The seed the draw actually used.
+   *
+   * `PREREGISTRATION.md §7`'s frozen `CONSISTENCY_DRAW_SEED` on any official run
+   * (spec 1.4.28, M44), or a **non-authoritative** local override. Recorded
+   * either way, so a gate run always names the draw that produced it.
    */
   readonly draw_seed: number;
+  /** `§7`'s frozen value, recorded so a departure is visible without the spec. */
+  readonly frozen_draw_seed: number;
+  /**
+   * `false` when a local override was used (`AL3`, M44).
+   *
+   * An artifact that cannot pass itself off as official is what separates the
+   * exploration `AL4` permits from the result-driven choice `§L.4` forbids.
+   */
+  readonly authoritative: boolean;
   readonly by_clause: ConsistencyResult["by_clause"];
   readonly divergences: ConsistencyResult["divergences"];
   readonly admissibility_divergences: readonly string[];

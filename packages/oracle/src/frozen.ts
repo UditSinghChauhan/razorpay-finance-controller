@@ -147,5 +147,13 @@ export const BPS_DENOMINATOR = 10_000;
  * `TAU_FLOOR_PAISE` and `TAU_RATE_BPS` are unchanged, no constraint, budget or label
  * definition changes, and `BENCHMARK_VERSION` (1.0.6) and `GT_VERSION` (1.1.0) stay
  * `packages/generator`'s.
+ *
+ * **1.4.27 -> 1.4.28 (M44) — required nothing of this package.** The amendment
+ * freezes `PREREGISTRATION.md §5.3`'s **consistency** draw into `§7`; this
+ * package owns the **completeness** gate, which reads no sample and draws
+ * nothing. `universe.ts`'s `isTargetKind` and `memberContribution` are the two
+ * pools the frozen draw cites and are **read, not amended** — `DATA_MODEL.md
+ * §11.1`'s member-eligible set is unchanged. `BENCHMARK_VERSION` (1.0.7) and
+ * `GT_VERSION` (1.1.0) stay `packages/generator`'s.
  */
-export const SPEC_VERSION = "1.4.27";
+export const SPEC_VERSION = "1.4.28";
