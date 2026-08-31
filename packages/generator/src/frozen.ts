@@ -434,5 +434,17 @@ export const GT_VERSION = "1.1.0";
  * `SEEDS_PER_CONFIGURATION` are untouched -- and the `§4.1` composition, the
  * `§6.1` seed table, `GT_VERSION` and the recon report's spec-1.4.24 row order are
  * all unchanged.
+ *
+ * **1.4.25 -> 1.4.26 (M41) — required nothing of this package, and not even a
+ * version constant.** The amendment is a threats-to-validity **disclosure**
+ * (`PREREGISTRATION.md §10` V23, `DECISION_BRIEF.md §A.33`): `§H` tier H1's
+ * affirmative claim is withdrawn because `R3`'s choice set is a singleton on the
+ * conforming v1.0.0 population and `§7`'s frozen `A3-NOLLM` policy is weakly
+ * dominant. Nothing this package produces is implicated. **`BENCHMARK_VERSION`
+ * does NOT move** -- no artifact, population parameter, seed, family, rate, `§7`
+ * threshold or `§18` manifest field changes, and there is no dataset in existence
+ * to regenerate. `constraint_set_hash` is `packages/domain`'s and is unmodified;
+ * `GT_VERSION` stays 1.1.0. This constant moves only so the package's declared
+ * provenance matches the documents it was checked against.
  */
-export const SPEC_VERSION = "1.4.25";
+export const SPEC_VERSION = "1.4.26";
