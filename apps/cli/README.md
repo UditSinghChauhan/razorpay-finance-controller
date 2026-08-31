@@ -1,9 +1,10 @@
 # `@assay/cli`
 
-Written against **specification 1.4.25 / benchmark 1.0.5**.
+Written against **specification 1.4.29 / benchmark 1.0.7**.
 
-`assay generate · oracle · run · bench · close · verify · seal`
-(`DECISION_BRIEF.md §C` T0-11).
+`assay generate · oracle · run · bench · close · verify · seal · report`
+(`DECISION_BRIEF.md §C` T0-11; `report` appended at spec 1.4.29, register row
+`DATA_MODEL.md §22.2` **M48**).
 
 > *"**all filesystem I/O** — it acquires raw source contents and passes them into
 > `packages/domain`'s `S0` boundary, and **performs no `S0` transform itself**
@@ -11,6 +12,15 @@ Written against **specification 1.4.25 / benchmark 1.0.5**.
 > Everything demonstrable must be scriptable."* — `ARCHITECTURE.md §3`
 
 This package is a **composition root**. It holds no reconciliation logic at all.
+
+**From spec 1.4.29 (register row M47) it also holds the seven agent
+implementations**, at `src/agents/`. That is not reconciliation logic arriving:
+an agent is a *composition* of `engine`, `llm`, `probe` and `ledger` behind
+`@assay/eval`'s one interface, and it is built here because `packages/eval`
+refuses all three imports — register row **M37** having already ruled that
+hosting the run loop there *"would put the system under test inside the thing
+measuring it"*. The agents are constructed here and **injected**; `packages/eval`
+imports nothing new, and `src/agents/**` may not reach `src/fs/` at all.
 
 ## What this package guarantees
 
@@ -152,9 +162,17 @@ asserted from its source in `tests/boundary.test.ts`; the aggregation itself is
 tested in `packages/generator/tests/dataset.test.ts`, at seeds `§6.1` assigns to
 no split.
 
-`--split test` remains refused for the reason `commands/generate.ts` states: the
-command cannot establish whether the seal tag exists, and *"a command that
-guessed would guess in the direction that costs a seed"*.
+`--split test` remains refused **until the operator attests to the seal tag**
+(spec 1.4.29, register row **M45**). `PREREGISTRATION.md §6.1` holds the split
+*"before the seal"*, and M45 settles what that bounds: the seal is `§9` step 1's
+signed tag, and step 6's commit SHA is the seal *point*. This command still
+cannot establish whether the tag exists — it runs no subprocess and reads no git
+state, and *"a command that guessed would guess in the direction that costs a
+seed"* — so what lifts the bar is `--seal-tag bench-v<BENCHMARK_VERSION>` and
+nothing else. Absent, the refusal is exactly what it was at spec 1.4.28 and `AL7`
+still burns a seed on the breach. `src/seal-tag.ts` holds M45's five clauses; the
+tag name is **derived** from `BENCHMARK_VERSION`, which is what removes the class
+of defect M46 corrects.
 
 A blocked command reports the **owner** and the **citation** and exits `3`. It
 does not implement the missing side: `ARCHITECTURE.md §3` and `§L.2` have already
@@ -227,6 +245,29 @@ it. The executor's enum is still closed at five.
   src/fs/io.ts           the one filesystem module; every read is guarded
   src/fs/json-dir.ts     a *.json directory listing (names files, opens none)
   src/fs/digest.ts       sha256 over artifact bytes, branded by domain
+  src/seal-tag.ts        §9 step 1's tag name, derived; M45's attestation check
   src/artifacts/         jsonl framing; observation, ledger-event, cache loaders
-  src/commands/          T0-11's seven, in the order the table names them
+                         and metrics-path.ts — M48's scored-artifact layout
+  src/agents/            §3's seven, constructed here and injected into eval
+                         (M47); may not import ../fs/ — path-scoped lint (G8)
+  src/commands/          T0-11's eight, in the order the table names them
 ```
+
+## Where a scored run's artifacts land
+
+Ratified at spec 1.4.29, register row **M48**. The scored unit is
+`(agent_id, split, seed, llm_mode)` — `@assay/eval`'s `RunKey`, the union of what
+`ARCHITECTURE.md §10` and `§C` T0-9 each named in part — and the bootstrap
+resamples `seed` alone.
+
+```
+  runs/<run_id>/<split>/<seed>/<agent>/<llm_mode>/metrics.json
+  runs/report.html                    EVALUATION_SPEC.md §7's own --out path
+```
+
+**These are committed.** `PROJECT_SPEC.md §7` `S10`, `EVALUATION_SPEC.md §5.5`
+and `§C` T0-13 each require every claimed number to be traceable to a *committed*
+run artifact, and through spec 1.4.28 `.gitignore` excluded `runs/` wholesale.
+The SQLite database stays ignored. `artifacts/metrics-path.ts` records the
+`metrics.json` layout as a **convention**, on the precedent
+`artifacts/replay-cache.ts` set for `fixtures/llm-cache/`.

@@ -262,6 +262,19 @@ export const LEGACY_MAX_UNRESOLVED_ABS_PAISE = 5_000_000;
  *     added and none is removed** — `metric-list.ts` stays at 28, and the gate is
  *     not a metric.
  *
+ *   - **1.4.29 (M45-M48)** — three contract defects closed before any DEV scored
+ *     result existed. **None of them is a `§7` parameter and none reaches this
+ *     file.** M47 moves the seven agent implementations from
+ *     `DECISION_BRIEF.md §K`'s `packages/eval/src/agents/` to
+ *     `apps/cli/src/agents/`, where they are constructed and **injected** — this
+ *     package gains no import, `agent.ts` is unchanged, `AgentInput` keeps its
+ *     two fields and `report/` does not move. M48 adds `run-key.ts`, which
+ *     records `(agent_id, split, seed, llm_mode)` as the scored unit and holds no
+ *     path and no threshold. M45 and M46 are `PREREGISTRATION.md §9`'s and reach
+ *     `apps/cli` alone. **No metric definition changes, none is added and none is
+ *     removed** — `metric-list.ts` stays at 28 — and `BENCHMARK_VERSION` does NOT
+ *     move, staying 1.0.7.
+ *
  * **Nothing below moves with it**, and neither does `metric-list.ts`.
  */
-export const SPEC_VERSION = "1.4.28";
+export const SPEC_VERSION = "1.4.29";

@@ -502,5 +502,20 @@ export const GT_VERSION = "1.1.0";
  * because `§9` step 5 pins it; no population, seed, family, rate, `§7` threshold
  * this package reads, composition figure or artifact byte moves, and
  * `GT_VERSION` stays 1.1.0.
+ *
+ * **1.4.28 -> 1.4.29 (M45-M48) — required one thing of this package and it is
+ * this constant.** M45/M46 correct `PREREGISTRATION.md §9`'s stale
+ * `bench-v1.0.6` / `"1.0.6"` literals to the version this package has exported
+ * since spec 1.4.28 and settle that `§6.1`'s *"before the seal"* means before
+ * `§9` step 1's signed tag; `apps/cli` derives that tag name from
+ * `BENCHMARK_VERSION` below rather than transcribing it, which is what removes
+ * the class of defect M46 corrects. **`SPLIT_TABLE`, `SEED_BLOCKS`, `AL7`'s
+ * successor rule and `blockOf` are read by that path and amended by none of
+ * it.** M47 (agent placement) and M48 (the report command and the scored-artifact
+ * layout) reach `apps/cli` and `packages/eval` and not this package.
+ * **`BENCHMARK_VERSION` does NOT move and stays 1.0.7**: no decision parameter
+ * enters `§7`, no artifact surface changes and no metric moves. No population,
+ * seed, family, rate, `§7` threshold, composition figure or artifact byte moves;
+ * `GT_VERSION` stays 1.1.0.
  */
-export const SPEC_VERSION = "1.4.28";
+export const SPEC_VERSION = "1.4.29";
