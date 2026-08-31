@@ -1,8 +1,20 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.24 · **Date:** 2026-08-28
+**Spec version:** 1.4.25 · **Date:** 2026-08-31
 **Reviewer role:** principal architect / skeptical reviewer
+
+**At spec 1.4.25** §A.32 records three governance decisions and one implementation
+convention, taken at a governance gate held **after spec 1.4.24, before `R3` exists
+in any form, and before any H1, dev or benchmark figure was observed**: the
+`A3-NOLLM` probe priority policy is **frozen** into `PREREGISTRATION.md §7`;
+`DATA_MODEL.md §13` gains a fourth and final certificate reason
+`NO_USEFUL_PROBE_AVAILABLE`; `R3` **may not propose `widen_temporal_window`**, with
+`§L.1` rule 2 **unchanged and unweakened**; and a rejected probe proposal terminates
+the loop, recorded as a convention. Register rows **M39** and **M40**. **Two are
+ratifications and the record says so.** No metric definition, `C1`–`C8`, `SE1`–`SE5`
+weight, `§7` threshold, population parameter or `constraint_set_hash` moves;
+`GT_VERSION` stays 1.1.0. Benchmark v1.0.4 → **v1.0.5**.
 
 **At spec 1.4.6** §A.13 records one definition, taken at a governance gate held
 during the `packages/oracle` build and before any dataset was generated:
@@ -1841,6 +1853,145 @@ threshold; `§18`'s `BenchmarkManifest`; the population, seeds, families and rat
 remains open** and is not resolved here — it governs `fetch_settlement_recon`'s
 `date` argument, which is the dispatch's business rather than the artifact's.
 
+### A.32 Spec 1.4.25 / benchmark 1.0.5 — the control arm nobody had frozen
+
+**The decision.** Four items, taken together because they are one seam. `A3-NOLLM`'s
+**static probe priority policy** is stated and frozen into `PREREGISTRATION.md §7`
+(register row M39). `R3`'s **proposable action set** is fixed at the four
+id-argument probes plus `NO_USEFUL_PROBE`, excluding `widen_temporal_window`
+(M40). `DATA_MODEL.md §13`'s `AmbiguityCertificate.reason` gains a **fourth and
+final** member, `NO_USEFUL_PROBE_AVAILABLE`, closing `RECONCILIATION_SPEC.md §6`'s
+`A2` middle case (M40). And a rejected probe proposal **terminates the loop**, an
+implementation convention recorded at `ARCHITECTURE.md §12`. Nothing is generated
+and nothing is implemented: `R3` does not exist in either arm, which is precisely
+why the policy could still be frozen honestly.
+
+**The one that mattered most was invisible.** `ARCHITECTURE.md §6.5` has called the
+`offline` provider's `R3` a *"static probe priority list"* since spec 1.0.0, and
+`RECONCILIATION_SPEC.md §6.2` has made that list the **comparand** of *"whether the
+LLM's probe selection beats a static priority list (`A3-NOLLM`)"* for just as long.
+**No document ever stated the list.** Six sites recorded it open and none supplied
+it. That is not a missing detail: `A3`'s probe spend decides `A3`'s own figures for
+metrics **1, 2, 3, 4, 6, 8** and **9**, all primary, so an unstated policy is an
+outcome-bearing decision parameter of a **scored control agent** — and `§L.4`'s bar
+on result-driven change reaches only *"any frozen threshold or decision parameter
+listed in `PREREGISTRATION.md §7`"*, which this was not. An implementer could have
+authored the list, seen dev figures, and revised it, violating no frozen rule and
+moving the denominator of the only claim `§H` tier H1 exists to make.
+`EVALUATION_SPEC.md §3.2` requires an ablation to differ from ASSAY *"in exactly one
+respect"*; unfrozen, `A3` differed in two — the provider, and a hand-authored
+policy.
+
+**It is a RATIFICATION, and the record says so.** No frozen clause determines an
+ordering; three candidate derivations were tested and none survives as more than an
+argument. The values were chosen on frozen consumer facts rather than on taste:
+`fetch_settlement_recon` leads because `SE5`'s 2000 bps is the only route above
+`ε = 1500` (`PREREGISTRATION.md §10` V20) while `SE2` (spec 1.4.20) and `SE4` (spec
+1.4.11) are declared expected-non-binding, so it is the only probe that can move a
+decision on this population; the remaining three follow `§6.2`'s own declaration
+order among equals, which needs no new fact. **Argument selection is the half that
+would have been missed**, and it is not derivable from an ordering: which
+`settlement_id` a probe names decides what the report returns, hence `SE5`, hence
+`Δs`, hence commit-versus-abstain. Lexicographically smallest is chosen because it
+is **total, order-independent and admits no human or model choice at the moment of
+selection** — the property `AL7`'s successor rule was written for, and the property
+enumeration order and wall-clock order both lack. `DATA_MODEL.md §16` and metric 23
+already forbid enumeration order from supplying an outcome, which `§A.28`'s M35
+found for tie-breaks and which applies here unchanged.
+
+**Frozen on stricter terms than the weights, deliberately.** `PREREGISTRATION.md §7`
+lets the `SE1`–`SE5` weights be adjusted on TRAIN and DEV before the seal. The
+priority policy is **not** covered by that permission and `§7` now says so: the
+weights rank candidates inside one agent, while this policy parameterises the
+**control** the system under test is measured against. It is bound by `AL3`, listed
+in `§L.1` rule 12, and unadjustable on TRAIN, DEV and TEST alike. R1's regex battery
+and R2's classifier are **not** pre-registered this way and do not need to be —
+R1's output is verified against its input by substring grounding and R2's is scored
+against a known cause by metric 10; neither is a denominator.
+
+**The days conflict resolved without touching `§L.1` rule 2, and that is the whole
+point.** `RECONCILIATION_SPEC.md §6.2` declares `widen_temporal_window(days)` and
+`DATA_MODEL.md §12` types `days` as `integer > 0`; rule 2 forbids a numeric field in
+any LLM output schema and sits under *"invariants that may never be violated"*. The
+apparent contradiction dissolves on reading which proposition is settled. Rule 2 is
+settled, absolute and doubly enforced. Whether `R3` may propose this probe is
+**expressly unsettled** — `§6.2`, `THREAT_MODEL.md §T7` and register row M33 each
+say so in terms. A settled invariant governs an unsettled question, so the question
+resolves in the only direction that preserves the invariant. **Rule 2 is unchanged
+and unweakened, and no `days` constant is invented.**
+
+**Two alternatives were tested and both fail on frozen text, not on convenience.** A
+**string numeral** satisfies rule 2's letter and defeats the mechanism rule 2 exists
+to enforce: `ARCHITECTURE.md §4` boundary 2 says *"where a quantity is needed, the
+model returns an **identifier** and deterministic code **looks up** the value"*, and
+a numeral a caller parses is neither an identifier nor looked up in anything. A
+**symbolic token with a deterministic mapping** is boundary 2's own mechanism, and
+fails on the table rather than the shape: its values exist in no document, three
+sections have expressly declined to supply one, and the single figure frozen text
+does derive — M33's *"the widening required for completeness is **zero days**"* — is
+excluded by `§12`'s own `integer > 0`. The frozen derivation and the frozen schema
+are mutually exclusive at the only derivable point. Amending rule 2 was rejected as
+disproportionate: it would weaken a trust boundary to admit a probe M33 already
+reports as expected-non-binding on this population and whose result spec 1.4.15 bars
+from feeding `SE5`.
+
+**The enum is not narrowed and the probe is not deleted.** `DATA_MODEL.md §12` keeps
+five `ProbeResultDetail` variants, `§6.2` keeps five probes, and `THREAT_MODEL.md
+§T7`'s *"closed enum of five read-only operations"* is untouched — the executor's
+enum and the set of actions **one proposer** may name are different sets, and only
+the second is decided. `§T7`'s numeric hard bound **remains unspecified**; it is now
+unreachable through `R3` rather than supplied. Both arms use the same four-probe
+schema, which is what keeps `EVALUATION_SPEC.md §3.2`'s attributability intact — an
+asymmetry in proposable actions would itself have been a second difference.
+
+**The `A2` middle case had to close here, and spec 1.4.23 said as much.** `§6.2`
+wrote *"No new terminal reason is invented for a loop that stopped on
+`NO_USEFUL_PROBE` with budget remaining; that gap is `§6`'s and remains open"* at a
+point when nothing could reach the state: no proposer existed, `attempts` was always
+`0`, and the interval `0 < attempts < P_max` was empty. This amendment makes it
+reachable in **both** arms — a model may decline after spending one or two probes,
+and M39's policy returns the same token when no priority entry is constructible — so
+this is the amendment that must close it. `DATA_MODEL.md §13`'s union was a **closed
+three-member** type: without a fourth value the state is not merely undefined, it is
+**unrepresentable**, and no defaulting could have hidden that. The mapping is now
+total over `attempts`. **No fourth unrelated reason is added**, no existing reason
+is re-pointed, the certificate is still emitted **iff** `ABSTAINED`, and `§16`'s
+hashed `body` projection and genesis are unchanged — `reason` already entered the
+hashed body through `certificate`.
+
+**`N1` is labelled a convention because that is what it is.** A well-formed proposal
+that `packages/probe` rejects before budget is spent terminates the loop for that
+component; it is not re-issued, `attempts` does not move, and the terminal reason
+follows from the resulting state. The alternative is not neutral: an unchanged loop
+state yields an unchanged `input_hash`, hence an unchanged `cache_key`, hence the
+identical rejected proposal forever under `--llm=replay` and `--llm=offline` alike.
+It writes no value, adds nothing to `§7` or `AL3`, and is recorded at
+`ARCHITECTURE.md §12` beside the other failure dispositions rather than in a frozen
+block.
+
+**What this does NOT settle.** `M31`'s date-scoping field, which the policy never
+reads. `M33`'s `days` bound, now unreachable through `R3` but still unstated.
+`R3`'s own selection policy in the `replay` and live arms — that is the model's
+output and is not a frozen constant, which is the entire point of the comparison.
+And one thing worth stating plainly: **`abstentions resolved per probe spent` is not
+on `PREREGISTRATION.md §8`'s frozen list of 28**, and `EVALUATION_SPEC.md §4.13`
+says it is *"not a new quantity that could support a claim"*. `§H` tier H1's
+evidence therefore runs through **metric 24 `offline_parity`** — which `§E.6` already
+names *"the pre-registered form of the AI-necessity claim"* — plus the ASSAY-versus-`A3`
+deltas in the primary metrics, with the probe ratio reported beside them as
+provenance and labelled `EXPLORATORY`. **No metric is added here to fix that**;
+doing so would be a benchmark amendment made because a claim wanted one.
+
+**What does not change.** Every metric formula, definition and number; the 28-metric
+list; `C1`–`C8` and therefore `constraint_set_hash`; `SE1`–`SE5`; every `§7`
+threshold including `P_max = 3`; `DATA_MODEL.md §18`'s `BenchmarkManifest` **shape**;
+the population, seeds, families and rates; and `GT_VERSION` **1.1.0**.
+`BENCHMARK_VERSION` moves **1.0.4 → 1.0.5**, because the pre-registered parameter set
+gains a control-arm policy and the certificate gains a legal value. **`§L.1` rule 2
+is unchanged and unweakened**, and the four sentences of `§L.5` remain true —
+sentence 4's *"cannot express a monetary amount"* is strengthened, not qualified, by
+`R3` losing its one numeric argument.
+
 ## B. Locked project definition
 
 > **ASSAY is a settlement reconciliation controller for Razorpay-shaped payment
@@ -1921,6 +2072,17 @@ a choice, cut anything else first.
 ---
 
 ## E. Benchmark changes in this revision
+
+**At benchmark 1.0.5 (spec 1.4.25, `§A.32`).** `PREREGISTRATION.md §7` gains the
+**`A3-NOLLM` probe priority policy** — the control arm's `R3`, stated for the first
+time and bound by `AL3` and `§L.1` rule 12 — and `DATA_MODEL.md §13`'s
+`AmbiguityCertificate.reason` gains its fourth and final member,
+`NO_USEFUL_PROBE_AVAILABLE`. `R3` may not propose `widen_temporal_window`; `§L.1`
+rule 2 is unchanged and unweakened and no `days` constant is invented. **No metric
+formula, definition, number or count changes** — the list stays at 28 — and
+`constraint_set_hash`, `C1`–`C8`, `SE1`–`SE5`, every other `§7` threshold, the
+population parameters and `GT_VERSION` 1.1.0 are all unmoved. The numbered items
+below are the historical record and are preserved verbatim.
 
 0. **A PG-side recon report is committed, and the benchmark version moves to
    1.0.4** (spec 1.4.22, `§A.29`). `RECONCILIATION_SPEC.md §6.2`'s
@@ -2036,7 +2198,7 @@ before a reviewer does.
 
 | Tier | Item | Value |
 |---|---|---|
-| H1 | LLM role R3 (probe planning) + `abstentions resolved per probe` | Strongest genuine-AI-necessity evidence |
+| H1 | LLM role R3 (probe planning) + `abstentions resolved per probe` | Strongest genuine-AI-necessity evidence. **From spec 1.4.25:** the claim runs through **metric 24** and the ASSAY-vs-`A3` primary deltas — `abstentions resolved per probe spent` is absent from `PREREGISTRATION.md §8`'s 28 and is reported `EXPLORATORY` as provenance (`EVALUATION_SPEC.md §4.13`). The `A3` comparand is frozen at `PREREGISTRATION.md §7` (M39). |
 | H1 | Calibration: reliability diagram + ECE | Justifies the ε threshold |
 | H2 | LLM role R4 (grounded explanations) with numeral verification | Demo polish with a real control attached |
 | H2 | `anthropic` and `openai-compatible` providers exercised live | Completes the provider matrix; needs F2 resolved |
@@ -2247,9 +2409,18 @@ with a version bump, not a judgement call at the keyboard.
     `ε = 1500 bps (0.15)`, `K_max = 22`, `C_max = 5000`, `P_max = 3`,
     `C_review = ₹250`, `C_exception = ₹500`, `k_sigma = 3`, `queue_top_n = 20`,
     `max_unresolved_ratio_bps = 50 (0.005)`, the per-family
-    `target_record_count` schedule in `PREREGISTRATION.md §4.1`, and the SE1–SE5
-    weights (3500 / 2000 / 1500 / 1000 / 2000 bps). `max_unresolved_abs` no
-    longer exists.
+    `target_record_count` schedule in `PREREGISTRATION.md §4.1`, the SE1–SE5
+    weights (3500 / 2000 / 1500 / 1000 / 2000 bps), and — **added at spec 1.4.25,
+    register row M39** — the **`A3-NOLLM` probe priority policy** of
+    `PREREGISTRATION.md §7`: priority order `fetch_settlement_recon` →
+    `fetch_payment` → `fetch_order` → `fetch_refund`, the lexicographically
+    smallest eligible argument for the chosen kind, first constructible entry
+    wins, else `NO_USEFUL_PROBE`. `max_unresolved_abs` no longer exists.
+    **The policy is frozen on stricter terms than the SE1–SE5 weights**, which
+    `PREREGISTRATION.md §7` permits adjusting on TRAIN and DEV before the seal: it
+    parameterises the **control arm** against which the system under test is
+    measured, so it is unadjustable on TRAIN, DEV and TEST alike, and was fixed
+    before `R3` existed in either arm.
 
 ### L.2 Build order (do not reorder)
 

@@ -5,7 +5,7 @@ layer. `ARCHITECTURE.md §3`: *"Must be independently runnable and
 seed-deterministic. Kept out of the engine so no engine code can ever import
 ground truth — an import lint enforces this."*
 
-Written against **specification 1.4.24 / benchmark 1.0.4**.
+Written against **specification 1.4.25 / benchmark 1.0.5**.
 
 ## What this package guarantees
 
