@@ -48,6 +48,48 @@ export type ProbeProposal =
 /** A proposal that names one of the five probes, rather than declining. */
 export type ProbeCallProposal = Exclude<ProbeProposal, { probe: typeof NO_USEFUL_PROBE }>;
 
+/**
+ * The four probes `R3` may propose (spec 1.4.25, `DATA_MODEL.md §22.2` M40).
+ *
+ * `widen_temporal_window` is **absent**: its only argument is `days`, and
+ * `DECISION_BRIEF.md §L.1` rule 2 forbids a numeric field in any LLM output
+ * schema. `RECONCILIATION_SPEC.md §6.2`, `THREAT_MODEL.md §T7` and register row
+ * M33 each left `R3`'s authority over that probe unsettled, so the settled
+ * invariant governs and the unsettled question resolves the only way that
+ * preserves it.
+ *
+ * **`PROBE_KINDS` still has five members and this list is not a narrowing of
+ * it.** The executor's enum and the set of actions **one proposer** may name are
+ * different sets: a non-`R3` caller may still construct a
+ * `widen_temporal_window` call through {@link validate}, and `§T7`'s closed enum
+ * of five is unchanged. Only the `R3` entry point is narrowed, at
+ * {@link offerR3Proposal}.
+ */
+export const R3_PROBE_KINDS: readonly ProbeKind[] = Object.freeze([
+  "fetch_order",
+  "fetch_payment",
+  "fetch_refund",
+  "fetch_settlement_recon",
+] as const);
+
+/** One of the four probes `R3` may propose. */
+export type R3ProbeKind = Exclude<ProbeKind, "widen_temporal_window">;
+
+/**
+ * What `R3` may propose: the four id-argument probes, or the decline.
+ *
+ * `ARCHITECTURE.md §6`: *"one call from a closed enum with allowlisted
+ * arguments, or `NO_USEFUL_PROBE`"*, narrowed by M40. Every field is a string,
+ * which is what makes `§L.1` rule 2 hold at the type level and not only at the
+ * schema walker.
+ */
+export type R3Proposal = Exclude<ProbeProposal, { probe: "widen_temporal_window" }>;
+
+/** Whether a probe kind is one `R3` may propose (spec 1.4.25, M40). */
+export function isR3ProposableKind(kind: string): kind is R3ProbeKind {
+  return (R3_PROBE_KINDS as readonly string[]).includes(kind);
+}
+
 declare const validatedProbeCall: unique symbol;
 
 /**
@@ -72,7 +114,17 @@ export type RejectionReason =
   /** `§L.1` rule 8 / `I6`: the argument names no observation. */
   | "ARGUMENT_NOT_IN_OBSERVATION_SET"
   /** `DATA_MODEL.md §12`: `days` is `integer > 0`. */
-  | "ARGUMENT_OUT_OF_RANGE";
+  | "ARGUMENT_OUT_OF_RANGE"
+  /**
+   * Spec 1.4.25 / M40: the proposal names a probe `R3` may not propose.
+   *
+   * Reachable only through {@link offerR3Proposal}. `R3Proposal` excludes
+   * `widen_temporal_window` at the type level, so this fires only for a value
+   * that crossed a runtime boundary — a provider response, a replay cache entry
+   * — which `ARCHITECTURE.md §4` boundary 2 requires be treated as adversarial
+   * whatever its declared type says.
+   */
+  | "NOT_R3_PROPOSABLE";
 
 export type ProposalCheck =
   | { readonly ok: true; readonly call: ValidatedProbeCall }

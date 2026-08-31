@@ -69,7 +69,6 @@ export {
   modalLagDays,
   solve,
   tauFor,
-  type CertificateReasonResult,
   type ReconReport,
   type ScoredSolution,
   type SignalContributions,

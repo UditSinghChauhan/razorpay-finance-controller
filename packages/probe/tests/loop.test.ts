@@ -1,5 +1,5 @@
 import type { ProbeResultDetail } from "@assay/domain";
-import { P_MAX, type SolveInput } from "@assay/engine";
+import { P_MAX, certificateReason, type SolveInput } from "@assay/engine";
 import { describe, expect, it } from "vitest";
 
 import { validate, type ValidatedProbeCall } from "../src/call.js";
@@ -87,27 +87,22 @@ describe("the three attempt positions — 0 / middle / exhausted", () => {
     const d = decide(s, ambiguousAt(P_MAX));
     expect(d.action).toBe("STOP");
     if (d.action === "STOP") {
-      expect(d.certificate_reason).toEqual({
-        determined: true,
-        reason: "PROBE_BUDGET_EXHAUSTED",
-      });
+      expect(d.certificate_reason).toBe("PROBE_BUDGET_EXHAUSTED");
     }
   });
 
-  it("SURFACES §6's undecided middle seam and invents no terminal reason", () => {
+  it("closes §6's middle case with NO_USEFUL_PROBE_AVAILABLE (spec 1.4.25, M40)", () => {
     // The A2 middle case: stopped with budget left, on NO_USEFUL_PROBE.
     const s = { ...initialState("c"), attempts: 2 };
     const out = offerProposal(s, { probe: "NO_USEFUL_PROBE" }, UNIVERSE, ambiguousAt(2));
     expect(out.kind).toBe("STOP");
     if (out.kind === "STOP") {
-      expect(out.certificate_reason).toEqual({
-        determined: false,
-        seam: "A2_MIDDLE_CASE_UNSPECIFIED",
-        attempts: 2,
-      });
-      // Nothing here fabricates a `reason` for the undecided branch.
-      expect(out.certificate_reason.determined).toBe(false);
+      expect(out.certificate_reason).toBe("NO_USEFUL_PROBE_AVAILABLE");
+      // A decline is not a rejection: N1 did not fire.
+      expect(out.rejection).toBeNull();
     }
+    // The reason is the engine's, forwarded — not one this package chose.
+    expect(certificateReason(2)).toBe("NO_USEFUL_PROBE_AVAILABLE");
   });
 });
 
@@ -121,7 +116,7 @@ describe("transitions", () => {
       initialState("c"),
       solve({
         outcome: "INTRACTABLE",
-        certificate_reason: { determined: true, reason: "SEARCH_BOUND_EXCEEDED" },
+        certificate_reason: "SEARCH_BOUND_EXCEEDED",
       }),
     );
     expect(d.action).toBe("STOP");
@@ -154,17 +149,23 @@ describe("R3 proposal and execution stay separated (§6.2)", () => {
       ambiguousAt(0),
     );
     expect(out.kind).toBe("CALL");
-    if (out.kind === "CALL" && out.check.ok) {
+    if (out.kind === "CALL") {
       // A call, not a result: no data field exists on it.
-      expect(Object.keys(out.check.call)).toEqual(["probe", "settlement_id", "date"]);
+      expect(Object.keys(out.call)).toEqual(["probe", "settlement_id", "date"]);
     }
   });
 
   it("rejects a proposal whose argument fails pre-call I6, without spending budget", () => {
     const s = initialState("c");
     const out = offerProposal(s, { probe: "fetch_payment", payment_id: ABSENT }, UNIVERSE, ambiguousAt(0));
-    expect(out.kind).toBe("CALL");
-    if (out.kind === "CALL") expect(out.check.ok).toBe(false);
+    // N1 (spec 1.4.25): a refused proposal STOPS the component. There is no
+    // "rejected, ask again" branch for a caller to loop on.
+    expect(out.kind).toBe("STOP");
+    if (out.kind === "STOP") {
+      expect(out.rejection).toBe("ARGUMENT_NOT_IN_OBSERVATION_SET");
+      expect(out.argument).toBe(ABSENT);
+      expect(out.certificate_reason).toBe("EVIDENCE_TIE");
+    }
     expect(s.attempts).toBe(0);
   });
 });

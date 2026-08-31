@@ -1,6 +1,6 @@
 # `@assay/llm`
 
-Written against **specification 1.4.21 / benchmark 1.0.3**.
+Written against **specification 1.4.25 / benchmark 1.0.5**.
 
 The LLM adjudicator — `ARCHITECTURE.md §6`'s four bounded roles behind `§6.5`'s
 one `LlmProvider` interface, and `§4` boundary 2's three verification layers.
@@ -47,23 +47,44 @@ providers; roles R1, R2; schema/allowlist/grounding verification"*.
 | `anthropic`, `openai-compatible` | **declared, not built** | `§H` tier H2, blocked on `§F` **F2** — no metered credential. Declared as data in `PROVIDER_DESCRIPTORS` so the four-provider architecture stays checkable while two are unimplemented. |
 | `R1 parse_bank_narration` | built | `§C` T0-7 |
 | `R2 classify_exception` | built | `§C` T0-7 |
-| `R3 propose_probe` | **declared, not built** | `§H` tier **H1** |
+| `R3 propose_probe` | built | `§H` tier **H1**, spec 1.4.25 — `roles/r3.ts` |
 | `R4 explain_decision` | **declared, not built** | `§H` tier H2 |
 | schema / allowlist / grounding | built | `§4` boundary 2, all three |
 
-**`R3` is not stubbed, and that is deliberate.** `§6.5` describes the `offline`
-provider's `R3` as a *"static probe priority list"* — which is exactly the
-baseline `§6` measures the model's probe selection **against**
-(*"abstentions resolved per probe spent"*). Writing one here would silently
-create the control before the experiment that needs it, so `offlineProvider()`
-returns `ROLE_NOT_IMPLEMENTED` for `R3` and `R4` rather than a plausible default.
+**`R3`'s offline half is a pre-registered parameter, not a list written here.**
+`§6.5` describes the `offline` provider's `R3` as a *"static probe priority
+list"*, which is exactly the baseline `§6` measures the model's probe selection
+**against** (*"abstentions resolved per probe spent"*). Phase 8 refused to stub it
+because writing one here would *"silently create the control before the experiment
+that needs it"*. **That objection is answered rather than overruled:**
+`PREREGISTRATION.md §7` now states the policy, `AL3` binds it and
+`DECISION_BRIEF.md §L.1` rule 12 lists it, so `§L.4` forbids revising it from an
+observed result — on TRAIN, DEV and TEST alike. `roles/r3.ts` **executes** a frozen
+parameter; it does not choose one, and nothing in it may be tuned.
+
+```
+  priority   fetch_settlement_recon -> fetch_payment -> fetch_order -> fetch_refund
+  argument   the LEXICOGRAPHICALLY SMALLEST eligible one
+  stop       first constructible entry; else NO_USEFUL_PROBE
+```
+
+**`R3` may not propose `widen_temporal_window`** (spec 1.4.25, `DATA_MODEL.md
+§22.2` M40). Its only argument is `days`, and `§L.1` rule 2 — *"No LLM output
+schema may contain a numeric field"* — is **unchanged and unweakened**. The
+executor's enum stays closed at **five**; only what this proposer may name is
+four. A discipline test fails the build if any code in this package names that
+probe, or a `days` field.
+
+**`R4` is still declared and not built** (`§H` tier H2), and `offlineProvider()`
+returns `ROLE_NOT_IMPLEMENTED` for it rather than a plausible default.
 
 **No probe execution and no probe loop live here.**
 `RECONCILIATION_SPEC.md §6.2` has `R3` propose a probe and *"deterministic code
-execute it and re-run the solve"* — two different actors. Neither exists yet, and
-the executor's owner is an **open governance question**. A discipline test fails
-the build if any source file in this package names a probe kind, `PROBE_KINDS`,
-`ProbeResultDetail` or `P_MAX`, so this package cannot quietly become the answer.
+execute it and re-run the solve"* — two different actors. This package is the
+**proposer**; `packages/probe` is the executor (M37) and `apps/cli` performs the
+dispatch. A discipline test fails the build if any source file here names
+`PROBE_KINDS`, `ProbeResultDetail`, `ValidatedProbeCall`, `probeEventBody`,
+`P_MAX` or `@assay/probe`, so this package cannot quietly become the executor.
 
 ## Trust boundary 2 (`ARCHITECTURE.md §4`)
 

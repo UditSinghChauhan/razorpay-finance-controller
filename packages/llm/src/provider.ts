@@ -24,7 +24,8 @@ import type { ZodType } from "zod";
  *                                                          on §F F2 (no metered
  *                                                          credential)
  *   R1, R2                      built
- *   R3, R4                      DECLARED, not built     -- §H tier H1 / H2
+ *   R3                          built        spec 1.4.25, §H tier H1
+ *   R4                          DECLARED, not built     -- §H tier H2
  * ```
  *
  * The four-provider architecture is **preserved as a declared table**
@@ -40,8 +41,15 @@ export const ROLE_IDS = Object.freeze(["R1", "R2", "R3", "R4"] as const);
 /** One of `§6`'s four roles. */
 export type RoleId = (typeof ROLE_IDS)[number];
 
-/** The roles this phase implements. `R3` is `§H` tier H1, `R4` tier H2. */
-export const IMPLEMENTED_ROLE_IDS = Object.freeze(["R1", "R2"] as const);
+/**
+ * The roles with a built implementation. `R4` remains `§H` tier H2.
+ *
+ * `R3` was added at spec 1.4.25 (`§H` tier H1): `PREREGISTRATION.md §7` freezes
+ * the `A3-NOLLM` policy the `offline` provider executes, and `DATA_MODEL.md §13`
+ * supplies the certificate reason the loop needs to terminate, so the role has
+ * both halves of a contract for the first time.
+ */
+export const IMPLEMENTED_ROLE_IDS = Object.freeze(["R1", "R2", "R3"] as const);
 
 /** A role with a built implementation at Phase 8. */
 export type ImplementedRoleId = (typeof IMPLEMENTED_ROLE_IDS)[number];
@@ -145,7 +153,7 @@ export function providerDescriptor(id: LlmProviderId): ProviderDescriptor {
  * in which, per `ARCHITECTURE.md §6`, amounts appear **as opaque references**
  * and never as values.
  */
-export type StructuredRoleInput = R1Input | R2Input;
+export type StructuredRoleInput = R1Input | R2Input | R3Input;
 
 /** `R1 parse_bank_narration` input (`ARCHITECTURE.md §6`). */
 export interface R1Input {
@@ -187,6 +195,111 @@ export interface R2Input {
   readonly member_count: number;
   /** Whether the target has an `AN2` bank-side match established. */
   readonly bank_matched: boolean;
+}
+
+/**
+ * One probe kind the caller has determined is constructible for this component.
+ *
+ * `ARCHITECTURE.md §6` gives `R3` the input *"the ambiguity certificate + **list
+ * of available probes**"*; this is that list. `argument_ids` holds the **eligible**
+ * arguments in `PREREGISTRATION.md §7`'s sense — of the exact type the probe
+ * requires, present in this component's context, and already past the frozen
+ * deterministic validity and pre-call `I6` checks.
+ *
+ * **The filtering is the caller's and happens before a provider is chosen**, so
+ * `offline` and `replay` receive byte-identical context and the only difference
+ * between the arms is which entry the proposer picks. `packages/probe` re-runs
+ * pre-call `I6` independently on whatever comes back, as `DECISION_BRIEF.md §L.1`
+ * rule 8 requires.
+ */
+export interface R3AvailableProbe {
+  /** One of the four `R3` may propose (`DATA_MODEL.md §22.2` M40). */
+  readonly probe: "fetch_order" | "fetch_payment" | "fetch_refund" | "fetch_settlement_recon";
+  /** Eligible arguments. Empty means the probe is not constructible here. */
+  readonly argument_ids: readonly string[];
+}
+
+/**
+ * What one already-spent probe returned, as `R3` sees it.
+ *
+ * Carried so that each iteration's input differs from the last: `§19`'s
+ * `cache_key` is `sha256(provider ‖ model_id ‖ system_prompt_hash ‖ input_hash)`,
+ * so an input that did not change between attempts would return the **same**
+ * proposal from the replay cache and spend all of `P_max` on one probe.
+ *
+ * Ids only. No amount, no score, no timestamp — there is no quantity here for a
+ * model to echo.
+ */
+export interface R3ProbeResultSummary {
+  readonly probe: string;
+  /** The entity the probe named, or `null` where the variant carries none. */
+  readonly argument_id: string | null;
+  /** `DATA_MODEL.md §12`: the probe **ran**; `false` means it yielded nothing. */
+  readonly yielded: boolean;
+  /** Entity ids the result carried, in the order the result listed them. */
+  readonly returned_entity_ids: readonly string[];
+}
+
+/**
+ * `R3 propose_probe` input (`ARCHITECTURE.md §6`), added at spec 1.4.25.
+ *
+ * **Amounts are opaque references, never values** — `ARCHITECTURE.md §6`'s `R2`
+ * rule, applied here for the same reason: `§4` boundary 2 answers "where a
+ * quantity is needed" with *"the model returns an identifier and deterministic
+ * code looks up the value"*, and carrying only a reference means there is no
+ * rupee figure in the envelope for a model to echo. `§L.5` sentence 4 —
+ * *"cannot express a monetary amount"* — stays literally true of this role.
+ *
+ * Structural counts and basis-point scores **are** carried, following `R2Input`'s
+ * `member_count`: they are neither free text nor monetary amounts, and `§L.1`
+ * rule 2 constrains **output** schemas.
+ */
+export interface R3Input {
+  readonly role: "R3";
+  readonly comp_id: string;
+  /** `DATA_MODEL.md §13`'s certificate, structurally. */
+  readonly certificate: R3CertificateSummary;
+  /** `§6`'s *"list of available probes"*, already filtered for eligibility. */
+  readonly available_probes: readonly R3AvailableProbe[];
+  /** Probes spent on this component so far. */
+  readonly attempts: number;
+  /** `P_max` minus {@link attempts}. */
+  readonly attempts_remaining: number;
+  /** `DATA_MODEL.md §13`: *"what we tried before giving up"*, as ids. */
+  readonly probes_attempted: readonly string[];
+  /** What those probes returned. Distinguishes one iteration's input from the next. */
+  readonly probe_results: readonly R3ProbeResultSummary[];
+  /**
+   * The `date` argument `§6.2`'s `fetch_settlement_recon(settlement_id, date)`
+   * signature requires, supplied by deterministic code as an **opaque string**.
+   *
+   * `DATA_MODEL.md §22.2` M31 leaves the field a query is date-scoped on
+   * undecided and this does **not** settle it: on spec 1.4.22's committed
+   * surface `settlement_id` is the only query key, so the argument selects
+   * nothing. It is carried because the frozen signature has two arguments and
+   * `DATA_MODEL.md §16` records the call as issued through `inputs_hash`.
+   */
+  readonly recon_date_scope: string;
+}
+
+/** `DATA_MODEL.md §13`'s `AmbiguityCertificate`, as `R3` receives it. */
+export interface R3CertificateSummary {
+  readonly solution_a_obs_ids: readonly string[];
+  readonly solution_b_obs_ids: readonly string[];
+  /** `C1`-`C8` clauses both solutions satisfy identically. */
+  readonly shared_hard_constraints: readonly string[];
+  /** `§4.2`'s `|score_a − score_b|` in integer bps. A score, never an amount. */
+  readonly evidence_score_gap_bps: number;
+  /** The pre-registered margin in force, `1500` bps. */
+  readonly epsilon_bps: number;
+  /**
+   * The materiality between the two solutions, **as an opaque reference**.
+   *
+   * `ARCHITECTURE.md §6`'s `R2` row carries *"amounts as opaque references"* and
+   * the same rule governs here. `τ` and the paise figure stay on the
+   * deterministic side; what crosses is a token naming the quantity.
+   */
+  readonly materiality_ref: string;
 }
 
 /** Why a call did not return a usable value. */

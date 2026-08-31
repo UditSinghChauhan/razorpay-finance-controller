@@ -7,7 +7,7 @@ import { ReplayCacheMissError, replayProvider } from "../src/providers/replay.js
 import { callHashes } from "../src/cache-key.js";
 import { R1OutputSchema, R1_SYSTEM_PROMPT_ID } from "../src/roles/r1.js";
 import { NumericSchemaError } from "../src/verify/schema.js";
-import { r1Input, r1Request, r2Request } from "./fixtures.js";
+import { r1Input, r1Request, r2Request, r3Request } from "./fixtures.js";
 
 describe("the four-provider architecture (ARCHITECTURE §6.5)", () => {
   it("declares all four, with the two network ones marked unbuilt at this phase", () => {
@@ -68,12 +68,16 @@ describe("the offline provider — §6.5's guaranteed demo path", () => {
     expect(result.meta.failure).toBeNull();
   });
 
-  it("refuses R3 and R4 rather than inventing a static probe list", async () => {
-    for (const role of ["R3", "R4"] as const) {
-      const result = await provider.invoke({ ...r1Request(), role });
-      expect(result.value).toBeNull();
-      expect(result.meta.failure).toBe("ROLE_NOT_IMPLEMENTED");
-    }
+  it("refuses R4 — still declared and not built (§H tier H2)", async () => {
+    const result = await provider.invoke({ ...r1Request(), role: "R4" });
+    expect(result.value).toBeNull();
+    expect(result.meta.failure).toBe("ROLE_NOT_IMPLEMENTED");
+  });
+
+  it("answers R3 from PREREGISTRATION.md §7's frozen policy, not an invented list", async () => {
+    const result = await provider.invoke(r3Request());
+    expect(result.value).not.toBeNull();
+    expect(result.meta.failure).toBeNull();
   });
 
   it("is byte-deterministic across repeated calls (metric 23's precondition)", async () => {

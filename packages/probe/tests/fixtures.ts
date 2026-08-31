@@ -35,7 +35,7 @@ export function solve(over: Partial<SolveResult> = {}): SolveResult {
     delta_s_bps: 0,
     materiality_paise: 0,
     tau_paise: 10_000,
-    certificate_reason: { determined: true, reason: "EVIDENCE_TIE" },
+    certificate_reason: "EVIDENCE_TIE",
     ranked: [],
     ...over,
   } as SolveResult;
@@ -43,15 +43,8 @@ export function solve(over: Partial<SolveResult> = {}): SolveResult {
 
 /** An ambiguous solve whose certificate reason matches `attempts` spent. */
 export function ambiguousAt(attempts: number): SolveResult {
-  if (attempts <= 0) {
-    return solve({ certificate_reason: { determined: true, reason: "EVIDENCE_TIE" } });
-  }
-  if (attempts >= 3) {
-    return solve({
-      certificate_reason: { determined: true, reason: "PROBE_BUDGET_EXHAUSTED" },
-    });
-  }
-  return solve({
-    certificate_reason: { determined: false, seam: "A2_MIDDLE_CASE_UNSPECIFIED", attempts },
-  });
+  if (attempts <= 0) return solve({ certificate_reason: "EVIDENCE_TIE" });
+  if (attempts >= 3) return solve({ certificate_reason: "PROBE_BUDGET_EXHAUSTED" });
+  // spec 1.4.25 / M40: the A2 middle case now has a value.
+  return solve({ certificate_reason: "NO_USEFUL_PROBE_AVAILABLE" });
 }

@@ -13,14 +13,18 @@
 
 export {
   NO_USEFUL_PROBE,
+  R3_PROBE_KINDS,
   argumentEntityId,
   isNoUsefulProbe,
+  isR3ProposableKind,
   kindOf,
   validate,
   type ObservationUniverse,
   type ProbeCallProposal,
   type ProbeProposal,
   type ProposalCheck,
+  type R3ProbeKind,
+  type R3Proposal,
   type RejectionReason,
   type ValidatedProbeCall,
 } from "./call.js";
@@ -32,6 +36,7 @@ export {
   decide,
   initialState,
   offerProposal,
+  offerR3Proposal,
   type LoopDecision,
   type ProbeLoopState,
   type ProposalOutcome,

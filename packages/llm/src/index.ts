@@ -6,15 +6,18 @@
  * model call goes through one interface, so swapping providers — or removing the
  * model entirely — is configuration, not a rewrite."*
  *
- * **Phase 8 scope** (`§L.2`: `llm (provider + offline + replay)`; `§C` T0-7):
- * the interface, the two deterministic providers, roles `R1` and `R2`, and the
- * three verification layers. `R3` (`§H` H1), `R4` (`§H` H2) and the two network
- * providers (`§H` H2, blocked on `§F` F2) are **declared and not built**.
+ * **Scope.** Phase 8 (`§L.2`: `llm (provider + offline + replay)`; `§C` T0-7)
+ * built the interface, the two deterministic providers, roles `R1` and `R2`, and
+ * the three verification layers. Spec 1.4.25 adds **`R3`** (`§H` tier H1).
+ * `R4` (`§H` H2) and the two network providers (`§H` H2, blocked on `§F` F2)
+ * remain **declared and not built**.
  *
  * **This package owns no probe execution and no probe loop.**
  * `RECONCILIATION_SPEC.md §6.2` has `R3` propose a probe and *"deterministic
- * code execute it and re-run the solve"* — two different actors, and neither the
- * proposal role nor the executor exists here yet.
+ * code execute it and re-run the solve"* — two different actors. From spec
+ * 1.4.25 the **proposal** role lives here (`roles/r3.ts`); the executor is
+ * `packages/probe`'s and the dispatch is `apps/cli`'s, and this package imports
+ * neither. `R3` returns a **value**.
  */
 
 export {
@@ -33,6 +36,10 @@ export {
   type ProviderDescriptor,
   type R1Input,
   type R2Input,
+  type R3AvailableProbe,
+  type R3CertificateSummary,
+  type R3Input,
+  type R3ProbeResultSummary,
   type RoleCallName,
   type RoleId,
   type StructuredRoleInput,
@@ -87,6 +94,15 @@ export {
   type OfflineRule,
   type R2Output,
 } from "./roles/r2.js";
+
+export {
+  R3OutputSchema,
+  R3_PROBE_PRIORITY,
+  R3_SYSTEM_PROMPT_ID,
+  offlineR3,
+  type R3Output,
+  type R3PriorityProbe,
+} from "./roles/r3.js";
 
 export { OfflineProvider, offlineProvider } from "./providers/offline.js";
 

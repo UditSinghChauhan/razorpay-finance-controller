@@ -7,6 +7,7 @@ import {
 } from "../provider.js";
 import { offlineR1 } from "../roles/r1.js";
 import { offlineR2 } from "../roles/r2.js";
+import { offlineR3 } from "../roles/r3.js";
 import { checkSchema } from "../verify/schema.js";
 
 /**
@@ -25,12 +26,18 @@ import { checkSchema } from "../verify/schema.js";
  *   the demo guarantee and invalidate the ablation."*
  * - Network: **none**. Cost: **zero**. Determinism: **full**.
  *
- * **`R3` and `R4` are not implemented at this phase**, and this provider says so
- * rather than returning a plausible default. `§C`'s T0-7 scopes Phase 8 to
- * *"roles R1, R2"*; `§H` puts `R3` at tier H1 and `R4` at tier H2. A stubbed
- * `R3` would be exactly the *"static probe priority list"* that `A3-NOLLM` is
- * measured **as**, so inventing one here would silently create the baseline the
- * H1 comparison is supposed to build deliberately.
+ * **`R3` is implemented from spec 1.4.25; `R4` is not, and this provider says so
+ * rather than returning a plausible default.** `§H` puts `R3` at tier H1 and `R4`
+ * at tier H2.
+ *
+ * Phase 8 refused to stub `R3` on the grounds that it *"would be exactly the
+ * static probe priority list that `A3-NOLLM` is measured **as**, so inventing one
+ * here would silently create the baseline the H1 comparison is supposed to build
+ * deliberately."* **That objection is answered rather than overruled.** The list
+ * is no longer invented here: `PREREGISTRATION.md §7` states it, `AL3` binds it
+ * and `DECISION_BRIEF.md §L.1` rule 12 lists it, so `§L.4` forbids revising it
+ * from a result. `roles/r3.ts` executes a pre-registered parameter; it does not
+ * choose one.
  */
 export class OfflineProvider implements LlmProvider {
   readonly id = "offline" as const;
@@ -69,11 +76,15 @@ export class OfflineProvider implements LlmProvider {
       raw = offlineR1(req.input);
     } else if (req.role === "R2" && req.input.role === "R2") {
       raw = offlineR2(req.input, req.idAllowlist);
+    } else if (req.role === "R3" && req.input.role === "R3") {
+      // PREREGISTRATION.md §7's frozen A3-NOLLM policy, executed. Nothing here
+      // is chosen at the keyboard; see roles/r3.ts.
+      raw = offlineR3(req.input);
     } else {
       const meta: LlmCallMeta = {
         ...base,
         raw_response_hash: "",
-        failure: req.role === "R3" || req.role === "R4" ? "ROLE_NOT_IMPLEMENTED" : "SCHEMA_REJECT",
+        failure: req.role === "R4" ? "ROLE_NOT_IMPLEMENTED" : "SCHEMA_REJECT",
       };
       return { value: null, meta };
     }

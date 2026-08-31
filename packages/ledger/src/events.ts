@@ -129,11 +129,27 @@ export const ACTOR_TYPES = Object.freeze([
 /** `DATA_MODEL.md §16`. */
 export type ActorType = (typeof ACTOR_TYPES)[number];
 
-/** The three abstention reasons of `DATA_MODEL.md §13`. */
+/**
+ * The four abstention reasons of `DATA_MODEL.md §13`.
+ *
+ * **`NO_USEFUL_PROBE_AVAILABLE` was added at spec 1.4.25, register row M40**, and
+ * it is the **fourth and final** member. It closes `RECONCILIATION_SPEC.md §6`'s
+ * `A2` middle case — `0 < attempts < P_max`, the loop having stopped because no
+ * usable probe remained — which spec 1.4.23 surfaced and expressly declined to
+ * fill *"for the phase that made it reachable"*. `R3` is that phase: a proposer
+ * may decline after spending one or two probes, and `PREREGISTRATION.md §7`'s
+ * frozen `A3-NOLLM` policy returns `NO_USEFUL_PROBE` when no priority entry has a
+ * constructible argument, so **both arms** reach the interval.
+ *
+ * `packages/engine`'s `certificateReason` is total over `attempts` and is the
+ * only producer; no fourth unrelated reason is added and no existing reason is
+ * re-pointed. Order is declaration order and carries no meaning.
+ */
 export const CERTIFICATE_REASONS = Object.freeze([
   "EVIDENCE_TIE",
   "SEARCH_BOUND_EXCEEDED",
   "PROBE_BUDGET_EXHAUSTED",
+  "NO_USEFUL_PROBE_AVAILABLE",
 ] as const);
 
 /** `DATA_MODEL.md §13`. */
