@@ -2,8 +2,14 @@
 
 **Track:** 04 — AI Finance Controller
 **Status:** Specification. Frozen scope for implementation.
-**Spec version:** 1.4.28
+**Spec version:** 1.4.29
 **Date:** 2026-08-31
+
+**At spec 1.4.29** this document is unchanged apart from the version header. **No
+success criterion moves.** `S10`'s *"every claimed number traceable to a committed run
+artifact"* is **read, not amended** — register row `DATA_MODEL.md §22.2` M48 makes the
+repository satisfy it by committing scored run artifacts, rather than changing what it
+asks. See `DECISION_BRIEF.md §A.36`.
 
 **At spec 1.4.28** this document is unchanged apart from the version header. **No
 success criterion moves**, and none reads a `§5.3` gate: `S6` tests

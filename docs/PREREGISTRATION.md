@@ -1,12 +1,13 @@
 # PREREGISTRATION — ASSAY Benchmark v1.0.7
 
-**Spec version:** 1.4.28 · **Benchmark version:** 1.0.7
+**Spec version:** 1.4.29 · **Benchmark version:** 1.0.7
 
 **Status: FROZEN on commit. Amendments require a version bump and a new seal.**
 **Date frozen:** 2026-08-23 · **Amended:** 2026-08-24 (benchmark 1.0.1),
 2026-08-25 (benchmark 1.0.2), 2026-08-26 (benchmark 1.0.3),
 2026-08-30 (benchmark 1.0.4), 2026-08-31 (benchmark 1.0.5) and
-2026-08-31 (benchmark 1.0.6) and 2026-08-31 (benchmark 1.0.7) — see below
+2026-08-31 (benchmark 1.0.6) and 2026-08-31 (benchmark 1.0.7); spec 1.4.29
+amends `§6.1` and `§9` at benchmark 1.0.7 — see below
 · **Sealed at:** _(pending — see §9)_
 
 **Amendment 1.1.1 (pre-seal, factual correction).** Applied before the seal and
@@ -1188,6 +1189,65 @@ holds only `.gitkeep`, and no manifest, run, root hash or `bench-v1.0.6` tag was
 ever produced. `M42`, `M43`, `V23` and §H's H1 disposition are unchanged and are
 not reopened. Historical amendment records are preserved verbatim.
 
+**Amendment 1.4.29 / benchmark 1.0.7 (pre-seal, three contract defects closed before
+any scored result existed).** Applied before the seal, before any dataset was
+generated and — the condition that makes this amendment legitimate — **before any
+DEV scored result existed**. `bench/` was absent, `runs/` held only `.gitkeep`, no
+agent had been run and no metric had been computed, so nothing observed could have
+informed any decision below. This is the same legitimacy claim spec 1.4.28 made for
+`CONSISTENCY_DRAW_SEED`, and it is made deliberately for `M45`: a rule governing
+**when the test split becomes reachable** is more defensible fixed before any figure
+exists than after. Four ratifications, in three groups. Register rows
+`DATA_MODEL.md §22.2` **M45**–**M48**; record at `DECISION_BRIEF.md §A.36`.
+
+**`BENCHMARK_VERSION` does NOT move and stays 1.0.7.** No decision parameter enters
+`§7`, no artifact surface changes, no metric definition moves, no seed moves and
+`constraint_set_hash` does not move. `M46` is the *application* of the 1.0.6 → 1.0.7
+bump already taken at spec 1.4.28, not a new one. `SPEC_VERSION` moves **1.4.28 →
+1.4.29**; `GT_VERSION` stays **1.1.0**.
+
+```
+  GROUP I    M45  the seal is step 1's signed tag; the commit SHA at step 6 is the
+                  seal POINT. --split test is lifted by --seal-tag attestation.
+             M46  §9's stale bench-v1.0.6 / "1.0.6" literals corrected to 1.0.7.
+  GROUP II   M47  agents/ move to apps/cli/src/agents/ and are INJECTED into
+                  packages/eval, which stays the measurement package.
+  GROUP III  M48  assay report is an eighth command; metrics.json is keyed
+                  (agent_id, split, seed, llm_mode); scored artifacts are committed.
+```
+
+**What this amendment is not.** It settles **placement, procedure and artifact
+location**. It computes nothing, measures nothing and decides no threshold. `§7` is
+untouched in every entry, `§8`'s list stays at **28**, and no metric formula,
+definition, universe or number is amended, added or removed. `§4.1`'s composition,
+`§4.2`, `§4.3`, `§5`, `§6.1`'s split and seed table, every generation seed, `C1`–`C8`,
+`I1`–`I9`, `SE1`–`SE5`, `τ`, `ε`, `K_max`, `C_max`, `P_max = 3`, `C_review`,
+`C_exception`, `k_sigma`, `queue_top_n`, the close policy, the `A3-NOLLM` policy and
+the `§5.3` consistency draw are all unchanged. `AL1`–`AL8` are unchanged in
+substance: `AL7` keeps its burn rule and its fail-closed default, and `§6.1`'s
+forbidden list gains a **reading** of *"before the seal"*, not a new permission.
+
+**What stays open, and is recorded as open.** `--record` and the live recording pass
+remain **unresolved**, exactly as `DECISION_BRIEF.md §F` **F2** classifies them: F2 is
+*"Unresolved"* with a pre-declared response, and on the F2-false branch the benchmark
+runs `--llm=offline` throughout and needs no cache. Two consequences of that branch
+are already declared by F2 and are not restated here. One further gap is recorded now
+so it is not discovered later: because `DATA_MODEL.md §19`'s `cache_key` is
+content-addressed on the structured role input, **a DEV-recorded cache cannot serve
+TEST calls**, so on the F2-true branch `§9` would need a recording step between steps
+2 and 7 and step 7 would need an explicit `--llm` mode. That is deliberately **not**
+amended here: it is conditional on a credential fact that has not occurred, and
+amending for it now would fix a procedure nobody can execute.
+
+**Nothing else moves.** `GT_VERSION` stays **1.1.0**; `constraint_set_hash` does not
+move; **no artifact byte changes** and **no dataset exists to regenerate** — `bench/`
+is absent, `runs/` holds only `.gitkeep`, and no manifest, run, root hash or
+`bench-v1.0.7` tag was ever produced. `M42`, `M43`, `M44`, `V23`, `V25` and §H's `H1`
+disposition are unchanged and are not reopened. Historical amendment records,
+including spec 1.4.27's and spec 1.4.28's statements that the refusal was not lifted,
+are preserved **verbatim** and are not rewritten as though this reading existed
+earlier.
+
 ---
 
 ## 1. Pre-registration discipline, and its honest limits
@@ -2201,7 +2261,12 @@ and may not happen, in terms of the contamination `§6.3` actually targets.
 - Generating any `F07`–`F10` instance under any seed in the split table above.
 - Generating `F07`–`F10` instances into the `dev` or `train` split at all. All
   four are declared **test only** in `§4.1` and are assigned no development seed.
-- Invoking `--split test` for any purpose.
+- Invoking `--split test` for any purpose. **"Before the seal" means before
+  `§9` step 1's signed `bench-v<BENCHMARK_VERSION>` tag exists** (spec 1.4.29,
+  register row `DATA_MODEL.md §22.2` M45); the tag is the seal, and step 6's commit
+  SHA is the seal *point*. The bar is lifted by the operator's `--seal-tag`
+  attestation and by nothing else; without it the command stays refused and `AL7`
+  stays in force.
 - Running `packages/engine`, any baseline, or any ablation against `F07`–`F10`
   output of any kind, from any seed.
 - Allowing `F07`–`F10` output to reach any evaluation artifact or the developer
@@ -2790,8 +2855,14 @@ results are reported, with the reason for the re-run.
 ## 9. Seal procedure
 
 ```
-  1. Freeze code:  git tag -s bench-v1.0.6 -m "ASSAY benchmark v1.0.6 seal"
-  2. Generate:     assay generate --split test --seeds 9000-9004,9100-9104
+  1. Freeze code:  git tag -s bench-v1.0.7 -m "ASSAY benchmark v1.0.7 seal"
+     # THE TAG IS THE SEAL (spec 1.4.29, M45). §6.1's "before the seal" means
+     #   before this tag exists; step 6's commit SHA is the seal POINT.
+  2. Generate:     assay generate --split test --seal-tag bench-v1.0.7 \
+                     --seeds 9000-9004,9100-9104
+     # --seal-tag is the OPERATOR'S ATTESTATION that step 1 was taken (M45).
+     #   Without it --split test stays refused and AL7 stays fail-closed.
+     #   It is not verified: apps/cli runs no subprocess and detects no tag.
      # per seed:   bench/test/<seed>/{observations,untrusted_text,ground_truth}.jsonl
      # per split:  bench/test/recon_report.jsonl        # M36; NOT per seed (M42)
   3. Oracle:       assay oracle --split test --seeds 9000-9004,9100-9104
@@ -2805,7 +2876,7 @@ results are reported, with the reason for the re-run.
      and once:        sha256 bench/test/recon_report.jsonl         # spec 1.4.22
   5. Commit hashes into bench/test/<seed>/benchmark_manifest.json, ONE PER (split, seed)
      # ground truth itself NOT committed
-     # `benchmark_version` must read "1.0.6" (DATA_MODEL.md §18)
+     # `benchmark_version` must read "1.0.7" (DATA_MODEL.md §18)
      # `seeds` is the singleton [<seed>]; `record_counts` holds THAT seed's
      #   families (§4.1, M42)
      # `recon_report_sha256` must be present and non-null (spec 1.4.22). It is the
@@ -2839,9 +2910,53 @@ Steps 4 and 5 read per seed because `§4.1` defines a dataset that way and
 exception and does not move: `§6.2`'s probe surface is not a dataset artifact, is
 never ingested, and is keyed by a `settlement_id` unique across every family and
 seed, so it is hashed once per split and that one digest appears in every manifest of
-the split. **`assay generate --split test` remains refused** until this procedure's
-step 1 has been taken; `§6.1`'s forbidden list bars *"invoking `--split test` for any
-purpose"* before the seal, and nothing here lifts that.
+the split.
+
+**The lifting condition, ratified at spec 1.4.29 (register row `DATA_MODEL.md §22.2`
+M45).** Through spec 1.4.28 this paragraph named a condition and revoked it in one
+sentence — *"remains refused until this procedure's step 1 has been taken; `§6.1`'s
+forbidden list bars … before the seal, and nothing here lifts that"* — so step 2 of
+this procedure was not executable and `DECISION_BRIEF.md §A.34` recorded that as a
+separate open item. The defect was never a missing condition. It was that **"the
+seal" was defined twice**: `§9` above calls the *commit SHA* recorded at step 6 *"the
+seal point"*, while the `§1` framing of the seal has always called the repository
+*"tagged `bench-v…` (signed) at seal time"*. One of the two readings had to be
+selected, and the tag reading is selected because it is the only one under which this
+procedure's own steps 2 through 5 are executable:
+
+```
+  THE SEAL        step 1's signed tag, bench-v<BENCHMARK_VERSION>.
+                  §6.1's "before the seal" means BEFORE THAT TAG EXISTS.
+  THE SEAL POINT  step 6's commit SHA -- the provenance record of the artifacts,
+                  recorded in BenchmarkManifest, NOT the access boundary.
+```
+
+**The refusal stays fail-closed, and the attestation is minimal.** `apps/cli` cannot
+establish that the tag exists — it runs no subprocess and reads no git state, and
+`commands/seal.ts` records why: *"a commit SHA read by running a subprocess is a fact
+about the working tree rather than about the sealed artifact"*. The operator
+therefore **attests** to step 1 with `--seal-tag <name>` on `assay generate`, whose
+whole semantics are these five lines and nothing more:
+
+```
+  1. Its presence is what lifts the --split test refusal. Absent, the command
+     refuses exactly as it did at spec 1.4.28 and AL7 stays fail-closed.
+  2. Its value must equal bench-v<BENCHMARK_VERSION> exactly. This is checkable
+     without git and makes the 1.0.6/1.0.7 drift M46 corrects unrepeatable.
+  3. It is refused unless --split is test, so it can never sit inert in a script.
+  4. It is recorded in BenchmarkManifest.seal_signature, a field DATA_MODEL.md §18
+     already types "signed git tag name". No field, artifact or zone is added.
+  5. It is an ATTESTATION, NOT A CONTROL. §10 V3 already declares the residual --
+     "Developer tunes against the test split ... Moderate -- self-enforced" -- and
+     this adds no new threat class, so no new threat row is opened.
+```
+
+**What is not weakened.** `§6.1`'s forbidden list is unchanged in every other
+respect; `AL4` still bars inspection of TEST outputs before the sealed run; `AL7`
+still burns a seed on any breach, including a `--split test` invocation made without
+the attestation; and the four permitted-before-the-seal conditions for `F07`–`F10`
+are untouched. Nothing here makes test generation *easier* — it makes the frozen
+procedure *executable*, which through spec 1.4.28 it was not.
 
 ---
 
