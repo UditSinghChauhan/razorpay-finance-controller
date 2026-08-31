@@ -155,5 +155,15 @@ export const BPS_DENOMINATOR = 10_000;
  * pools the frozen draw cites and are **read, not amended** — `DATA_MODEL.md
  * §11.1`'s member-eligible set is unchanged. `BENCHMARK_VERSION` (1.0.7) and
  * `GT_VERSION` (1.1.0) stay `packages/generator`'s.
+ *
+ * **1.4.28 -> 1.4.29 (M45-M48) — required nothing of this package.** The
+ * amendment settles the seal procedure's lifting condition (M45/M46), agent
+ * placement (M47) and the evaluation output surface (M48). None reaches an
+ * oracle: this package performs no I/O, enumerates from observations alone, and
+ * is not an agent. `assay oracle --split test` is unchanged and still runs
+ * labels plus the completeness gate only, `§9` step 3's asymmetry holding
+ * exactly as M43 left it. `SETTLEMENT_WINDOW_DAYS`, `K_ORACLE`, `C_ORACLE`,
+ * `TAU_FLOOR_PAISE` and `TAU_RATE_BPS` are unchanged; `BENCHMARK_VERSION`
+ * (1.0.7) and `GT_VERSION` (1.1.0) stay `packages/generator`'s.
  */
-export const SPEC_VERSION = "1.4.28";
+export const SPEC_VERSION = "1.4.29";
