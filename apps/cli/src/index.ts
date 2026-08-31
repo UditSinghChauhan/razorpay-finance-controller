@@ -2,9 +2,9 @@
  * `@assay/cli` — the ASSAY command line.
  *
  * `ARCHITECTURE.md §3`: *"`assay generate / oracle / run / bench / close /
- * verify / seal`; **all filesystem I/O — it acquires raw source contents and
- * passes them into `packages/domain`'s `S0` boundary, and performs no `S0`
- * transform itself (spec 1.4.18)**. The CLI is the real interface; the UI is a
+ * verify / seal / report`; **all filesystem I/O — it acquires raw source
+ * contents and passes them into `packages/domain`'s `S0` boundary, and performs
+ * no `S0` transform itself (spec 1.4.18)**. The CLI is the real interface; the UI is a
  * view over it. Everything demonstrable must be scriptable."*
  *
  * This package is a **composition root**. It contains no reconciliation logic:
@@ -14,6 +14,15 @@
  * `§6.2` dispatch and, from spec 1.4.25, the `§6.6` composition that joins them
  * (`src/probe/`). The loop's decisions are `packages/probe`'s; this package
  * sequences the calls and performs the one read.
+ *
+ * **From spec 1.4.29 (`DATA_MODEL.md §22.2` M47) it also holds the seven agent
+ * implementations**, at `src/agents/`. That is not reconciliation logic moving
+ * here: an agent is a *composition* of `engine`, `llm`, `probe` and `ledger`
+ * behind `@assay/eval`'s one interface, and `packages/eval` refuses all three
+ * imports because M37 already ruled that hosting the run loop there would put
+ * the system under test inside the thing measuring it. The agents are
+ * constructed here and **injected** into `packages/eval`, which imports nothing
+ * new. `src/agents/**` may not reach `src/fs/` at all.
  *
  * The surface below exists for `tests/`; the binary is `src/main.ts`.
  */
@@ -68,4 +77,5 @@ export {
   type ProbeRunStop,
 } from "./probe/run.js";
 export { COMMANDS, T0_11_COMMANDS, findCommand, flagsFor, type Command, type CommandContext } from "./commands/index.js";
+export { SEAL_TAG, checkSealTag } from "./seal-tag.js";
 export { usage, versionLine } from "./usage.js";

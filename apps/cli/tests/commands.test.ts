@@ -10,6 +10,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import {
   COMMANDS,
   EXIT,
+  SEAL_TAG,
   T0_11_COMMANDS,
   dispatch,
   encodeJsonl,
@@ -20,17 +21,19 @@ import { reconReportRows, recorder } from "./fixtures.js";
 
 /**
  * `DECISION_BRIEF.md §C` T0-11 — `generate · oracle · run · bench · close ·
- * verify · seal`.
+ * verify · seal · report`.
  *
- * Every command is registered. Four report the dependency that blocks them
+ * Every command is registered. Five report the dependency that blocks them
  * rather than working around it, and this suite asserts **which** dependency
  * each names — a command that failed for a reason nobody recorded would be
- * indistinguishable from one that is merely broken.
+ * indistinguishable from one that is merely broken. `report` joined the list at
+ * spec 1.4.29 (`DATA_MODEL.md §22.2` M48).
  *
  * **No benchmark data is produced anywhere in this file.** `PREREGISTRATION.md
- * §6.1` holds the test split until the seal and `§9` sequences generation after
- * the seal tag, so `generate`'s happy path is deliberately not exercised: only
- * its refusals are, and none of them reaches `generateFamily`.
+ * §6.1` holds the test split until `§9` step 1's signed tag and the operator's
+ * `--seal-tag` attestation (spec 1.4.29, M45), so `generate`'s happy path is
+ * deliberately not exercised: only its refusals and its attestation checks are,
+ * and none of them reaches `generateFamily`.
  */
 
 const roots: string[] = [];
@@ -59,7 +62,7 @@ async function run(argv: readonly string[], env: Record<string, string> = {}): P
 }
 
 describe("the registry is T0-11's list", () => {
-  it("holds exactly the seven commands, in the order the table names them", () => {
+  it("holds exactly the eight commands, in the order the table names them", () => {
     expect(COMMANDS.map((c) => c.name)).toEqual([...T0_11_COMMANDS]);
     expect(T0_11_COMMANDS).toEqual([
       "generate",
@@ -69,6 +72,9 @@ describe("the registry is T0-11's list", () => {
       "close",
       "verify",
       "seal",
+      // Appended at spec 1.4.29 (M48) on §8's own principle for metrics 27-28 —
+      // "appended, never renumbered" — so the original seven keep their order.
+      "report",
     ]);
   });
 
@@ -111,6 +117,7 @@ describe("blocked commands name their owner and their citation", () => {
     { argv: ["bench"], owner: "packages/eval", cite: "ARCHITECTURE.md §10" },
     { argv: ["close", "--run", "runs/x"], owner: "packages/ledger", cite: "RECONCILIATION_SPEC.md §10.1" },
     { argv: ["run", "--dataset", "bench/dev/2000"], owner: "packages/domain", cite: "ARCHITECTURE.md §3" },
+    { argv: ["report"], owner: "packages/eval (src/report/)", cite: "DECISION_BRIEF.md §C T0-13" },
   ] as const;
 
   for (const { argv, owner, cite } of expected) {
@@ -265,12 +272,48 @@ describe("assay oracle", () => {
 });
 
 describe("assay generate refuses before it ever simulates", () => {
-  it("refuses --split test, citing §6.1 and AL7", async () => {
+  it("refuses --split test with no attestation, citing §6.1 and AL7", async () => {
     const result = await run(["generate", "--split", "test", "--seed", "9000"]);
     expect(result.code).toBe(EXIT.USAGE);
     expect(result.err).toContain("PREREGISTRATION.md §6.1");
     expect(result.err).toContain("AL7");
+    // M45: the refusal names the way out rather than only the rule.
+    expect(result.err).toContain(SEAL_TAG);
     expect(result.sink.files.size).toBe(0);
+  });
+
+  // --- spec 1.4.29, register row M45 ------------------------------------
+  //
+  // The attestation lifts §6.1's bar and NOTHING ELSE does. These assert the
+  // three clauses that can be checked without a tag existing; that no tag is
+  // detected is asserted by `boundary.test.ts`'s no-subprocess rule and by
+  // eslint.config.js's transport ban, not here.
+
+  it("refuses --split test when the attested tag is not §9 step 1's", async () => {
+    const result = await run([
+      "generate", "--split", "test", "--seed", "9000", "--seal-tag", "bench-v1.0.6",
+    ]);
+    expect(result.code).toBe(EXIT.USAGE);
+    expect(result.err).toContain(SEAL_TAG);
+    // M46's defect, refused rather than accepted: the stale literal §9 itself
+    // carried for three amendments cannot re-enter through the command line.
+    expect(result.err).toContain("bench-v1.0.6");
+    expect(result.sink.files.size).toBe(0);
+  });
+
+  it("refuses --seal-tag on a split that §6.1 does not bar", async () => {
+    const result = await run([
+      "generate", "--split", "dev", "--seed", "2000", "--seal-tag", SEAL_TAG,
+    ]);
+    expect(result.code).toBe(EXIT.USAGE);
+    expect(result.err).toContain("only with --split test");
+    expect(result.sink.files.size).toBe(0);
+  });
+
+  it("derives the attested tag name from BENCHMARK_VERSION, never a literal", () => {
+    // M46: §9's literals drifted from the constant they tracked. Deriving is
+    // what removes the class of defect rather than the instance.
+    expect(SEAL_TAG).toBe(`bench-v${BENCHMARK_VERSION}`);
   });
 
   it("refuses a seed that appears in no row of the split table", async () => {

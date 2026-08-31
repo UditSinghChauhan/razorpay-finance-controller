@@ -378,6 +378,11 @@ describe("the surface stays honest", () => {
       "commands/generate.ts",
       "commands/index.ts",
       "commands/oracle.ts",
+      // Appended at spec 1.4.29 (DATA_MODEL.md §22.2 M48): EVALUATION_SPEC.md §7
+      // has invoked `assay report` since before this CLI existed while T0-11
+      // enumerated seven, so the command was required by the reproducibility
+      // guarantee and present in no list.
+      "commands/report.ts",
       "commands/run.ts",
       "commands/seal.ts",
       "commands/types.ts",

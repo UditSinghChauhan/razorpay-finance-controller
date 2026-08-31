@@ -6,9 +6,10 @@ import { COMMANDS, flagsFor, type Command } from "./commands/index.js";
 /**
  * Usage text.
  *
- * Every command carries its `DECISION_BRIEF.md §C` T0-11 summary, and the four
+ * Every command carries its `DECISION_BRIEF.md §C` T0-11 summary, and the five
  * that cannot run yet say so on the line where a user would otherwise discover
- * it by running them. `ARCHITECTURE.md §3` calls the CLI *"the real interface;
+ * it by running them. `report` joined the list at spec 1.4.29 (`DATA_MODEL.md
+ * §22.2` M48), appended rather than renumbered. `ARCHITECTURE.md §3` calls the CLI *"the real interface;
  * the UI is a view over it"*, which makes an honest surface part of the
  * deliverable rather than a courtesy.
  */
