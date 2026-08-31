@@ -115,11 +115,27 @@ describe("§L.1 rule 3 — the single permitted exception, checked by path", () 
 describe("AL1 / AL2 — where ground truth may go, and where it may not", () => {
   it("imports the generator from exactly one module", () => {
     const importers = sources().filter((s) => importsPackage(s, "generator")).map((s) => s.name);
-    // `truth.ts` reads GroundTruth; `bootstrap.ts` reads the vendored PRNG
-    // ARCHITECTURE.md §11 fixes for the project. Both are permitted -- AL1 binds
-    // the engine and the oracle, not the scorer -- but the SET is pinned so a
-    // third import site cannot appear unnoticed.
-    expect(importers.sort()).toEqual(["bootstrap.ts", "truth.ts"]);
+    // `truth.ts` reads GroundTruth; `bootstrap.ts` and `gates/sample.ts` read the
+    // vendored PRNG ARCHITECTURE.md §11 fixes for the project. All three are
+    // permitted -- AL1 binds the engine and the oracle, not the scorer -- but the
+    // SET is pinned so a fourth import site cannot appear unnoticed.
+    //
+    // `gates/sample.ts` joined at spec 1.4.27 (DATA_MODEL.md §22.2 M43) on
+    // `bootstrap.ts`'s justification exactly: a deterministic draw needs a PRNG,
+    // and §11 vendors one precisely so a Node upgrade cannot silently change a
+    // benchmark quantity. It reads NO GroundTruth -- asserted below.
+    expect(importers.sort()).toEqual(["bootstrap.ts", "gates/sample.ts", "truth.ts"]);
+  });
+
+  it("keeps the §5.3 draw free of ground truth", () => {
+    // §5.3's consistency gate compares two IMPLEMENTATIONS; a sampler that could
+    // see the answer key could draw pairs the engine and the oracle happen to
+    // agree on. M43 states it as a property of the gate; it has to hold of the
+    // draw that feeds it too, or the gate is fed a biased sample.
+    const sample = sources().find((s) => s.name === "gates/sample.ts");
+    expect(sample).toBeDefined();
+    expect(importsOf((sample as Source).text)).not.toMatch(/GroundTruth/);
+    expect((sample as Source).text).not.toMatch(/ground_truth/);
   });
 
   it("names GroundTruth in exactly one module", () => {

@@ -114,6 +114,18 @@ export {
   consistencyGate,
 } from "./gates/consistency-gate.js";
 
+/**
+ * The `§5.3` differential draw (spec 1.4.27, `DATA_MODEL.md §22.2` M43).
+ *
+ * Separate from `consistency-gate.ts` because `DECISION_BRIEF.md §L.1` rule 3
+ * lets that file hold *"no logic other than the differential test"*. The draw's
+ * seed is **not frozen** — `PREREGISTRATION.md §10` V24 — so the caller supplies
+ * one and this package chooses none.
+ */
+export {
+  type BankReferent, type DrawOptions, drawPairs,
+} from "./gates/sample.js";
+
 export {
   type CoverageRatio,
   type CoverageReport,

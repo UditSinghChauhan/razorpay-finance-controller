@@ -38,6 +38,9 @@ importers:
       '@assay/engine':
         specifier: workspace:*
         version: link:../../packages/engine
+      '@assay/eval':
+        specifier: workspace:*
+        version: link:../../packages/eval
       '@assay/generator':
         specifier: workspace:*
         version: link:../../packages/generator

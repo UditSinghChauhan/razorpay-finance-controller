@@ -93,35 +93,64 @@ refusal that makes it so.
 truth in `GENERATOR_TRUST`, the route `AL2` has always given it, so a caller
 cannot reach ground truth by declaring itself the seal. The four artifacts the
 seal hashes are read in three zones — `observations.jsonl` and
-`ambiguity_labels.jsonl` in `AGENT`, `ground_truth.jsonl` in `GENERATOR_TRUST`,
+`oracle_labels.jsonl` in `AGENT`, `ground_truth.jsonl` in `GENERATOR_TRUST`,
 `recon_report.jsonl` in `SEAL`.
+
+From spec 1.4.27 (`DATA_MODEL.md §22.2` M43) `assay oracle` reads ground truth in
+`GENERATOR_TRUST` too, for the `§5.3` completeness gate. That is `AL2`'s existing
+route and no zone is widened: `AL5` withdraws it under `--sealed`, so neither gate
+runs sealed, and `AL8` still keeps `recon_report.jsonl` away from both gates —
+*"the `§5.3` completeness gate … stays observations-only"*.
 
 ## Per command
 
 | Command | Status | If not complete, what blocks it |
 |---|---|---|
 | `generate` | **implemented** | — (`packages/generator` gained the recon report's rows at spec 1.4.24; before that, the command reported the missing emitter and wrote the other three artifacts) |
-| `oracle` | **implemented** | — (`packages/oracle` gained `oracleContext` at spec 1.4.23; before it, the command was blocked for want of a `CandidateContext` builder) |
+| `oracle` | **implemented**, including both `§5.3` gates | — (`packages/oracle` gained `oracleContext` at spec 1.4.23; the gates were wired at spec 1.4.27, M43, having had no execution path before) |
 | `run` | provider selection and the `§6.2` probe loop implemented; full pipeline **blocked** | `packages/domain` has no `S0` entry point (`§3`: *"scheduled, not written"*), then engine's missing `Target`/`EvaluationContext` constructor, then the ledger write path. `R3` and the `§6.6` composition landed at spec 1.4.25 and are exercised by `tests/h1-integration.test.ts` over a hand-built `SolveInput` |
-| `bench` | **deferred** | `packages/eval` (`ARCHITECTURE.md §10`) |
+| `bench` | **deferred** | `packages/eval`'s agent runner, scorer and aggregator (`ARCHITECTURE.md §10`). The package is a dependency from spec 1.4.27 — `assay oracle` uses its `§5.3` consistency gate — but nothing in `ARCHITECTURE.md §10`'s runner exists yet |
 | `close` | **deferred** | `packages/ledger`'s `close-gate.ts` / `close.ts`, *"deliberately absent rather than stubbed"* |
 | `verify` | **implemented** for `G4` and `G2` | `G3` needs the close gate; the `assay.sqlite` route needs `better-sqlite3`, which is not a workspace dependency |
 | `seal` | **implemented** | — |
 
-`generate` writes four artifacts per family, under
-`<out>/<split>/<seed>/<family>/` — `observations.jsonl`, `untrusted_text.jsonl`,
-`ground_truth.jsonl` and `recon_report.jsonl`. The last is
-`RECONCILIATION_SPEC.md §6.2`'s probe surface: `packages/generator` produces the
-rows, already ordered by `entity_id` ascending (spec 1.4.24, M38) and already
-frozen, and this package serializes them with the same `encodeJsonl` it uses for
-the other three and **re-orders nothing**.
+## The committed layout — `DATA_MODEL.md §22.2` M42, spec 1.4.27
+
+```
+  bench/<split>/<seed>/observations.jsonl        dataset artifacts, (split, seed)
+  bench/<split>/<seed>/untrusted_text.jsonl
+  bench/<split>/<seed>/ground_truth.jsonl
+  bench/<split>/<seed>/oracle_labels.jsonl       written by `assay oracle`
+  bench/<split>/<seed>/oracle_gate.json          §5.3 gate results (M43)
+  bench/<split>/<seed>/benchmark_manifest.json   one per (split, seed)
+
+  bench/<split>/recon_report.jsonl               §6.2 probe surface, SPLIT-scoped
+```
+
+**Family is a composition dimension and never a file dimension.** A seed's
+families are concatenated into one dataset — F01..F10 ascending, each family's own
+row order preserved, `source_line` re-based 1-based within the aggregated logical
+file — and that concatenation is `packages/generator`'s `buildDataset`, not this
+package's: `ARCHITECTURE.md §3` bars `apps/cli` from performing an `S0` transform
+and `RECONCILIATION_SPEC.md §2` step 5 makes provenance stamping `S0`'s. This
+package serializes rows and **re-orders nothing**.
+
+**`recon_report.jsonl` does not move.** M36 scoped it to the split and M42 leaves
+it there: it is a probe response surface, *"never an `Observation`, and never
+ingested"*, keyed by a `settlement_id` unique across every family and seed. It is
+written once per invocation, from every seed that invocation generated, ordered
+`entity_id` ascending (M38) over the merged artifact. Its digest is therefore
+identical across every manifest of one split, by construction rather than by a
+check — `tests/layout-and-gates.test.ts` asserts it.
 
 `generate`'s happy path is deliberately **not exercised by the suite**:
 `PREREGISTRATION.md §6.1` holds the test split until the seal and `§9` sequences
 generation after the seal tag, so the tests assert its refusals, its serialized
-bytes and its write set, and stop short of `generateFamily`. That the command
-writes all four artifacts inside its family loop, unconditioned on the split, is
-asserted from its source in `tests/boundary.test.ts`.
+bytes and its write set, and stop short of `generateFamily`. That the seed loop
+writes three dataset artifacts and the split-scoped report once, outside it, is
+asserted from its source in `tests/boundary.test.ts`; the aggregation itself is
+tested in `packages/generator/tests/dataset.test.ts`, at seeds `§6.1` assigns to
+no split.
 
 `--split test` remains refused for the reason `commands/generate.ts` states: the
 command cannot establish whether the seal tag exists, and *"a command that

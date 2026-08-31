@@ -2,7 +2,8 @@ import { canonicalConstraintSet } from "@assay/domain";
 import { buildManifest, familiesFor, BENCHMARK_VERSION, GT_VERSION } from "@assay/generator";
 
 import { requireFlag, stringFlag } from "../args.js";
-import { UsageError } from "../errors.js";
+import { gateArtifactPasses } from "../artifacts/gate.js";
+import { CliError, EXIT, UsageError } from "../errors.js";
 import { sha256Text } from "../fs/digest.js";
 import { join, readText } from "../fs/io.js";
 import type { Command, CommandContext } from "./types.js";
@@ -49,9 +50,41 @@ import type { Command, CommandContext } from "./types.js";
  * never to hold the report. `AL5` does not withdraw this unlock — it is scoped
  * to ground-truth fields, and `§6.2` gives the report `settlement_id`,
  * `entity_id` and `settled_at` and *"nothing else"*.
+ *
+ * **One manifest per `(split, seed)`, ratified at spec 1.4.27 (`DATA_MODEL.md
+ * §22.2` M42).** `seeds` was already the singleton `familiesFor(seed)` implies
+ * and `record_counts` already that seed's families; what M42 adds is that this is
+ * the **unit**, not a convenience. `--recon-report` names
+ * `bench/<split>/recon_report.jsonl`, which is **split-scoped and does not
+ * move** — so `recon_report_sha256` is identical across every manifest of one
+ * split, by construction rather than by a check. The file is written as
+ * `benchmark_manifest.json`, `PREREGISTRATION.md §9` step 5's and
+ * `DECISION_BRIEF.md §K`'s own name for it.
+ *
+ * **A passing `§5.3` completeness gate is a seal precondition, from spec 1.4.27
+ * (M43).** `§9` step 3 has always said *"Step 3 is a gate, not a formality"*, and
+ * through spec 1.4.26 nothing checked that it had run: this command read no gate
+ * result, so a seal taken without step 3 was indistinguishable from one taken
+ * after it. `--oracle-gate` names `bench/<split>/<seed>/oracle_gate.json` and a
+ * missing or failing artifact is a **SEAL FAILURE** alongside `§9` step 5's
+ * existing three. Sequencing is a procedure; a precondition is a control.
  */
 
-const MANIFEST = "manifest.json";
+const MANIFEST = "benchmark_manifest.json";
+
+/** `§9` step 5's fourth seal failure, added at spec 1.4.27 (M43). */
+export class SealGateFailure extends CliError {
+  constructor(detail: string) {
+    super(
+      `SEAL FAILURE: ${detail} PREREGISTRATION.md §9 step 3 makes the §5.3 completeness gate ` +
+        `a gate rather than a formality — "if the oracle cannot recover the true allocation ` +
+        `for every target, the constraint set is wrong and nothing downstream is trustworthy" ` +
+        `— and step 5 (spec 1.4.27, M43) refuses a manifest without a passing one.`,
+      EXIT.FAILURE,
+    );
+    this.name = "SealGateFailure";
+  }
+}
 
 function readUnixSeconds(raw: string, flag: string): number {
   const value = Number(raw);
@@ -79,6 +112,26 @@ async function run(context: CommandContext): Promise<void> {
   const signature = stringFlag(context.args, "seal-signature");
 
   const policy = { sealed: context.config.sealed };
+
+  // Before anything is hashed: a seal that computed five digests and then
+  // refused would leave a reader wondering which half to trust.
+  const gatePath = requireFlag(context.args, "oracle-gate");
+  let gate: unknown;
+  try {
+    gate = JSON.parse(readText({ path: gatePath, zone: "GENERATOR_TRUST", policy }));
+  } catch (cause) {
+    throw new SealGateFailure(
+      `cannot read the §5.3 gate artifact at ${JSON.stringify(gatePath)}: ` +
+        `${cause instanceof Error ? cause.message : String(cause)}.`,
+    );
+  }
+  if (!gateArtifactPasses(gate)) {
+    throw new SealGateFailure(
+      `the gate artifact at ${JSON.stringify(gatePath)} does not record a passing completeness ` +
+        `gate. Run \`assay oracle --split <split> --seeds <seed>\` and resolve the failure ` +
+        `before sealing; the gate is not waived by re-running the seal.`,
+    );
+  }
 
   const manifest = buildManifest({
     created_at:
@@ -118,6 +171,10 @@ async function run(context: CommandContext): Promise<void> {
   // is not a ground-truth field and carries no constituent identifier (M38), so
   // printing it is not an AL5 question.
   context.out(`recon_report_sha256 ${manifest.recon_report_sha256}`);
+  // M43: printed so the seal names the gate it was permitted by. The artifact
+  // is not hashed into the manifest -- it is a build product, not a benchmark
+  // surface -- so this line is its only appearance in the seal's output.
+  context.out(`oracle_gate         PASS (${gatePath})`);
   context.out(`sealed_at           ${manifest.sealed_at === null ? "(not sealed)" : String(manifest.sealed_at)}`);
 }
 
@@ -129,7 +186,8 @@ export const sealCommand: Command = {
     observations: { kind: "string", describe: "Path to the committed observations.jsonl." },
     "ground-truth": { kind: "string", describe: "Path to the committed ground_truth.jsonl." },
     "oracle-labels": { kind: "string", describe: "Path to the committed ambiguity_labels.jsonl." },
-    "recon-report": { kind: "string", describe: "Path to the committed recon_report.jsonl (§9 step 4)." },
+    "recon-report": { kind: "string", describe: "Path to the split-scoped recon_report.jsonl (§9 step 4)." },
+    "oracle-gate": { kind: "string", describe: "Path to this (split, seed)'s oracle_gate.json (§9 step 5, M43)." },
     "generator-commit": { kind: "string", describe: "Commit SHA of the generator (§9)." },
     "spec-commit": { kind: "string", describe: "Commit SHA of the specification (§9)." },
     "created-at": { kind: "string", describe: "Unix seconds. Default: the wall clock." },
