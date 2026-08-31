@@ -62,6 +62,13 @@ describe("forbidden imports (DECISION_BRIEF §L.1 rule 3, AL1)", () => {
     [/@assay\/oracle|packages[/\\]oracle/, "packages/oracle"],
     [/@assay\/generator|packages[/\\]generator/, "packages/generator"],
     [/untrusted-text|untrusted_text|UntrustedText/, "the quarantined text store"],
+    // Stage S0, added when Phase 2 gave it a subpath export. It is a SEPARATE
+    // entry rather than a widening of the row above because the specifier
+    // `@assay/domain/s0-ingest` contains no "untrusted" substring and would
+    // pass that regex — while `RECONCILIATION_SPEC.md §2` gives S0 the output
+    // `Observation[]` + `UntrustedText[]`, so importing it reaches the
+    // quarantine by another name. This package begins at S1 (spec 1.4.18, M32).
+    [/@assay\/domain\/s0-ingest|s0-ingest/, "stage S0"],
   ];
 
   for (const [re, label] of banned) {
