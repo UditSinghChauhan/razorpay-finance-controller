@@ -3,6 +3,7 @@ import { buildManifest, familiesFor, BENCHMARK_VERSION, GT_VERSION } from "@assa
 
 import { requireFlag, stringFlag } from "../args.js";
 import { gateArtifactPasses } from "../artifacts/gate.js";
+import { SEAL_TAG, checkSealTag } from "../seal-tag.js";
 import { CliError, EXIT, UsageError } from "../errors.js";
 import { sha256Text } from "../fs/digest.js";
 import { join, readText } from "../fs/io.js";
@@ -61,6 +62,16 @@ import type { Command, CommandContext } from "./types.js";
  * `benchmark_manifest.json`, `PREREGISTRATION.md §9` step 5's and
  * `DECISION_BRIEF.md §K`'s own name for it.
  *
+ * **`seal_signature` carries `§9` step 1's tag, checked from spec 1.4.29 (M45,
+ * M46).** `DATA_MODEL.md §18` has typed the field *"signed git tag name"* since
+ * the manifest existed, and nothing checked it: a manifest could record any
+ * string, including the `bench-v1.0.6` that `§9`'s own text still named three
+ * amendments after the benchmark moved to 1.0.7. A non-null `--seal-signature`
+ * must now equal `bench-v<BENCHMARK_VERSION>`, derived from the constant rather than
+ * transcribed. **Null is unchanged** — `§9` step 5 admits an unsealed manifest.
+ * This verifies a *name*, not a *tag*: no subprocess is run and no git state is
+ * read, exactly as this command's own rule below requires.
+ *
  * **A passing `§5.3` completeness gate is a seal precondition, from spec 1.4.27
  * (M43).** `§9` step 3 has always said *"Step 3 is a gate, not a formality"*, and
  * through spec 1.4.26 nothing checked that it had run: this command read no gate
@@ -110,6 +121,11 @@ async function run(context: CommandContext): Promise<void> {
   const createdAtFlag = stringFlag(context.args, "created-at");
   const sealedAtFlag = stringFlag(context.args, "sealed-at");
   const signature = stringFlag(context.args, "seal-signature");
+  // M45 clause 4: this is where the operator's `--seal-tag` attestation lands.
+  // `DATA_MODEL.md §18` already types the field "signed git tag name", so the
+  // only thing added here is that a non-null value must actually be that name.
+  // Null is untouched -- `§9` step 5 admits an unsealed manifest and says so.
+  if (signature !== null) checkSealTag(signature, "seal-signature");
 
   const policy = { sealed: context.config.sealed };
 
@@ -192,7 +208,7 @@ export const sealCommand: Command = {
     "spec-commit": { kind: "string", describe: "Commit SHA of the specification (§9)." },
     "created-at": { kind: "string", describe: "Unix seconds. Default: the wall clock." },
     "sealed-at": { kind: "string", describe: "Unix seconds. Omit for an unsealed manifest." },
-    "seal-signature": { kind: "string", describe: "§9's seal signature." },
+    "seal-signature": { kind: "string", describe: `§9 step 1's signed tag (${SEAL_TAG}). Omit for unsealed.` },
     out: { kind: "string", describe: "Directory to write manifest.json into. Default: ." },
   },
   run,

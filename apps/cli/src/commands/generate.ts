@@ -4,6 +4,7 @@ import { requireFlag, requireSeeds, stringFlag } from "../args.js";
 import { UsageError } from "../errors.js";
 import { encodeJsonl } from "../artifacts/jsonl.js";
 import { join } from "../fs/io.js";
+import { SEAL_TAG, checkSealTag } from "../seal-tag.js";
 import type { Command, CommandContext } from "./types.js";
 
 /**
@@ -33,13 +34,22 @@ import type { Command, CommandContext } from "./types.js";
  *   <out>/<split>/recon_report.jsonl             §6.2 probe surface, SPLIT-scoped
  * ```
  *
- * **`--split test` is refused.** `PREREGISTRATION.md §6.1` holds the test split
- * until the seal and `§9` sequences its generation *after* the seal tag; `AL7`
- * burns a seed on any breach. Whether the seal tag exists is a fact about the
- * repository that this process cannot establish, and a command that guessed
- * would guess in the direction that costs a seed. It therefore fails closed and
- * names the procedure instead. **Spec 1.4.27 does not lift this** — it settles
- * the artifact unit, not the sequence.
+ * **`--split test` is refused until the operator attests to the seal tag**
+ * (spec 1.4.29, `DATA_MODEL.md §22.2` M45). `PREREGISTRATION.md §6.1` holds the
+ * test split *"before the seal"*, and M45 settles what that phrase bounds: **the
+ * seal is `§9` step 1's signed tag**, and step 6's commit SHA is the seal
+ * *point* — the provenance record, not the access boundary. Through spec 1.4.28
+ * the two readings coexisted and `§9` forbade its own step 2.
+ *
+ * Whether the tag exists remains a fact this process cannot establish — it runs
+ * no subprocess, `eslint.config.js` bans every transport here, and
+ * `commands/seal.ts` gives the reason it does not shell out to `git`. So the
+ * command still **fails closed**, and what lifts it is the operator's
+ * attestation `--seal-tag bench-v<BENCHMARK_VERSION>` and nothing else: absent,
+ * the refusal is
+ * exactly the spec-1.4.28 refusal and `AL7` still burns a seed on the breach.
+ * `../seal-tag.ts` holds M45's five clauses. **Spec 1.4.27 did not lift this**
+ * — it settled the artifact unit, not the sequence.
  *
  * **The `§6.2` probe surface is written once per split and decided elsewhere.**
  * `ARCHITECTURE.md §3` assigns *"the PG-side recon report `§6.2`'s probe reads
@@ -59,16 +69,45 @@ const UNTRUSTED_TEXT = "untrusted_text.jsonl";
 const RECON_REPORT = "recon_report.jsonl";
 
 function readSplit(raw: string): Split {
-  if (raw === "train" || raw === "dev") return raw;
-  if (raw === "test") {
+  if (raw === "train" || raw === "dev" || raw === "test") return raw;
+  throw new UsageError(
+    `--split must be train, dev or test; received ${JSON.stringify(raw)}.`,
+  );
+}
+
+/**
+ * `§6.1`'s bar on `--split test`, and `M45`'s attestation.
+ *
+ * Split from {@link readSplit} because they answer different questions: one asks
+ * whether a split *exists*, the other whether this invocation is *permitted*.
+ * Folding them would make the refusal look like a parse failure, and `AL7` burns
+ * a seed on the difference.
+ *
+ * @throws UsageError when `test` is named without a correct attestation, or when
+ *   an attestation is supplied for a split that does not need one.
+ */
+function checkSealAttestation(split: Split, attested: string | null): void {
+  if (split !== "test") {
+    if (attested === null) return;
     throw new UsageError(
-      `--split test is refused. PREREGISTRATION.md §6.1 holds the test split until the seal ` +
-        `and §9 sequences its generation after the seal tag; AL7 burns a seed on any breach. ` +
-        `This process cannot establish whether the tag exists, so it declines rather than ` +
-        `guessing in the direction that costs a seed.`,
+      `--seal-tag is valid only with --split test (spec 1.4.29, register row M45). ` +
+        `PREREGISTRATION.md §6.1 bars no other split, so an attestation here would assert ` +
+        `something nothing asked for -- and a flag that is inert on the common path is a ` +
+        `flag that stays in a script until the day it is not inert.`,
     );
   }
-  throw new UsageError(`--split must be train or dev; received ${JSON.stringify(raw)}.`);
+  if (attested === null) {
+    throw new UsageError(
+      `--split test is refused. PREREGISTRATION.md §6.1 holds the test split until the seal, ` +
+        `and spec 1.4.29 (register row M45) settles that "the seal" is §9 step 1's signed tag ` +
+        `-- step 6's commit SHA is the seal POINT, not the boundary. This process cannot ` +
+        `establish whether that tag exists: it runs no subprocess and reads no git state, and ` +
+        `a command that guessed would guess in the direction that costs a seed. Take §9 step 1, ` +
+        `then attest to it: --seal-tag ${SEAL_TAG}. Until then AL7 stays in force and this ` +
+        `invocation would itself be a §6.1 forbidden-list breach.`,
+    );
+  }
+  checkSealTag(attested, "seal-tag");
 }
 
 /**
@@ -95,8 +134,21 @@ function checkSeed(seed: number, split: Split): void {
 
 async function run(context: CommandContext): Promise<void> {
   const split = readSplit(requireFlag(context.args, "split"));
+  const attested = stringFlag(context.args, "seal-tag");
+  checkSealAttestation(split, attested);
+
   const seeds = requireSeeds(context.args);
   const outRoot = stringFlag(context.args, "out") ?? "bench";
+
+  if (attested !== null) {
+    // Echoed so the operator's assertion appears in the run log beside the data
+    // it authorised. `assay seal --seal-signature` records the same value in
+    // `BenchmarkManifest.seal_signature`, which `DATA_MODEL.md §18` already
+    // types "signed git tag name" (M45 clause 4). No field is added anywhere.
+    context.out(
+      `seal attestation  ${attested}  (operator-asserted, not verified; §9 step 1, M45)`,
+    );
+  }
 
   for (const seed of seeds) checkSeed(seed, split);
 
@@ -136,7 +188,11 @@ export const generateCommand: Command = {
   flags: {
     seeds: { kind: "string", describe: "Declared seeds: \"2000-2004\" or \"9000-9004,9100-9104\"." },
     seed: { kind: "string", describe: "One declared seed; the one-element case of --seeds." },
-    split: { kind: "string", describe: "train | dev. test is held until the seal (§6.1)." },
+    split: { kind: "string", describe: "train | dev | test. test needs --seal-tag (§6.1, M45)." },
+    "seal-tag": {
+      kind: "string",
+      describe: `Attest to §9 step 1's signed tag (${SEAL_TAG}). Required for --split test.`,
+    },
     out: { kind: "string", describe: "Output root. Default: bench" },
   },
   run,
