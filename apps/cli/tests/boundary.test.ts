@@ -385,9 +385,10 @@ describe("the surface stays honest", () => {
     ]);
   });
 
-  it("writes §6.2's probe surface beside the other three artifacts, for every family", () => {
-    // Spec 1.4.24 (M38) closed the gap `generate` used to report: the rows are
-    // packages/generator's and the write is this package's. Asserted from the
+  it("writes three dataset artifacts per seed and the probe surface once per split", () => {
+    // Spec 1.4.27 (M42): the dataset artifact unit is (split, seed) and family is
+    // a COMPOSITION dimension, so the seed loop writes three files and the
+    // split-scoped §6.2 surface is written once, outside it. Asserted from the
     // source because PREREGISTRATION.md §9 sequences every real generation after
     // the seal tag, so the command's happy path cannot be driven here.
     const generate = sources.find((s) => s.rel === "commands/generate.ts");
@@ -403,19 +404,29 @@ describe("the surface stays honest", () => {
       expect(body, artifact).toContain(artifact);
     }
 
-    // Four writes, inside the one `for (const family of ...)` loop, so the
-    // artifact is produced for every family the split table assigns.
-    const loopAt = body.indexOf("for (const family of");
+    const loopAt = body.indexOf("for (const seed of seeds)");
     const declAt = body.indexOf("export const generateCommand");
     expect(loopAt).toBeGreaterThan(-1);
     expect(declAt).toBeGreaterThan(loopAt);
     const loop = body.slice(loopAt, declAt);
-    expect(loop.match(/context\.sink\.write\(/g)).toHaveLength(4);
 
-    // And unconditioned on the split: `split` names a directory and checks §6.1's
-    // frozen table, both above the loop, and no artifact below is written behind
-    // a test on it. Whichever splits the command accepts, all four are written.
-    expect(loop).not.toContain("split");
+    // Three writes inside the seed loop -- one per dataset artifact -- and one
+    // more after it, for the split-scoped recon report. Four writes in the
+    // command, arranged as M42 arranges the files.
+    const inLoop = loop.slice(0, loop.indexOf("mergeReconReports"));
+    expect(inLoop.match(/context\.sink\.write\(/g)).toHaveLength(3);
+    expect(body.match(/context\.sink\.write\(/g)).toHaveLength(4);
+
+    // The recon report write is NOT in the seed loop: one file per split, from
+    // every seed the invocation generated (M36 keeps it split-scoped, M42 leaves
+    // it there).
+    expect(inLoop).not.toContain("RECON_REPORT");
+    expect(body).toContain("mergeReconReports");
+
+    // No family dimension anywhere in the write path: M42 makes family a
+    // composition dimension, and `buildDataset` owns the concatenation.
+    expect(body).not.toContain("for (const family of");
+    expect(body).toContain("buildDataset");
 
     // The BLOCKED report is gone. A command that still announced a gap it has
     // closed would be exactly as misleading as one that never reported it.

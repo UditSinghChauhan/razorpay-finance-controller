@@ -132,5 +132,20 @@ export const BPS_DENOMINATOR = 10_000;
  * budget or label definition changes; `constraint_set_hash` is
  * `packages/domain`'s and is unmodified; and `BENCHMARK_VERSION` (1.0.5) and
  * `GT_VERSION` (1.1.0) live in `packages/generator` and are not restated here.
+ *
+ * **1.4.26 -> 1.4.27 (M42, M43) — required nothing of this package's logic.** M43
+ * names `apps/cli` the executor of `PREREGISTRATION.md §5.3`'s gates and keeps
+ * `completeness-gate.ts` **here**, unchanged: it stays a pure function over
+ * `OracleTargetResult[]` and the `TrueAllocation[]` its caller derives from
+ * `GroundTruth`, so `AL1` and `AL2` hold the strong way — there is no import of
+ * `packages/generator` and no read for a path guard to intercept. `AL8` continues to
+ * bar the recon report from this package outright, and `§5.3`'s completeness gate
+ * *"stays observations-only"*. M42 is an artifact-layout ratification and reaches no
+ * module here; the labels this package returns are data, and `apps/cli` writes them.
+ *
+ * **Nothing below moves with it**: `SETTLEMENT_WINDOW_DAYS`, `K_ORACLE`, `C_ORACLE`,
+ * `TAU_FLOOR_PAISE` and `TAU_RATE_BPS` are unchanged, no constraint, budget or label
+ * definition changes, and `BENCHMARK_VERSION` (1.0.6) and `GT_VERSION` (1.1.0) stay
+ * `packages/generator`'s.
  */
-export const SPEC_VERSION = "1.4.26";
+export const SPEC_VERSION = "1.4.27";

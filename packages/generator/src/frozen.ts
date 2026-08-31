@@ -379,8 +379,23 @@ export const K_MAX = 22;
  * unchanged and this constant is the only field of it that this amendment
  * touches; `constraint_set_hash` is `packages/domain`'s and is unmodified; and
  * `GT_VERSION` stays 1.1.0. No dataset exists to regenerate.
+ *
+ * **1.0.5 -> 1.0.6 at spec 1.4.27** (register rows M42, M43). The committed
+ * benchmark **surface changes shape**: `DATA_MODEL.md §22.2` M42 makes the dataset
+ * artifact unit `(split, seed)` rather than `(split, seed, family)`, so the files
+ * `PREREGISTRATION.md §9` steps 4 and 5 hash are different files. This is the same
+ * ground on which 1.0.3 -> 1.0.4 moved when the surface *gained* an artifact.
+ * `§9` step 5 now requires this field to read `"1.0.6"`.
+ *
+ * **What this package produces changes only in its arrangement.** `dataset.ts`
+ * concatenates a seed's families in `§4.1` table order and re-bases `source_line`;
+ * no payload byte moves, no `ingest_hash` moves (it covers the canonical payload
+ * alone), and every family instance is generated exactly as before. No population,
+ * seed, family, rate or `§7` threshold changes; `§18`'s `BenchmarkManifest`
+ * **shape** is unchanged; `constraint_set_hash` is `packages/domain`'s and is
+ * unmodified; `GT_VERSION` stays 1.1.0. No dataset exists to regenerate.
  */
-export const BENCHMARK_VERSION = "1.0.5";
+export const BENCHMARK_VERSION = "1.0.6";
 
 /** `DATA_MODEL.md §1`: `GroundTruth.gt_version`. */
 export const GT_VERSION = "1.1.0";
@@ -446,5 +461,24 @@ export const GT_VERSION = "1.1.0";
  * to regenerate. `constraint_set_hash` is `packages/domain`'s and is unmodified;
  * `GT_VERSION` stays 1.1.0. This constant moves only so the package's declared
  * provenance matches the documents it was checked against.
+ *
+ * **1.4.26 -> 1.4.27 (M42, M43) — the first amendment since 1.4.22 that binds this
+ * package's output.** M42 ratifies the `(split, seed)` dataset artifact unit and the
+ * aggregation that produces it, and `ARCHITECTURE.md §3` bars `apps/cli` from
+ * performing an `S0` transform while `RECONCILIATION_SPEC.md §2` step 5 makes
+ * provenance stamping `S0`'s — so the `source_line` re-basing is **this package's**,
+ * and `dataset.ts` carries it. The split is the one spec 1.4.24 already used for the
+ * recon report: this package produces rows, `apps/cli` writes bytes.
+ *
+ * M43 requires nothing here. It wires `PREREGISTRATION.md §5.3`'s gates into
+ * `apps/cli` over pure functions in `packages/oracle` and `packages/eval`; `AL1` and
+ * `AL2` keep both away from this package, and the completeness gate takes ground
+ * truth as an argument its caller derives.
+ *
+ * **Nothing else moves.** `K_MAX`, `SEEDS_PER_CONFIGURATION`, `SPLIT_TABLE`, the
+ * `§4.1` composition, every `target_record_count`, `PERIOD`, the degradation
+ * operators and `GT_VERSION` are unchanged; `constraint_set_hash` is
+ * `packages/domain`'s and is unmodified; the recon report's spec-1.4.24 row order
+ * holds unchanged over the merged split artifact, which is what M38's order was for.
  */
-export const SPEC_VERSION = "1.4.26";
+export const SPEC_VERSION = "1.4.27";
