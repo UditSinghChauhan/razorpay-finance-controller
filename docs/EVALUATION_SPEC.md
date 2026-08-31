@@ -1,6 +1,17 @@
 # EVALUATION_SPEC — ASSAY
 
-**Spec version:** 1.4.27 · **Date:** 2026-08-31
+**Spec version:** 1.4.28 · **Date:** 2026-08-31
+
+**At spec 1.4.28** `§2`'s protocol and `§7`'s command block record that the `§5.3`
+consistency draw is **frozen** at `PREREGISTRATION.md §7` (register row M44) —
+`R = 20,000` unchanged, per `(dev, seed)` dataset, `CONSISTENCY_DRAW_SEED =
+417203` — so `assay oracle --split dev --seeds 2000-2004` needs no draw flag and
+`§7`'s reproducibility block returns to its frozen spelling. `§5.4` item 4 reads
+the frozen seed from `oracle_gate.json` rather than an operator's. **No metric
+formula, definition, number or count changes** — the frozen list stays at **28**,
+none is added or removed, and `oracle_gate.json` is still not a metric. Benchmark
+v1.0.6 → **v1.0.7**. See `DECISION_BRIEF.md §A.35`, `PREREGISTRATION.md §10`
+**V25**.
 
 **At spec 1.4.27** `§2`'s protocol and `§7`'s command block record the committed
 artifact paths — dataset artifacts at `bench/<split>/<seed>/`, `recon_report.jsonl`
@@ -167,9 +178,13 @@ Rules:
 - **The consistency gate is dev-scoped** (`PREREGISTRATION.md §5.3`,
   `ARCHITECTURE.md §7.3`: *"pairs drawn from the dev split"*). The loop line above
   runs it on `dev` alone; `test` runs the completeness gate only, exactly as
-  `PREREGISTRATION.md §9` step 3 spells it. Its `R = 20,000` draw has **no frozen
-  sampler and no frozen seed** — `PREREGISTRATION.md §10` **V24** — so the seed is
-  supplied by the operator and recorded beside the result.
+  `PREREGISTRATION.md §9` step 3 spells it. Its `R = 20,000` draw is **frozen** at
+  `PREREGISTRATION.md §7` from spec 1.4.28 (register row M44) — sampler and seed
+  together, `CONSISTENCY_DRAW_SEED = 417203`, one independent draw per
+  `(dev, seed)` dataset — and `AL3` binds it. The seed is recorded beside the
+  result; an override is non-authoritative and refused on a sealed or official
+  run. The frozen sample bounds the gate's coverage, which `PREREGISTRATION.md
+  §10` **V25** states.
 - **An agent's inputs are the observation files plus, from spec 1.4.22, the
   PG-side recon report reachable only through `RECONCILIATION_SPEC.md §6.2`'s
   probe under `P_max`.** The protocol line above reads *"observations only"* in
@@ -826,8 +841,9 @@ significantly different** — no bolding of a 2% lead over a 15% interval.
 4. Oracle gate results: completeness and consistency, both passing, with the
    sample size used for the differential test — read from
    `bench/<split>/<seed>/oracle_gate.json` (spec 1.4.27, M43), together with the
-   operator-supplied seed that produced the differential draw
-   (`PREREGISTRATION.md §10` V24). On the test split the consistency gate does not
+   seed that produced the differential draw — `PREREGISTRATION.md §7`'s frozen
+   `CONSISTENCY_DRAW_SEED` on any official run (spec 1.4.28, M44), and the report
+   states plainly if a run used a non-authoritative override instead. On the test split the consistency gate does not
    run and the line says so; on the test split the completeness figures are
    aggregate only, `AL4` and `AL7` barring any record-level detail.
 5. The full metric table with CIs, including every metric in the frozen list —
@@ -921,8 +937,7 @@ A third party with the repository must be able to reproduce every number, with
 ```
   pnpm install
   pnpm assay generate --split dev --seeds 2000-2004
-  pnpm assay oracle   --split dev --seeds 2000-2004 \
-                      --consistency-seed <n>         # gates must pass (§5.3, V24)
+  pnpm assay oracle   --split dev --seeds 2000-2004  # gates must pass (§5.3)
   pnpm assay bench    --split dev --agents all --llm offline
   pnpm assay bench    --split dev --agents all --llm replay --strict-replay
   pnpm assay report   --out runs/report.html

@@ -1,8 +1,18 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.27 · **Date:** 2026-08-31
+**Spec version:** 1.4.28 · **Date:** 2026-08-31
 **Reviewer role:** principal architect / skeptical reviewer
+
+**At spec 1.4.28** §A.35 records **one ratification**, taken at a governance gate
+held after spec 1.4.27 and — the condition that makes it legitimate — **before any
+dev consistency-gate result existed**: the `PREREGISTRATION.md §5.3` consistency
+draw is frozen into `§7` and bound by `AL3`, **sampler and seed together**, with
+`CONSISTENCY_DRAW_SEED = 417203` and `R = 20,000` unchanged. Register row **M44**;
+threat row `PREREGISTRATION.md §10` **V25**, closing **V24**. **Benchmark v1.0.6 →
+v1.0.7**; `GT_VERSION` stays 1.1.0, `constraint_set_hash` does not move, `C1`–`C8`,
+`SE1`–`SE5`, every other `§7` threshold and all **28** metrics are unchanged, no
+generation seed is touched and no artifact byte changes.
 
 **At spec 1.4.27** §A.34 records **two ratifications**, taken at a governance gate
 held after spec 1.4.26 and **before any dataset was generated**: the committed
@@ -2289,6 +2299,137 @@ table; `§4.1`'s composition and every `target_record_count`; every `PROJECT_SPE
 `runs/` holds only `.gitkeep`, and no manifest, run, root hash or `bench-v1.0.5` tag
 was ever produced.
 
+### A.35 Spec 1.4.28 / benchmark 1.0.7 — the seed that had to be chosen, not derived
+
+**The decision.** The `PREREGISTRATION.md §5.3` consistency draw is frozen into
+`§7` and bound by `AL3` — **sampler and seed together** — with
+`CONSISTENCY_DRAW_SEED = 417203`, `R = 20,000` **unchanged**, and one independent
+draw per `(dev, seed)` dataset. Register row `DATA_MODEL.md §22.2` **M44**; threat
+row `PREREGISTRATION.md §10` **V25**, closing **V24**. `BENCHMARK_VERSION`
+**1.0.6 → 1.0.7**.
+
+**The condition that makes this legitimate is an ordering, and it holds.** The
+value was fixed **before any dev consistency-gate result existed**: `bench/` was
+absent, no dev dataset had been generated, and `assay oracle --split dev` had
+never been run. Nothing could have informed the choice, which is the only state in
+which an arbitrary constant can be frozen honestly. Spec 1.4.27 made the command
+fail closed precisely to preserve that state until a governance gate could use it.
+
+#### Why nothing could be derived
+
+Spec 1.4.27 (§A.34) left this open deliberately, and the reason it gave is the
+reason it stays true: deriving a seed from a `§6.1` dataset seed *"would be a
+choice made silently because a candidate happened to be deterministic"*. Made
+concrete, at least four derivations were available —
+
+```
+  Prng.fromSeed(dataset_seed)              Prng.fromSeed(dataset_seed + 1)
+  substream(dataset_seed, family, stream)  Prng.fromSeed(sha256(dataset_seed))
+```
+
+— and **no document selects among them**. A derivation nobody can check against a
+clause is a choice with a derivation's manners. Two further grounds close it:
+`substream(seed, family, stream)` is the **generator's phase namespace** and a
+gate is not a generation phase, so a name added there would couple a build gate to
+benchmark generation; and a `§6.1` seed is fixed by `§7` for **generation**, so
+reusing one would give a single integer two unrelated jobs and make a change to
+the split table silently change what the gate tests.
+
+**The vendored PRNG is shared and the stream namespace is not.**
+`ARCHITECTURE.md §11` fixes xorshift128+ as the project's generator, and
+`EVALUATION_SPEC.md §5.2`'s bootstrap already reaches it through the plain
+`Prng.fromSeed` constructor on the stated ground that *"a second PRNG would be a
+second thing to keep deterministic"*. The draw does the same. Sharing an algorithm
+is not coupling; sharing a seed space would be.
+
+#### Why the sampler had to be frozen with the seed
+
+A seed selects a path through a PRNG stream. It selects **pairs** only in
+combination with the procedure that consumes the stream — so freezing `417203`
+over a free sampler would have frozen nothing:
+
+```
+  member-set bound   1..4 today; change it and the same seed draws other members
+  draw order         target -> size -> members; reorder and the whole path shifts
+  pools              target-kind and member-eligible; narrow either and the
+                     indices land elsewhere
+  words per draw     one per index; consume two and every later pair moves
+```
+
+`ARCHITECTURE.md §7.3` names *"the sampler and seed"* as the pair that was
+unspecified, and `§7` now carries both. **A frozen seed over a free sampler is
+vacuous**, and recording that is the substance of M44 rather than the number.
+
+#### Why the stricter terms
+
+`§7`'s permission to adjust *"on the TRAIN and DEV splits before the seal"* is
+scoped, in its own words, to **the `SE1`–`SE5` weights**. Those rank candidates
+inside one agent, and a poor choice *"degrade[s] abstention precision"* — a
+reported figure a reader can see and weigh. **This parameter decides a hard build
+gate's pass criterion, and a poor choice is invisible.** The report line reads
+*"consistency: passing"*; a reader cannot see which pairs went untested, and an
+author who re-rolled after a failure would have concealed an engine/oracle
+divergence — the one thing `ARCHITECTURE.md §7.2` says the gate exists to make *"a
+checked property rather than a claim"*. It therefore takes the `A3-NOLLM`
+treatment (M39): `AL3` binds it, `§L.1` rule 12 lists it, `§L.4` forbids changing
+it on an observed result, and it is unadjustable on TRAIN and DEV. An override
+survives for local exploration, is explicitly **non-authoritative**, and is
+**refused on a sealed or official run**.
+
+#### The precedent that was considered and not followed
+
+`EVALUATION_SPEC.md §5.2`'s `bootstrapMean` faces the identical shape — `§7`
+freezes `Bootstrap resamples = 10_000` and `Confidence level = 95%` and **no
+resampling seed** — and the repository already answered it: the seed is an
+explicit caller parameter, *"the caller's to record in the run manifest"*. Spec
+1.4.27 followed that precedent. It does **not** transfer, and the asymmetry is
+exact:
+
+```
+  bootstrap seed   jitters a REPORTED INTERVAL. The mean is exact whatever the
+                   seed; the reader sees the number. A bad seed hides nothing.
+
+  draw seed        decides a PASS/FAIL BUILD GATE. A different seed can flip the
+                   verdict, and the report shows only that it passed.
+```
+
+A seed that perturbs a published figure is a nuisance parameter. A seed that can
+flip a gate is a **decision parameter**, and `AL3` is what the specification has
+for decision parameters. `bootstrapMean` is unchanged and its seed stays the
+caller's.
+
+#### What the closure costs, stated as a threat rather than a footnote
+
+`V24` said the free draw made *"the gate passed"* irreproducible. `V25` says the
+frozen draw makes it *"passed on this sample"*. **Both are true and they trade
+against each other**; neither can be eliminated while `§7.3` says *"randomly
+sampled"*. This amendment takes the second because reproducibility is checkable
+and coverage is bounded either way — a free seed is *also* a fixed slice, just an
+unrecorded one chosen after the fact. `V24` is closed in place and preserved as
+written; `V25` is a separate row because irreproducibility and bounded coverage
+are different threats and folding one into the other would lose the trade.
+
+**`R = 20,000` is NOT raised to compensate.** Raising a `§7` constant to answer a
+disclosure is a parameter change made in response to reasoning about a result, and
+`§4.1`'s standing treatment of a declared-but-bounded control — applied to `C8`,
+`SE1`, `SE4` and `SE2` — is to report the bound rather than tune around it. The
+draw is per `(dev, seed)` over five datasets with five different observation pools,
+so one frozen seed yields **five different samples and 100,000 pairs**, not one
+sample re-tested; widening beyond that is available to a future amendment and no
+such policy is decided here.
+
+**What does not change.** Every metric formula, definition, number and the
+28-metric list; `C1`–`C8` and therefore `constraint_set_hash`; `SE1`–`SE5` and
+their weights; every other `§7` threshold, `R = 20,000` included; `AL1`–`AL2` and
+`AL4`–`AL8`; `DATA_MODEL.md §10`'s `Observation`, `§11.1`'s member-eligible set,
+`§13`, `§12` and `§18`'s `BenchmarkManifest` **shape**; `§6.1`'s split and seed
+table and **every generation seed**; `§4.1`'s composition and every
+`target_record_count`; `M42`, `M43` and §H's **H1** disposition; every
+`PROJECT_SPEC.md §7` success criterion; and `GT_VERSION` **1.1.0**. **No artifact
+byte changes** and **no dataset exists to regenerate** — `bench/` is absent,
+`runs/` holds only `.gitkeep`, and no manifest, run, root hash or `bench-v1.0.6`
+tag was ever produced.
+
 ## B. Locked project definition
 
 > **ASSAY is a settlement reconciliation controller for Razorpay-shaped payment
@@ -2729,6 +2870,20 @@ with a version bump, not a judgement call at the keyboard.
     parameterises the **control arm** against which the system under test is
     measured, so it is unadjustable on TRAIN, DEV and TEST alike, and was fixed
     before `R3` existed in either arm.
+
+    **Added at spec 1.4.28, register row M44 — the `§5.3` consistency draw**, also
+    of `PREREGISTRATION.md §7`: `R = 20,000` per `(dev, seed)` dataset,
+    `CONSISTENCY_DRAW_SEED = 417203`, member-set size uniformly `1..4` drawn
+    before the member indices, target pool every target-kind observation, member
+    pool every member-eligible observation (`DATA_MODEL.md §11.1`),
+    `anchored`/`allocated` always empty, draw order target → size → members, and
+    exactly one PRNG word per index draw. **The sampler is frozen with the seed**,
+    a seed over a free sampler fixing nothing. It takes the same stricter terms as
+    the `A3-NOLLM` policy and for the same reason — it decides a **hard build
+    gate's pass criterion**, where a bad choice is invisible to a reader — so it
+    is unadjustable on TRAIN and DEV, and an override is non-authoritative and
+    refused on a sealed or official run. It was fixed **before any dev
+    consistency-gate result existed**.
 
 ### L.2 Build order (do not reorder)
 

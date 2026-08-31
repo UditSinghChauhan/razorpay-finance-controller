@@ -2,8 +2,13 @@
 
 **Track:** 04 — AI Finance Controller
 **Status:** Specification. Frozen scope for implementation.
-**Spec version:** 1.4.27
+**Spec version:** 1.4.28
 **Date:** 2026-08-31
+
+**At spec 1.4.28** this document is unchanged apart from the version header. **No
+success criterion moves**, and none reads a `§5.3` gate: `S6` tests
+`A1-NOVALIDATE`, `S11` the `--llm=offline` path and `S12` the close gate. See
+`DECISION_BRIEF.md §A.35`.
 
 **At spec 1.4.27** this document is unchanged apart from the version header. **No
 success criterion moves.** `§9`'s *"10,000–20,000 per benchmark run"* is unchanged and

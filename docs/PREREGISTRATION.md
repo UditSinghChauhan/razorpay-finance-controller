@@ -1,12 +1,12 @@
-# PREREGISTRATION — ASSAY Benchmark v1.0.6
+# PREREGISTRATION — ASSAY Benchmark v1.0.7
 
-**Spec version:** 1.4.27 · **Benchmark version:** 1.0.6
+**Spec version:** 1.4.28 · **Benchmark version:** 1.0.7
 
 **Status: FROZEN on commit. Amendments require a version bump and a new seal.**
 **Date frozen:** 2026-08-23 · **Amended:** 2026-08-24 (benchmark 1.0.1),
 2026-08-25 (benchmark 1.0.2), 2026-08-26 (benchmark 1.0.3),
 2026-08-30 (benchmark 1.0.4), 2026-08-31 (benchmark 1.0.5) and
-2026-08-31 (benchmark 1.0.6) — see below
+2026-08-31 (benchmark 1.0.6) and 2026-08-31 (benchmark 1.0.7) — see below
 · **Sealed at:** _(pending — see §9)_
 
 **Amendment 1.1.1 (pre-seal, factual correction).** Applied before the seal and
@@ -1090,6 +1090,104 @@ unchanged and is **not** reopened. Historical amendment records, **M36 and M38
 included**, are preserved verbatim and are not rewritten as though this layout
 existed earlier.
 
+**Amendment 1.4.28 / benchmark 1.0.7 (pre-seal, one draw frozen before any result
+existed).** Applied before the seal, before any dataset was generated and — the
+condition that makes this amendment legitimate at all — **before any dev
+consistency-gate result existed**. `bench/` was absent, no dev dataset had been
+generated and the gate had never been run, so no observation could have informed
+the value below. One ratification: the `§5.3` consistency draw is frozen in `§7`
+and bound by `AL3`. Register row `DATA_MODEL.md §22.2` **M44**; threat row `§10`
+**V25**, with **V24** closed and preserved; record at `DECISION_BRIEF.md §A.35`.
+**Benchmark version moves 1.0.6 → 1.0.7**, on spec 1.4.25's precedent exactly: a
+decision parameter enters `§7`, the pre-registered surface, and `§9` step 5 pins
+the field.
+
+**What was open, and what closing it required.** Spec 1.4.27 wired the gate into
+`assay oracle` (M43) and deliberately resolved neither the sampler nor its seed,
+recording the gap as `V24` and making the command **fail closed** rather than
+derive a seed and call the choice a derivation. That was the correct disposition
+for an amendment that had just built the gate; it is not a durable one, because a
+hard build gate that cannot be run without an ad-hoc parameter is a gate whose
+pass criterion the operator supplies.
+
+**The sampler is frozen together with the seed, and neither alone would have
+worked.** A seed selects a path through a PRNG stream; it selects **pairs** only
+in combination with the procedure that consumes the stream. Freezing `417203`
+over a free sampler would have fixed nothing — a change to the member-set bound,
+the draw order, the pools, or the number of words consumed per pair draws a
+different sample under the same seed. `ARCHITECTURE.md §7.3` names both, and `§7`
+now carries both:
+
+```
+  R                     20,000 pairs, UNCHANGED, per (dev, seed) dataset
+  scope                 one independent draw per dataset; same procedure and
+                        same seed for every dev dataset
+  CONSISTENCY_DRAW_SEED 417203
+  member-set size       uniformly 1..4, drawn BEFORE the member indices
+  target pool           every target-kind observation in the dataset
+  member pool           every member-eligible observation (§11.1) -- never the
+                        target's own allocation, §5.3 requiring inadmissible pairs
+  anchored/allocated    always empty; a sampled pair is a differential-test
+                        input, not a real component
+  draw order            target index, then member-set size, then member indices
+  PRNG consumption      exactly one word per index draw
+```
+
+**This is a RATIFICATION and the record says so plainly.** No frozen rule
+determined the value and **no derivation was available that would not have been a
+choice wearing a derivation's clothes.** Deriving from a `§6.1` dataset seed was
+considered and **rejected** on two independent grounds: at least four derivations
+exist — `fromSeed(s)`, `fromSeed(s+1)`, `substream(s, family, stream)`,
+`sha256(s)` — and nothing in any document selects among them; and it would place a
+**gate** parameter inside the **generator's** seed space, whose
+`substream(seed, family, stream)` namespace is a space of generation **phases**
+and to which a gate is not one. `§7`'s draw therefore uses `ARCHITECTURE.md §11`'s
+vendored PRNG through its plain `Prng.fromSeed` constructor, exactly as
+`EVALUATION_SPEC.md §5.2`'s bootstrap already does, and shares no stream name with
+generation.
+
+**What makes `417203` legitimate is when it was fixed, not how it was computed.**
+Any integer would have served; that is precisely why it had to be fixed **before**
+observation rather than derived. `AL3` now binds it and `§L.4` makes changing it
+on the basis of an observed result a spec violation, so the value's authority
+comes from the ordering the git history establishes and from nothing else.
+
+**Why it is frozen on the `A3-NOLLM` terms and not the `SE1`–`SE5` terms.** `§7`'s
+permission to adjust *"on the TRAIN and DEV splits before the seal"* is scoped to
+**the `SE1`–`SE5` weights**, which rank candidates inside one agent and whose
+misconfiguration degrades a reported figure a reader can see. This seed decides a
+**hard build gate's pass criterion**, and a bad choice is invisible: the report
+line reads *"consistency: passing"* and a reader cannot see what was not tested.
+It is therefore unadjustable on TRAIN and DEV. An override exists for local
+exploration only, is explicitly **non-authoritative**, and is **refused on a
+sealed or official run**.
+
+**The residual is disclosed, not argued away.** `§10` **V25**: a frozen sample is
+a fixed slice, so the gate's coverage is fixed and *"the gate passed"* means
+*"passed on this sample"*. The two threats trade against each other and cannot
+both be eliminated — a free seed is irreproducible and re-rollable, a frozen seed
+is reproducible and bounded — and this amendment takes the second because
+`ARCHITECTURE.md §7.2` makes the gate's purpose *"a checked property rather than a
+claim"*. **`R = 20,000` is NOT raised to compensate**: raising a `§7` constant to
+answer a disclosure is a parameter change made in response to reasoning about a
+result, and `§4.1`'s standing treatment of a declared-but-bounded control is to
+report the bound.
+
+**Nothing else moves.** `C1`–`C8` and `I1`–`I9` are untouched and
+`constraint_set_hash` does not move; the `SE1`–`SE5` weights stay at 3500 / 2000 /
+1500 / 1000 / 2000; `τ`, `ε`, `K_max`, `C_max`, `P_max = 3`, `C_review`,
+`C_exception`, `k_sigma`, `queue_top_n`, the close policy, `§7`'s `A3-NOLLM`
+policy and **`R = 20,000` itself** are unchanged; **no metric definition is
+amended, none is added and none is removed** — the list stays at **28**, and
+`oracle_gate.json` remains a build product that enters no digest; no seed, split,
+family, rate or `target_record_count` moves and **no generation seed is touched**;
+`§4.2`, `§4.3`, `§5.1`, `§5.2`, `§5.4`, `§6.1` and `§6.2`'s `AL1`–`AL2` and
+`AL4`–`AL8` are untouched; `GT_VERSION` stays **1.1.0**; **no artifact byte
+changes** and **no dataset exists to regenerate** — `bench/` is absent, `runs/`
+holds only `.gitkeep`, and no manifest, run, root hash or `bench-v1.0.6` tag was
+ever produced. `M42`, `M43`, `V23` and §H's H1 disposition are unchanged and are
+not reopened. Historical amendment records are preserved verbatim.
+
 ---
 
 ## 1. Pre-registration discipline, and its honest limits
@@ -2008,11 +2106,35 @@ writes and prints **aggregate counts only** — no `target_id`, no `member_obs_i
 because `AL4` bars inspection of TEST outputs before the sealed run and `AL7` burns
 the seed on a breach.
 
-**The pair-drawing procedure is UNSPECIFIED and stays open.** `§7` freezes
-`R = 20,000` and freezes no sampler and no seed; spec 1.4.27 resolves neither and
-declares the gap at `§10` **V24**. The draw's seed is an operator input and the
-command **fails closed** without one rather than deriving a seed and calling the
-choice a derivation.
+**The pair-drawing procedure is FROZEN at spec 1.4.28 (register row
+`DATA_MODEL.md §22.2` M44).** Spec 1.4.27 declared the gap at `§10` **V24** and
+resolved nothing; `§7` now carries the whole draw — `R = 20,000` **unchanged**,
+one independent draw per `(dev, seed)` dataset, `CONSISTENCY_DRAW_SEED = 417203`,
+the 1..4 member-set bound, the two pools, the empty `anchored`/`allocated`, the
+draw order and the one-word-per-index rule — and `AL3` binds it.
+
+**The sampler is frozen together with the seed, and that is not thoroughness.** A
+seed selects a path through a PRNG stream; it selects **pairs** only in
+combination with the procedure that consumes the stream. Freezing a seed over a
+free sampler would fix nothing: a change to the member-set bound, the draw order
+or the words consumed per pair would silently draw a different sample under the
+same seed. `ARCHITECTURE.md §7.3` names both — *"the sampler and seed"* — and
+both are settled here or neither is.
+
+**`417203` is a RATIFICATION, not a derivation, and the record says so.** No
+frozen rule determined it and no derivation was available that would not have
+been a choice wearing a derivation's clothes — deriving from a `§6.1` dataset
+seed was rejected because at least four derivations exist and nothing selects
+among them, and because it would put a gate parameter in the generator's seed
+space. What makes the value legitimate is **not** how it was computed but
+**when** it was fixed: before any dev consistency-gate result existed, at a
+governance gate, with no dev dataset generated. `AL3` and `§L.4` make changing it
+on the basis of an observed result a spec violation rather than a judgement call.
+
+**The residual is that a fixed sample is a fixed slice.** `§10` **V25** states
+it: the gate now tests the same 20,000 pairs per dataset on every run, so *"the
+gate passed"* means *"passed on this sample"*. That is the cost of removing the
+choice, and it is disclosed rather than argued away.
 
 ### 5.4 The ambiguity definition
 
@@ -2101,7 +2223,7 @@ to inspection. This is the reason the adversarial suite must be authored early
 |---|---|
 | AL1 | `packages/engine` may not import `packages/generator` or `packages/oracle`; `packages/oracle` may not import `packages/engine` or `packages/generator`. Enforced by ESLint `no-restricted-imports`, checked in CI. |
 | AL2 | Neither engine nor oracle code may read a file matching `**/ground_truth*.jsonl`. Enforced by a runtime path guard that throws. |
-| AL3 | Every constant in §7 — τ, ε, the SE1–SE5 weights, `K_max`, `C_max`, `P_max`, `C_review`, `C_exception`, the close policy bounds, `k_sigma` and `queue_top_n` — is fixed before the seal and immutable after it. **From spec 1.4.25 (register row M39) this enumeration also binds the `A3-NOLLM` probe priority policy in §7** — its priority order, its eligible-argument rule, its lexicographically-smallest argument selection and its stop rule. It is a decision parameter of the **control arm**, so it is additionally unadjustable on TRAIN and DEV, unlike the SE1–SE5 weights; see §7 and `DECISION_BRIEF.md §L.1` rule 12. |
+| AL3 | Every constant in §7 — τ, ε, the SE1–SE5 weights, `K_max`, `C_max`, `P_max`, `C_review`, `C_exception`, the close policy bounds, `k_sigma` and `queue_top_n` — is fixed before the seal and immutable after it. **From spec 1.4.25 (register row M39) this enumeration also binds the `A3-NOLLM` probe priority policy in §7** — its priority order, its eligible-argument rule, its lexicographically-smallest argument selection and its stop rule. It is a decision parameter of the **control arm**, so it is additionally unadjustable on TRAIN and DEV, unlike the SE1–SE5 weights; see §7 and `DECISION_BRIEF.md §L.1` rule 12. **From spec 1.4.28 (register row M44) it also binds the `§5.3` consistency draw in §7** — `R`, its per-`(dev, seed)` scope, `CONSISTENCY_DRAW_SEED = 417203`, the member-set bound, the two pools, the empty `anchored`/`allocated`, the draw order and the one-word-per-index rule. It decides a **hard build gate's pass criterion**, so it is unadjustable on TRAIN and DEV on the same terms: an override exists for local exploration only, is non-authoritative, and is refused on a sealed or official run. |
 | AL4 | The developer may inspect TRAIN and DEV outputs without limit and TEST outputs **never** before the sealed run. |
 | AL5 | The CLI's `--sealed` flag refuses to print, log or write any ground-truth field; only aggregate metrics are emitted. |
 | AL6 | Prompt text may not contain examples derived from any TEST record. |
@@ -2223,6 +2345,43 @@ test split. Rules AL1–AL8 target that, because it is the real risk here.
   DECISION_BRIEF.md §L.1 rule 12 lists it, and §L.4 therefore forbids changing it
   on the basis of an observed result. It was fixed before R3 existed in any form
   and before any H1 or dev figure was produced.
+
+  §5.3 consistency draw (RATIFIED at spec 1.4.28, register row M44; the sampler
+  and the seed together, because a frozen seed over a free sampler is vacuous):
+
+      R                   = 20,000 pairs, UNCHANGED, per (dev, seed) dataset
+      scope               one independent draw for EACH (dev, seed) dataset;
+                          the same procedure and the same seed for every one
+
+      CONSISTENCY_DRAW_SEED = 417203
+
+      member-set size     uniformly 1..4, drawn BEFORE the member indices
+      target pool         every target-kind observation in the dataset
+      member pool         every member-eligible observation in the dataset
+                          (DATA_MODEL.md §11.1); never the target's own
+                          allocation -- §5.3 requires inadmissible pairs
+      anchored/allocated  ALWAYS EMPTY. A sampled pair is a differential-test
+                          input, not a real component; AN1 anchoring and C7's
+                          allocated set are properties of a component
+
+      draw order          target index, then member-set size, then member
+                          indices
+      PRNG consumption    exactly ONE word per index draw, so the stream
+                          position never depends on the values it produced and
+                          a re-run walks the same path
+
+  The seed is NOT derived from any §6.1 dataset seed and is NOT a name in the
+  generator's substream(seed, family, stream) namespace: that namespace is the
+  generator's PHASE space and a gate is not a generation phase. The draw uses
+  ARCHITECTURE.md §11's vendored PRNG through its plain Prng.fromSeed
+  constructor, as EVALUATION_SPEC.md §5.2's bootstrap already does.
+
+  Frozen on the A3-NOLLM terms rather than the SE1-SE5 terms: AL3 binds it,
+  DECISION_BRIEF.md §L.1 rule 12 lists it, and it is unadjustable on TRAIN and
+  DEV. The permission below to adjust on TRAIN and DEV is scoped to the
+  SE1-SE5 weights and does not reach a gate's pass criterion. An override may
+  exist for local exploration only, is explicitly NON-AUTHORITATIVE, and is
+  refused on a sealed or official run.
 ```
 
 These weights are set by judgement, not fitted. They may be adjusted on the
@@ -2715,7 +2874,8 @@ Stated here, before results, so they cannot be presented later as afterthoughts.
 | V21 | `SE4`'s 1000 bps separates no candidates on v1.0.0 data | **Derived, from six frozen facts.** `memo` is quarantined (`DATA_MODEL.md §0` rule 4, `§8`, `§10`) and **no** `RECONCILIATION_SPEC.md §6.2` probe returns it — the closed enum holds no ledger-entry probe, and `DATA_MODEL.md §3` gives `receipt` an explicit probe-reachability sentence that `memo` has no counterpart to. `MerchantLedgerEntry` (`§8`) carries no structural method or card-network field. `fetch_payment` supplies `method`, which `§10`'s `payment` observation already carries structurally. `card_network` has no Payment-side field at all, spec 1.1.1 having placed the card attributes on `ReconLine` *"when they are settlement-recon columns"*. No **exercised** `§4.3` operator perturbs `method` or `card_network` — `DROP_FIELD` could and is declared not exercised. And `§4.2`'s `F06` construction draws *"identical method — ONCE from the frozen mix"* for **both** members of a collision pair, so the family that manufactures equal-credit ambiguity leaves `SE4` nothing to separate | **Accepted and disclosed rather than repaired**, on the `C8` precedent in `RECONCILIATION_SPEC.md §4.1`. The row and its **1000 bps are retained, not reallocated and not removed**; `AL3` freezes the `SE1`–`SE5` weights and nothing is renormalised. `§6.2`'s `fetch_payment` route is unchanged, the probe enum stays closed, and **no `fetch_ledger_entry` probe is added** — that would open a closed enum and put a merchant-controlled surface (`THREAT_MODEL.md §T1`) inside the probe budget. **The agreement function is left undefined**, being unnecessary while the signal is non-discriminating. **No metric definition is amended and no threshold moved.** With `SE1` inactive (V20) and `SE4` non-binding, the evidence budget that is both live and defined was recorded at spec 1.4.11 as `SE2` + `SE3` = 3500 of 10000 bps with `SE5`'s 2000 undefined; `SE5` is defined at spec 1.4.16, and at spec 1.4.20 `SE2` is declared expected-non-binding on v1.0.0 data (M34), so the budget that is live and defined is `SE3` + `SE5` = **3500** of 10000 — the same figure by a different route. All five weights stand unchanged and unreallocated at 3500 / 2000 / 1500 / 1000 / 2000 |
 | V22 | The probe reaches evidence the Ambiguity Oracle cannot see, so ASSAY may correctly resolve a case the oracle labels truly ambiguous | **Derived, and older than the probe source.** `RECONCILIATION_SPEC.md §6`'s `DISCRIMINATED` branch **accepts** an allocation when `Δs ≥ ε`, while `§5.4`'s ambiguity definition carries **no `Δs` term** — so every `DISCRIMINATED` decision is, by the oracle's own definition, a commit on a truly-ambiguous case, and has been since spec 1.0.0. `§10` V20 shows the branch was **unreachable** pre-probe (`Δs ≤ 469 bps < ε = 1500`), and spec 1.4.20 leaves `SE5`'s 2000 bps as the only route above `ε`, so spec 1.4.22's probe source does not create the asymmetry — it makes an already-frozen branch reachable. Consequences: `abstention_recall` falls, `silent_guess_value_inr` becomes non-zero for correct decisions, and `gap_to_oracle` may go **negative**, which `EVALUATION_SPEC.md §4.13` shows is arithmetically valid since the oracle policy pays `C_review` on the whole truly-ambiguous set | **Ratified as intentional, and corrected in prose rather than repaired in formula.** The oracle stays a **fixed observations-only reference**: `AL8` bars it from the recon report, its labels can never depend on a probe result, and `§5.3`'s completeness gate keeps its observations-only scope. Letting the oracle read the artifact was **considered and rejected** — `§5.3`'s expressibility scoping exists *because* `F05` withholds a line, and an oracle holding the report would void that scoping and make the gate tautological, destroying the independence `ARCHITECTURE.md §7` exists to establish. **No metric formula, definition, number or count changes**; the 28-metric list stands. Two sentences written before the branch was reachable are corrected: `§5.1`'s *"Its input is exactly what every agent receives"* and `EVALUATION_SPEC.md §4.3`'s *"had no evidential right to make"*. Metrics 4 and 8 are reported beside the probe count so the provenance of the difference is visible. **No exploratory second reference model is added** — `DECISION_BRIEF.md §L.4` would force it to `EXPLORATORY`, where it could support no claim |
 | V23 | `DECISION_BRIEF.md §H` tier **H1**'s affirmative claim — that `R3`'s probe selection *beats* the `A3-NOLLM` static priority list — is **not answerable on the conforming v1.0.0 population**; `R3`'s choice set is a singleton and the frozen `§7` policy is weakly dominant | **Derived from five frozen facts, none amended here.** `§11.1` (spec 1.4.4) gives a `bank_line` target the **empty candidate set**, so only a **settlement** target reaches `RECONCILIATION_SPEC.md §6.2`'s loop; `§11.1` gives such a target exactly **one** `settlement_id`; `§4.2`'s `SE5` is **target-scoped**, so a report carrying any other `settlement_id` contributes nothing; register row M36 gives **only** `fetch_settlement_recon` a source; and `§4.5`'s `net_cost_inr = harm + C_review·\|abstained\| + C_exception·\|open exceptions\|` carries **no probe term**, nor does any other metric on `§8`'s list of 28 — so a probe is **free**. Every `AMBIGUOUS` component therefore offers **one** probe with **one** reachable argument at **zero** cost, and spec 1.4.17 makes repetition idempotent (*"Repeating a probe adds nothing"*). `§7`'s policy takes that action every time and it is **weakly dominant**: a proposer can match it, decline and lose the only evidence above `ε` (`§10` V20), or spend budget that buys nothing. A maximisation over a one-element choice set cannot be beaten, so the affirmative claim is **unfalsifiable**; the arms can differ, but only in the model's disfavour. | **Accepted and disclosed rather than repaired — the `C8` treatment, applied to the experiment itself.** `§4.1`'s standing practice for a declared-but-inert clause, already applied to `SE1` (1.4.10), `SE4` (1.4.11) and `SE2` (1.4.20), is to retain it and report that it does nothing. **`§7`'s `A3-NOLLM` policy is unchanged and must not be tuned** — revising it having observed that it is optimal is exactly the result-driven change `DECISION_BRIEF.md §L.4` forbids and `AL3` binds against. **This is not an implementation defect:** `R3`, `packages/probe`'s loop, the `§6.2` dispatch and `§6.6`'s composition are built, tested and correct, and nothing is withdrawn but a **claim**. **Adding the three missing probe sources would not repair it** — `fetch_payment` and `fetch_refund` are **redundant** (`method`/`card_*` sit on every `recon_line` and on the `payment` observation, a refund `recon_line` carries its parent `payment_id` per `§22.1` D14, and `§4.3`'s `DROP_FIELD` is **not exercised**), and `fetch_order`, though genuinely unobservable, sits behind the **inert** `SE2` consumer (spec 1.4.20) and would move no primary metric. **What stands:** `metric 24` `offline_parity` and every metric on `§8`'s list of 28, for their stated purposes — `R1` and `R2` have live discriminating roles. **`abstentions resolved per probe spent` is NOT added to that list and stays `EXPLORATORY`** (`EVALUATION_SPEC.md §4.13`). **Population-specific:** a future family or amendment producing a component with several independently probeable `settlement_id`s would restore the choice and H1's power; **no such policy is decided here**. **No metric definition is amended, no threshold moves, `constraint_set_hash` does not move, `BENCHMARK_VERSION` stays 1.0.5 and `GT_VERSION` 1.1.0.** **Residual risk: HIGH for H1 alone, and now stated before results** — zero for `A1`, `A2`, `B0` and every `§8` metric, whose validity this row does not touch. `§10` V4's *"Low for ablations"* rating remains correct about `A3`'s **cleanliness** — one code path, one differing flag — and is **qualified here as to its power** for the `R3` arm |
-| V24 | The `§5.3` consistency gate's `R = 20,000` pair draw has **no frozen sampler and no frozen seed**, so "the gate passed" is not by itself a reproducible statement | **Declared, not repaired, at spec 1.4.27.** `§7` freezes `R` and freezes nothing about the draw; `ARCHITECTURE.md §7.3` says only *"randomly sampled … deliberately including inadmissible ones"*. Spec 1.4.27 (M43) wires the gate into `assay oracle` and **deliberately resolves neither**: deriving a seed from the dataset seed would have been a choice made silently because a candidate happened to be deterministic, which is the failure `DATA_MODEL.md §22.2` exists to prevent and which M38's record names in terms. The draw's seed is therefore an **operator input** and the command **fails closed** without one, so a gate run always names the seed that produced it, and the seed is recorded in `oracle_gate.json` beside the result. | **Real and bounded.** It binds the **dev build gate only**: the consistency gate is dev-scoped by `§5.3`, the `§9` seal path is completeness-only, and no `§8` metric, no threshold and no artifact digest depends on the draw. Two runs under the same operator-supplied seed agree; two runs under different seeds test different pairs and may disagree about *which* pair exposed a divergence, never about whether the engine and the oracle agree on a pair both evaluated. **`R = 20,000` is unchanged and is not renegotiated here**, and `AL3` is not extended to cover the draw — doing either would freeze a parameter this amendment is declining to choose. Closing it requires a ratification of the sampler and its seed, which no result may inform (`DECISION_BRIEF.md §L.4`). |
+| V24 | The `§5.3` consistency gate's `R = 20,000` pair draw has **no frozen sampler and no frozen seed**, so "the gate passed" is not by itself a reproducible statement | **Declared, not repaired, at spec 1.4.27.** `§7` freezes `R` and freezes nothing about the draw; `ARCHITECTURE.md §7.3` says only *"randomly sampled … deliberately including inadmissible ones"*. Spec 1.4.27 (M43) wires the gate into `assay oracle` and **deliberately resolves neither**: deriving a seed from the dataset seed would have been a choice made silently because a candidate happened to be deterministic, which is the failure `DATA_MODEL.md §22.2` exists to prevent and which M38's record names in terms. The draw's seed is therefore an **operator input** and the command **fails closed** without one, so a gate run always names the seed that produced it, and the seed is recorded in `oracle_gate.json` beside the result. | **Real and bounded.** It binds the **dev build gate only**: the consistency gate is dev-scoped by `§5.3`, the `§9` seal path is completeness-only, and no `§8` metric, no threshold and no artifact digest depends on the draw. Two runs under the same operator-supplied seed agree; two runs under different seeds test different pairs and may disagree about *which* pair exposed a divergence, never about whether the engine and the oracle agree on a pair both evaluated. **`R = 20,000` is unchanged and is not renegotiated here**, and `AL3` is not extended to cover the draw — doing either would freeze a parameter this amendment is declining to choose. Closing it requires a ratification of the sampler and its seed, which no result may inform (`DECISION_BRIEF.md §L.4`). **CLOSED at spec 1.4.28, register row M44, and the row above is preserved as written.** `§7` now carries the whole draw — `R = 20,000` unchanged, one independent draw per `(dev, seed)` dataset, `CONSISTENCY_DRAW_SEED = 417203`, the 1..4 member-set bound, the two pools, the empty `anchored`/`allocated`, the draw order and the one-word-per-index rule — and `AL3` binds it. The seed was fixed **before any dev consistency-gate result existed**: no dev dataset had been generated, `bench/` was absent and the gate had never been run, so no observation could have informed it. The command no longer fails closed; it defaults to the frozen seed, and an override is non-authoritative and refused on a sealed or official run. **The closure creates a new and different residual, stated apart as `V25`** rather than folded in here, because irreproducibility and bounded coverage are not the same threat. |
+| V25 | Freezing the `§5.3` draw fixes **which** 20,000 pairs the consistency gate tests, so its coverage is a fixed slice of the pair space and *"the gate passed"* means *"passed on this sample"* | **Accepted as the price of closing `V24`, and disclosed rather than argued away.** The two threats trade against each other and cannot both be eliminated: a **free** seed makes the gate irreproducible and lets an author re-roll after a failure, concealing an engine/oracle divergence behind a report line that says only *"consistency: passing"*; a **frozen** seed removes that choice and fixes the slice. Spec 1.4.28 takes the second, because `ARCHITECTURE.md §7.2` makes the gate's whole purpose *"a checked property rather than a claim"* and a criterion the author selects after seeing it is not checked. **`R = 20,000` is unchanged and is not raised to compensate** — raising it having reasoned about coverage would be a result-free change to a `§7` constant, but it would also be a parameter change made to answer a disclosure, and `§4.1`'s standing treatment of a declared-but-bounded control is to report the bound rather than tune around it. | **Real, and smaller than it looks, but not zero.** The draw is **per `(dev, seed)`** and the five dev datasets carry different observation pools, so one frozen seed yields five different samples and 100,000 pairs in total, not one sample re-tested; and the pairs are drawn from the **whole** member-eligible pool rather than from true allocations, so most fail `C6` and the sample is dominated by the inadmissible cases `§5.3` asks for. What remains uncovered is any divergence that this particular path through the stream never reaches. **Nothing downstream depends on the draw:** the gate is not on `§8`'s list of 28, `oracle_gate.json` enters no digest (`§9` step 4, M43), and no metric, threshold or artifact byte is a function of it — so the residual is bounded to the gate's own power and reaches no reported figure. `AL4` permits inspecting DEV *"without limit"*, so a developer may run further seeds during development; what `AL3` forbids is choosing **which run counts** after seeing it. Widening coverage is available to a future amendment — a larger `R`, or a declared set of seeds — and no such policy is decided here. |
 
 **The claim ASSAY is entitled to make, and no more:**
 

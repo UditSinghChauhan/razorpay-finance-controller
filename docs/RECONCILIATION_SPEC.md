@@ -1,6 +1,15 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.4.27 · **Date:** 2026-08-31
+**Spec version:** 1.4.28 · **Date:** 2026-08-31
+
+**At spec 1.4.28** this document is unchanged apart from the version header. The
+amendment freezes the `PREREGISTRATION.md §5.3` consistency draw (register row M44)
+— a build gate's sampler, which reads `C1`–`C8` through the two implementations it
+compares and **amends none of them**. **No constraint, signal, weight, threshold,
+probe, probe source or outcome rule changes**; `C1`–`C8`, `SE1`–`SE5`, `τ`, `ε`,
+`P_max = 3`, the five-probe enum, `§6`'s four outcomes and `§6.2`'s probe surface
+are untouched, and `constraint_set_hash` does not move. Benchmark v1.0.6 →
+**v1.0.7**. See `DECISION_BRIEF.md §A.35`.
 
 **At spec 1.4.27** `§6.2`'s probe surface `bench/<split>/recon_report.jsonl` is
 **unchanged**: `DATA_MODEL.md §22.2` M42 scopes the *dataset* artifacts to
