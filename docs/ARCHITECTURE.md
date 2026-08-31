@@ -1,6 +1,19 @@
 # ARCHITECTURE — ASSAY
 
-**Spec version:** 1.4.26 · **Date:** 2026-08-31
+**Spec version:** 1.4.27 · **Date:** 2026-08-31
+
+**At spec 1.4.27** `§10`'s pipeline records the committed artifact paths — dataset
+artifacts at `bench/<split>/<seed>/`, `recon_report.jsonl` **unchanged** at
+`bench/<split>/` (M36) — and names `apps/cli` as the executor of both `§7.3` gates,
+whose pure implementations do not move. `§10`'s `ambiguity_labels.jsonl` is written
+under `PREREGISTRATION.md §9` step 4's own name, `oracle_labels.jsonl`; it is the
+same artifact and the rename settles a two-name seam rather than adding one. **No
+trust boundary, data flow, interface, provider, role, package responsibility, probe
+enum or gate definition changes**; `§7.3`'s two gates are untouched in scope and in
+criterion, and `§3`'s table is unchanged — `apps/cli` already held *"all filesystem
+I/O"*, which is the whole of why the gates are its to run. Benchmark v1.0.5 →
+**v1.0.6**. See `DECISION_BRIEF.md §A.34`, register rows **M42** and **M43**,
+`PREREGISTRATION.md §10` V24.
 
 **At spec 1.4.26** `§6`'s `R3` row records that its *"why not a rule"* justification
 is **not demonstrable on the conforming v1.0.0 population** — the choice set is a
@@ -789,16 +802,21 @@ actually asks.
 
 ```
   generator --seed S --families F --split dev|test
-        │
-        ├──▶ observations.jsonl        (given to every agent)
-        ├──▶ recon_report.jsonl        (PG-side probe surface, spec 1.4.22;
+        │                              families are CONCATENATED into one dataset,
+        │                              F01..F10 ascending (spec 1.4.27, M42)
+        ├──▶ bench/<split>/<seed>/observations.jsonl    (given to every agent)
+        ├──▶ bench/<split>/recon_report.jsonl           (PG-side probe surface,
+        │                               spec 1.4.22; SPLIT-scoped and NOT per seed,
+        │                               it is a lookup table keyed by a globally
+        │                               unique settlement_id and is never ingested;
         │                               reachable ONLY through §6.2's probe
         │                               under P_max; engine + oracle barred, AL8)
-        └──▶ ground_truth.jsonl        (sealed for the test split)
+        └──▶ bench/<split>/<seed>/ground_truth.jsonl    (sealed for the test split)
                     │
-  oracle ◀──────────┘ observations ONLY ──▶ ambiguity_labels.jsonl
-        │            + completeness gate (vs ground truth, offline)
-        │            + consistency gate  (vs engine, differential)
+  oracle ◀──────────┘ observations ONLY ──▶ bench/<split>/<seed>/oracle_labels.jsonl
+        │            + completeness gate (vs ground truth, offline)  EVERY dataset
+        │            + consistency gate  (vs engine, differential)   DEV ONLY, §7.3
+        │            both run by apps/cli; results ──▶ <split>/<seed>/oracle_gate.json
         ▼
   agent runner ── ASSAY · B0 · B1 · B2 · A1 · A2 · A3
         │   one interface: Observations -> Decisions + Ledger
@@ -818,6 +836,20 @@ the same code and are exercised by the same tests.
 Note the gate ordering: the completeness gate compares oracle output to ground
 truth and therefore runs **inside the generator's trust zone, offline, before any
 agent exists**. No agent, and no agent-facing code, ever touches it.
+
+**`apps/cli` runs both gates, ratified at spec 1.4.27 (register row
+`DATA_MODEL.md §22.2` M43), and no gate logic moves.** `§3` gives this app *"all
+filesystem I/O"* and neither gate's package performs any, so the caller was always
+going to be the composition root; `DECISION_BRIEF.md §K` keeps `completeness-gate.ts`
+in `packages/oracle` and `consistency-gate.ts` in `packages/eval`, and `§L.2` builds
+`oracle` before `eval`, which is why the completeness gate could never have been
+eval's. Ground truth reaches the completeness gate through zone `GENERATOR_TRUST`
+alone and is withdrawn under `--sealed` by `AL5`; `recon_report.jsonl` reaches
+**neither** gate (`AL8`); and the consistency gate **never** receives ground truth.
+On the test split the gate writes aggregate counts only, `AL4` and `AL7` barring any
+record-level output. The `R = 20,000` draw's sampler and seed remain **unspecified**
+— `PREREGISTRATION.md §10` V24 — so the seed is an operator input and the command
+fails closed without one.
 
 ## 11. Technology choices and their justifications
 

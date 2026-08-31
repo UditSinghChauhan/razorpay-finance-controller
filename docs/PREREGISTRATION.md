@@ -1,11 +1,12 @@
-# PREREGISTRATION — ASSAY Benchmark v1.0.5
+# PREREGISTRATION — ASSAY Benchmark v1.0.6
 
-**Spec version:** 1.4.26 · **Benchmark version:** 1.0.5
+**Spec version:** 1.4.27 · **Benchmark version:** 1.0.6
 
 **Status: FROZEN on commit. Amendments require a version bump and a new seal.**
 **Date frozen:** 2026-08-23 · **Amended:** 2026-08-24 (benchmark 1.0.1),
 2026-08-25 (benchmark 1.0.2), 2026-08-26 (benchmark 1.0.3),
-2026-08-30 (benchmark 1.0.4) and 2026-08-31 (benchmark 1.0.5) — see below
+2026-08-30 (benchmark 1.0.4), 2026-08-31 (benchmark 1.0.5) and
+2026-08-31 (benchmark 1.0.6) — see below
 · **Sealed at:** _(pending — see §9)_
 
 **Amendment 1.1.1 (pre-seal, factual correction).** Applied before the seal and
@@ -933,6 +934,162 @@ existence. **No `PROJECT_SPEC.md §7` success criterion depends on H1** — `S6`
 `A1-NOVALIDATE` and `S11` the `--llm=offline` path — so none moves. No package
 implementation is modified. Historical amendment records are preserved verbatim.
 
+**Amendment 1.4.27 / benchmark 1.0.6 (pre-seal, one artifact unit and one gate
+owner).** Applied before the seal, before any dataset was generated and before any
+result was observed. Two ratifications, both forced by an audit of the sealed-run
+path against this section: the **committed artifact unit** was never stated, and
+the `§5.3` gates had **no execution path**. Register rows `DATA_MODEL.md §22.2`
+**M42** and **M43**; threat row `§10` **V24**; record at `DECISION_BRIEF.md §A.34`.
+**Benchmark version moves 1.0.5 → 1.0.6**, because the committed benchmark surface
+changes shape — the same ground on which 1.0.3 → 1.0.4 moved when it gained an
+artifact.
+
+**M42 — the dataset artifact unit is `(split, seed)`, and family is not a file
+dimension.** `§4.1` already reads `record_counts` *"per seed range"* and defines a
+dataset as *"a `(split, seed)` dataset [that] holds exactly the families `§6.1`
+assigns to that seed's range"*; `EVALUATION_SPEC.md §2` loops `for seed in
+seeds(split)` with **no family loop**; and `ARCHITECTURE.md §10` scores
+`metrics.json` per `(agent × seed × split)`. **No document has ever introduced a
+per-family artifact file.** The layout is therefore:
+
+```
+  bench/<split>/<seed>/observations.jsonl      dataset artifacts, (split, seed)-scoped
+  bench/<split>/<seed>/untrusted_text.jsonl
+  bench/<split>/<seed>/ground_truth.jsonl
+  bench/<split>/<seed>/oracle_labels.jsonl
+  bench/<split>/<seed>/oracle_gate.json        M43; NOT a benchmark digest, NOT a metric
+  bench/<split>/<seed>/benchmark_manifest.json one per (split, seed)
+
+  bench/<split>/recon_report.jsonl             UNCHANGED, split-scoped, M36
+```
+
+**The recon report does not move, and M36 is not rewritten.** It is a **probe
+response surface** and not a dataset artifact — `DATA_MODEL.md §12` and `§6.2` make
+it *"never an `Observation`, and never ingested"*, and `settlement_id`, its only
+query key, is unique across every family and seed. It needs no partition by seed
+because nothing partitions a lookup table. **This is why M36 could ratify a
+split-scoped location while no document ever gave one for the other three**, and
+that asymmetry is now stated rather than inferred. M38's `entity_id`-ascending row
+order is likewise unchanged and now holds over the merged split artifact.
+
+**The manifest is one per `(split, seed)`.** `seeds` is the singleton `[seed]`,
+`record_counts` holds that seed's families, and `recon_report_sha256` is the
+**split-level** digest and is therefore **identical across every manifest of one
+split**. `§18`'s plural `seeds` array is retained and is not retyped: the field
+admits a set, this amendment fixes the cardinality one manifest carries, and `§4.1`'s
+derivation — *"one `record_counts` map against a plural `seeds` array, so the realized
+composition must be identical across the seeds of a configuration"* — is unaffected,
+because it reasons about the type and not about any manifest's contents.
+
+**Aggregation is ratified, because nothing derived it.** `PREREGISTRATION.md §7`
+requires a regeneration at the same seed to be byte-identical, which constrains
+**determinism** and not the **choice**; `conventions.ts`'s `U-EMISSION-ORDER` is an
+`[ASSAY-MODEL]` convention scoped **within** one family instance; and
+`DECISION_BRIEF.md §A.31` already found that *"the observation emission order is
+frozen nowhere"*. This is the M38 situation and gets the M38 treatment:
+
+```
+  family order      §4.1's table order, F01..F10 ascending
+  within a family   the producing package's own order, unchanged
+  recon report      entity_id ascending over the merged split artifact (M38)
+  form              CONCATENATION, never canonical reserialization -- key order
+                    is §6.2's and §10's declaration order and must survive
+  encoding          UTF-8, \n-delimited JSONL, trailing newline
+  source_line       RE-BASED to 1-based within the aggregated logical file
+```
+
+**`source_line` re-basing is required, not cosmetic.** `U-SOURCE-FILES` gives one
+logical filename per source system and numbers lines 1-based **within the file**,
+per family instance. Concatenating six families without re-basing puts six
+observations at `pg_recon.jsonl` line 1 in one dataset, against `ARCHITECTURE.md §4`'s
+*"Nothing enters the system anonymously."* Re-basing is **free of hash
+consequences**: `ingest_hash` is `sha256` over the canonical **payload** alone, so no
+`ingest_hash`, no `inputs_hash` and no ledger body moves.
+
+**The `Observation` schema does not change.** No `seed` field and no `family` field
+is added. `DATA_MODEL.md §10` is untouched, `GT_VERSION` stays **1.1.0**, and no
+payload byte moves. **Cross-family identifier uniqueness stays exactly as
+`DATA_MODEL.md §0` rule 3 and the minter already characterize it** — asserted within a
+family instance, probabilistically certain across them at 62^14 — and is **not**
+promoted to an invariant here. Promoting it would add a check no frozen rule requires
+and would make a probabilistic property look like a guarantee.
+
+**M43 — `apps/cli` executes both `§5.3` gates; no gate logic moves.**
+`ARCHITECTURE.md §3` gives `apps/cli` *"all filesystem I/O"*, `§K` places
+`completeness-gate.ts` in `packages/oracle` and `consistency-gate.ts` in
+`packages/eval`, and `§L.2` builds `oracle` before `eval` — so the completeness gate
+cannot be eval's, and neither gate can be its own package's, both packages performing
+no I/O at all. The gates stay pure functions over data the caller supplies. The
+command surface is `§9` step 3's and `EVALUATION_SPEC.md §7`'s own:
+
+```
+  assay oracle --split dev  --seeds ...   labels + completeness + consistency
+  assay oracle --split test --seeds ...   labels + completeness ONLY
+```
+
+**The split asymmetry is derived, not chosen.** `§5.3` and `ARCHITECTURE.md §7.3`
+scope the consistency gate to *"pairs drawn from the **dev split**"* — it is a hard
+**build** gate — while the completeness gate *"runs on every dataset before any agent
+sees it"* and `§9` step 3 makes it a **seal** gate. `EVALUATION_SPEC.md §7` writes
+*"# gates must pass"* for dev and `§9` step 3 writes *"# completeness gate MUST
+pass"* for test; the two spellings were already the rule and are now stated as one.
+
+**Access is unchanged and is restated because a new caller now exercises it.**
+Ground truth reaches the completeness gate through zone `GENERATOR_TRUST` and no
+other, exactly as `AL2` has permitted since `apps/cli` landed; `AL5` withdraws that
+route under `--sealed`, so neither gate runs sealed and `§9` step 3 carries no such
+flag. **The recon report reaches neither gate**: `AL8` states that its seal-scoped
+permission *"does **not** extend to the `§5.3` completeness gate, which stays
+observations-only"*, and `§10` V22 rests on it. **The consistency gate never accepts
+ground truth**, and gains no parameter for it — a differential test that consulted the
+answer key would measure nothing.
+
+**Gate results are an artifact and a seal precondition.** `bench/<split>/<seed>/oracle_gate.json`
+carries `CompletenessResult` and, on dev, `ConsistencyResult` — which is what `§5.3`'s
+*"reports the inexpressible ones with their cause and count, per family, **in the same
+artifact as the pass**"* and `EVALUATION_SPEC.md §5.4` item 4 already require. It is
+**not** hashed into `BenchmarkManifest` and is **not** a metric: it is a build product,
+the frozen list stays at **28**, and `§8` is untouched. `§9` step 5 gains one seal
+check — a missing or failing gate artifact is a **SEAL FAILURE**, which is what makes
+step 3 a gate rather than a step someone remembered to run.
+
+**On the test split the gate output is aggregate only.** No `target_id` and no
+`member_obs_ids` are written, printed or logged. `AL4` bars inspection of TEST outputs
+before the sealed run and `AL7` burns the seed on a breach; a finding naming a target
+would be an inspection performed by the gate itself. Counts, per-family tallies and
+the pass bit carry no record.
+
+**Open, and recorded as open: the consistency gate's pair-drawing procedure.** `§7`
+freezes `R = 20,000` and freezes **no sampler and no seed**, and this amendment
+resolves neither — see `§10` **V24**. The implementation therefore takes the draw's
+seed as an operator input and **fails closed** without one, rather than deriving a
+seed from the dataset and calling the choice a derivation. This binds the dev build
+gate only; the `§9` seal path is completeness-only and is unaffected.
+
+**The command surface is the frozen text's own, and nothing is invented.** `§9` step
+2 writes `--seeds 9000-9004,9100-9104` and `EVALUATION_SPEC.md §7` writes
+`--seeds 2000-2004`, so the seed argument is a comma-separated list whose items are a
+single declared seed or an inclusive `lo-hi` range of declared seeds. **No new seed
+syntax is introduced**; this records the spelling both documents already use. `§6.1`'s
+split table remains the sole authority on which seeds exist, and
+**`assay generate --split test` remains refused** until the frozen sequence permits
+it — `§6.1`'s forbidden list bars *"invoking `--split test` for any purpose"* before
+the seal, and this amendment does not lift it.
+
+**Nothing else moves.** `C1`–`C8` and `I1`–`I9` are untouched and
+`constraint_set_hash` does not move; the `SE1`–`SE5` weights stay at 3500 / 2000 /
+1500 / 1000 / 2000; `τ`, `ε`, `K_max`, `C_max`, `P_max = 3`, `C_review`,
+`C_exception`, `k_sigma`, `queue_top_n`, the close policy and `§7`'s `A3-NOLLM`
+policy are unchanged; **no metric definition is amended, none is added and none is
+removed** — the list stays at **28**; no seed, split, family, rate or
+`target_record_count` moves; `§4.2`, `§4.3`, `§5`, `§6.1` and `§6.2`'s `AL1`–`AL8`
+are untouched; `GT_VERSION` stays **1.1.0**; **no dataset exists to regenerate** —
+`bench/` is absent, `runs/` holds only `.gitkeep`, and no manifest, run, root hash or
+`bench-v1.0.5` tag was ever produced. `DECISION_BRIEF.md §H`'s H1 disposition is
+unchanged and is **not** reopened. Historical amendment records, **M36 and M38
+included**, are preserved verbatim and are not rewritten as though this layout
+existed earlier.
+
 ---
 
 ## 1. Pre-registration discipline, and its honest limits
@@ -1127,6 +1284,22 @@ the sum over *those* families that must fall in the 10,000–20,000 band.
   seeds 1000-1004, 2000-2004, 9000-9004   F01..F06   = 15,726
   seeds 9100-9104                          F07..F10   = 10,486
 ```
+
+**The `(split, seed)` dataset is also the committed artifact unit, ratified at spec
+1.4.27 (register row `DATA_MODEL.md §22.2` M42).** The paragraph above already reads
+`record_counts` per seed range and already calls the thing a dataset holds *"exactly
+the families §6.1 assigns to that seed's range"*; **family is a composition
+dimension and is not a file dimension**, and no artifact is written per family.
+`bench/<split>/<seed>/` holds `observations.jsonl`, `untrusted_text.jsonl`,
+`ground_truth.jsonl`, `oracle_labels.jsonl`, `oracle_gate.json` (`§5.3`, M43) and one
+`benchmark_manifest.json`. The families of a seed are concatenated into those files
+in **F01..F10 ascending** order, each family's own row order preserved, with
+`source_line` re-based 1-based within the aggregated logical file so
+`(source_file, source_line)` stays unique as `ARCHITECTURE.md §4` requires;
+`ingest_hash` covers the payload alone and does not move. `bench/<split>/recon_report.jsonl`
+is **not** a dataset artifact and does not move: it is `§6.2`'s probe response
+surface, split-scoped by M36, keyed by a `settlement_id` that is unique across every
+family and seed, and ordered `entity_id` ascending by M38.
 
 **`F07` emits both chargeback rows unconditionally.** The deduction row and its
 later reversal are both emitted even where the reversal's `created_at` falls
@@ -1803,6 +1976,44 @@ Excluding it wholesale would drop a clause the gate can and should test on the
 targets where the evidence exists; including it unconditionally would count
 agreement on the targets where it does not.
 
+**Who runs them, ratified at spec 1.4.27 (register row `DATA_MODEL.md §22.2` M43).**
+Both gates are pure functions over data a caller supplies, and **`apps/cli` is that
+caller**: `ARCHITECTURE.md §3` gives it *"all filesystem I/O"*, while
+`packages/oracle` (which holds the completeness gate) and `packages/eval` (which
+holds the consistency gate, `DECISION_BRIEF.md §L.1` rule 3's single allowlisted
+engine-and-oracle importer) perform none. **No gate logic moves.** The command is
+`assay oracle --split <split> --seeds <seeds>`, and which gates it runs follows from
+this section rather than from a flag:
+
+```
+  --split dev    labels + completeness gate + consistency gate   ("gates must pass")
+  --split test   labels + completeness gate                      ("completeness gate MUST pass")
+```
+
+The completeness gate *"runs on every dataset before any agent sees it"*
+(`ARCHITECTURE.md §7.3`) and `§9` step 3 makes it a **seal** gate; the consistency
+gate draws its pairs *"from the **dev split**"* and is a **build** gate. A failing
+gate is a non-zero exit. Results are written to `bench/<split>/<seed>/oracle_gate.json`,
+which is where this section's *"in the same artifact as the pass"* obligation and
+`EVALUATION_SPEC.md §5.4` item 4 are discharged; it is **not** part of the
+`BenchmarkManifest` digest set and is **not** a metric.
+
+**Access, restated because a new caller now exercises it.** Ground truth reaches the
+completeness gate through zone `GENERATOR_TRUST` and no other route (`§6.2` `AL2`);
+`AL5` withdraws that route under `--sealed`, so neither gate runs sealed. `AL8` keeps
+`recon_report.jsonl` away from the completeness gate, which *"stays
+observations-only"*, and `§10` V22 depends on that. **The consistency gate never
+receives ground truth** and takes no parameter for it. On the **test** split the gate
+writes and prints **aggregate counts only** — no `target_id`, no `member_obs_ids` —
+because `AL4` bars inspection of TEST outputs before the sealed run and `AL7` burns
+the seed on a breach.
+
+**The pair-drawing procedure is UNSPECIFIED and stays open.** `§7` freezes
+`R = 20,000` and freezes no sampler and no seed; spec 1.4.27 resolves neither and
+declares the gap at `§10` **V24**. The draw's seed is an operator input and the
+command **fails closed** without one rather than deriving a seed and calling the
+choice a derivation.
+
 ### 5.4 The ambiguity definition
 
 A case is **truly ambiguous** iff the oracle finds ≥ 2 admissible allocations
@@ -2420,18 +2631,32 @@ results are reported, with the reason for the re-run.
 ## 9. Seal procedure
 
 ```
-  1. Freeze code:  git tag -s bench-v1.0.5 -m "ASSAY benchmark v1.0.5 seal"
+  1. Freeze code:  git tag -s bench-v1.0.6 -m "ASSAY benchmark v1.0.6 seal"
   2. Generate:     assay generate --split test --seeds 9000-9004,9100-9104
-  3. Oracle:       assay oracle --split test          # completeness gate MUST pass
-  4. Hash:         sha256 observations.jsonl ground_truth.jsonl oracle_labels.jsonl \
-                          recon_report.jsonl                      # spec 1.4.22
-  5. Commit hashes into benchmark_manifest.json      # ground truth itself NOT committed
-     # `benchmark_version` must read "1.0.5" (DATA_MODEL.md §18)
-     # `recon_report_sha256` must be present and non-null (spec 1.4.22);
-     #   its absence is a SEAL FAILURE, because §6.2's probe has no source
+     # per seed:   bench/test/<seed>/{observations,untrusted_text,ground_truth}.jsonl
+     # per split:  bench/test/recon_report.jsonl        # M36; NOT per seed (M42)
+  3. Oracle:       assay oracle --split test --seeds 9000-9004,9100-9104
+     # per seed:   bench/test/<seed>/{oracle_labels.jsonl,oracle_gate.json}
+     # completeness gate MUST pass on EVERY (split, seed); a failure exits non-zero
+     # the §5.3 consistency gate is DEV-scoped and does not run here
+     # output is AGGREGATE ONLY on test: no target_id, no member_obs_ids (AL4/AL7)
+  4. Hash, per seed:  sha256 bench/test/<seed>/observations.jsonl \
+                             bench/test/<seed>/ground_truth.jsonl \
+                             bench/test/<seed>/oracle_labels.jsonl
+     and once:        sha256 bench/test/recon_report.jsonl         # spec 1.4.22
+  5. Commit hashes into bench/test/<seed>/benchmark_manifest.json, ONE PER (split, seed)
+     # ground truth itself NOT committed
+     # `benchmark_version` must read "1.0.6" (DATA_MODEL.md §18)
+     # `seeds` is the singleton [<seed>]; `record_counts` holds THAT seed's
+     #   families (§4.1, M42)
+     # `recon_report_sha256` must be present and non-null (spec 1.4.22). It is the
+     #   SPLIT-level digest and is IDENTICAL across every manifest of one split
+     #   (M42); its absence is a SEAL FAILURE, because §6.2's probe has no source
      #   without it and SE5 would silently score 0 on every candidate
      # `record_counts` must match the frozen §4.1 composition; a mismatch, or a
      # per-(split,seed) total outside 10,000-20,000, is a SEAL FAILURE
+     # a MISSING or FAILING bench/<split>/<seed>/oracle_gate.json is a SEAL
+     #   FAILURE (spec 1.4.27, M43) -- this is what makes step 3 a gate
      # `true_balances` must equal the projection of `true_journal` for every
      # AccountCode; a mismatch is a SEAL FAILURE (DATA_MODEL.md §1)
   6. Commit + push. Record the commit SHA as the seal point.
@@ -2442,6 +2667,22 @@ results are reported, with the reason for the re-run.
 Step 3 is a gate, not a formality: if the oracle cannot recover the true
 allocation for every target, the constraint set is wrong and nothing downstream
 is trustworthy.
+
+**Step 3 is enforced at step 5 from spec 1.4.27, register row M43.** Through spec
+1.4.26 this section sequenced the gate and nothing checked that it had run: `assay
+seal` read no gate result, so a seal taken without step 3 was indistinguishable from
+one taken after it. The gate artifact is now a **seal precondition** — sequencing is
+a procedure, and a procedure is not a control.
+
+**The artifact unit is `(split, seed)`, ratified at spec 1.4.27, register row M42.**
+Steps 4 and 5 read per seed because `§4.1` defines a dataset that way and
+`EVALUATION_SPEC.md §2` scores that way. `bench/<split>/recon_report.jsonl` is the one
+exception and does not move: `§6.2`'s probe surface is not a dataset artifact, is
+never ingested, and is keyed by a `settlement_id` unique across every family and
+seed, so it is hashed once per split and that one digest appears in every manifest of
+the split. **`assay generate --split test` remains refused** until this procedure's
+step 1 has been taken; `§6.1`'s forbidden list bars *"invoking `--split test` for any
+purpose"* before the seal, and nothing here lifts that.
 
 ---
 
@@ -2474,6 +2715,7 @@ Stated here, before results, so they cannot be presented later as afterthoughts.
 | V21 | `SE4`'s 1000 bps separates no candidates on v1.0.0 data | **Derived, from six frozen facts.** `memo` is quarantined (`DATA_MODEL.md §0` rule 4, `§8`, `§10`) and **no** `RECONCILIATION_SPEC.md §6.2` probe returns it — the closed enum holds no ledger-entry probe, and `DATA_MODEL.md §3` gives `receipt` an explicit probe-reachability sentence that `memo` has no counterpart to. `MerchantLedgerEntry` (`§8`) carries no structural method or card-network field. `fetch_payment` supplies `method`, which `§10`'s `payment` observation already carries structurally. `card_network` has no Payment-side field at all, spec 1.1.1 having placed the card attributes on `ReconLine` *"when they are settlement-recon columns"*. No **exercised** `§4.3` operator perturbs `method` or `card_network` — `DROP_FIELD` could and is declared not exercised. And `§4.2`'s `F06` construction draws *"identical method — ONCE from the frozen mix"* for **both** members of a collision pair, so the family that manufactures equal-credit ambiguity leaves `SE4` nothing to separate | **Accepted and disclosed rather than repaired**, on the `C8` precedent in `RECONCILIATION_SPEC.md §4.1`. The row and its **1000 bps are retained, not reallocated and not removed**; `AL3` freezes the `SE1`–`SE5` weights and nothing is renormalised. `§6.2`'s `fetch_payment` route is unchanged, the probe enum stays closed, and **no `fetch_ledger_entry` probe is added** — that would open a closed enum and put a merchant-controlled surface (`THREAT_MODEL.md §T1`) inside the probe budget. **The agreement function is left undefined**, being unnecessary while the signal is non-discriminating. **No metric definition is amended and no threshold moved.** With `SE1` inactive (V20) and `SE4` non-binding, the evidence budget that is both live and defined was recorded at spec 1.4.11 as `SE2` + `SE3` = 3500 of 10000 bps with `SE5`'s 2000 undefined; `SE5` is defined at spec 1.4.16, and at spec 1.4.20 `SE2` is declared expected-non-binding on v1.0.0 data (M34), so the budget that is live and defined is `SE3` + `SE5` = **3500** of 10000 — the same figure by a different route. All five weights stand unchanged and unreallocated at 3500 / 2000 / 1500 / 1000 / 2000 |
 | V22 | The probe reaches evidence the Ambiguity Oracle cannot see, so ASSAY may correctly resolve a case the oracle labels truly ambiguous | **Derived, and older than the probe source.** `RECONCILIATION_SPEC.md §6`'s `DISCRIMINATED` branch **accepts** an allocation when `Δs ≥ ε`, while `§5.4`'s ambiguity definition carries **no `Δs` term** — so every `DISCRIMINATED` decision is, by the oracle's own definition, a commit on a truly-ambiguous case, and has been since spec 1.0.0. `§10` V20 shows the branch was **unreachable** pre-probe (`Δs ≤ 469 bps < ε = 1500`), and spec 1.4.20 leaves `SE5`'s 2000 bps as the only route above `ε`, so spec 1.4.22's probe source does not create the asymmetry — it makes an already-frozen branch reachable. Consequences: `abstention_recall` falls, `silent_guess_value_inr` becomes non-zero for correct decisions, and `gap_to_oracle` may go **negative**, which `EVALUATION_SPEC.md §4.13` shows is arithmetically valid since the oracle policy pays `C_review` on the whole truly-ambiguous set | **Ratified as intentional, and corrected in prose rather than repaired in formula.** The oracle stays a **fixed observations-only reference**: `AL8` bars it from the recon report, its labels can never depend on a probe result, and `§5.3`'s completeness gate keeps its observations-only scope. Letting the oracle read the artifact was **considered and rejected** — `§5.3`'s expressibility scoping exists *because* `F05` withholds a line, and an oracle holding the report would void that scoping and make the gate tautological, destroying the independence `ARCHITECTURE.md §7` exists to establish. **No metric formula, definition, number or count changes**; the 28-metric list stands. Two sentences written before the branch was reachable are corrected: `§5.1`'s *"Its input is exactly what every agent receives"* and `EVALUATION_SPEC.md §4.3`'s *"had no evidential right to make"*. Metrics 4 and 8 are reported beside the probe count so the provenance of the difference is visible. **No exploratory second reference model is added** — `DECISION_BRIEF.md §L.4` would force it to `EXPLORATORY`, where it could support no claim |
 | V23 | `DECISION_BRIEF.md §H` tier **H1**'s affirmative claim — that `R3`'s probe selection *beats* the `A3-NOLLM` static priority list — is **not answerable on the conforming v1.0.0 population**; `R3`'s choice set is a singleton and the frozen `§7` policy is weakly dominant | **Derived from five frozen facts, none amended here.** `§11.1` (spec 1.4.4) gives a `bank_line` target the **empty candidate set**, so only a **settlement** target reaches `RECONCILIATION_SPEC.md §6.2`'s loop; `§11.1` gives such a target exactly **one** `settlement_id`; `§4.2`'s `SE5` is **target-scoped**, so a report carrying any other `settlement_id` contributes nothing; register row M36 gives **only** `fetch_settlement_recon` a source; and `§4.5`'s `net_cost_inr = harm + C_review·\|abstained\| + C_exception·\|open exceptions\|` carries **no probe term**, nor does any other metric on `§8`'s list of 28 — so a probe is **free**. Every `AMBIGUOUS` component therefore offers **one** probe with **one** reachable argument at **zero** cost, and spec 1.4.17 makes repetition idempotent (*"Repeating a probe adds nothing"*). `§7`'s policy takes that action every time and it is **weakly dominant**: a proposer can match it, decline and lose the only evidence above `ε` (`§10` V20), or spend budget that buys nothing. A maximisation over a one-element choice set cannot be beaten, so the affirmative claim is **unfalsifiable**; the arms can differ, but only in the model's disfavour. | **Accepted and disclosed rather than repaired — the `C8` treatment, applied to the experiment itself.** `§4.1`'s standing practice for a declared-but-inert clause, already applied to `SE1` (1.4.10), `SE4` (1.4.11) and `SE2` (1.4.20), is to retain it and report that it does nothing. **`§7`'s `A3-NOLLM` policy is unchanged and must not be tuned** — revising it having observed that it is optimal is exactly the result-driven change `DECISION_BRIEF.md §L.4` forbids and `AL3` binds against. **This is not an implementation defect:** `R3`, `packages/probe`'s loop, the `§6.2` dispatch and `§6.6`'s composition are built, tested and correct, and nothing is withdrawn but a **claim**. **Adding the three missing probe sources would not repair it** — `fetch_payment` and `fetch_refund` are **redundant** (`method`/`card_*` sit on every `recon_line` and on the `payment` observation, a refund `recon_line` carries its parent `payment_id` per `§22.1` D14, and `§4.3`'s `DROP_FIELD` is **not exercised**), and `fetch_order`, though genuinely unobservable, sits behind the **inert** `SE2` consumer (spec 1.4.20) and would move no primary metric. **What stands:** `metric 24` `offline_parity` and every metric on `§8`'s list of 28, for their stated purposes — `R1` and `R2` have live discriminating roles. **`abstentions resolved per probe spent` is NOT added to that list and stays `EXPLORATORY`** (`EVALUATION_SPEC.md §4.13`). **Population-specific:** a future family or amendment producing a component with several independently probeable `settlement_id`s would restore the choice and H1's power; **no such policy is decided here**. **No metric definition is amended, no threshold moves, `constraint_set_hash` does not move, `BENCHMARK_VERSION` stays 1.0.5 and `GT_VERSION` 1.1.0.** **Residual risk: HIGH for H1 alone, and now stated before results** — zero for `A1`, `A2`, `B0` and every `§8` metric, whose validity this row does not touch. `§10` V4's *"Low for ablations"* rating remains correct about `A3`'s **cleanliness** — one code path, one differing flag — and is **qualified here as to its power** for the `R3` arm |
+| V24 | The `§5.3` consistency gate's `R = 20,000` pair draw has **no frozen sampler and no frozen seed**, so "the gate passed" is not by itself a reproducible statement | **Declared, not repaired, at spec 1.4.27.** `§7` freezes `R` and freezes nothing about the draw; `ARCHITECTURE.md §7.3` says only *"randomly sampled … deliberately including inadmissible ones"*. Spec 1.4.27 (M43) wires the gate into `assay oracle` and **deliberately resolves neither**: deriving a seed from the dataset seed would have been a choice made silently because a candidate happened to be deterministic, which is the failure `DATA_MODEL.md §22.2` exists to prevent and which M38's record names in terms. The draw's seed is therefore an **operator input** and the command **fails closed** without one, so a gate run always names the seed that produced it, and the seed is recorded in `oracle_gate.json` beside the result. | **Real and bounded.** It binds the **dev build gate only**: the consistency gate is dev-scoped by `§5.3`, the `§9` seal path is completeness-only, and no `§8` metric, no threshold and no artifact digest depends on the draw. Two runs under the same operator-supplied seed agree; two runs under different seeds test different pairs and may disagree about *which* pair exposed a divergence, never about whether the engine and the oracle agree on a pair both evaluated. **`R = 20,000` is unchanged and is not renegotiated here**, and `AL3` is not extended to cover the draw — doing either would freeze a parameter this amendment is declining to choose. Closing it requires a ratification of the sampler and its seed, which no result may inform (`DECISION_BRIEF.md §L.4`). |
 
 **The claim ASSAY is entitled to make, and no more:**
 

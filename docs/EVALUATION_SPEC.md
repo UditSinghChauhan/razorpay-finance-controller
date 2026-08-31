@@ -1,6 +1,15 @@
 # EVALUATION_SPEC — ASSAY
 
-**Spec version:** 1.4.26 · **Date:** 2026-08-31
+**Spec version:** 1.4.27 · **Date:** 2026-08-31
+
+**At spec 1.4.27** `§2`'s protocol and `§7`'s command block record the committed
+artifact paths — dataset artifacts at `bench/<split>/<seed>/`, `recon_report.jsonl`
+**unchanged** at `bench/<split>/` — and that **`apps/cli` runs both `§5.3` gates**,
+consistency on **dev only**. `§5.4` item 4's oracle-gate line now names the artifact
+it is read from. **No metric formula, definition, number or count changes** — the
+frozen list stays at **28**, no metric is added or removed, and `oracle_gate.json` is
+**not** a metric. Benchmark v1.0.5 → **v1.0.6**. See `DECISION_BRIEF.md §A.34`,
+register rows **M42** and **M43**, `PREREGISTRATION.md §10` V24.
 
 **At spec 1.4.26** `§3.2` records that the `A3-NOLLM` comparison is
 **non-discriminating for `R3`** on the conforming v1.0.0 population. **No metric
@@ -135,7 +144,8 @@ integral, **AURC**, denominated in rupees.
       generate observations + ground truth      (generator, seeded)
       oracle: enumerate from observations ONLY  -> ambiguity labels
       oracle completeness gate  (vs ground truth, offline)   MUST PASS
-      oracle consistency gate   (vs engine, differential)    MUST PASS
+      oracle consistency gate   (vs engine, differential)    MUST PASS, DEV ONLY
+        both run by apps/cli (M43); results -> bench/<split>/<seed>/oracle_gate.json
       for agent in {ASSAY, B0, B2, A1, A2, A3}   (+ B1 if built):
         run agent on observations only, --llm=replay --strict-replay
         attempt period close -> CLOSED | OPEN | BLOCKED
@@ -148,6 +158,18 @@ Rules:
 - **No agent ever sees ground truth or oracle labels.** Enforced structurally
   (`PREREGISTRATION.md §6.2`, AL1–AL2). The completeness gate runs offline inside
   the generator's trust zone, before any agent exists.
+- **The dataset unit is `(split, seed)`** (spec 1.4.27, `DATA_MODEL.md §22.2` M42).
+  A seed's families are concatenated into one dataset in **F01..F10** order at
+  `bench/<split>/<seed>/`; family is a composition dimension and never a file
+  dimension. `bench/<split>/recon_report.jsonl` is **split-scoped and does not
+  move** — it is `§6.2`'s probe surface, keyed by a globally unique
+  `settlement_id`, never ingested, and therefore never partitioned (M36, M38).
+- **The consistency gate is dev-scoped** (`PREREGISTRATION.md §5.3`,
+  `ARCHITECTURE.md §7.3`: *"pairs drawn from the dev split"*). The loop line above
+  runs it on `dev` alone; `test` runs the completeness gate only, exactly as
+  `PREREGISTRATION.md §9` step 3 spells it. Its `R = 20,000` draw has **no frozen
+  sampler and no frozen seed** — `PREREGISTRATION.md §10` **V24** — so the seed is
+  supplied by the operator and recorded beside the result.
 - **An agent's inputs are the observation files plus, from spec 1.4.22, the
   PG-side recon report reachable only through `RECONCILIATION_SPEC.md §6.2`'s
   probe under `P_max`.** The protocol line above reads *"observations only"* in
@@ -802,7 +824,12 @@ significantly different** — no bolding of a 2% lead over a 15% interval.
    Razorpay recon report as authoritative input and claims no gap in it.
 3. The benchmark manifest hashes, the `constraint_set_hash`, and the seal commit SHA.
 4. Oracle gate results: completeness and consistency, both passing, with the
-   sample size used for the differential test.
+   sample size used for the differential test — read from
+   `bench/<split>/<seed>/oracle_gate.json` (spec 1.4.27, M43), together with the
+   operator-supplied seed that produced the differential draw
+   (`PREREGISTRATION.md §10` V24). On the test split the consistency gate does not
+   run and the line says so; on the test split the completeness figures are
+   aggregate only, `AL4` and `AL7` barring any record-level detail.
 5. The full metric table with CIs, including every metric in the frozen list —
    **including the ones where ASSAY does poorly.**
 6. **Two columns for every primary metric:** `--llm=replay` and `--llm=offline`,
@@ -894,7 +921,8 @@ A third party with the repository must be able to reproduce every number, with
 ```
   pnpm install
   pnpm assay generate --split dev --seeds 2000-2004
-  pnpm assay oracle   --split dev                    # gates must pass
+  pnpm assay oracle   --split dev --seeds 2000-2004 \
+                      --consistency-seed <n>         # gates must pass (§5.3, V24)
   pnpm assay bench    --split dev --agents all --llm offline
   pnpm assay bench    --split dev --agents all --llm replay --strict-replay
   pnpm assay report   --out runs/report.html
