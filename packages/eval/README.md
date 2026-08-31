@@ -1,6 +1,6 @@
 # `@assay/eval` — the measurement layer
 
-Written against **specification 1.4.26 / benchmark 1.0.5**.
+Written against **specification 1.4.29 / benchmark 1.0.7**.
 
 `ARCHITECTURE.md §3`: *"Metrics, bootstrap CIs, baselines, ablations, report
 generation. Must run against any agent behind one interface, so ablations are
@@ -8,28 +8,38 @@ configuration, not forked code."*
 
 ## What this package guarantees
 
-1. **It holds no agent.** `src/agent.ts` is the interface `ARCHITECTURE.md §10`
-   names — *"Observations -> Decisions + Ledger"* — and nothing in `src/`
-   implements it. An agent inside the scorer would make the ablations forked
-   code, which is what `EVALUATION_SPEC.md §3.2` says would invalidate them as
-   controls. Asserted in `tests/discipline.test.ts`.
+1. **It holds no agent implementation.** `src/agent.ts` is the interface
+   `ARCHITECTURE.md §10` names — *"Observations -> Decisions + Ledger"* — and
+   nothing in `src/` implements it. An agent inside the scorer would make the
+   ablations forked code, which is what `EVALUATION_SPEC.md §3.2` says would
+   invalidate them as controls. Asserted in `tests/discipline.test.ts`.
 
-   **This departs from `DECISION_BRIEF.md §K`, which places
-   `agents/{assay,b0,b1,b2,a1,a2,a3}.ts` under `packages/eval/src/`, and the
-   departure is forced rather than chosen:** an ASSAY agent must import
-   `packages/engine` (S1–S5), `packages/llm` (R1–R4) and `packages/probe`
-   (`RECONCILIATION_SPEC.md §6.2`'s loop), and all three are refused inside this
-   package — by `§6.2`'s *"hosting the run loop there would put the system under
-   test inside the thing measuring it"*, by `DATA_MODEL.md §22.2` M37's matching
-   rejection, and by `DECISION_BRIEF.md §L.1` rule 3 as enforced in
-   `eslint.config.js`. The composition therefore lives in the composition root
-   (`apps/cli`) and reaches this package by **injection** — `apps/cli` imports
-   `@assay/eval` and passes a constructed `Agent` in, rather than this package
-   importing the agent's dependencies. `§L.2` constrains only the packages named
-   in its build order and is silent on `apps/cli`'s dependencies, so that edge
-   is available and the graph stays acyclic. **The placement in `§K` is
-   unreconciled frozen text, recorded here rather than resolved: no amendment
-   has been made.**
+   **`DECISION_BRIEF.md §K` placed `agents/{assay,b0,b1,b2,a1,a2,a3}.ts` under
+   `packages/eval/src/`, and spec 1.4.29 (register row `DATA_MODEL.md §22.2`
+   **M47**) moved them to `apps/cli/src/agents/`.** Through spec 1.4.28 this
+   README recorded the departure as *"unreconciled frozen text … no amendment has
+   been made"*; the amendment has now been made. The reason is unchanged: an
+   ASSAY agent must import `packages/engine` (S1–S5), `packages/llm` (R1–R4) and
+   `packages/probe` (`RECONCILIATION_SPEC.md §6.2`'s loop), and all three are
+   refused inside this package. **Register row M37 had already ratified that at
+   spec 1.4.23** — *"`packages/eval` (scoped to measurement; hosting the run loop
+   puts the system under test inside the thing measuring it)"* — so the
+   contradiction was M37-vs-`§K` rather than a new finding, and `§K` is what
+   moved.
+
+   The composition lives in the composition root (`apps/cli`) and reaches this
+   package by **injection**: `apps/cli` imports `@assay/eval` and passes a
+   constructed `Agent` in, rather than this package importing the agent's
+   dependencies. M37 also rejected `apps/cli`, on the ground that *"`packages/eval`'s
+   agent runner could not import it and the loop would be **forked**"* — that
+   assumed the opposite import direction, which injection reverses. `§L.2`
+   constrains only the packages named in its build order and is silent on
+   `apps/cli`, so the edge is available and the graph stays acyclic. Nothing is
+   forked: all seven agents share this interface and differ only by `RunConfig`
+   flags.
+
+   **`src/report/` does not move** — a renderer reads metrics and imports none of
+   the three, so it never participated in the contradiction.
 2. **No agent can reach ground truth or an oracle label through it.**
    `AgentInput` has exactly two fields — `observations` and `config` — and no
    path, reader, or label among them. `EVALUATION_SPEC.md §2`'s first rule is a
@@ -61,6 +71,7 @@ configuration, not forked code."*
 | `metric-list.ts` | `PREREGISTRATION.md §8`'s 28 metrics as data, with what is not yet computable and why; and the four `EXPLORATORY` companions the specification requires be printed beside a frozen figure |
 | `agent.ts` | `ARCHITECTURE.md §10`'s interface, `EVALUATION_SPEC.md §3`'s agent table, and `AgentInput` — the whole of what an agent is handed |
 | `run.ts` | `AgentRun`, the scorer's input; and `CloseOutcome`, the typed boundary the unwritten close gate leaves |
+| `run-key.ts` | `M48`'s `(agent_id, split, seed, llm_mode)` — what identifies one scored run, and the `seed`-only dimension the bootstrap resamples. Holds no path: layout is `apps/cli`'s |
 | `truth.ts` | The ground-truth projection. The single `@assay/generator` `GroundTruth` import site |
 | `gates/consistency-gate.ts` | `§5.3`'s differential test. `§L.1` rule 3's single permitted exception |
 | `metrics/coverage.ts` | Metrics 1, 9, 27, 28 and `§4.1`'s `EXPLORATORY` audit line |
