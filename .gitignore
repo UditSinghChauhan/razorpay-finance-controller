@@ -24,6 +24,20 @@ coverage/
 *.db
 .DS_Store
 
-# --- Run outputs (regenerable) ---
-runs/*
-!runs/.gitkeep
+# --- Run outputs ---
+# SCORED RUN ARTIFACTS ARE COMMITTED from spec 1.4.29 (register row
+# DATA_MODEL.md §22.2 M48). PROJECT_SPEC.md §7 S10, EVALUATION_SPEC.md §5.5 and
+# DECISION_BRIEF.md §C T0-13 each require every claimed number to be traceable
+# to a COMMITTED run artifact, while this file excluded runs/ wholesale -- so a
+# conforming scored run produced numbers §5.5 forbids reporting.
+#
+#   runs/<run_id>/<split>/<seed>/<agent>/<llm_mode>/metrics.json   committed
+#   runs/report.html                                               committed
+#
+# The SQLite database stays ignored by *.sqlite above: it is regenerable and is
+# not an artifact any reported number is traced to. Scratch output is ignored by
+# kind rather than by directory, so a new artifact is committed by default and
+# an exclusion has to be argued for.
+runs/**/*.log
+runs/**/*.tmp
+runs/**/tmp/

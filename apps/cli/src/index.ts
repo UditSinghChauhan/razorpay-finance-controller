@@ -57,6 +57,9 @@ export { decodeJsonl, encodeJsonl, RecordRejectedError, type Decoder } from "./a
 export { loadObservations } from "./artifacts/observations.js";
 export { loadLedgerEvents } from "./artifacts/ledger-events.js";
 export { loadReplayCache, ReplayCacheError } from "./artifacts/replay-cache.js";
+export {
+  METRICS_FILE, REPORT_PATH, RUNS_ROOT, metricsPath, runRoot,
+} from "./artifacts/metrics-path.js";
 export { buildProvider, ProviderRefusedError, DEFAULT_REPLAY_CACHE_DIR } from "./providers.js";
 export {
   DISPATCHABLE_PROBE_KINDS,
