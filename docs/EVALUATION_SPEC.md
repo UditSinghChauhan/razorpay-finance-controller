@@ -1,6 +1,19 @@
 # EVALUATION_SPEC — ASSAY
 
-**Spec version:** 1.4.28 · **Date:** 2026-08-31
+**Spec version:** 1.4.29 · **Date:** 2026-08-31
+
+**At spec 1.4.29** `§7`'s command block records the artifact locations a scored run
+writes (register row `DATA_MODEL.md §22.2` M48): `metrics.json` is keyed
+`(agent_id, split, seed, llm_mode)` at
+`runs/<run_id>/<split>/<seed>/<agent>/<llm_mode>/metrics.json`, `report.html` at
+`runs/report.html`, and **scored run artifacts are committed**, which `§5.5`'s
+*"committed run artifact"* rule and `PROJECT_SPEC.md §7` S10 already required. `assay
+report` is confirmed as an eighth CLI command, its renderer staying in
+`packages/eval/src/report/`. **No metric formula, definition, number or count
+changes** — the frozen list stays at **28** — and `§5.4`'s thirteen obligations and
+`§5.5`'s forbidden practices are untouched. `--record` and the live recording pass
+stay **unresolved** under `DECISION_BRIEF.md §F` F2. Benchmark stays **v1.0.7**. See
+`DECISION_BRIEF.md §A.36`.
 
 **At spec 1.4.28** `§2`'s protocol and `§7`'s command block record that the `§5.3`
 consistency draw is **frozen** at `PREREGISTRATION.md §7` (register row M44) —
@@ -942,6 +955,26 @@ A third party with the repository must be able to reproduce every number, with
   pnpm assay bench    --split dev --agents all --llm replay --strict-replay
   pnpm assay report   --out runs/report.html
 ```
+
+**Where a scored run's artifacts land, ratified at spec 1.4.29 (`DATA_MODEL.md §22.2`
+M48).** The scored unit is `(agent_id, split, seed, llm_mode)` — the union of what
+`ARCHITECTURE.md §10` and `DECISION_BRIEF.md §C` T0-9 each named in part, forced by
+`RunConfig`, by `§L.1` rule 11 fixing `strict_replay` true on every scored run, and by
+`§5.4` item 6 requiring `llm_mode` as a reported dimension. The bootstrap resamples
+**`seed`** and holds the other three fixed, `§2` requiring *"≥ 5 seeds"* per
+configuration.
+
+```
+  runs/<run_id>/<split>/<seed>/<agent>/<llm_mode>/metrics.json
+  runs/report.html
+```
+
+**These are committed.** `§5.5` forbids *"Any number in the demo that does not exist in
+a committed run artifact"*, `PROJECT_SPEC.md §7` `S10` and `DECISION_BRIEF.md §C`
+T0-13 say the same, and through spec 1.4.28 `§K` and `.gitignore` excluded `runs/`
+wholesale — so a conforming run produced numbers this section forbids reporting. The
+SQLite database stays ignored; it is regenerable and is not an artifact any number is
+traced to.
 
 The `--llm=offline` line requires nothing external at all. The `--llm=replay`
 line requires only the committed response cache. Neither touches the network.

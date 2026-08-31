@@ -1,6 +1,15 @@
 # ARCHITECTURE — ASSAY
 
-**Spec version:** 1.4.28 · **Date:** 2026-08-31
+**Spec version:** 1.4.29 · **Date:** 2026-08-31
+
+**At spec 1.4.29** `§3` records two placements and `§10` one topology: the seven
+agent implementations are `apps/cli/src/agents/`'s and are **injected** into
+`packages/eval` (register row `DATA_MODEL.md §22.2` M47), and `apps/cli` gains an
+eighth command, `report` (M48). **No trust boundary, data flow, interface, provider,
+role, probe enum or gate definition changes**; `packages/eval` stays the measurement
+package and gains no import, its `report/` module does not move, `AgentInput` keeps its
+two fields, and `§11`'s PRNG and `§7.3`'s two gates are untouched. Benchmark stays
+**v1.0.7**. See `DECISION_BRIEF.md §A.36`.
 
 **At spec 1.4.28** `§7.3`'s consistency gate records that its **sampler and seed**
 are frozen at `PREREGISTRATION.md §7` (register row M44) — `R = 20,000` unchanged,
@@ -216,10 +225,10 @@ carries.
 | `packages/probe` | The `§6.2` probe **loop**, as a pure state machine: `P_max` accounting, pre-call `I6`, construction of the closed five-probe call, and the `PROBE` event body (spec 1.4.23) | The one place `THREAT_MODEL.md §T7`'s four controls meet. It is the **only** constructor of a probe call, so a caller cannot dispatch around them. Pure and I/O-free, so the caller owns the read and the append — the split spec 1.4.18 already made for `S0`. |
 | `packages/llm` | **`LlmProvider` interface + four providers**; four bounded roles; response cache; output verification | Single choke point. Every model call goes through one interface, so swapping providers — or removing the model entirely — is configuration, not a rewrite. See §6.5. |
 | `packages/ledger` | **Layer A** append-only hash-chained audit events; **Layer B** double-entry projection; close gate | Append-only semantics, the trial-balance invariant and the Suspense identity are properties of this package, not conventions its callers must remember. |
-| `packages/eval` | Metrics, bootstrap CIs, baselines, ablations, report generation | Must run against any agent behind one interface, so ablations are configuration, not forked code. |
+| `packages/eval` | Metrics, bootstrap CIs, report generation, and the **agent interface** the baselines and ablations implement. **The implementations themselves are `apps/cli`'s from spec 1.4.29 (register row `DATA_MODEL.md §22.2` M47)** and are injected; `report/` does not move | Must run against any agent behind one interface, so ablations are configuration, not forked code. An agent must import `engine`, `llm` and `probe`, all three refused here — **M37 already rejected this package as a run-loop host**, and `§K` had not absorbed that. |
 | `apps/api` | Thin HTTP over engine + ledger | — |
 | `apps/web` | Four screens (`PROJECT_SPEC.md §10`) | — |
-| `apps/cli` | `assay generate / oracle / run / bench / close / verify / seal`; **all filesystem I/O — it acquires raw source contents and passes them into `packages/domain`'s `S0` boundary, and performs no `S0` transform itself (spec 1.4.18)** | The CLI is the real interface; the UI is a view over it. Everything demonstrable must be scriptable. |
+| `apps/cli` | `assay generate / oracle / run / bench / close / verify / seal / report` (`report` appended at spec 1.4.29, M48); **the seven agent implementations at `src/agents/`, constructed here and injected into `packages/eval` (M47) — they may not import `src/fs/`, enforced by a path-scoped lint**; **all filesystem I/O — it acquires raw source contents and passes them into `packages/domain`'s `S0` boundary, and performs no `S0` transform itself (spec 1.4.18)** | The CLI is the real interface; the UI is a view over it. Everything demonstrable must be scriptable. |
 
 
 **`S0`'s owner, ratified at spec 1.4.18 `[ASSAY-MODEL]`, register row M32.** The
@@ -855,7 +864,23 @@ actually asks.
 ```
 
 Every agent implements the same interface, so ablations are configuration flags
-rather than forked codebases — which is what makes them valid controls. `A3-NOLLM`
+rather than forked codebases — which is what makes them valid controls.
+
+**The implementations live in the composition root and are injected, ratified at spec
+1.4.29 (`DATA_MODEL.md §22.2` M47).** `DECISION_BRIEF.md §K` placed them under
+`packages/eval/src/agents/`, where an agent cannot live: it imports `engine`, `llm`
+and `probe`, and all three are refused there. Register row **M37** had already
+rejected this package as a run-loop host — *"hosting the run loop puts the system
+under test inside the thing measuring it"* — and `§K` never absorbed it. M37 also
+rejected `apps/cli`, on the ground that *"`packages/eval`'s agent runner could not
+import it and the loop would be **forked**"*; **injection reverses that direction** —
+`apps/cli` imports `@assay/eval` and passes a constructed `Agent` in, this package
+imports nothing new, `DECISION_BRIEF.md §L.2` is silent on `apps/cli`, and the graph
+stays acyclic. Nothing is forked: all seven share one interface and differ only by
+`RunConfig` flags. `AgentInput` keeps exactly two fields — `observations` and
+`config` — so no path, reader, ground truth, oracle label or recon-report handle can
+reach an agent, and `apps/cli/src/agents/**` may not import the filesystem door at
+all. `A3-NOLLM`
 is literally `ASSAY --llm=offline`, so the ablation and the offline demo path are
 the same code and are exercised by the same tests.
 

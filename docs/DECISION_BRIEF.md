@@ -1,8 +1,22 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.28 · **Date:** 2026-08-31
+**Spec version:** 1.4.29 · **Date:** 2026-08-31
 **Reviewer role:** principal architect / skeptical reviewer
+
+**At spec 1.4.29** §A.36 records **four ratifications** in three groups, taken at a
+governance gate held after spec 1.4.28 and — the condition that makes them
+legitimate — **before any DEV scored result existed**: `bench/` absent, `runs/`
+holding only `.gitkeep`, no agent run and no metric computed. **M45** makes `§9` step
+1's signed tag *the seal* and lifts `--split test` on a `--seal-tag` operator
+attestation; **M46** corrects `§9`'s stale `1.0.6` literals; **M47** places the seven
+agents at `apps/cli/src/agents/` and injects them into `packages/eval`; **M48** makes
+`assay report` an eighth command, keys `metrics.json` `(agent_id, split, seed,
+llm_mode)` and makes scored run artifacts committed. Register rows **M45**–**M48**.
+**Benchmark version does NOT move and stays v1.0.7**; `GT_VERSION` stays 1.1.0,
+`constraint_set_hash` does not move, `C1`–`C8`, `SE1`–`SE5`, every `§7` threshold and
+all **28** metrics are unchanged, and no artifact byte changes. `--record`/`F2` and
+`§H`'s `H1` disposition are untouched. See `PREREGISTRATION.md` amendment 1.4.29.
 
 **At spec 1.4.28** §A.35 records **one ratification**, taken at a governance gate
 held after spec 1.4.27 and — the condition that makes it legitimate — **before any
@@ -2430,6 +2444,163 @@ byte changes** and **no dataset exists to regenerate** — `bench/` is absent,
 `runs/` holds only `.gitkeep`, and no manifest, run, root hash or `bench-v1.0.6`
 tag was ever produced.
 
+### A.36 Spec 1.4.29 / benchmark 1.0.7 — three contracts that could not be executed
+
+**The decision.** Four ratifications in three groups, closing the last contract
+defects that stood between the repository and a first DEV scored run. Register rows
+`DATA_MODEL.md §22.2` **M45**–**M48**. **`BENCHMARK_VERSION` does not move and stays
+1.0.7**; `SPEC_VERSION` **1.4.28 → 1.4.29**; `GT_VERSION` stays 1.1.0.
+
+**The condition that makes this legitimate is an ordering, and it holds.** Every
+decision below was fixed **before any DEV scored result existed**: `bench/` absent,
+`runs/` holding only `.gitkeep`, no agent constructed, no metric computed and
+`assay bench` never run. This matters most for **M45**, which governs *when the test
+split becomes reachable* — a rule of that kind is defensible fixed before any figure
+exists and indefensible fixed after, which is why it is taken now rather than at the
+seal, even though it is **executed** last. It is spec 1.4.28's own legitimacy claim,
+applied to a different parameter.
+
+#### Group I — the seal that was defined twice (M45, M46)
+
+Through spec 1.4.28 `PREREGISTRATION.md §9`'s own note read *"remains refused until
+this procedure's step 1 has been taken; `§6.1`'s forbidden list bars … before the
+seal, **and nothing here lifts that**"* — a sentence that names a condition and
+revokes it. §A.34 recorded the consequence honestly: *"That the seal procedure's own
+step 2 is therefore still not executable is a separate open item."*
+
+**The defect was never a missing condition.** It was a term defined twice. `§9` step
+6 calls the commit SHA *"the seal point"*; `PREREGISTRATION.md §1`'s framing has
+always read *"tagged `bench-v…` (signed) **at seal time**"*. Two readings of *"the
+seal"* existed, and under the commit reading the procedure forbids its own step 2.
+The tag reading is selected because it is the only one under which steps 2 through 5
+are executable, and it leaves **both** sentences true:
+
+```
+  THE SEAL        step 1's signed tag.        §6.1's boundary.
+  THE SEAL POINT  step 6's commit SHA.        the provenance record.
+```
+
+**No third condition was invented, and no detection was added.** `apps/cli` cannot
+learn whether a tag exists: it runs no subprocess, `eslint.config.js` bans the
+transports, and `commands/seal.ts` already states the principle — *"a commit SHA read
+by running a subprocess is a fact about the working tree rather than about the sealed
+artifact"*. What remains is an operator **attestation**, `--seal-tag <name>`, and its
+semantics were held to the minimum that does the job: it lifts the refusal, its value
+must equal `bench-v<BENCHMARK_VERSION>`, it is refused unless `--split` is `test`, and
+it is recorded in `BenchmarkManifest.seal_signature` — a field `DATA_MODEL.md §18`
+already types *"signed git tag name"*. **No field, artifact, trust zone, exit code or
+subprocess is added.** `§10` **V3** already carries the residual — *"Developer tunes
+against the test split … Moderate — self-enforced"* — so no threat row is opened.
+
+**The rule is not weakened.** `AL7` keeps its burn rule and its fail-closed default:
+an unattested `--split test` invocation is still a forbidden-list breach. What changed
+is that the frozen procedure became executable, not that test data became easier to
+reach.
+
+**M46 is clerical and is recorded as such.** Spec 1.4.28 moved `BENCHMARK_VERSION` to
+1.0.7 and did not carry the move into `§9`, leaving step 1 naming a tag nobody may cut
+and step 5 a literal no conforming manifest can carry — while
+`packages/generator/src/frozen.ts` asserted *"§9 step 5 now requires this field to
+read `"1.0.7"`"*, a citation to text that did not exist. Applying a bump already
+taken is not a new bump; M45's equality check now makes the same drift unrepeatable.
+
+#### Group II — the placement M37 had already settled (M47)
+
+`§K` placed `agents/{assay,b0,b1,b2,a1,a2,a3}.ts` under `packages/eval/src/`, where
+an agent cannot live: it must import `engine` (S1–S5), `llm` (R1–R4) and `probe`
+(`§6.2`'s loop), and `eslint.config.js` refuses all three under `noInlineConfig`.
+
+**This was not a new finding. It was a consequence of M37 that `§K` never absorbed.**
+Register row M37 (spec 1.4.23) already rejected this package in terms — *"`packages/eval`
+(scoped to measurement; hosting the run loop puts the system under test inside the
+thing measuring it)"*. M37 also rejected `apps/cli`, and that rejection **does not
+reach the resolution taken here**, because it was reasoned against the opposite import
+direction: *"`packages/eval`'s agent runner could not import it and the loop would be
+**forked**"*. Injection reverses the direction — `apps/cli` imports `@assay/eval` and
+passes a constructed `Agent` in, eval imports nothing new, `§L.2` is silent on
+`apps/cli`, and the graph stays acyclic. Nothing is forked: all seven agents share one
+`Agent` surface and differ only by `RunConfig` flags, which is precisely what
+`ARCHITECTURE.md §10` requires to keep the ablations valid controls.
+
+**One provenance correction, recorded so a later reader does not mis-locate the
+conflict.** `eslint.config.js`'s `packages/eval ↛ engine|llm|probe` bans are **derived**
+from M37 and the measurement boundary (`ARCHITECTURE.md §10`, `EVALUATION_SPEC.md
+§4.11`, `RECONCILIATION_SPEC.md §6.2`) — **not** from the literal wording of `§L.1`
+rule 3, which binds `engine ↛ generator|oracle` and `oracle ↛ engine|generator` and
+names `consistency-gate.ts` only as the exception to *that* pair. The contradiction
+was M37-vs-`§K`, not rule-3-vs-`§K`, and the lint is correctly stricter than rule 3's
+text.
+
+**`report/` does not move,** because it never participated: a renderer reads metrics
+and imports no engine, llm or probe.
+
+**G8, the enforcement, is the same mechanism used three times already.** `guard.ts`
+records that *"the zone is an argument at the call site"*, so zones are per-read rather
+than per-process and a module is not zone-restricted by sitting in the composition
+root. Four protections already hold — no `node:fs` outside `apps/cli/src/fs/**`; every
+read declares a `ReadZone` and `AGENT` refuses both restricted artifacts; `AgentInput`
+carries only `observations` and `config`, so an agent has nothing to read *with*; and
+`AL1` binds `packages/engine` and `packages/oracle` **by name**, and neither moves. The
+residual is closed by a **path-scoped** ban on the filesystem door from
+`apps/cli/src/agents/**`, and deliberately not broadened.
+
+#### Group III — the command that existed everywhere but the list (M48)
+
+`EVALUATION_SPEC.md §7` invokes `assay report --out runs/report.html` inside the
+reproducibility guarantee; `§C` **T0-13** is a Tier-0 row distinct from T0-9 and
+T0-11; `§K` gives the renderer its own `report/` module. Three sources support the
+command against one — T0-11's enumeration — that merely omits it. Folding it into
+`bench` was rejected: it would falsify `§7`'s literal recipe, closing one
+contradiction by creating another, and `§9` step 8's *"NO CODE CHANGES BETWEEN 6 AND
+8"* means re-rendering must not require re-scoring.
+
+**The key tuple was never in conflict.** `ARCHITECTURE.md §10` writes *(agent × seed ×
+split)* and T0-9 writes *(agent × seed × llm-mode)* — overlapping subsets, not rival
+claims. `RunConfig` already carries `{llm_mode, strict_replay, split, seed}`;
+`strict_replay` cannot vary within the scored set because `§L.1` rule 11 fixes it
+true; `§5.4` item 6 requires `llm_mode` as a reported dimension. The union is forced:
+**`(agent_id, split, seed, llm_mode)`**, with the bootstrap resampling `seed` alone.
+
+**The committability defect could not have waited.** `PROJECT_SPEC.md §7` **S10**,
+`EVALUATION_SPEC.md §5.5` and T0-13 each require every claimed number to be traceable
+to a **committed** run artifact, while `§K` and `.gitignore` excluded `runs/`
+wholesale — so a conforming scored run would have produced numbers `§5.5` forbids
+reporting. Settling it after a run would mean choosing where results live after seeing
+them, which is the pattern `AL3` and `§L.4` exist to prevent. `*.sqlite` is already
+excluded globally, so the database stays ignored with no `runs/`-specific rule.
+
+#### What was left open, deliberately
+
+**`--record`, the live recording pass, and `§9`'s missing recording step.** `§F`
+**F2** is *"Unresolved"* and already carries a pre-declared response; on the F2-false
+branch the benchmark runs `--llm=offline` throughout and needs no cache, no
+`--record` and nothing from this amendment. One gap is recorded now so it is not
+discovered later: `DATA_MODEL.md §19`'s `cache_key` is content-addressed on the
+structured role input, so **a DEV-recorded cache cannot serve TEST calls** — on the
+F2-true branch `§9` would need a recording step between steps 2 and 7, and step 7,
+which names no `--llm` mode while `§L.1` rule 11 requires one, would need it stated.
+Amending for that now would fix a procedure nobody can execute, so it waits on the
+credential fact. **F2's disposition is untouched.**
+
+**`--seeds all` / `--agents all`** are implementation conventions, not ratifications.
+Spec 1.4.27 derived the seed grammar from two instances and overlooked `§9` step 7's
+third spelling; `--seeds all` is in any case semantically identical to the explicit
+enumeration that grammar already admits, so no frozen text requires a parser change
+and none is ratified. Both are recorded in code on `artifacts/replay-cache.ts`'s
+convention precedent.
+
+**What does not change.** Every metric formula, definition, number and the 28-metric
+list; `C1`–`C8` and therefore `constraint_set_hash`; `SE1`–`SE5` and their weights;
+every `§7` threshold, the `A3-NOLLM` policy and the `§5.3` consistency draw;
+`AL1`–`AL8` in substance, `AL7`'s burn rule and fail-closed default included;
+`AgentInput`'s two fields; `DATA_MODEL.md §10`'s `Observation`, `§11.1`, `§13`, `§12`
+and `§18`'s `BenchmarkManifest` **shape**; `§6.1`'s split and seed table and every
+generation seed; `§4.1`'s composition and every `target_record_count`; `M42`, `M43`,
+`M44`, `V23`, `V25`, `§F` **F2** and §H's **H1** disposition; every `PROJECT_SPEC.md
+§7` success criterion; and `GT_VERSION` **1.1.0**. **No artifact byte changes** and
+**no dataset exists to regenerate** — `bench/` is absent, `runs/` holds only
+`.gitkeep`, and no manifest, run, root hash or `bench-v1.0.7` tag was ever produced.
+
 ## B. Locked project definition
 
 > **ASSAY is a settlement reconciliation controller for Razorpay-shaped payment
@@ -2469,7 +2640,7 @@ never from here. A working Tier-0 beats a half-built Tier-1 by a wide margin.
 | T0-8 | `packages/oracle` — exhaustive enumeration + **completeness gate + consistency gate** | Both gates pass on dev; 20,000-pair differential test agrees with the engine constraint-by-constraint |
 | T0-9 | `packages/eval` — coverage, balance harm, net cost, abstention precision/recall, close-loop metrics, 5 seeds, bootstrap CIs | `metrics.json` per (agent × seed × llm-mode) |
 | T0-10 | Baselines `B0-IDONLY`; ablations `A1-NOVALIDATE`, `A2-NOABSTAIN`, `A3-NOLLM`. **`B2-LLM-DIRECT` conditional on F2** — it needs a live credential to populate its replay cache. | All run behind one agent interface; `A3` is literally `ASSAY --llm=offline`. If F2 is unresolved, `B2` defers to tier H2 and the report names which baselines ran and why. The ablations alone are sufficient for the central claim. |
-| T0-11 | `apps/cli` — `generate · oracle · run · bench · close · verify · seal` | Full pipeline runs from a clean checkout with no API key |
+| T0-11 | `apps/cli` — `generate · oracle · run · bench · close · verify · seal · report`. **`report` appended at spec 1.4.29 (register row `DATA_MODEL.md §22.2` M48)** — `EVALUATION_SPEC.md §7` invokes it inside the reproducibility guarantee, T0-13 is a distinct deliverable and `§K` already gives the renderer its own module; it is **appended, never renumbered**, so the original seven keep their order. **The six Tier-0 agents are `apps/cli/src/agents/`'s from spec 1.4.29 (M47)** and are injected into `packages/eval`. | Full pipeline runs from a clean checkout with no API key |
 | T0-12 | `apps/web` + `apps/api` — close report, exception queue (value-ranked), **certificate drill-down**, `/ledger/verify` | The certificate view renders solution A vs B with shared constraints and ₹ materiality |
 | T0-13 | Static benchmark report with the risk–coverage figure and the `offline` / `replay` two-column table | Every number traceable to a committed run artifact |
 
@@ -2768,13 +2939,21 @@ razorpay-finance-controller/
 │   ├── ledger/       src/{events.ts,hash-chain.ts,        # Layer A
 │   │                      journal.ts,projection.ts,       # Layer B
 │   │                      close-gate.ts,close.ts}
-│   └── eval/         src/{agents/{assay,b0,b1,b2,a1,a2,a3}.ts,metrics/,
-│                          bootstrap.ts,report/,
+│   └── eval/         src/{metrics/,bootstrap.ts,report/,run-key.ts,
 │                          gates/consistency-gate.ts}   # ONLY place importing
 │                          #        both engine and oracle — see L.1 rule 3
+│                     # agents/ MOVED to apps/cli/src/agents/ at spec 1.4.29
+│                     #   (register row M47): an agent must import engine, llm
+│                     #   and probe, all three refused here — see M37, which
+│                     #   already rejected this package as a run-loop host.
+│                     #   report/ STAYS: a renderer imports none of the three.
 │
 ├── apps/
-│   ├── cli/          src/commands/{generate,oracle,run,bench,close,verify,seal}.ts
+│   ├── cli/          src/commands/{generate,oracle,run,bench,close,verify,
+│   │                                 seal,report}.ts      # report: 1.4.29, M48
+│   │                 src/agents/{assay,b0,b1,b2,a1,a2,a3}.ts   # 1.4.29, M47
+│   │                 #   constructed here and INJECTED into packages/eval;
+│   │                 #   may not import ../fs/ — path-scoped lint (M47/G8)
 │   ├── api/          src/routes/
 │   └── web/          src/screens/{Run,Close,Exceptions,Benchmark}.tsx
 │
@@ -2798,7 +2977,14 @@ razorpay-finance-controller/
 │                                   #   oracle_gate.json is AGGREGATE ONLY (AL4/AL7)
 │
 ├── fixtures/llm-cache/             # committed; makes replay-mode runs reproducible
-└── runs/                           # gitignored run artifacts
+└── runs/                           # SCORED ARTIFACTS ARE COMMITTED from spec
+                                    #   1.4.29 (M48): PROJECT_SPEC.md §7 S10,
+                                    #   EVALUATION_SPEC.md §5.5 and T0-13 each
+                                    #   require every claimed number to be
+                                    #   traceable to a COMMITTED run artifact.
+    ├── <run_id>/<split>/<seed>/<agent>/<llm_mode>/metrics.json
+    └── report.html                 # EVALUATION_SPEC.md §7's own --out path
+                                    # *.sqlite stays ignored (already global)
 ```
 
 ---

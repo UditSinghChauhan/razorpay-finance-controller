@@ -1,6 +1,17 @@
 # THREAT_MODEL — ASSAY
 
-**Spec version:** 1.4.28 · **Date:** 2026-08-31
+**Spec version:** 1.4.29 · **Date:** 2026-08-31
+
+**At spec 1.4.29** this document is unchanged apart from the version header, and one
+disclosure belongs here. `PREREGISTRATION.md §9`'s `--seal-tag` is an **operator
+attestation, not a control**: `apps/cli` runs no subprocess and detects no git state,
+so the flag records what an operator asserts and verifies only that the value equals
+`bench-v<BENCHMARK_VERSION>`. The residual is an existing declared class —
+`PREREGISTRATION.md §10` **V3**, *"Developer tunes against the test split … Moderate —
+self-enforced"* — so **no new threat row is opened** and no `§T` control is weakened:
+`AL7` keeps its burn rule and its fail-closed default, and an unattested `--split
+test` invocation remains a forbidden-list breach. `§T7`'s controls, its closed enum of
+five and its unstated `days` bound are untouched. See `DECISION_BRIEF.md §A.36`.
 
 **At spec 1.4.28** this document is unchanged apart from the version header. `§T7`'s
 controls, its closed enum of five and its unstated `days` bound are untouched: the

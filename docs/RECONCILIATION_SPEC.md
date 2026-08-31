@@ -1,6 +1,14 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.4.28 · **Date:** 2026-08-31
+**Spec version:** 1.4.29 · **Date:** 2026-08-31
+
+**At spec 1.4.29** this document is unchanged apart from the version header. The
+amendment settles agent **placement** (register row `DATA_MODEL.md §22.2` M47) and the
+evaluation **output surface** (M48); `§6.2`'s probe loop, its `P_max` budget, its
+five-probe enum and its committed surface are untouched, and `§10.1`'s `G1`–`G5` are
+neither implemented nor amended here. **No constraint, signal, weight, threshold,
+probe, probe source or outcome rule changes** and `constraint_set_hash` does not move.
+Benchmark stays **v1.0.7**. See `DECISION_BRIEF.md §A.36`.
 
 **At spec 1.4.28** this document is unchanged apart from the version header. The
 amendment freezes the `PREREGISTRATION.md §5.3` consistency draw (register row M44)
