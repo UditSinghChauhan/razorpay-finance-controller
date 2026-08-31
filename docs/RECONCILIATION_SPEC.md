@@ -1,6 +1,17 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.4.26 · **Date:** 2026-08-31
+**Spec version:** 1.4.27 · **Date:** 2026-08-31
+
+**At spec 1.4.27** `§6.2`'s probe surface `bench/<split>/recon_report.jsonl` is
+**unchanged**: `DATA_MODEL.md §22.2` M42 scopes the *dataset* artifacts to
+`(split, seed)` and leaves this one split-scoped exactly as M36 ratified, because it
+is a lookup table keyed by a globally unique `settlement_id` and is *"never an
+`Observation`, and never ingested"* — a surface has nothing to partition. M38's
+`entity_id`-ascending order now holds over the merged split artifact, which is what
+that order was always for. **No constraint, signal, weight, threshold, probe, probe
+source or outcome rule changes**; `C1`–`C8`, `SE1`–`SE5`, `τ`, `ε`, `P_max = 3`, the
+five-probe enum and `§6`'s four outcomes are untouched, and `constraint_set_hash` does
+not move. Benchmark v1.0.5 → **v1.0.6**. See `DECISION_BRIEF.md §A.34`.
 
 **At spec 1.4.26** `§6.2` records that its *"abstentions resolved per probe spent"*
 comparison is **non-discriminating on the conforming v1.0.0 population** — `R3`'s

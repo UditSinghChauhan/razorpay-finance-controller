@@ -1,8 +1,22 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.26 · **Date:** 2026-08-31
+**Spec version:** 1.4.27 · **Date:** 2026-08-31
 **Reviewer role:** principal architect / skeptical reviewer
+
+**At spec 1.4.27** §A.34 records **two ratifications**, taken at a governance gate
+held after spec 1.4.26 and **before any dataset was generated**: the committed
+**dataset artifact unit is `(split, seed)`** and family is not a file dimension
+(**M42**), and **`apps/cli` executes both `PREREGISTRATION.md §5.3` gates** with no
+gate logic moving package (**M43**). Both were forced by an audit of the sealed-run
+path, which found that `§9` had never stated the artifact unit and that the
+completeness gate — declared MUST-PASS — had **no execution path and no power to
+stop a seal**. `bench/<split>/recon_report.jsonl` does **not** move and M36/M38 are
+preserved verbatim. Threat row `PREREGISTRATION.md §10` **V24** records the one thing
+deliberately left open: the `R = 20,000` consistency draw's sampler and seed.
+**Benchmark v1.0.5 → v1.0.6**; `GT_VERSION` stays 1.1.0, `constraint_set_hash` does
+not move, `C1`–`C8`, `SE1`–`SE5`, every `§7` threshold and all **28** metrics are
+unchanged, and §H's H1 disposition is not reopened.
 
 **At spec 1.4.26** §A.33 records one **disclosure**, taken at a governance gate held
 after spec 1.4.25, after `R3` was built and tested, and **before any dataset was
@@ -2106,6 +2120,175 @@ every `§7` threshold **including the `A3-NOLLM` priority policy**; `DATA_MODEL.
 `PROJECT_SPEC.md §7` success criterion; `BENCHMARK_VERSION` **1.0.5**; and
 `GT_VERSION` **1.1.0**. No package implementation is modified.
 
+### A.34 Spec 1.4.27 / benchmark 1.0.6 — the unit nobody stated and the gate nobody could run
+
+**The decision.** Two ratifications. **M42:** the committed **dataset artifact unit
+is `(split, seed)`** — `bench/<split>/<seed>/` holds `observations.jsonl`,
+`untrusted_text.jsonl`, `ground_truth.jsonl`, `oracle_labels.jsonl`,
+`oracle_gate.json` and one `benchmark_manifest.json` — and **family is a composition
+dimension, never a file dimension**. `bench/<split>/recon_report.jsonl` **does not
+move**. **M43:** **`apps/cli` executes both `PREREGISTRATION.md §5.3` gates**, the
+pure gate implementations staying exactly where `§K` puts them, and a missing or
+failing completeness gate becomes a **SEAL FAILURE**. Threat row
+`PREREGISTRATION.md §10` **V24**. `BENCHMARK_VERSION` **1.0.5 → 1.0.6**.
+
+**Both were found by audit before any data existed, which is the only time either
+could have been found cheaply.** The generator, the engine, the probe loop, the
+oracle, the scorer and seven CLI commands were all built and green — 1,914 tests, no
+type errors — and the sealed-run path still could not be walked end to end. That is
+the characteristic shape of a specification gap rather than a defect: every component
+satisfies its own contract, and the contract between them was never written down.
+
+#### M42 — the artifact unit
+
+**The gap, stated exactly.** `PREREGISTRATION.md §9` step 4 hashes four **singular**
+filenames into **one** manifest, and no document said which files those were.
+`assay generate` had answered it at the keyboard — one artifact per **family**, at
+`<split>/<seed>/<family>/` — a level **no frozen document introduces anywhere**.
+`assay seal` took one path per artifact class. The two were never reconciled because
+nothing forced them to be: `buildManifest` computes `§9` step 5's 10,000–20,000 band
+from the **declared** `target_record_count`s, not from the bytes it hashes, so
+sealing against a single family's file would have passed every check while
+`record_counts` and `families` claimed all six. **The failure mode was a silently
+valid manifest binding the wrong bytes**, which is worse than a loud one.
+
+**The unit is derived, not chosen.** `§4.1` already reads `record_counts` *"per seed
+range"* and already defines a dataset as one *"`(split, seed)` dataset [that] holds
+exactly the families `§6.1` assigns to that seed's range"*; `EVALUATION_SPEC.md §2`
+loops `for seed in seeds(split)` with **no family loop**; `ARCHITECTURE.md §10` scores
+`metrics.json` per `(agent × seed × split)`; `PROJECT_SPEC.md §9` bounds *"one
+`(split, seed)` dataset"*. Four documents agree and none mentions a family file.
+
+**Why the recon report does not move, and why that is not an inconsistency.** It is a
+**probe response surface**, not a dataset artifact: `DATA_MODEL.md §12` and
+`RECONCILIATION_SPEC.md §6.2` make it *"never an `Observation`, and never ingested"*,
+and `settlement_id` — *"its only query key"* — is unique across every family and seed.
+A lookup table has nothing to partition. **This is precisely why M36 could ratify a
+location for this one artifact while no document ever gave one for the other three**,
+and the asymmetry is now stated rather than left for a reader to reconstruct. M36 and
+M38 are preserved verbatim; `entity_id` ascending now holds over the merged split
+artifact, which is what M38's order was already for.
+
+**Split-level aggregation of the dataset artifacts was considered and rejected.** It
+reads `bench/<split>/recon_report.jsonl` most literally and matches `§K`'s single
+`benchmark_manifest.json` — but `DATA_MODEL.md §10`'s `Observation` carries **no seed
+and no family**, so a split-level `observations.jsonl` could not be partitioned back
+into the runs `EVALUATION_SPEC.md §2` scores. Repairing that means adding a
+discriminator to `Observation`, which moves `§10`'s shape, `GT_VERSION` and every
+artifact byte. **A larger amendment to reach the same seal is not the smaller one**,
+and `§18`'s plural `seeds` is left standing rather than retyped: the field admits a
+set, this fixes the cardinality one manifest carries, and `§4.1`'s derivation from
+the type is untouched.
+
+**A family-granular manifest was rejected outright.** `§18`'s `record_counts` is a
+map **over** families **inside one** manifest, and `§9` step 5's band is a **sum**
+over a seed's families — 2,621 for one family against a 10,000 floor. It contradicts
+the frozen text rather than merely underfitting it.
+
+**The aggregation order is a RATIFICATION and the record says so.** No frozen rule
+determined one. `§7` requires byte-identical regeneration at the same seed, which
+constrains **determinism** and not the **choice**; `conventions.ts`'s
+`U-EMISSION-ORDER` carries `spec_basis: null` and orders **within** one family
+instance; and `§A.31` already found, for the recon report, that *"the observation
+emission order is frozen nowhere"*. That finding applies unchanged here. Choosing
+silently because a candidate happened to be deterministic is exactly the failure the
+provenance register exists to prevent, so: **F01..F10 ascending**, each family's own
+row order preserved, **concatenation and never canonical reserialization** so
+`§6.2`'s and `§10`'s declaration key order survives, UTF-8 with a trailing newline.
+
+**`source_line` re-basing is forced, not stylistic.** `U-SOURCE-FILES` numbers lines
+1-based **within the logical file**, per family instance, so a naive concatenation
+puts six observations at `pg_recon.jsonl` line 1 inside one dataset — against
+`ARCHITECTURE.md §4`'s *"Nothing enters the system anonymously."* It is **free of
+hash consequences**: `ingest_hash` covers the canonical **payload** alone, so no
+`ingest_hash`, no `inputs_hash` and no ledger body moves. **The re-basing is the
+generator's**, not the CLI's: `ARCHITECTURE.md §3` bars `apps/cli` from performing an
+`S0` transform and provenance stamping is `RECONCILIATION_SPEC.md §2` step 5, so the
+package that owns `U-SOURCE-FILES` owns the renumbering and hands `apps/cli` rows —
+the same split spec 1.4.24 already used for the recon report.
+
+**What is deliberately not tightened.** `DATA_MODEL.md §0` rule 3's cross-family
+identifier uniqueness stays the probabilistic property the minter already
+characterizes — asserted within a family instance, astronomically unlikely to fail
+across them at 62^14. Promoting it to an invariant would add a check no frozen rule
+requires and would dress a probability as a guarantee.
+
+#### M43 — the gate owner
+
+**The gap, stated exactly.** `§9` step 3 says *"Step 3 is a gate, not a formality"*
+and `§5.3` calls both gates *"hard build gates"*. `completenessGate` existed, was
+correct and was tested; **no command could invoke it.** `assay oracle` wrote labels,
+had no `--ground-truth` input, and exited 0 unconditionally. `assay seal` read no gate
+result. So a MUST-PASS gate had no execution path, and a seal taken without it was
+indistinguishable from one taken after it. That is not an implementation omission
+alone — **it is a control that existed only in prose.**
+
+**The owner is derived.** `ARCHITECTURE.md §3` gives `apps/cli` *"all filesystem
+I/O"*; neither gate's package performs any, and both modules already name their
+caller — `completeness-gate.ts`: *"`apps/cli` performs the read"*;
+`consistency-gate.ts`: *"performs no sampling and no I/O … the caller draws the pairs
+and `apps/cli` reads the split"*. The exclusions are equally derived: the completeness
+gate cannot be `packages/eval`'s, since `§K` places it in `oracle/src/` and `§L.2`
+builds `oracle` **before** `eval`; and neither gate can be its own package's, `AL2`
+barring oracle code from ground truth and both packages performing no I/O at all.
+**No gate logic moves.** `§L.2` records that *"`apps/cli` is absent from this line"*,
+so it sits outside the build order and importing `packages/eval` opens no cycle.
+
+**The split asymmetry was already the rule.** `§5.3` and `ARCHITECTURE.md §7.3` scope
+the consistency gate to *"pairs drawn from the dev split"* — a **build** gate — while
+the completeness gate *"runs on every dataset before any agent sees it"* and `§9` step
+3 makes it a **seal** gate. `EVALUATION_SPEC.md §7` writes *"# gates must pass"* for
+dev and `§9` step 3 *"# completeness gate MUST pass"* for test. The two spellings were
+never inconsistent; nothing had read them together.
+
+**Access is restated, not widened.** Ground truth reaches the completeness gate
+through `GENERATOR_TRUST` alone, the route `AL2` has permitted since `apps/cli`
+landed, and `AL5` withdraws it under `--sealed` — so neither gate runs sealed, and
+`§9` step 3 correctly carries no such flag. `recon_report.jsonl` reaches **neither**
+gate: `AL8` says its seal-scoped permission *"does not extend to the `§5.3`
+completeness gate, which stays observations-only"*, and `§10` V22 rests on that. **The
+consistency gate never receives ground truth** and gains no parameter for it; a
+differential test that consulted the answer key would measure nothing.
+
+**On test, aggregate only.** `AL4` bars inspection of TEST outputs before the sealed
+run and `AL7` burns the seed on a breach, so `oracle_gate.json` on the test split
+carries counts, per-family tallies and the pass bit — never a `target_id` and never a
+`member_obs_ids`. A gate that named a failing target would be performing the
+inspection itself.
+
+**Sequencing is a procedure; a seal precondition is a control.** `§9` step 5 gains one
+check, and it is the check that makes step 3 mean what it says.
+
+**What is deliberately left open: the `R = 20,000` draw.** `§7` freezes `R` and
+freezes **no sampler and no seed**. Deriving one from the dataset seed was available,
+cheap and deterministic — and would have been a choice made silently because a
+candidate happened to be deterministic, which is the failure M38's own record names in
+terms. It is therefore **not taken**. The draw's seed is an operator input, the
+command **fails closed** without one, and the seed is recorded beside the result so a
+gate run always names the draw that produced it. `§10` **V24** carries the disclosure.
+This binds the **dev build gate only**; the `§9` seal path is completeness-only.
+
+**The command surface is the frozen text's own.** `§9` step 2 writes
+`--seeds 9000-9004,9100-9104` and `EVALUATION_SPEC.md §7` writes `--seeds 2000-2004`,
+so the seed argument is a comma-separated list of declared seeds and inclusive
+`lo-hi` ranges. **No new syntax is invented** — this records the spelling both
+documents already use, and `§6.1`'s split table stays the sole authority on which
+seeds exist. **`assay generate --split test` remains refused**: `§6.1`'s forbidden
+list bars *"invoking `--split test` for any purpose"* before the seal, and nothing
+here lifts it. That the seal procedure's own step 2 is therefore still not executable
+is a **separate** open item, deliberately untouched by this amendment.
+
+**What does not change.** Every metric formula, definition, number and the 28-metric
+list; `C1`–`C8` and therefore `constraint_set_hash`; `SE1`–`SE5` and their weights;
+every `§7` threshold including the `A3-NOLLM` priority policy; `AL1`–`AL8`;
+`DATA_MODEL.md §10`'s `Observation`, `§13`'s four certificate reasons, `§12`'s five
+probe variants and `§18`'s `BenchmarkManifest` **shape**; `§6.1`'s split and seed
+table; `§4.1`'s composition and every `target_record_count`; every `PROJECT_SPEC.md
+§7` success criterion; §H's **H1** disposition, which is not reopened; and
+`GT_VERSION` **1.1.0**. **No dataset exists to regenerate** — `bench/` is absent,
+`runs/` holds only `.gitkeep`, and no manifest, run, root hash or `bench-v1.0.5` tag
+was ever produced.
+
 ## B. Locked project definition
 
 > **ASSAY is a settlement reconciliation controller for Razorpay-shaped payment
@@ -2454,13 +2637,24 @@ razorpay-finance-controller/
 │   ├── api/          src/routes/
 │   └── web/          src/screens/{Run,Close,Exceptions,Benchmark}.tsx
 │
-├── bench/
-│   ├── benchmark_manifest.json     # committed, includes GT + constraint-set hashes
-│   │                               #   + recon_report_sha256 (spec 1.4.22)
+├── bench/                          # layout ratified at spec 1.4.27 (M42):
+│   │                               #   dataset artifacts are (split, seed)-scoped;
+│   │                               #   family is COMPOSITION, never a file dimension
 │   ├── dev/                        # observations + ground truth, committed
-│   │   └── recon_report.jsonl      # PG-side probe surface; engine+oracle barred (AL8)
+│   │   ├── recon_report.jsonl      # PG-side probe surface; engine+oracle barred (AL8)
+│   │   │                           #   SPLIT-scoped, unchanged since 1.4.22 (M36)
+│   │   └── <seed>/                 # 2000..2004
+│   │       ├── observations.jsonl        untrusted_text.jsonl
+│   │       ├── ground_truth.jsonl        oracle_labels.jsonl
+│   │       ├── oracle_gate.json    # §5.3 gate results (M43); NOT a benchmark digest
+│   │       └── benchmark_manifest.json   # one per (split, seed); includes GT +
+│   │                               #   constraint-set hashes + recon_report_sha256
+│   │                               #   (spec 1.4.22), the latter identical across
+│   │                               #   every manifest of the split
 │   └── test/                       # observations committed; ground_truth.jsonl GITIGNORED
-│       └── recon_report.jsonl      # committed; AL4/AL7 inspection discipline applies
+│       ├── recon_report.jsonl      # committed; AL4/AL7 inspection discipline applies
+│       └── <seed>/                 # 9000..9004, 9100..9104; same five files
+│                                   #   oracle_gate.json is AGGREGATE ONLY (AL4/AL7)
 │
 ├── fixtures/llm-cache/             # committed; makes replay-mode runs reproducible
 └── runs/                           # gitignored run artifacts

@@ -1,6 +1,15 @@
 # THREAT_MODEL — ASSAY
 
-**Spec version:** 1.4.26 · **Date:** 2026-08-31
+**Spec version:** 1.4.27 · **Date:** 2026-08-31
+
+**At spec 1.4.27** this document is unchanged apart from the version header. `§T7`'s
+controls are untouched and its `bench/<split>/recon_report.jsonl` **does not move** —
+`DATA_MODEL.md §22.2` M42 scopes the *dataset* artifacts to `(split, seed)` and leaves
+the probe surface exactly where M36 put it, so `§T7`'s *"no network call, no URL"*
+statement and its closed enum of five are unaffected. M43 wires the `PREREGISTRATION.md
+§5.3` gates into `apps/cli` **without widening any access**: `AL8` still keeps the recon
+report away from the completeness gate, and the consistency gate never receives ground
+truth. See `DECISION_BRIEF.md §A.34`.
 
 **At spec 1.4.26** this document is unchanged apart from the version header. `§T7`'s
 controls, its closed enum of five and its unstated `days` bound are untouched; the
