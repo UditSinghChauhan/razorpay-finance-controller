@@ -1,6 +1,13 @@
 # ARCHITECTURE — ASSAY
 
-**Spec version:** 1.4.25 · **Date:** 2026-08-31
+**Spec version:** 1.4.26 · **Date:** 2026-08-31
+
+**At spec 1.4.26** `§6`'s `R3` row records that its *"why not a rule"* justification
+is **not demonstrable on the conforming v1.0.0 population** — the choice set is a
+singleton, so the static list cannot be beaten. **Disclosure only. No trust
+boundary, data flow, interface, provider, role, package responsibility or probe
+enum changes**, and benchmark v1.0.5 is unchanged. See `DECISION_BRIEF.md §A.33`,
+register row M41, `PREREGISTRATION.md §10` V23.
 
 **At spec 1.4.25** `§6`'s `R3` row states its **proposable action set** — the four
 id-argument probes plus `NO_USEFUL_PROBE`, `widen_temporal_window` excluded
@@ -455,6 +462,17 @@ model is wrong or hostile?*
   which single lookup, out of many, most reduces ambiguity here. A static
   priority list is the deterministic baseline and it is measured against this
   (`abstentions resolved per probe spent`). If the static list wins, we say so.
+- **That justification does not hold on v1.0.0 data, disclosed at spec 1.4.26
+  `[ASSAY-MODEL]`, register row M41.** There is no *"out of many"*:
+  `DATA_MODEL.md §11.1` gives a `bank_line` target the empty candidate set and a
+  settlement target one `settlement_id`; `§4.2`'s `SE5` is target-scoped; M36
+  sources only `fetch_settlement_recon`; and `EVALUATION_SPEC.md §4.5` prices no
+  probe. **One probe, one argument, zero cost** — so
+  `PREREGISTRATION.md §7`'s frozen policy is **weakly dominant** and *"if the
+  static list wins, we say so"* is the **only** outcome available. We say so here,
+  before any run. The role is built and correct; the **claim** that it beats the
+  list is withdrawn (`DECISION_BRIEF.md §H`, `§A.33`, `PREREGISTRATION.md §10`
+  V23), the policy stays frozen and untuned, and no probe source is added.
 - **If wrong or hostile:** wastes probe budget (hard-capped at 3 per component).
   All probes are read-only and allowlisted, so a hostile choice cannot reach an
   unintended target.

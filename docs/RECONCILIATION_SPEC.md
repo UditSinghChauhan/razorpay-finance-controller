@@ -1,6 +1,17 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.4.25 · **Date:** 2026-08-31
+**Spec version:** 1.4.26 · **Date:** 2026-08-31
+
+**At spec 1.4.26** `§6.2` records that its *"abstentions resolved per probe spent"*
+comparison is **non-discriminating on the conforming v1.0.0 population** — `R3`'s
+choice set is a singleton and `PREREGISTRATION.md §7`'s frozen `A3-NOLLM` policy is
+weakly dominant, so the affirmative *"beats"* reading is unfalsifiable and is
+withdrawn. **Disclosure only.** **No constraint, signal, weight, threshold, probe,
+probe source or outcome rule changes**; `C1`–`C8`, `SE1`–`SE5`, `τ`, `ε`,
+`P_max = 3`, the five-probe enum and `§6`'s four outcomes are untouched,
+`constraint_set_hash` does not move, `GT_VERSION` stays 1.1.0 and **benchmark v1.0.5
+is unchanged**. See `DECISION_BRIEF.md §A.33`, register row M41,
+`PREREGISTRATION.md §10` V23.
 
 **At spec 1.4.25** `§6.2` records three governance decisions and one implementation
 convention: the `A3-NOLLM` **static probe priority policy** is frozen into
@@ -939,6 +950,47 @@ All probes are read-only, allowlist-constrained, and logged. If probes exhaust
 without discriminating, the certificate records `PROBE_BUDGET_EXHAUSTED`. The
 metric `abstentions resolved per probe spent` measures whether the LLM's probe
 selection beats a static priority list (`A3-NOLLM`).
+
+**That comparison is NON-DISCRIMINATING on the conforming v1.0.0 population,
+disclosed at spec 1.4.26 `[ASSAY-MODEL]`, register row M41.** The sentence above
+stands unedited and its metric is still reported; what is withdrawn is the
+**affirmative reading** — that `R3` can be shown to *beat* the static list. Five
+frozen facts compose, and none is amended:
+
+```
+  DATA_MODEL.md §11.1   a bank_line target has the EMPTY candidate set, so only
+                        a SETTLEMENT target ever reaches this loop
+  DATA_MODEL.md §11.1   a settlement target carries exactly ONE settlement_id
+  §4.2  SE5             target-scoped -- a report whose settlement_id is not the
+                        target's contributes nothing
+  §6.2  M36             fetch_settlement_recon is the ONLY probe with a source
+  EVALUATION_SPEC §4.5  net_cost_inr carries NO probe term, and neither does any
+                        other metric on PREREGISTRATION.md §8's list of 28
+```
+
+So every `AMBIGUOUS` component offers **one** probe, **one** reachable argument, at
+**zero** cost, and `§4.2`'s multi-probe rule (spec 1.4.17) makes repetition
+idempotent. `PREREGISTRATION.md §7`'s frozen policy takes that action every time and
+it is **weakly dominant**: a proposer can match it, decline and forgo the only
+evidence above `ε`, or spend budget that buys nothing. **A maximisation over a
+one-element choice set cannot be beaten.**
+
+**Disclosed, not repaired, and nothing here is tuned.** This is `§4.1`'s standing
+`C8` treatment — retain the declared thing, report that it separates nothing —
+already applied to `SE1` (1.4.10), `SE4` (1.4.11) and `SE2` (1.4.20). The
+`A3-NOLLM` policy **stays exactly as `PREREGISTRATION.md §7` freezes it and must not
+be widened or tuned**: revising a control-arm parameter after observing that it is
+optimal is the result-driven change `DECISION_BRIEF.md §L.4` forbids. **Adding the
+three missing probe sources would not repair it** — `fetch_payment` and
+`fetch_refund` are redundant against the observation set, and `fetch_order` sits
+behind the inert `SE2` consumer. **No probe source is added and the enum stays
+closed at five.** The **software is valid and unchanged**; a claim is withdrawn, not
+a capability. `abstentions resolved per probe spent` remains **`EXPLORATORY`**
+(`EVALUATION_SPEC.md §4.13`) and is not added to the 28.
+
+**Population-specific.** A future family or amendment producing a component with
+several independently probeable `settlement_id`s would restore a real choice; **no
+such policy is decided here.**
 
 **The static priority list is stated, and frozen, at spec 1.4.25 `[ASSAY-MODEL]`,
 register row M39.** The sentence above has made that list the **comparand** of this

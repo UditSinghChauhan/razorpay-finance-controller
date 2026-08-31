@@ -1,6 +1,6 @@
 # PREREGISTRATION — ASSAY Benchmark v1.0.5
 
-**Spec version:** 1.4.25 · **Benchmark version:** 1.0.5
+**Spec version:** 1.4.26 · **Benchmark version:** 1.0.5
 
 **Status: FROZEN on commit. Amendments require a version bump and a new seal.**
 **Date frozen:** 2026-08-23 · **Amended:** 2026-08-24 (benchmark 1.0.1),
@@ -856,6 +856,82 @@ certificate value both enter the pre-registered surface. `packages/engine`,
 `packages/ledger`, `packages/probe`, `packages/llm`, `packages/domain` and
 `apps/cli` are **not modified by this amendment**; `packages/generator` carries the
 version constants only. Historical amendment records are preserved verbatim.
+
+**Amendment 1.4.26 / benchmark 1.0.5 (pre-seal, one disclosure and no repair).**
+Applied before the seal, before any dataset was generated and before any result was
+observed. **Documentation only.** `DECISION_BRIEF.md §H` tier **H1**'s affirmative
+claim — that `R3`'s probe selection *beats* the `A3-NOLLM` static priority list —
+is **not answerable on the conforming v1.0.0 population**, and this amendment says
+so rather than repairing it. Threat row `§10` **V23**; register row
+`DATA_MODEL.md §22.2` **M41**; record at `DECISION_BRIEF.md §A.33`. **Benchmark
+version does not move.**
+
+**The cause is choice-set cardinality, not a missing implementation.** Five frozen
+facts compose, and none of them is amended here:
+
+```
+  §11.1 (1.4.4)   a bank_line target has the EMPTY candidate set, so only a
+                  SETTLEMENT target ever reaches §6.2's probe loop
+  §11.1           a settlement target carries exactly ONE settlement_id
+  §4.2 SE5        the signal is TARGET-scoped: a report whose settlement_id is
+                  not the target's contributes nothing
+  §6.2 M36        fetch_settlement_recon is the only probe with a source
+  §4.5            net_cost_inr = harm + C_review·|abstained|
+                                      + C_exception·|open exceptions|
+                  -- NO probe term exists in any of the 28 frozen metrics
+```
+
+So every `AMBIGUOUS` component offers exactly **one** probe with exactly **one**
+reachable argument, at **zero** cost, and `§4.2` (spec 1.4.17) makes repetition
+idempotent. `§7`'s frozen `A3-NOLLM` policy takes that action every time, and it is
+**weakly dominant**: a proposer can match it, decline and do worse, or waste budget
+and do no better. A maximisation over a one-element choice set cannot be beaten, so
+the affirmative claim is unfalsifiable.
+
+**Supplying the three missing probe sources would not repair it.** `fetch_payment`
+and `fetch_refund` are **redundant**: `method`, `card_network`, `card_issuer` and
+`card_type` sit on every `recon_line` payload and on the `payment` observation,
+a refund `recon_line` carries its parent `payment_id` (`§22.1` D14), and `§4.3`'s
+`DROP_FIELD` is **not exercised**, so nothing removes them. `fetch_order` is not
+redundant — `receipt` is quarantined and no normative rule reads it — but its **only
+named consumer `SE2` is expected-non-binding** (spec 1.4.20): `order_ref` exists only
+on `MerchantLedgerEntry` and no frozen clause pairs one with a candidate, component,
+target or probed order. A fetched `receipt` would have nothing to compare against and
+would move no primary metric. **No probe source is added here.**
+
+**The `A3-NOLLM` policy stays ratified exactly as `§7` states it, and must not be
+tuned.** Revising it now, having observed that it is optimal, is precisely the
+result-driven change `DECISION_BRIEF.md §L.4` forbids and `AL3` binds against. Its
+inertness is the `C8` condition and gets the `C8` treatment, already applied to
+`SE1` (1.4.10), `SE4` (1.4.11) and `SE2` (1.4.20): **declare it, report that it
+separates nothing, and do not delete it.**
+
+**The software is valid and stays.** `R3`, `packages/probe`'s loop, the `§6.2`
+dispatch and `§6.6`'s composition are built, tested and correct; nothing is
+withdrawn. What is withdrawn is a **claim**, not a capability. `metric 24`
+`offline_parity` and every metric on `§8`'s list of **28** remain valid for their
+stated purposes — `R1` and `R2` have live, discriminating roles and `offline_parity`
+measures them as pre-registered. **`abstentions resolved per probe spent` is NOT
+added to the list and remains `EXPLORATORY`** (`EVALUATION_SPEC.md §4.13`: *"not a
+new quantity that could support a claim"*).
+
+**The limitation is population-specific and no future policy is decided here.** It
+follows from the v1.0.0 family composition and `§11.1`'s target universe. A future
+family or amendment that produced a component with **several independently probeable
+`settlement_id`s** would restore a real choice and with it H1's power. This amendment
+takes no position on whether that should be built.
+
+**Nothing else moves.** `C1`–`C8` and `I1`–`I9` are untouched and
+`constraint_set_hash` does not move; the `SE1`–`SE5` weights stay at 3500 / 2000 /
+1500 / 1000 / 2000; `τ`, `ε`, `K_max`, `C_max`, `P_max = 3`, `C_review`,
+`C_exception`, `k_sigma`, `queue_top_n`, the close policy and the `§7` `A3-NOLLM`
+policy are unchanged; **no metric definition is amended, none is added and none is
+removed** — the list stays at **28**; no seed, split, family, rate or
+`target_record_count` moves; no artifact is added, removed or altered;
+`BENCHMARK_VERSION` stays **1.0.5** and `GT_VERSION` **1.1.0**, with no dataset in
+existence. **No `PROJECT_SPEC.md §7` success criterion depends on H1** — `S6` tests
+`A1-NOVALIDATE` and `S11` the `--llm=offline` path — so none moves. No package
+implementation is modified. Historical amendment records are preserved verbatim.
 
 ---
 
@@ -2397,6 +2473,7 @@ Stated here, before results, so they cannot be presented later as afterthoughts.
 | V20 | `SE1`'s 3500 bps is permanently inactive, and pre-probe discrimination is unreachable | **Derived:** `SE1` compares `settlement.utr` with its `AN2` bank line's `bank_ref` (`DATA_MODEL.md §22.2` M8) — both target-scoped, so it takes one value across every candidate of a target and can neither order candidates nor move the ε-gap, which `RECONCILIATION_SPEC.md §4.2` gives as the score's only two uses. It could rank only for a `bank_line` target, and `DATA_MODEL.md §11.1` (spec 1.4.4) gave that target the empty candidate set. `§11`'s worked example corroborates: its stated `Δs = 400 bps` with `SE3` deciding and a verdict of `ABSTAINED` is reproducible only if `SE1` contributes equally to both candidates. **This section's V18 disclosed 1.4.4's bank-side consequences — metric 27, the completeness gate, `B8` — and did not record this one.** With `SE1` inactive and `SE2`/`SE4`/`SE5` probe-gated, pre-probe `Δs ≤ **469 bps** < ε under the spec-1.4.13 formulation — restated from the `1250 bps` published at spec 1.4.10, which was computed from `C4`'s full `[1, 7]`-day domain under a formula since corrected. `1250` was a true upper bound and nothing published under it is falsified; the frozen `T+1`–`T+3` cycle simply never populates that domain's tails, so the bound that holds is `469` | **Accepted and disclosed rather than repaired.** The weight is **not** reallocated and the row is **not** removed: `AL3` freezes the `SE1`–`SE5` weights, and `RECONCILIATION_SPEC.md §4.1`'s standing treatment of a declared-but-inert clause — `C8`, and `C2`'s adjustment half — is to retain it and report that it does nothing rather than delete it. The effective evidence budget is `SE2`+`SE3`+`SE4`+`SE5` = 6500 bps, of which 5000 is probe-gated. **No metric definition is amended and no threshold moved**; this row reports a consequence and redefines nothing. `SE5` remains undefined and is untouched at spec 1.4.10 |
 | V21 | `SE4`'s 1000 bps separates no candidates on v1.0.0 data | **Derived, from six frozen facts.** `memo` is quarantined (`DATA_MODEL.md §0` rule 4, `§8`, `§10`) and **no** `RECONCILIATION_SPEC.md §6.2` probe returns it — the closed enum holds no ledger-entry probe, and `DATA_MODEL.md §3` gives `receipt` an explicit probe-reachability sentence that `memo` has no counterpart to. `MerchantLedgerEntry` (`§8`) carries no structural method or card-network field. `fetch_payment` supplies `method`, which `§10`'s `payment` observation already carries structurally. `card_network` has no Payment-side field at all, spec 1.1.1 having placed the card attributes on `ReconLine` *"when they are settlement-recon columns"*. No **exercised** `§4.3` operator perturbs `method` or `card_network` — `DROP_FIELD` could and is declared not exercised. And `§4.2`'s `F06` construction draws *"identical method — ONCE from the frozen mix"* for **both** members of a collision pair, so the family that manufactures equal-credit ambiguity leaves `SE4` nothing to separate | **Accepted and disclosed rather than repaired**, on the `C8` precedent in `RECONCILIATION_SPEC.md §4.1`. The row and its **1000 bps are retained, not reallocated and not removed**; `AL3` freezes the `SE1`–`SE5` weights and nothing is renormalised. `§6.2`'s `fetch_payment` route is unchanged, the probe enum stays closed, and **no `fetch_ledger_entry` probe is added** — that would open a closed enum and put a merchant-controlled surface (`THREAT_MODEL.md §T1`) inside the probe budget. **The agreement function is left undefined**, being unnecessary while the signal is non-discriminating. **No metric definition is amended and no threshold moved.** With `SE1` inactive (V20) and `SE4` non-binding, the evidence budget that is both live and defined was recorded at spec 1.4.11 as `SE2` + `SE3` = 3500 of 10000 bps with `SE5`'s 2000 undefined; `SE5` is defined at spec 1.4.16, and at spec 1.4.20 `SE2` is declared expected-non-binding on v1.0.0 data (M34), so the budget that is live and defined is `SE3` + `SE5` = **3500** of 10000 — the same figure by a different route. All five weights stand unchanged and unreallocated at 3500 / 2000 / 1500 / 1000 / 2000 |
 | V22 | The probe reaches evidence the Ambiguity Oracle cannot see, so ASSAY may correctly resolve a case the oracle labels truly ambiguous | **Derived, and older than the probe source.** `RECONCILIATION_SPEC.md §6`'s `DISCRIMINATED` branch **accepts** an allocation when `Δs ≥ ε`, while `§5.4`'s ambiguity definition carries **no `Δs` term** — so every `DISCRIMINATED` decision is, by the oracle's own definition, a commit on a truly-ambiguous case, and has been since spec 1.0.0. `§10` V20 shows the branch was **unreachable** pre-probe (`Δs ≤ 469 bps < ε = 1500`), and spec 1.4.20 leaves `SE5`'s 2000 bps as the only route above `ε`, so spec 1.4.22's probe source does not create the asymmetry — it makes an already-frozen branch reachable. Consequences: `abstention_recall` falls, `silent_guess_value_inr` becomes non-zero for correct decisions, and `gap_to_oracle` may go **negative**, which `EVALUATION_SPEC.md §4.13` shows is arithmetically valid since the oracle policy pays `C_review` on the whole truly-ambiguous set | **Ratified as intentional, and corrected in prose rather than repaired in formula.** The oracle stays a **fixed observations-only reference**: `AL8` bars it from the recon report, its labels can never depend on a probe result, and `§5.3`'s completeness gate keeps its observations-only scope. Letting the oracle read the artifact was **considered and rejected** — `§5.3`'s expressibility scoping exists *because* `F05` withholds a line, and an oracle holding the report would void that scoping and make the gate tautological, destroying the independence `ARCHITECTURE.md §7` exists to establish. **No metric formula, definition, number or count changes**; the 28-metric list stands. Two sentences written before the branch was reachable are corrected: `§5.1`'s *"Its input is exactly what every agent receives"* and `EVALUATION_SPEC.md §4.3`'s *"had no evidential right to make"*. Metrics 4 and 8 are reported beside the probe count so the provenance of the difference is visible. **No exploratory second reference model is added** — `DECISION_BRIEF.md §L.4` would force it to `EXPLORATORY`, where it could support no claim |
+| V23 | `DECISION_BRIEF.md §H` tier **H1**'s affirmative claim — that `R3`'s probe selection *beats* the `A3-NOLLM` static priority list — is **not answerable on the conforming v1.0.0 population**; `R3`'s choice set is a singleton and the frozen `§7` policy is weakly dominant | **Derived from five frozen facts, none amended here.** `§11.1` (spec 1.4.4) gives a `bank_line` target the **empty candidate set**, so only a **settlement** target reaches `RECONCILIATION_SPEC.md §6.2`'s loop; `§11.1` gives such a target exactly **one** `settlement_id`; `§4.2`'s `SE5` is **target-scoped**, so a report carrying any other `settlement_id` contributes nothing; register row M36 gives **only** `fetch_settlement_recon` a source; and `§4.5`'s `net_cost_inr = harm + C_review·\|abstained\| + C_exception·\|open exceptions\|` carries **no probe term**, nor does any other metric on `§8`'s list of 28 — so a probe is **free**. Every `AMBIGUOUS` component therefore offers **one** probe with **one** reachable argument at **zero** cost, and spec 1.4.17 makes repetition idempotent (*"Repeating a probe adds nothing"*). `§7`'s policy takes that action every time and it is **weakly dominant**: a proposer can match it, decline and lose the only evidence above `ε` (`§10` V20), or spend budget that buys nothing. A maximisation over a one-element choice set cannot be beaten, so the affirmative claim is **unfalsifiable**; the arms can differ, but only in the model's disfavour. | **Accepted and disclosed rather than repaired — the `C8` treatment, applied to the experiment itself.** `§4.1`'s standing practice for a declared-but-inert clause, already applied to `SE1` (1.4.10), `SE4` (1.4.11) and `SE2` (1.4.20), is to retain it and report that it does nothing. **`§7`'s `A3-NOLLM` policy is unchanged and must not be tuned** — revising it having observed that it is optimal is exactly the result-driven change `DECISION_BRIEF.md §L.4` forbids and `AL3` binds against. **This is not an implementation defect:** `R3`, `packages/probe`'s loop, the `§6.2` dispatch and `§6.6`'s composition are built, tested and correct, and nothing is withdrawn but a **claim**. **Adding the three missing probe sources would not repair it** — `fetch_payment` and `fetch_refund` are **redundant** (`method`/`card_*` sit on every `recon_line` and on the `payment` observation, a refund `recon_line` carries its parent `payment_id` per `§22.1` D14, and `§4.3`'s `DROP_FIELD` is **not exercised**), and `fetch_order`, though genuinely unobservable, sits behind the **inert** `SE2` consumer (spec 1.4.20) and would move no primary metric. **What stands:** `metric 24` `offline_parity` and every metric on `§8`'s list of 28, for their stated purposes — `R1` and `R2` have live discriminating roles. **`abstentions resolved per probe spent` is NOT added to that list and stays `EXPLORATORY`** (`EVALUATION_SPEC.md §4.13`). **Population-specific:** a future family or amendment producing a component with several independently probeable `settlement_id`s would restore the choice and H1's power; **no such policy is decided here**. **No metric definition is amended, no threshold moves, `constraint_set_hash` does not move, `BENCHMARK_VERSION` stays 1.0.5 and `GT_VERSION` 1.1.0.** **Residual risk: HIGH for H1 alone, and now stated before results** — zero for `A1`, `A2`, `B0` and every `§8` metric, whose validity this row does not touch. `§10` V4's *"Low for ablations"* rating remains correct about `A3`'s **cleanliness** — one code path, one differing flag — and is **qualified here as to its power** for the `R3` arm |
 
 **The claim ASSAY is entitled to make, and no more:**
 
