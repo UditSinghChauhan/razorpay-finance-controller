@@ -1,6 +1,11 @@
 # THREAT_MODEL — ASSAY
 
-**Spec version:** 1.4.25 · **Date:** 2026-08-31
+**Spec version:** 1.4.26 · **Date:** 2026-08-31
+
+**At spec 1.4.26** this document is unchanged apart from the version header. `§T7`'s
+controls, its closed enum of five and its unstated `days` bound are untouched; the
+amendment withdraws an evaluation claim, not a control. See
+`DECISION_BRIEF.md §A.33`.
 
 **At spec 1.4.25** `§T7` records that `R3` **may not propose
 `widen_temporal_window`** — the one probe that relaxes a constraint is now

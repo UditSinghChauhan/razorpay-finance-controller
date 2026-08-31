@@ -1,8 +1,20 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.25 · **Date:** 2026-08-31
+**Spec version:** 1.4.26 · **Date:** 2026-08-31
 **Reviewer role:** principal architect / skeptical reviewer
+
+**At spec 1.4.26** §A.33 records one **disclosure**, taken at a governance gate held
+after spec 1.4.25, after `R3` was built and tested, and **before any dataset was
+generated or any result observed**: `§H` tier **H1**'s affirmative claim — that
+`R3`'s probe selection *beats* the `A3-NOLLM` static priority list — is **not
+answerable on the conforming v1.0.0 population**, because `R3`'s choice set is a
+**singleton** and `PREREGISTRATION.md §7`'s frozen policy is **weakly dominant**.
+**Documentation only; a claim is withdrawn, not a capability.** Threat row
+`PREREGISTRATION.md §10` **V23**, register row **M41**. No metric definition,
+threshold, `C1`–`C8`, `SE1`–`SE5` weight, probe source, success criterion or package
+implementation changes; **`BENCHMARK_VERSION` stays 1.0.5**, `GT_VERSION` 1.1.0 and
+`constraint_set_hash` does not move.
 
 **At spec 1.4.25** §A.32 records three governance decisions and one implementation
 convention, taken at a governance gate held **after spec 1.4.24, before `R3` exists
@@ -1992,6 +2004,108 @@ is unchanged and unweakened**, and the four sentences of `§L.5` remain true —
 sentence 4's *"cannot express a monetary amount"* is strengthened, not qualified, by
 `R3` losing its one numeric argument.
 
+### A.33 Spec 1.4.26 / benchmark 1.0.5 — the experiment that cannot fail its control
+
+**The decision.** `§H` tier **H1**'s affirmative claim is withdrawn: on the
+conforming v1.0.0 population, *"whether the LLM's probe selection **beats** a static
+priority list"* (`RECONCILIATION_SPEC.md §6.2`) is **not answerable**. Threat row
+`PREREGISTRATION.md §10` **V23**, register row **M41**. **Documentation only.**
+Nothing is generated, nothing is implemented, and no probe source is added.
+
+**This was found by audit before any data existed, which is the only time it could
+have been found honestly.** Had it surfaced after a sealed run, the difference
+between *"we disclose a degenerate experiment"* and *"we explain away a null
+result"* would have been invisible to a reader and nearly invisible to us.
+
+**The cause is choice-set cardinality, and every input to it is already frozen.**
+Five clauses compose, and this amendment changes none of them:
+
+```
+  §11.1 (1.4.4)    a bank_line target has the EMPTY candidate set
+                     -> only a SETTLEMENT target reaches §6.2's probe loop
+  §11.1            a settlement target carries exactly ONE settlement_id
+  §4.2  SE5        target-scoped: a report whose settlement_id is not the
+                   target's contributes nothing
+  M36   (1.4.22)   fetch_settlement_recon is the ONLY probe with a source
+  §4.5             net_cost_inr has NO probe term, and neither does any other
+                   metric on §8's list of 28 -- a probe is FREE
+```
+
+So every `AMBIGUOUS` component offers **one** probe, with **one** reachable
+argument, at **zero** cost — and spec 1.4.17 makes repetition idempotent
+(*"Repeating a probe adds nothing; a result that returns nothing removes
+nothing"*). `PREREGISTRATION.md §7`'s frozen policy takes that action every time,
+and it is **weakly dominant**: a proposer can match it, decline and forgo the only
+evidence above `ε` (`§10` V20), or spend budget that buys nothing. **A maximisation
+over a one-element choice set cannot be beaten.** The two arms can still differ —
+but only in the model's disfavour, which is a one-sided measurement and not the
+comparison `§6.2` describes.
+
+**The three missing probe sources are a red herring, and supplying them would not
+repair H1.** `fetch_payment` and `fetch_refund` are **redundant**: `method`,
+`card_network`, `card_issuer` and `card_type` sit on every `recon_line` payload and
+on the `payment` observation; a refund `recon_line` carries its parent `payment_id`
+(`§22.1` D14); and `PREREGISTRATION.md §4.3`'s `DROP_FIELD` is **not exercised**, so
+nothing removes them. `fetch_order` is genuinely different — `receipt` is quarantined
+and no normative rule reads it — but its **only named consumer `SE2` is
+expected-non-binding** (spec 1.4.20), because `order_ref` lives only on
+`MerchantLedgerEntry` and no frozen clause pairs one with a candidate, component,
+target or probed order. A fetched `receipt` would have nothing to compare against.
+**No probe source is added here**, and `DATA_MODEL.md §12`'s five variants are
+unchanged.
+
+**The `A3-NOLLM` policy stays exactly as `§L.1` rule 12 and `PREREGISTRATION.md §7`
+freeze it, and this is the part it would be easiest to get wrong.** The tempting
+move is to widen the policy — offer more probe kinds, more arguments — so that a
+choice exists and H1 becomes measurable. That is **forbidden and would be
+disqualifying**: it revises a control-arm parameter *after* observing that it is
+optimal, which is precisely the result-driven change `§L.4` bars and `AL3` binds
+against. The policy is not defective. It is correct, total, and optimal on this
+population; the population is what has no decision in it.
+
+**This is the `C8` treatment, applied for the first time to an experiment rather
+than a clause.** `§4.1` has retained a declared-but-inert constraint and reported
+that it does nothing since spec 1.0.0; spec 1.4.10 did it for `SE1`, 1.4.11 for
+`SE4`, 1.4.20 for `SE2`. H1 gets the same disposition: **declared, reported inert,
+not deleted, not tuned.**
+
+**What is withdrawn is a claim, not a capability.** `R3`, `packages/probe`'s loop,
+the `§6.2` dispatch and `§6.6`'s composition are built, tested and correct, and the
+full suite is green. `--llm=offline` still runs the whole pipeline. Nothing is
+un-built and no code is touched by this amendment.
+
+**What still stands, and is not weakened.** `metric 24` `offline_parity` remains
+valid for the purpose `§E.6` gives it — *"the pre-registered form of the
+AI-necessity claim: measured, not asserted, **including the outcome where the model
+contributed nothing measurable**"* — and `R1` and `R2` have live, discriminating
+roles that it measures. Every metric on `PREREGISTRATION.md §8`'s list of **28**
+stands for its stated purpose. `A1-NOVALIDATE` and `A2-NOABSTAIN` are untouched, and
+with them `PROJECT_SPEC.md §7`'s `S6` — **no success criterion depends on H1**.
+**`abstentions resolved per probe spent` is NOT added to the 28 and stays
+`EXPLORATORY`**, exactly as `EVALUATION_SPEC.md §4.13` already requires: *"not a new
+quantity that could support a claim"*.
+
+**What the report must and must not say.** It must not assert that ASSAY's probe
+selection beats the static list, or that H1 supplies AI-necessity evidence. It must
+report V23 as a declared threat, state that `R3`'s decision space is a singleton on
+v1.0.0 data, and publish the probe count and `metric 24` as the pre-registered
+figures they are.
+
+**Population-specific, and no future policy is decided.** The limitation follows
+from the v1.0.0 family composition and `§11.1`'s target universe. A future family or
+amendment producing a component with **several independently probeable
+`settlement_id`s** would restore a genuine choice and with it H1's power. Whether to
+build one is **not decided here**, and deciding it after a result would carry the
+same `§L.4` problem this row exists to avoid.
+
+**What does not change.** Every metric formula, definition, number and the 28-metric
+list; `C1`–`C8` and therefore `constraint_set_hash`; `SE1`–`SE5` and their weights;
+every `§7` threshold **including the `A3-NOLLM` priority policy**; `DATA_MODEL.md
+§13`'s four certificate reasons and `§12`'s five probe variants; `§18`'s
+`BenchmarkManifest`; the population, seeds, families and rates; every
+`PROJECT_SPEC.md §7` success criterion; `BENCHMARK_VERSION` **1.0.5**; and
+`GT_VERSION` **1.1.0**. No package implementation is modified.
+
 ## B. Locked project definition
 
 > **ASSAY is a settlement reconciliation controller for Razorpay-shaped payment
@@ -2198,7 +2312,7 @@ before a reviewer does.
 
 | Tier | Item | Value |
 |---|---|---|
-| H1 | LLM role R3 (probe planning) + `abstentions resolved per probe` | Strongest genuine-AI-necessity evidence. **From spec 1.4.25:** the claim runs through **metric 24** and the ASSAY-vs-`A3` primary deltas — `abstentions resolved per probe spent` is absent from `PREREGISTRATION.md §8`'s 28 and is reported `EXPLORATORY` as provenance (`EVALUATION_SPEC.md §4.13`). The `A3` comparand is frozen at `PREREGISTRATION.md §7` (M39). |
+| H1 | LLM role R3 (probe planning) + `abstentions resolved per probe` | **Built; the affirmative claim is WITHDRAWN at spec 1.4.26 (§A.33, M41, `PREREGISTRATION.md §10` V23).** This row read *"Strongest genuine-AI-necessity evidence"* through spec 1.4.25; on the conforming v1.0.0 population `R3`'s choice set is a **singleton** and `PREREGISTRATION.md §7`'s frozen policy is **weakly dominant**, so *"beats a static priority list"* is **unfalsifiable** and **must not be claimed**. The software is valid and stays. **From spec 1.4.25:** the claim runs through **metric 24** and the ASSAY-vs-`A3` primary deltas — `abstentions resolved per probe spent` is absent from `PREREGISTRATION.md §8`'s 28 and is reported `EXPLORATORY` as provenance (`EVALUATION_SPEC.md §4.13`). The `A3` comparand is frozen at `PREREGISTRATION.md §7` (M39) and **must not be tuned**. |
 | H1 | Calibration: reliability diagram + ECE | Justifies the ε threshold |
 | H2 | LLM role R4 (grounded explanations) with numeral verification | Demo polish with a real control attached |
 | H2 | `anthropic` and `openai-compatible` providers exercised live | Completes the provider matrix; needs F2 resolved |

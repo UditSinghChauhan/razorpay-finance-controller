@@ -1,6 +1,14 @@
 # EVALUATION_SPEC — ASSAY
 
-**Spec version:** 1.4.25 · **Date:** 2026-08-31
+**Spec version:** 1.4.26 · **Date:** 2026-08-31
+
+**At spec 1.4.26** `§3.2` records that the `A3-NOLLM` comparison is
+**non-discriminating for `R3`** on the conforming v1.0.0 population. **No metric
+formula, definition, number or count changes** — the frozen list stays at **28**,
+`metric 24` `offline_parity` keeps its stated purpose, and `abstentions resolved per
+probe spent` is **not** added and remains `EXPLORATORY` (`§4.13`). Benchmark v1.0.5
+is unchanged. See `DECISION_BRIEF.md §A.33`, register row M41,
+`PREREGISTRATION.md §10` V23.
 
 **At spec 1.4.25** `§3.2`'s `A3-NOLLM` row records that the ablation's `R3` probe
 policy is **pre-registered** at `PREREGISTRATION.md §7`. **No metric formula,
@@ -190,6 +198,18 @@ in exactly one respect, so the difference is attributable.
 | `A1-NOVALIDATE` | Stage S5 invariants I1–I9 | *The deterministic validator prevents real financial error.* Expected: higher `balance_harm_inr`, hallucinated IDs admitted, trial balance breaks, runs end `BLOCKED`. |
 | `A2-NOABSTAIN` | Abstention; always commits the top candidate | *Abstention is worth its cost.* Expected: coverage 100%, sharply higher harm and net cost, Suspense near zero — the "100% matched, 0 exceptions" failure mode, reproduced deliberately. |
 | `A3-NOLLM` | All four LLM roles → the `offline` provider | *The LLM contributes measurably.* **This may fail, and failing is a legitimate result.** From spec 1.4.25 its `R3` probe policy is **pre-registered** (`PREREGISTRATION.md §7`, `AL3`, register row M39), so the control's probe spend is fixed before any figure exists. |
+
+**`A3`'s `R3` arm is non-discriminating on v1.0.0 data `[ASSAY-MODEL]`, spec
+1.4.26, register row M41.** The ablation stays valid and stays reported; what is
+withdrawn is the affirmative claim that `R3` **beats** it. `DATA_MODEL.md §11.1`
+leaves only settlement targets probeable and gives each one `settlement_id`; `§4.2`'s
+`SE5` is target-scoped; M36 sources one probe; and `§4.5` prices none — **one probe,
+one argument, zero cost**, so `PREREGISTRATION.md §7`'s policy is weakly dominant and
+the arms can differ only in the model's disfavour. **No metric definition changes and
+no metric is added**: `metric 24` `offline_parity` keeps the purpose `DECISION_BRIEF.md
+§E.6` gives it — *"including the outcome where the model contributed nothing
+measurable"* — and `R1` and `R2` remain live, discriminating roles it measures. The
+probe count stays `EXPLORATORY` per `§4.13`. See `PREREGISTRATION.md §10` V23.
 
 **`A3`'s `R3` policy is pre-registered, and this is what keeps the row above an
 ablation `[ASSAY-MODEL]`, spec 1.4.25, register row M39.** `§3.2` requires an
