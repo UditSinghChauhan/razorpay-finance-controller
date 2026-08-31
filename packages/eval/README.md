@@ -1,6 +1,6 @@
 # `@assay/eval` — the measurement layer
 
-Written against **specification 1.4.23 / benchmark 1.0.4**.
+Written against **specification 1.4.26 / benchmark 1.0.5**.
 
 `ARCHITECTURE.md §3`: *"Metrics, bootstrap CIs, baselines, ablations, report
 generation. Must run against any agent behind one interface, so ablations are

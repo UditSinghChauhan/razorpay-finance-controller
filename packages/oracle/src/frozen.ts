@@ -102,5 +102,35 @@ export const BPS_DENOMINATOR = 10_000;
  * intercept — with `eslint.config.js` now carrying the ESLint half `AL8` names.
  * `PREREGISTRATION.md §5.1` states why the resulting asymmetry between the
  * oracle's universe and an agent's is deliberate; `§10` V22 records it.
+ *
+ * **1.4.23 -> 1.4.26, and what was re-checked to say so.** The constant read
+ * 1.4.23 while the documents read 1.4.26. Each intervening version, and what it
+ * required here:
+ *
+ *   - **1.4.24 (M38)** — the recon report's row order (`entity_id` ascending),
+ *     that unsettled rows are included, and that the offline seal may read the
+ *     artifact. `AL8` bars this package from that file, so all three are about a
+ *     surface the oracle may not touch. Nothing here moves.
+ *   - **1.4.25 (M39, M40)** — `PREREGISTRATION.md §7`'s frozen `A3-NOLLM` probe
+ *     priority policy, `DATA_MODEL.md §13`'s fourth certificate reason
+ *     `NO_USEFUL_PROBE_AVAILABLE`, and `R3`'s narrowed proposable set. All three
+ *     belong to the agent side: this package proposes no probe, reads no
+ *     certificate and may not import `packages/engine` (`AL1`). It references
+ *     none of those symbols. `§7`'s **numeric** parameters this file transcribes
+ *     — `C4`'s window, `τ`'s floor and rate — are untouched by that amendment.
+ *   - **1.4.26 (M41)** — a threats-to-validity **disclosure**
+ *     (`PREREGISTRATION.md §10` V23): `§H` tier H1's affirmative claim is
+ *     withdrawn because `R3`'s choice set is a singleton on the conforming
+ *     v1.0.0 population. It withdraws a claim, not a capability, and imposes
+ *     nothing on any package. **`PREREGISTRATION.md §5.4`'s ambiguity
+ *     definition, `§5.3`'s completeness gate and this package's labels are
+ *     entirely unaffected** — the oracle's universe is observations-only and
+ *     independent of anything an agent probes (`§5.1`, `§10` V22).
+ *
+ * **Nothing below moves with it.** `SETTLEMENT_WINDOW_DAYS`, `K_ORACLE`,
+ * `C_ORACLE`, `TAU_FLOOR_PAISE` and `TAU_RATE_BPS` are unchanged; no constraint,
+ * budget or label definition changes; `constraint_set_hash` is
+ * `packages/domain`'s and is unmodified; and `BENCHMARK_VERSION` (1.0.5) and
+ * `GT_VERSION` (1.1.0) live in `packages/generator` and are not restated here.
  */
-export const SPEC_VERSION = "1.4.23";
+export const SPEC_VERSION = "1.4.26";

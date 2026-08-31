@@ -149,5 +149,35 @@ export const LEGACY_MAX_UNRESOLVED_ABS_PAISE = 5_000_000;
  *
  * Bumped with the documents, exactly as `packages/generator/src/frozen.ts` and
  * `packages/oracle/src/frozen.ts` do.
+ *
+ * **1.4.23 -> 1.4.26, and what was re-checked to say so.** The constant read
+ * 1.4.23 while the documents read 1.4.26. Each intervening version, and what it
+ * required here:
+ *
+ *   - **1.4.24 (M38)** — three properties of the PG-side recon report. `AL8`
+ *     keeps that artifact on the probe channel, which is the **agent's**;
+ *     `EVALUATION_SPEC.md §4.13` has this package read back the probe **count**
+ *     as a value on `AgentRun`, which it already does. Nothing here moves.
+ *   - **1.4.25 (M39, M40)** — `PREREGISTRATION.md §7` gains the frozen
+ *     `A3-NOLLM` probe priority policy; `DATA_MODEL.md §13` gains a fourth
+ *     certificate reason. **Neither reaches this file's scope.** The policy is
+ *     an ordering and a selection rule rather than "a rate, a magnitude, a
+ *     threshold or a count", it is implemented in `packages/llm`, and this
+ *     package may import neither `packages/llm` nor `packages/probe`. No metric
+ *     on `PREREGISTRATION.md §8`'s list of 28 reads a certificate reason. Every
+ *     **numeric** `§7` parameter transcribed below is unchanged by that
+ *     amendment.
+ *   - **1.4.26 (M41)** — a threats-to-validity **disclosure**
+ *     (`PREREGISTRATION.md §10` V23): `§H` tier H1's affirmative claim is
+ *     withdrawn because `R3`'s choice set is a singleton on the conforming
+ *     v1.0.0 population. **No metric definition changes, none is added and none
+ *     is removed** — `metric-list.ts` stays at 28 and keeps its numbering,
+ *     `metric 24` `offline_parity` keeps its stated purpose, and
+ *     `abstentions resolved per probe spent` is **not** added and remains
+ *     `EXPLORATORY` (`EVALUATION_SPEC.md §4.13`).
+ *
+ * **Nothing below moves with it**, and neither does `metric-list.ts`.
+ * `BENCHMARK_VERSION` and `GT_VERSION` are deliberately not restated here, as
+ * this module's header says; they live in `packages/generator/src/frozen.ts`.
  */
-export const SPEC_VERSION = "1.4.23";
+export const SPEC_VERSION = "1.4.26";
