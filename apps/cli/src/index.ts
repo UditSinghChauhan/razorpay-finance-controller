@@ -29,7 +29,7 @@
 
 export { dispatch, type CliInvocation } from "./cli.js";
 export {
-  parseArgs, boolFlag, stringFlag, requireFlag, parseSeedList, requireSeeds,
+  ALL, parseArgs, boolFlag, stringFlag, requireFlag, parseSeedList, requireSeeds,
   type FlagSpec, type FlagSpecs, type ParsedArgs,
 } from "./args.js";
 export { GLOBAL_FLAGS, resolveConfig, type CliConfig } from "./config.js";
@@ -81,7 +81,7 @@ export {
 } from "./probe/run.js";
 export { COMMANDS, T0_11_COMMANDS, findCommand, flagsFor, type Command, type CommandContext } from "./commands/index.js";
 export {
-  ALL_AGENTS, TIER0_AGENTS, agentById, isAgentId, readAgentId,
+  ALL_AGENTS, TIER0_AGENTS, agentById, isAgentId, readAgentId, selectAgents,
 } from "./agents/index.js";
 export { AgentUnavailableError } from "./errors.js";
 export { SEAL_TAG, checkSealTag } from "./seal-tag.js";

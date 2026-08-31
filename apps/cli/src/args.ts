@@ -130,6 +130,16 @@ export function boolFlag(parsed: ParsedArgs, name: string): boolean {
   return parsed.flags.get(name) === true;
 }
 
+/**
+ * `PREREGISTRATION.md §9` step 7's `all`, as both `--seeds` and `--agents` spell it.
+ *
+ * One constant rather than two literals: the two flags took the word from the
+ * same line of the same code block, and a spelling that drifted between them
+ * would make one of `§9` step 7's two arguments silently different from the
+ * other.
+ */
+export const ALL = "all";
+
 /** A required string flag. */
 export function requireFlag(parsed: ParsedArgs, name: string): string {
   const value = stringFlag(parsed, name);
@@ -150,6 +160,23 @@ export function requireFlag(parsed: ParsedArgs, name: string): string {
  * integer or an inclusive `lo-hi` range. Both documents already spell it this
  * way; this function reads what they wrote rather than choosing a syntax.
  *
+ * **`all` is a third spelling, and it is a convention rather than a
+ * ratification.** `§9` step 7 writes `assay bench --sealed --agents all --seeds
+ * all`, and spec 1.4.27's derivation above considered only step 2 and
+ * `EVALUATION_SPEC.md §7` — so `all` is a form that derivation **overlooked**,
+ * not one it rejected. It is accepted here because refusing a spelling `§9`
+ * literally writes would leave the frozen procedure inexecutable, which is the
+ * defect spec 1.4.29 `M45` exists to close elsewhere. Nothing is ratified: `all`
+ * is semantically identical to the explicit enumeration the frozen grammar
+ * already admits, expands only over `§6.1`'s declared seeds for the split the
+ * caller names, and is recorded here on `artifacts/replay-cache.ts`'s precedent
+ * so a later amendment naming a different syntax supersedes this file rather
+ * than contradicting a rule nobody wrote.
+ *
+ * **`all` resolves nothing on its own.** The caller supplies the seeds, because
+ * `§6.1`'s split table is `packages/generator`'s and a parser that expanded it
+ * would be the second reader this function's next paragraph refuses to become.
+ *
  * **Membership is not checked here.** `PREREGISTRATION.md §6.1`'s split table is
  * the sole authority on which seeds exist and which split each belongs to, and
  * `packages/generator`'s `blockOf` is its only reader. A parser that also
@@ -161,7 +188,25 @@ export function requireFlag(parsed: ParsedArgs, name: string): string {
  *
  * @throws UsageError on an empty list, a malformed item, or a repeat.
  */
-export function parseSeedList(raw: string, flag = "seeds"): readonly number[] {
+export function parseSeedList(
+  raw: string,
+  flag = "seeds",
+  allSeeds?: readonly number[],
+): readonly number[] {
+  if (raw.trim() === ALL) {
+    if (allSeeds === undefined) {
+      throw new UsageError(
+        `--${flag} all is not available here: PREREGISTRATION.md §9 step 7 spells it for a ` +
+          `command that knows its split, and §6.1's table is the sole authority on which ` +
+          `seeds a split has. Name the seeds, as §9 step 2 does: "9000-9004,9100-9104".`,
+      );
+    }
+    if (allSeeds.length === 0) {
+      throw new UsageError(`--${flag} all expanded to no seed; §6.1 assigns every split five.`);
+    }
+    return Object.freeze([...allSeeds].sort((a, b) => a - b));
+  }
+
   const seeds: number[] = [];
   const seen = new Set<number>();
 
@@ -229,9 +274,17 @@ export function parseSeedList(raw: string, flag = "seeds"): readonly number[] {
  * and naming one is the commonest thing a caller does. `--seeds` is the surface
  * `PREREGISTRATION.md §9` and `EVALUATION_SPEC.md §7` write.
  *
+ * `allSeeds` is what `--seeds all` expands to, and is the caller's because
+ * `§6.1`'s split table is `packages/generator`'s. A command that knows its split
+ * passes that split's declared seeds; one that does not passes nothing, and
+ * `all` is refused rather than guessed.
+ *
  * @throws UsageError when both or neither is given.
  */
-export function requireSeeds(parsed: ParsedArgs): readonly number[] {
+export function requireSeeds(
+  parsed: ParsedArgs,
+  allSeeds?: readonly number[],
+): readonly number[] {
   const list = stringFlag(parsed, "seeds");
   const one = stringFlag(parsed, "seed");
   if (list !== null && one !== null) {
@@ -240,7 +293,9 @@ export function requireSeeds(parsed: ParsedArgs): readonly number[] {
         `--seeds, and --seed is its one-element case.`,
     );
   }
-  if (list !== null) return parseSeedList(list);
+  if (list !== null) return parseSeedList(list, "seeds", allSeeds);
+  // `--seed` is the ONE-element case and takes no `all`: naming one seed and
+  // meaning every seed is a contradiction the flag's own name already rules out.
   if (one !== null) return parseSeedList(one, "seed");
   throw new UsageError(`--seeds is required (PREREGISTRATION.md §9 step 2), or --seed for one.`);
 }

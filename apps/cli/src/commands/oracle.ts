@@ -1,5 +1,5 @@
 import { CONSISTENCY_DRAW_SEED, consistencyGate, drawPairs } from "@assay/eval";
-import { blockOf, SPEC_VERSION, type Split } from "@assay/generator";
+import { SEED_BLOCKS, blockOf, SPEC_VERSION, type Split } from "@assay/generator";
 import { completenessGate, labelAll, oracleContext } from "@assay/oracle";
 
 import { requireFlag, requireSeeds, stringFlag } from "../args.js";
@@ -121,7 +121,10 @@ function runsConsistencyGate(split: Split): boolean {
 
 async function run(context: CommandContext): Promise<void> {
   const split = readSplit(requireFlag(context.args, "split"));
-  const seeds = requireSeeds(context.args);
+  // `--seeds all` (§9 step 7's spelling) expands over §6.1's declared seeds for
+  // this split, read from the frozen table's one reader.
+  const declared = SEED_BLOCKS.filter((b) => b.split === split).flatMap((b) => [...b.seeds]);
+  const seeds = requireSeeds(context.args, declared);
   const benchRoot = stringFlag(context.args, "bench") ?? "bench";
   const drawSeedRaw = stringFlag(context.args, "consistency-seed");
 

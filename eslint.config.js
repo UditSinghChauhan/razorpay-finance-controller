@@ -125,6 +125,19 @@ const CLI_NO_NETWORK_MSG =
   "configuration mistake from the demo path. The two metered providers are §H " +
   "tier H2 and live in packages/llm, never here.";
 
+const AGENT_FS_DOOR_MSG =
+  "apps/cli/src/agents/** may not import the filesystem door (spec 1.4.29, " +
+  "register row DATA_MODEL.md §22.2 M47/G8). An agent receives DATA -- " +
+  "packages/eval's AgentInput carries only `observations` and `config`, no " +
+  "path and no reader -- so it has nothing to read WITH, and this rule keeps " +
+  "that a property rather than a convention. fs/guard.ts states why location " +
+  "alone is not enough: 'the zone is an argument at the call site', so a module " +
+  "is not zone-restricted by sitting in the composition root, and a call site " +
+  "here could otherwise declare GENERATOR_TRUST and reach ground truth. " +
+  "PREREGISTRATION.md §6.2 AL1/AL2/AL4 and EVALUATION_SPEC.md §2's 'No agent " +
+  "ever sees ground truth or oracle labels' are what this protects. The runner " +
+  "reads the dataset and passes the values in.";
+
 const CLI_FS_DOOR_MSG =
   "apps/cli performs all filesystem I/O (ARCHITECTURE.md §3) and performs it " +
   "in ONE place: src/fs/. PREREGISTRATION.md §6.2's AL2/AL8 runtime path guard " +
@@ -146,6 +159,16 @@ const CLI_FS_PATHS = ["fs", "path", "crypto", "os", "child_process"];
 const CLI_FS_PATTERNS = [
   "node:fs", "node:fs/promises", "node:path", "node:crypto", "node:os", "node:child_process",
 ];
+
+/**
+ * The door itself, as an agent under `apps/cli/src/agents/` would spell it.
+ *
+ * Deliberately narrow: exactly `src/fs/`, reached relatively from one directory
+ * down or by workspace path. It is not a ban on all relative imports — an agent
+ * composes `../providers.js` and `../probe/` by design — and over-broadening it
+ * would make the rule a style preference rather than the one boundary it states.
+ */
+const AGENT_FS_DOOR = ["../fs", "../fs/*", "**/apps/cli/src/fs", "**/apps/cli/src/fs/*"];
 
 /**
  * `no-restricted-imports` does not inspect dynamic `import()`, which would
@@ -742,6 +765,61 @@ export default tseslint.config(
       ],
       "no-restricted-syntax": [
         "error",
+        ...CLI_FS_PATHS.map((mod) =>
+          dynamicImportBan(`/^(node:)?${mod}$/`, CLI_FS_DOOR_MSG),
+        ),
+        ...CLI_NETWORK_DYNAMIC.map((mod) =>
+          dynamicImportBan(`/^(node:)?${mod}$/`, CLI_NO_NETWORK_MSG),
+        ),
+      ],
+    },
+  },
+
+  // --- apps/cli/src/agents · G8, the filesystem door -----------------------
+  //
+  // Spec 1.4.29, register row DATA_MODEL.md §22.2 M47. The agents moved here
+  // from packages/eval, where an import ban had kept them away from the data
+  // they measure against; inside the composition root that ban no longer
+  // applies, because apps/cli legitimately holds every unlock.
+  //
+  // Four protections already hold, and this closes the residual:
+  //   1. no node:fs outside src/fs/ (the block above);
+  //   2. every read declares a ReadZone, and AGENT refuses ground_truth*.jsonl
+  //      and recon_report*.jsonl;
+  //   3. AgentInput carries only `observations` and `config`, so an agent has
+  //      no path and no reader to read with;
+  //   4. AL1 binds packages/engine and packages/oracle BY NAME, and neither
+  //      package moves.
+  // The residual is fs/guard.ts's own disclosure -- "the zone is an argument at
+  // the call site" -- so a module here could declare GENERATOR_TRUST and reach
+  // ground truth. A path-scoped ban is the mechanism §L.1 rules 3 and 4 already
+  // use, and it is scoped to the door alone rather than to relative imports
+  // generally: an agent composes ../providers.js and ../probe/ by design.
+  //
+  // The fs and network paths are REPEATED, not inherited. Flat config applies
+  // objects in order and the last matching one WINS PER RULE -- it does not
+  // merge -- so dropping them here would silently reopen them under src/agents/.
+  {
+    files: ["apps/cli/src/agents/**"],
+    linterOptions: { noInlineConfig: true },
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            ...CLI_FS_PATHS.map((mod) => ({ name: mod, message: CLI_FS_DOOR_MSG })),
+            ...CLI_NETWORK_PATHS.map((mod) => ({ name: mod, message: CLI_NO_NETWORK_MSG })),
+          ],
+          patterns: [
+            { group: AGENT_FS_DOOR, message: AGENT_FS_DOOR_MSG },
+            { group: CLI_FS_PATTERNS, message: CLI_FS_DOOR_MSG },
+            { group: CLI_NETWORK_PATTERNS, message: CLI_NO_NETWORK_MSG },
+          ],
+        },
+      ],
+      "no-restricted-syntax": [
+        "error",
+        dynamicImportBan("/\\/fs\\//", AGENT_FS_DOOR_MSG),
         ...CLI_FS_PATHS.map((mod) =>
           dynamicImportBan(`/^(node:)?${mod}$/`, CLI_FS_DOOR_MSG),
         ),
