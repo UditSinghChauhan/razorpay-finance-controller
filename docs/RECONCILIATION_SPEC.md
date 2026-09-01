@@ -1,6 +1,20 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.4.30 · **Date:** 2026-09-01
+**Spec version:** 1.4.31 · **Date:** 2026-09-01
+
+**At spec 1.4.31** this document adds **one clarifying paragraph to `§10.1`** and
+changes no gate, invariant, constraint or threshold. Register row `DATA_MODEL.md
+§22.2` **M50** records what `G5` asserts — *no allocation carrying a **recorded**
+invariant failure was posted* — and what it does not: it does not assert that any
+invariant was **evaluated**, which is `Decision.invariants_checked`'s business. That
+distinction is what lets `EVALUATION_SPEC.md §3.2`'s `A1-NOVALIDATE` ablation exist
+without weakening the gate, and it forecloses the reading in which `A1` evaluates the
+invariants and posts the failures anyway. **`G1`–`G5` are unchanged and stay active
+for every agent**, as are `§10.2`'s three outcomes, `§10.3`'s close policy, `§10.4`'s
+procedure, `§7`'s `I1`–`I9` **definitions** and its failure semantics, `§6`'s
+materiality and probe loop, `§3`'s anchor table, `§4.1`'s `C1`–`C8` and every `§9`
+terminal state. **`constraint_set_hash` does not move** and benchmark stays
+**v1.0.8**. See `DECISION_BRIEF.md §A.38` and `PREREGISTRATION.md §10` **V26**.
 
 **At spec 1.4.30** this document is unchanged apart from the version header. The
 amendment fixes `DATA_MODEL.md §17.1.1`'s *"the settlement it is allocated to"* as
@@ -1502,6 +1516,30 @@ arithmetically impossible.
 Balances at close are **recomputed by projection from the event log**, never read
 from cached state. A corrupted balance that is not backed by an event simply
 disappears on re-projection, which is what makes G2 and G3 meaningful.
+
+**What `G5` asserts, and what it does not — clarified at spec 1.4.31, register row
+`DATA_MODEL.md §22.2` M50. The gate is unchanged and stays active for every agent.**
+`G5` asserts that **no allocation carrying a recorded invariant failure was
+posted**. It is a runtime scan over `Decision.invariants_failed`, which is what makes
+*"the validation gate was bypassed"* checkable by a third party reading a stored
+artifact rather than by trusting the stage that minted it. It does **not** assert
+that any invariant was **evaluated**; `Decision.invariants_checked` (`DATA_MODEL.md
+§13`) records that, and the two fields are read together. This is precisely what lets
+`EVALUATION_SPEC.md §3.2`'s `A1-NOVALIDATE` ablation exist without weakening
+anything: `A1` records `invariants_checked: []` and `invariants_failed: []`, so `G5`
+passes over a set holding no failure **because none was evaluated**, and the artifact
+says exactly that rather than concealing it. The competing reading — that `A1`
+evaluates the invariants and posts the failures anyway — is **foreclosed here**:
+`G5` refuses such an allocation at close and the single write path refuses it before
+that, and expressing it by recording an empty `invariants_failed` while failures were
+found is `THREAT_MODEL.md §T8`'s suppression, not an ablation. **`§7`'s failure
+semantics are unchanged for every invariant that is evaluated**: *"any invariant
+failure rejects the allocation. It is never partially posted, never repaired, never
+downgraded to a warning."* And `G2` is unaffected either way — `I1` is re-checked on
+the cumulative totals at every append, independently of what `S5` evaluated, which is
+why a broken trial balance is unreachable through this write path and why
+`EVALUATION_SPEC.md §3.2` withdrew that expectation for `A1` (`DECISION_BRIEF.md
+§A.38`).
 
 ### 10.2 The three outcomes
 

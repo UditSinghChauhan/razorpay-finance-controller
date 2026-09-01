@@ -290,6 +290,25 @@ export const LEGACY_MAX_UNRESOLVED_ABS_PAISE = 5_000_000;
  *     scored run has been produced. **`BENCHMARK_VERSION` moves 1.0.7 -> 1.0.8**,
  *     that constant being `packages/generator`'s.
  *
+ *   - **1.4.31 (M50)** — `EVALUATION_SPEC.md §3.2`'s `A1-NOVALIDATE` row is
+ *     amended: it removes stage `S5`'s **evaluation** of the allocation-scoped
+ *     invariants `I1`-`I8` (never "evaluate and ignore the failures"), and the
+ *     expectations *"trial balance breaks"* and *"runs end `BLOCKED`"* are
+ *     **withdrawn**. **It is not a `§7` parameter and reaches no constant in this
+ *     file.** Nothing here is scoped to an agent: `agent.ts`'s `AGENTS` table,
+ *     `AGENT_IDS`, `tier0Agents()` and `run-key.ts`'s `(agent_id, split, seed,
+ *     llm_mode)` identity are unchanged, `A1-NOVALIDATE` keeps its row and its
+ *     Tier-0 membership, and `metrics/close-loop.ts` keeps computing
+ *     `period_status` the same way for every agent -- the amendment removes the
+ *     expectation that one agent would end `BLOCKED`, and adds **no exclusion
+ *     rule** for the scorer or the aggregator to implement. **No metric
+ *     definition changes, none is added and none is removed** -- `metric-list.ts`
+ *     stays at 28 and keeps its numbering, metric 11's distribution and metric
+ *     14's *"`BLOCKED` must be 0"* included -- `§5.4`'s thirteen obligations and
+ *     `§5.5`'s forbidden practices are untouched, and no figure exists to move.
+ *     **`BENCHMARK_VERSION` does NOT move, staying 1.0.8**: no conforming agent's
+ *     postings change, the only arm the row settles having never produced one.
+ *
  * **Nothing below moves with it**, and neither does `metric-list.ts`.
  */
-export const SPEC_VERSION = "1.4.30";
+export const SPEC_VERSION = "1.4.31";

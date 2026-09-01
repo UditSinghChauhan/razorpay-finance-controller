@@ -1,6 +1,22 @@
 # EVALUATION_SPEC — ASSAY
 
-**Spec version:** 1.4.30 · **Date:** 2026-09-01
+**Spec version:** 1.4.31 · **Date:** 2026-09-01
+
+**At spec 1.4.31** this document amends **§3.2's `A1-NOVALIDATE` row**, and adds one
+sentence to `§5.4` item 5 and one bullet to `§6`. Two expectations that row carried
+are **withdrawn** — *"runs end `BLOCKED`"*, which contradicts `§2`'s protocol, `§4.9`
+and `PREREGISTRATION.md §8`'s metric 14, and *"trial balance breaks"*, which the
+frozen ledger boundary makes structurally unreachable — and the row now states the
+behaviour that boundary actually admits. *"Removed: Stage S5 invariants `I1`–`I9`"*
+is ratified as **`S5` does not evaluate the allocation-scoped set `I1`–`I8`**, never
+*"evaluate and ignore the failures"*. **No metric formula, definition, universe,
+number or count changes** — the frozen list stays at **28**, `§5.4`'s **thirteen**
+obligations and `§5.5`'s forbidden practices are untouched, and `§2`'s protocol,
+`§4.9`'s close-loop block and metric 14's *"`BLOCKED` must be 0"* stand exactly as
+written: it was the `A1` row that contradicted them. `§3.1`'s baselines,
+`A2-NOABSTAIN`, `A3-NOLLM` and every `§4` definition are unchanged. Register row
+`DATA_MODEL.md §22.2` **M50**; benchmark stays **v1.0.8**. See `DECISION_BRIEF.md
+§A.38` and `PREREGISTRATION.md §10` **V26**.
 
 **At spec 1.4.30** this document is unchanged apart from the version header.
 Register row `DATA_MODEL.md §22.2` **M49** fixes `§17.1.1`'s *"the settlement it
@@ -256,9 +272,61 @@ in exactly one respect, so the difference is attributable.
 
 | ID | Removed | Hypothesis it tests |
 |---|---|---|
-| `A1-NOVALIDATE` | Stage S5 invariants I1–I9 | *The deterministic validator prevents real financial error.* Expected: higher `balance_harm_inr`, hallucinated IDs admitted, trial balance breaks, runs end `BLOCKED`. |
+| `A1-NOVALIDATE` | Stage S5's **evaluation** of the allocation-scoped invariants I1–I8 | *The deterministic validator prevents real financial error.* Expected: higher `balance_harm_inr` and `misdirected_value_inr`, hallucinated IDs admitted (metric 20's `id_rejection_rate` falls), and allocations S5 would have rejected **committed** rather than routed to an `E05` exception. The run reaches `CLOSED` or `OPEN` like every other agent. **Two expectations were withdrawn at spec 1.4.31 (register row `DATA_MODEL.md §22.2` M50) — *"trial balance breaks"* and *"runs end `BLOCKED`"*; see below.** |
 | `A2-NOABSTAIN` | Abstention; always commits the top candidate | *Abstention is worth its cost.* Expected: coverage 100%, sharply higher harm and net cost, Suspense near zero — the "100% matched, 0 exceptions" failure mode, reproduced deliberately. |
 | `A3-NOLLM` | All four LLM roles → the `offline` provider | *The LLM contributes measurably.* **This may fail, and failing is a legitimate result.** From spec 1.4.25 its `R3` probe policy is **pre-registered** (`PREREGISTRATION.md §7`, `AL3`, register row M39), so the control's probe spend is fixed before any figure exists. |
+
+**`A1`'s two withdrawn expectations `[ASSAY-MODEL]`, spec 1.4.31, register row
+`DATA_MODEL.md §22.2` M50.** Through spec 1.4.30 the row above expected *"trial
+balance breaks, runs end `BLOCKED`"*. Both are withdrawn rather than restated, on
+the `M41` precedent: an expectation the frozen text cannot admit is withdrawn, not
+reported. **The hypothesis is untouched** — the validator still has to be shown to
+prevent real financial error, and `PROJECT_SPEC.md §7` **S6** still asks `A1` for a
+statistically significant ₹-harm increase.
+
+- **`BLOCKED` is withdrawn because three frozen clauses forbid it and the fourth
+  makes it self-defeating.** `§2`'s protocol closes *"A run that ends `BLOCKED` is a
+  defect and fails the build"*; `§4.9` states *"`BLOCKED` must be **0 across every
+  run** — it indicates a defect in ASSAY, not a property of the data"*;
+  `PREREGISTRATION.md §8`'s metric 14 requires the same; and
+  `RECONCILIATION_SPEC.md §10.2` marks a `BLOCKED` run **`invalid`** and emits no
+  close report. S6 needs a figure with a confidence interval over ≥ 5 seeds, and
+  `§5.5` bars *"any number that does not exist in a committed run artifact"* — so an
+  `A1` that ended `BLOCKED` could not supply the number S6 is written to read. The
+  expectation, if met, would destroy the criterion it exists to serve.
+- **A broken trial balance is withdrawn because the ledger boundary makes it
+  unreachable.** `I1` is re-checked **independently of `S5`** on the cumulative
+  totals at every ledger append — `DATA_MODEL.md §17`: *"at every point in the event
+  log, `Σ dr_paise === Σ cr_paise`"* — and `§17.1`'s `P1`–`P8` balance by
+  construction, so no allocation reaching the one write path can leave the books
+  unbalanced whatever `S5` evaluated. `PROJECT_SPEC.md §7` **S5** independently
+  requires *"trial balance = 0 and Suspense identity exact on every run"*, and
+  `ARCHITECTURE.md §12` makes a broken one *"a bug in the ledger itself"*. The
+  sentence described an `ASSAY` defect, not a property of the ablation.
+
+**What `A1` removes, stated so it cannot be read two ways (M50).** `A1` removes
+`S5`'s **evaluation** of the allocation-scoped invariant set `I1`–`I8`. It does
+**not** mean *"evaluate the invariants and ignore the failures"*, and that reading is
+foreclosed rather than merely disfavoured: an evaluated failure must be recorded in
+`invariants_failed`, and gate `G5` refuses to post an allocation carrying one — at
+the write path and again at close — so the only way to express it is to record an
+empty `invariants_failed` while failures were found, which falsifies the artifact and
+is `THREAT_MODEL.md §T8`'s suppression rather than an ablation. `I9` is **run-scoped**
+and `RECONCILIATION_SPEC.md §7` evaluates it *"only when the caller supplies both
+hashes"*, so it is in neither arm's per-allocation set. An `A1` decision therefore
+records `invariants_checked: []` **and** `invariants_failed: []`, and the second is
+empty **because nothing was evaluated, not because nothing failed** — the first field
+is what makes the removal visible in the run artifact. The removal is **one respect**,
+as this section requires: `S5`'s certificate/abstention agreement, the
+`ValidatedDecision` mint, the single write path and the whole `G1`–`G5` close gate
+are `ASSAY`'s, unchanged.
+
+**`A1`'s harm figure is a conservative lower bound, and the report must say so (M50,
+`PREREGISTRATION.md §10` **V26**).** `I1` and the five close gates keep running, so
+`A1` is *"`ASSAY` with the `S5` invariant gate removed"* and **not** *"an unvalidated
+ledger"*. It understates what removing validation would cost a system with no such
+boundary. The figure is reported with that statement attached, and no claim that `A1`
+reproduces a fully unvalidated ledger may be made.
 
 **`A3`'s `R3` arm is non-discriminating on v1.0.0 data `[ASSAY-MODEL]`, spec
 1.4.26, register row M41.** The ablation stays valid and stays reported; what is
@@ -871,7 +939,13 @@ significantly different** — no bolding of a 2% lead over a 15% interval.
    run and the line says so; on the test split the completeness figures are
    aggregate only, `AL4` and `AL7` barring any record-level detail.
 5. The full metric table with CIs, including every metric in the frozen list —
-   **including the ones where ASSAY does poorly.**
+   **including the ones where ASSAY does poorly.** For `A1-NOVALIDATE` the table
+   carries `invariants_checked` from the run artifact — the **empty set** (spec
+   1.4.31, register row `DATA_MODEL.md §22.2` M50) — so the removed gate is shown
+   rather than asserted, beside `PREREGISTRATION.md §10` **V26**'s statement that
+   `A1`'s harm figure is a conservative lower bound. This is an existing obligation
+   read onto an existing field, and the count of obligations in this list is
+   **thirteen**, unchanged.
 6. **Two columns for every primary metric:** `--llm=replay` and `--llm=offline`,
    with the delta and whether the CIs overlap (metric 24, `offline_parity`).
 7. The risk–coverage figure and reliability diagram.
@@ -946,6 +1020,14 @@ For each of the 14 exception classes: count, total rupee value, mean value,
   excluded. `THREAT_MODEL.md §T5`'s *prevention* is unaffected: an `E13` posts no
   journal line and can move no control account. Its *detection* is
   non-discriminating, and saying so is the point of this line.
+- **`A1-NOVALIDATE`'s `invariants_checked`, printed as the empty set** — spec
+  1.4.31, register row `DATA_MODEL.md §22.2` **M50**. `ASSAY` and every other agent
+  report the full allocation-scoped set `I1`–`I8` on every decision; `A1` reports
+  `[]`, and `invariants_failed` is `[]` for both, for opposite reasons. No exception
+  class, count, owner or value changes and the table's shape is untouched: what this
+  line adds is the artifact-side evidence that the ablation removed the gate it
+  claims to have removed, drawn from a committed run rather than from this document
+  (`§5.5`).
 - **`unresolved_value_inr_multiview`** — the benchmark v1.0.2 universe, labelled
   `EXPLORATORY`, printed beside the amended figure.
 - **`net_cost_inr_excluding_e13`** — the §4.5 companion line, labelled

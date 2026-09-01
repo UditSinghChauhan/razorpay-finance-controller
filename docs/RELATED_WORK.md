@@ -1,6 +1,13 @@
 # RELATED_WORK — ASSAY
 
-**Spec version:** 1.4.30 · **Date:** 2026-09-01
+**Spec version:** 1.4.31 · **Date:** 2026-09-01
+
+**At spec 1.4.31** this document is unchanged apart from the version header. Register
+row `DATA_MODEL.md §22.2` **M50** settles what `EVALUATION_SPEC.md §3.2`'s
+`A1-NOVALIDATE` ablation removes; no positioning claim, prior-art comparison or
+differentiator depends on it, and `§1.4`'s statement — that ASSAY consumes the
+Razorpay recon report as authoritative input and claims no gap in it — is untouched.
+See `DECISION_BRIEF.md §A.38`.
 
 **At spec 1.4.30** this document is unchanged apart from the version header. See
 `DECISION_BRIEF.md §A.37`.

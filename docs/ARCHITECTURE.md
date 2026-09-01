@@ -1,6 +1,22 @@
 # ARCHITECTURE — ASSAY
 
-**Spec version:** 1.4.30 · **Date:** 2026-09-01
+**Spec version:** 1.4.31 · **Date:** 2026-09-01
+
+**At spec 1.4.31** this document is unchanged apart from the version header, and
+**two of its clauses are load-bearing for the amendment without being amended by
+it**. Register row `DATA_MODEL.md §22.2` **M50** settles what
+`EVALUATION_SPEC.md §3.2`'s `A1-NOVALIDATE` removes. `§12`'s row *"Invariant
+violation on an accepted allocation → reject the allocation, route to exception,
+continue the batch, record `invariants_failed`"* is exactly the `ASSAY` behaviour the
+ablation removes, and `§12`'s `BLOCKED` row — *"these can only mean a bug in
+ASSAY"* — is one of the clauses that forecloses the withdrawn *"runs end `BLOCKED`"*
+expectation. **`§4` boundary 3 is not amended**: the non-exported brand, the
+**single** widening assertion in `packages/engine/src/s5-validate.ts` and the one
+mutating write path stand exactly as written, and `DECISION_BRIEF.md §L.1` rule 4's
+new clause narrows *who may select an evaluated invariant set* without adding a
+second constructor or a second assertion. **No trust boundary, data flow, interface,
+package ownership, provider, role, probe enum, gate definition or failure-handling
+row changes**, and benchmark stays **v1.0.8**. See `DECISION_BRIEF.md §A.38`.
 
 **At spec 1.4.30** this document is unchanged apart from the version header.
 Register row `DATA_MODEL.md §22.2` **M49** reads `§4` boundary 3's *"`journal.ts`

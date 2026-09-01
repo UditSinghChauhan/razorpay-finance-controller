@@ -2,8 +2,23 @@
 
 **Track:** 04 — AI Finance Controller
 **Status:** Specification. Frozen scope for implementation.
-**Spec version:** 1.4.30
+**Spec version:** 1.4.31
 **Date:** 2026-09-01
+
+**At spec 1.4.31** this document is unchanged apart from the version header, and
+**two `§7` success criteria are read rather than amended**. Register row
+`DATA_MODEL.md §22.2` **M50** withdraws two expectations from
+`EVALUATION_SPEC.md §3.2`'s `A1-NOVALIDATE` row, and both criteria are why. **S5** —
+*"trial balance = 0 and Suspense identity exact on every run"* — is what makes the
+withdrawn *"trial balance breaks"* an `ASSAY` defect rather than an ablation result;
+**S6** — *"ablation `A1-NOVALIDATE` shows a statistically significant ₹-harm
+increase"* — is what the withdrawn *"runs end `BLOCKED`"* would have forfeited, since
+`RECONCILIATION_SPEC.md §10.2` marks a `BLOCKED` run **`invalid`** and
+`EVALUATION_SPEC.md §5.5` bars any number not in a committed run artifact. **No
+success criterion moves, none is added and none is withdrawn**; `S6`'s hypothesis,
+its ablation and its metric linkage are untouched, and `PREREGISTRATION.md §10`
+**V26** records that `A1`'s harm figure is a conservative lower bound — which makes
+`S6` harder to satisfy, not easier. See `DECISION_BRIEF.md §A.38`.
 
 **At spec 1.4.30** this document is unchanged apart from the version header. **No
 success criterion moves.** `S4`'s *"abstains where the evidence is genuinely

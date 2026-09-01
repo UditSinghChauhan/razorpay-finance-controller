@@ -548,5 +548,23 @@ export const GT_VERSION = "1.1.0";
  * hold. `GT_VERSION` stays **1.1.0**: truth posts from omniscience and already
  * settles these lines under `P2`, so no ground-truth byte moves. No dataset
  * exists to regenerate.
+ *
+ * **1.4.30 -> 1.4.31 (M50) — required exactly ONE thing of this package: this
+ * constant, and nothing else.** The amendment settles what `EVALUATION_SPEC.md
+ * §3.2`'s `A1-NOVALIDATE` ablation removes -- stage `S5`'s **evaluation** of the
+ * allocation-scoped invariants `I1`-`I8` -- and withdraws two expectations that
+ * row carried. It governs an **agent's** behaviour, and this package generates
+ * the data every agent is run against, identically for all of them; nothing here
+ * is scoped to an agent and none of it is read by `S5`. **`BENCHMARK_VERSION`
+ * does NOT move and stays 1.0.8.** `M49`'s own test is whether an amendment
+ * changes what a **conforming agent posts**, so that runs either side are not
+ * comparable: `ASSAY`, `B0`, `B1`, `B2`, `A2` and `A3` post byte-identically
+ * before and after this row, and the one arm whose postings it settles --
+ * `A1-NOVALIDATE` -- is **unimplemented and has never produced a posting**, so
+ * there is no pair of runs to make incomparable. `GT_VERSION` stays **1.1.0**:
+ * ground truth is generated from omniscience and is not a function of which
+ * invariants an agent evaluates. `SPLIT_TABLE`, `SEED_BLOCKS`, `blockOf`, every
+ * family rate, every `target_record_count`, every degradation operator and its
+ * rate are unchanged, and **no dataset exists to regenerate**.
  */
-export const SPEC_VERSION = "1.4.30";
+export const SPEC_VERSION = "1.4.31";
