@@ -113,8 +113,11 @@ describe("the top-level surface", () => {
 });
 
 describe("blocked commands name their owner and their citation", () => {
+  // `bench` left this list at spec 1.4.32 (register row `DATA_MODEL.md §22.2`
+  // M51, implementation item (2)): it composes the injected agents, executes
+  // §5.1's ε curve and §5.3's τ sweep, and writes M48's metrics.json. Three
+  // commands remain blocked, each on a package that still owes a piece.
   const expected = [
-    { argv: ["bench"], owner: "packages/eval", cite: "ARCHITECTURE.md §10" },
     { argv: ["close", "--run", "runs/x"], owner: "packages/ledger", cite: "RECONCILIATION_SPEC.md §10.1" },
     { argv: ["run", "--dataset", "bench/dev/2000"], owner: "packages/domain", cite: "ARCHITECTURE.md §3" },
     { argv: ["report"], owner: "packages/eval (src/report/)", cite: "DECISION_BRIEF.md §C T0-13" },

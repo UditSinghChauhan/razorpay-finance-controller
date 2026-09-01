@@ -43,9 +43,15 @@ describe("the constructed set is EVALUATION_SPEC.md §3's table", () => {
     expect(ALL_AGENTS.map((a) => a.id)).toEqual([...AGENT_IDS]);
   });
 
-  it("holds §K's seven files plus the registry", () => {
+  it("holds §K's seven files, the registry and the sweep runner", () => {
+    // `sweep-runner.ts` joined at spec 1.4.32 (M51 item (2)): it carries
+    // `SweepParameters`, `ASSAY`'s swept entry point and `EVALUATION_SPEC.md
+    // §5.1`'s curve-agent list. It is an agent composition, not a command, which
+    // is why it sits here; `A1`'s counterpart must stay in `a1.ts`, whose option
+    // object carries the lint-allowlisted empty-selection literal.
     expect(agentSources.map((s) => s.name)).toEqual([
       "a1.ts", "a2.ts", "a3.ts", "assay.ts", "b0.ts", "b1.ts", "b2.ts", "index.ts",
+      "sweep-runner.ts",
     ]);
   });
 

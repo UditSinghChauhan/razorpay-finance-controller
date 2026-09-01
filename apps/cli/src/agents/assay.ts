@@ -27,6 +27,7 @@ import {
   type Member,
   type ScoredSolution,
   type SolveInput,
+  type SolveOutcome,
   type SolveResult,
   type Target,
   type ValidationResult,
@@ -755,7 +756,7 @@ interface TargetOutcome {
  * of this object, which is `§3.2`'s *"exactly one respect"* made a code fact
  * rather than a documentation claim.
  */
-interface AssayComposeOptions {
+export interface AssayComposeOptions {
   /** The `AgentId` this run reports as (`EVALUATION_SPEC.md §3`). */
   readonly agentId: AgentId;
   /**
@@ -795,13 +796,81 @@ interface AssayComposeOptions {
    * at close. `EVALUATION_SPEC.md §3.2`'s *"exactly one respect"*, literally.
    */
   readonly invariantSelection?: InvariantSelection;
+  /**
+   * `EVALUATION_SPEC.md §5.1`'s `ε` for this execution, in integer basis points
+   * (spec 1.4.32, register row `DATA_MODEL.md §22.2` **M51**).
+   *
+   * `undefined` — every ordinary execution — is `packages/engine`'s default,
+   * `PREREGISTRATION.md §7`'s frozen `1500`, so the field is absent from the
+   * `SolveInput` this file builds and `ASSAY`'s behaviour is unchanged in the
+   * strictest sense.
+   *
+   * **It lives here rather than on `RunConfig` because M51 says so.** The scored
+   * unit stays `(agent_id, split, seed, llm_mode)` — `EVALUATION_SPEC.md §7`'s
+   * M48 derives it as *"exactly four fields"* — and a sweep point is *"an
+   * evaluation inside one scored unit, never a fifth key dimension"*. This
+   * object is already `apps/cli`-internal and already carries exactly this kind
+   * of per-execution knob, which is why the sweep parameters join it rather than
+   * `AgentInput`: an agent's inputs are *"observations and configuration, and
+   * nothing else"*, and `packages/eval`'s `Agent` interface is untouched.
+   */
+  readonly epsilonBps?: number;
+  /**
+   * `§5.3`'s `τ` **floor** for this execution, in paise (M51).
+   *
+   * `undefined` is `packages/engine`'s frozen `TAU.floor_paise`. Only the floor
+   * moves: the `10` bps rate is `frozen.ts`'s on every call, swept or not, which
+   * spec 1.4.6 fixed — the sweep *"sweeps τ over absolute values and does not
+   * read the base"*.
+   */
+  readonly tauFloorPaise?: number;
+}
+
+/**
+ * The `§6` outcome tally over a run's targets — M51's `tau_sensitivity` input.
+ *
+ * `EVALUATION_SPEC.md §5.3` fixes what the τ sweep reports: `coverage_by_value`,
+ * `count(AMBIGUOUS)` and `count(IMMATERIALLY_AMBIGUOUS)`. The first is
+ * `packages/eval`'s `coverage()` over the `AgentRun`; the other two are **not
+ * derivable from an `AgentRun`** — an `IMMATERIALLY_AMBIGUOUS` target commits
+ * exactly as `UNIQUE` and `DISCRIMINATED` do, so the three are indistinguishable
+ * once a decision is recorded. They are therefore counted here, where `S4`'s
+ * result is still in hand.
+ *
+ * **This does not reach `packages/eval`.** `AgentRun` gains no field and no
+ * metric definition moves: the tally travels beside the run on
+ * {@link ComposedRun}, which is `apps/cli`-internal, and only the sweep writer
+ * reads it.
+ */
+export type SolveOutcomeTally = Readonly<Record<SolveOutcome, number>>;
+
+/** Every `§6` outcome at zero, in `RECONCILIATION_SPEC.md §6`'s own order. */
+export const ZERO_SOLVE_OUTCOMES: SolveOutcomeTally = Object.freeze({
+  UNIQUE: 0,
+  IMMATERIALLY_AMBIGUOUS: 0,
+  DISCRIMINATED: 0,
+  AMBIGUOUS: 0,
+  INTRACTABLE: 0,
+});
+
+/**
+ * What one composed execution produced: the agent's product, and the `§6` tally
+ * beside it.
+ *
+ * `Agent.run` returns the `AgentRun` alone (`ARCHITECTURE.md §10`); this is the
+ * `apps/cli`-internal shape the sweep runner consumes, so that surfacing the
+ * tally costs `packages/eval` nothing.
+ */
+export interface ComposedRun {
+  readonly run: AgentRun;
+  readonly solve_outcomes: SolveOutcomeTally;
 }
 
 /** `ARCHITECTURE.md §10`'s interface, composed. */
 async function runAssayComposed(
   input: AgentInput,
   options: AssayComposeOptions,
-): Promise<AgentRun> {
+): Promise<ComposedRun> {
   const { observations } = input;
   const config: RunConfig =
     options.llmModeOverride === undefined
@@ -905,6 +974,14 @@ async function runAssayComposed(
       target_entity_id: targetEntityId(target, byObsId),
       observationIdForEntityId: (id: string): ObservationId | undefined => obsIdByEntityId.get(id),
       bank_evidence: bankSide.evidence.get(target.obs_id) ?? null,
+      // M51: absent unless a sweep supplied one, so `packages/engine` resolves
+      // `PREREGISTRATION.md §7`'s frozen pair and an ordinary run is unchanged.
+      // Both flow through `runProbeLoop`'s `Omit<SolveInput, ...>` and its
+      // re-solve for free -- the loop spreads the input it was given.
+      ...(options.epsilonBps === undefined ? {} : { epsilon_bps: options.epsilonBps }),
+      ...(options.tauFloorPaise === undefined
+        ? {}
+        : { tau_floor_paise: options.tauFloorPaise }),
     } satisfies Omit<SolveInput, "recon_reports" | "probe_attempts">;
 
     const first = solve({ ...partial, recon_reports: [], probe_attempts: 0 });
@@ -1300,19 +1377,30 @@ async function runAssayComposed(
     ledger_root_hash: attempt.gate.recomputed_root_hash,
   };
 
+  // M51's `tau_sensitivity` counts, taken from the `S4` results still in hand.
+  // Iteration order does not reach the value -- these are counts over a set --
+  // so `§16`'s bar on a result depending on iteration order is not engaged.
+  const solveOutcomes: Record<SolveOutcome, number> = { ...ZERO_SOLVE_OUTCOMES };
+  for (const outcome of outcomes.values()) {
+    solveOutcomes[outcome.solve.outcome] += 1;
+  }
+
   return {
-    agent_id: options.agentId,
-    config,
-    outcomes: Object.freeze(observationOutcomes),
-    components: Object.freeze(components),
-    allocations: Object.freeze(allocations),
-    decisions: Object.freeze(committedDecisions),
-    abstentions: Object.freeze(abstentions),
-    open_exceptions: Object.freeze(openExceptions),
-    journal: Object.freeze(journal),
-    probes_spent: probesSpent,
-    abstentions_resolved_by_probe: resolvedByProbe,
-    close,
+    run: {
+      agent_id: options.agentId,
+      config,
+      outcomes: Object.freeze(observationOutcomes),
+      components: Object.freeze(components),
+      allocations: Object.freeze(allocations),
+      decisions: Object.freeze(committedDecisions),
+      abstentions: Object.freeze(abstentions),
+      open_exceptions: Object.freeze(openExceptions),
+      journal: Object.freeze(journal),
+      probes_spent: probesSpent,
+      abstentions_resolved_by_probe: resolvedByProbe,
+      close,
+    },
+    solve_outcomes: Object.freeze(solveOutcomes),
   };
 }
 
@@ -1570,7 +1658,7 @@ function classifyUnpostable(
 
 /** `ASSAY` itself: the composition above with no option overridden. */
 async function runAssay(input: AgentInput): Promise<AgentRun> {
-  return runAssayComposed(input, { agentId: "ASSAY" });
+  return (await runAssayComposed(input, { agentId: "ASSAY" })).run;
 }
 
 /**
@@ -1580,10 +1668,25 @@ async function runAssay(input: AgentInput): Promise<AgentRun> {
  * `apps/cli`-internal composition helper, the same status `AssayComposeOptions`
  * has.
  */
-export function runAssayAblation(
+export async function runAssayAblation(
   input: AgentInput,
   options: AssayComposeOptions,
 ): Promise<AgentRun> {
+  return (await runAssayComposed(input, options)).run;
+}
+
+/**
+ * The same composition, keeping the `§6` tally — M51's sweep entry point.
+ *
+ * `apps/cli`-internal, like {@link runAssayAblation} and
+ * {@link AssayComposeOptions} themselves. Only `bench/sweep.ts` calls it, and it
+ * exists so that a swept execution can report `count(AMBIGUOUS)` and
+ * `count(IMMATERIALLY_AMBIGUOUS)` without `AgentRun` gaining a field.
+ */
+export function runAssayComposedFull(
+  input: AgentInput,
+  options: AssayComposeOptions,
+): Promise<ComposedRun> {
   return runAssayComposed(input, options);
 }
 
