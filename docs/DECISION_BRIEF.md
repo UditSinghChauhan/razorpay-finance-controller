@@ -1,8 +1,31 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.30 · **Date:** 2026-09-01
+**Spec version:** 1.4.31 · **Date:** 2026-09-01
 **Reviewer role:** principal architect / skeptical reviewer
+
+**At spec 1.4.31** §A.38 records **one ratification and two withdrawals**, taken at a
+governance gate held after spec 1.4.30 and — the condition that makes them
+legitimate — **before any scored result existed**: `bench/` absent, `runs/` holding
+only `.gitkeep`, no dataset generated, no agent scored and no metric computed.
+`EVALUATION_SPEC.md §3.2`'s `A1-NOVALIDATE` row loses *"runs end `BLOCKED`"*, which
+contradicts `§2`'s protocol, `§4.9` and metric 14 and would forfeit the very
+criterion `PROJECT_SPEC.md §7` **S6** asks the ablation for, and *"trial balance
+breaks"*, which the ledger boundary makes unreachable because `I1` is re-checked at
+every append independently of `S5`. *"Removed: Stage S5 invariants `I1`–`I9`"* is
+ratified as **`S5` does not evaluate the allocation-scoped set `I1`–`I8`** — never
+*"evaluate and ignore the failures"* — so an `A1` decision records
+`invariants_checked: []` and the run closes `CLOSED`/`OPEN` like any other agent's.
+`§L.1` rule 4 gains a **narrowly-scoped** clause: `validate()` may take the evaluated
+set as a parameter, defaulting to the full set for every ordinary caller, with the
+empty set selectable only from the path-allowlisted `A1-NOVALIDATE` module, and with
+**no second `ValidatedDecision` constructor and no second widening assertion**.
+Register row **M50**. **`BENCHMARK_VERSION` stays 1.0.8**; `GT_VERSION` stays 1.1.0;
+`constraint_set_hash` does not move; `C1`–`C8`, `SE1`–`SE5`, `τ`, `ε`, every `§7`
+threshold, the definitions of `I1`–`I9`, `§17.1`'s `P1`–`P8`, `§13`'s certificate,
+the closed five-probe enum, the `A3-NOLLM` policy and all **28** metric definitions
+are unchanged. **No implementation code is touched and `A1` remains unimplemented.**
+See `PREREGISTRATION.md` amendment 1.4.31 and `§10` **V26**.
 
 **At spec 1.4.30** §A.37 records **one ratification**, taken at a governance gate
 held after spec 1.4.29 and — the condition that makes it legitimate — **before any
@@ -2717,6 +2740,149 @@ exists to regenerate** — `bench/` is absent, `runs/` holds only `.gitkeep`, an
 manifest, run, root hash or seal tag was ever produced. Historical amendment records
 are preserved **verbatim**.
 
+### A.38 Spec 1.4.31 / benchmark 1.0.8 — the control that was specified to fail the build
+
+**The decision.** One ratification and two withdrawals, all confined to
+`EVALUATION_SPEC.md §3.2`'s `A1-NOVALIDATE` row and the clauses that read it.
+*"Removed: Stage S5 invariants `I1`–`I9`"* means **`S5` does not evaluate the
+allocation-scoped set `I1`–`I8`**; the expectations *"trial balance breaks"* and
+*"runs end `BLOCKED`"* are **withdrawn**. Register row `DATA_MODEL.md §22.2`
+**M50**. `SPEC_VERSION` **1.4.30 → 1.4.31**; **`BENCHMARK_VERSION` stays 1.0.8** and
+`GT_VERSION` stays **1.1.0**.
+
+**The condition that makes this legitimate is the same ordering `§A.37` relied on,
+and it still holds.** No dataset has been generated, no agent has been scored, no
+metric has been computed, `bench/` is absent, `runs/` holds only `.gitkeep`, and no
+seal tag has been cut. `A1-NOVALIDATE` has **never run**: it is the one Tier-0 agent
+that is unimplemented, and this row is settled **before** the code exists rather than
+after a figure has been seen. Nothing here is adjusted in response to a result,
+because there is no result — `§L.4`'s bar on result-driven revision is not engaged.
+
+**`runs end BLOCKED` contradicted three frozen clauses outright.**
+`EVALUATION_SPEC.md §2` closes its protocol with *"A run that ends `BLOCKED` is a
+defect and fails the build; the distribution of `CLOSED` vs `OPEN` is a reported
+result."* `§4.9` states *"`BLOCKED` must be **0 across every run** — it indicates a
+defect in ASSAY, not a property of the data."* `PREREGISTRATION.md §8`'s **metric
+14** is *"`close_gate_failures` — per-gate failure counts across all runs; `BLOCKED`
+must be 0"*. And `RECONCILIATION_SPEC.md §10.2` makes the outcome *"NO close report.
+Run marked `invalid`"*, with `§10.1` calling every gate failure *"an ASSAY defect"*
+and `ARCHITECTURE.md §12` agreeing. Three of the four are not commentary: they are a
+build gate, a frozen metric and a run's validity.
+
+**And it was self-defeating, which is what settles it rather than merely
+disfavouring it.** `PROJECT_SPEC.md §7` **S6** — the criterion `A1` exists to
+serve — is *"ablation `A1-NOVALIDATE` shows a statistically significant ₹-harm
+increase"*. That needs a mean and a bootstrap interval over `§2`'s *"≥ 5 seeds"*, and
+`EVALUATION_SPEC.md §5.5` bars *"any number that does not exist in a committed run
+artifact"*. A run marked `invalid` emits no close report and commits no figure. **The
+expectation, if satisfied, destroys the criterion it was written to support** — so it
+cannot have been the intended reading, and no reading of `§3.2` is available on which
+both survive.
+
+**`trial balance breaks` is unreachable through the only write path there is.** `I1`
+is not `S5`'s alone: `DATA_MODEL.md §17` requires *"at every point in the event log,
+`Σ dr_paise === Σ cr_paise`"*, which the ledger re-checks on the **cumulative
+totals at every append**, before anything is persisted and independently of what
+`S5` evaluated. `§17.1`'s `P1`–`P8` balance by construction, and `§L.1` rule 4 leaves
+exactly one write path. `PROJECT_SPEC.md §7` **S5** independently requires *"trial
+balance = 0 and Suspense identity exact **on every run**"*, and `ARCHITECTURE.md §12`
+classes a broken one as *"a bug in the ledger itself"* and a hard abort. An `A1` that
+broke the trial balance would be reporting an `ASSAY` ledger defect under an
+ablation's name. Both withdrawals follow **`M41`**'s precedent — an expectation the
+frozen text cannot admit is **withdrawn**, and the ablation stays valid and stays
+reported — and spec 1.4.21's, which withdrew `§11`'s ₹1,00,000 figure as
+non-reproducible rather than inventing arithmetic to justify it.
+
+**The ratification: `removed` means `not evaluated`, and the alternative is
+foreclosed rather than merely rejected.** Two readings were available — (i) `S5` does
+not evaluate `I1`–`I8`, and (ii) `S5` evaluates them and ignores the failures — and
+they diverge at gate `G5`, which is *"No allocation with a non-empty
+`invariants_failed` was posted"*, a **runtime check over a recorded value**. Under
+(ii) the failures are found and must be recorded, and `G5` then refuses the
+allocation twice over — at the write path and again at close. Making it pass means
+weakening `G5` for **every** agent, contradicting `RECONCILIATION_SPEC.md §7`'s
+*"never partially posted, never repaired, never downgraded to a warning"* and the
+purpose of `§L.1` rule 4. The only other way to express (ii) is to record an empty
+`invariants_failed` while failures were found, which makes the artifact assert
+something false — `THREAT_MODEL.md §T8`'s suppression, committed by the system
+itself, and barred by `EVALUATION_SPEC.md §5.5`. Reading (i) needs none of that:
+`invariants_checked` records `[]` **truthfully**, `invariants_failed` is `[]` because
+nothing was evaluated rather than because nothing failed, and `G5` stays literally
+true **and** meaningful. It also keeps `§3.2`'s *"exactly one respect"* literally
+true, the removed component being the invariants and not the stage: `S5` still runs,
+still enforces its certificate/abstention agreement, and still mints.
+
+**A defect in the phrase itself, corrected in passing.** `I9` is **run-scoped** —
+`§7` folds it in *"only when the caller supplies both hashes"* — so it is evaluated
+by no per-allocation gate in **either** arm, `ASSAY` included. *"Remove `I1`–`I9`"*
+therefore named one invariant that was never there to remove. The allocation-scoped
+set is `I1`–`I8`, and the row now says so. **No invariant definition changes.**
+
+**What `A1` will actually demonstrate, and it is the hypothesis unchanged.** With the
+set empty, the allocation `S5` would have rejected is committed instead of being
+re-classified to an `E05` exception. `I2`'s double allocation, `I3`'s line
+arithmetic, `I4`'s settlement closure, `I5`'s bank tie-out, `I6`'s referential
+integrity, `I7`'s range and sign and `I8`'s temporal ordering are the channels, and
+they land in `EVALUATION_SPEC.md §4.4`'s `balance_harm_inr` and
+`misdirected_value_inr` and `§4.8`'s `id_rejection_rate` — which is exactly what
+`§3.2` states the ablation tests and exactly what **S6** reads. **The hypothesis, its
+metric linkage and S6 are untouched.**
+
+**The disclosure this creates, recorded rather than left for a reader to find.**
+Because `I1` and the `G1`–`G5` close gates keep running, `A1` measures *"`ASSAY` with
+the `S5` invariant gate removed"* and **not** *"an unvalidated ledger"*. Its harm
+figure is therefore a **conservative lower bound** on what removing validation costs
+a system with no such boundary, and the direction is the honest one — it understates
+`ASSAY`'s benefit rather than inflating it. `PREREGISTRATION.md §10` **V26** carries
+this, `EVALUATION_SPEC.md §5.4` item 5 requires it beside the figure, and the claim
+that `A1` reproduces a fully unvalidated ledger may not be made.
+
+**Rejected: three dispositions with no textual support.** **Scoping metric 14 or
+metric 11 to exclude `A1`** — it amends two frozen metrics to accommodate a sentence
+that was itself the defect, and establishes that an agent can be exempted from a
+close gate, which is the precedent `§10.2`'s *"treating `BLOCKED` as `OPEN`"*
+warning exists to prevent. **Declaring `A1` an intentionally invalid control run** —
+`§10.2` marks such a run `invalid`, so it forfeits S6 as shown above. **A second
+`ValidatedDecision` constructor, or a skip-checks mode inside `validate()` reachable
+by any caller** — the first voids the brand `§L.1` rule 4 rests on and the second
+weakens, for every agent, the one gate `RECONCILIATION_SPEC.md §7` calls *"the only
+code path that may post to the ledger"*. The clause added to rule 4 does neither: the
+default is the full set, the empty set is reachable from one path-allowlisted module,
+the brand and the single widening assertion are untouched, and the selection is
+recorded in the artifact.
+
+**Unchanged.** Every metric formula, definition, universe and number, and the
+28-metric list; `§5.4`'s **thirteen** obligations and `§5.5`'s twelve forbidden
+practices; `§2`'s protocol, `§4.9`'s close-loop block and metric 14's *"`BLOCKED`
+must be 0"*, which now bind `A1` as they bind every agent; `RECONCILIATION_SPEC.md
+§7`'s `I1`–`I9` **definitions** and its failure semantics; `§10.1`'s `G1`–`G5` and
+`§10.2`'s three outcomes; `§10.3`'s close policy; `§6`'s materiality, `§6.2`'s probe
+loop, `P_max`, the closed five-probe enum and the `A3-NOLLM` policy; `τ`, `ε`,
+`K_max`, `C_max`, `C1`–`C8` and therefore `constraint_set_hash`; `SE1`–`SE5` and
+their weights; `DATA_MODEL.md §17.1`'s `P1`–`P8`, `§17.2`, `§13`'s `Decision` **shape**
+and `§18`'s `BenchmarkManifest` shape; `AL1`–`AL8`; `§6.1`'s split and seed table and
+every generation seed; `§4.1`'s composition and every `target_record_count`; every
+`PROJECT_SPEC.md §7` success criterion, **S5** and **S6** included; `M41`'s finding,
+`V17`, `V22`–`V25`, `§F`'s rows and `§H`'s dispositions; and `GT_VERSION` **1.1.0**.
+
+**Why the benchmark version does not move.** `M49`'s own test is whether an
+amendment changes **what a conforming agent posts**, so that runs either side of it
+are not comparable. `ASSAY`, `B0`, `B1`, `B2`, `A2` and `A3` post byte-identically
+before and after this row. The only agent whose postings change is `A1`, which posts
+**nothing today** — it is unimplemented and has produced no figure — so there is no
+pair of runs this row could make incomparable. `M45`–`M48` are the precedent: each
+settled placement, output surface or procedure and none moved the constant. **No
+artifact byte changes and no dataset exists to regenerate.** Historical amendment
+records are preserved **verbatim**.
+
+**What this amendment does not do.** It does not implement `A1`, change
+`packages/engine/src/s5-validate.ts`, change `packages/ledger`, or touch any
+implementation file: the parameter `§L.1` rule 4 now permits is **ratified here and
+built later**, which is the order `§A.37` used for `M49` and the order `§L.4`
+requires. `A1-NOVALIDATE` remains an unimplemented Tier-0 ablation, and
+`apps/cli/src/agents/a1.ts` still reports it as blocked — on this row's authority
+now, rather than on an unresolved governance question.
+
 ## B. Locked project definition
 
 > **ASSAY is a settlement reconciliation controller for Razorpay-shaped payment
@@ -3134,6 +3300,31 @@ with a version bump, not a judgement call at the keyboard.
    The rule binds the **mutating write path**: `journal.ts` is a pure posting
    function over a *proposed* allocation and does not take this type, which is
    what keeps S5 → `I1` → mint → write acyclic.
+
+   **Added at spec 1.4.31, register row `DATA_MODEL.md §22.2` M50 — the evaluated
+   invariant set is a parameter, and exactly one module may narrow it.**
+   `validate()` may accept the allocation-scoped invariant set it evaluates. **The
+   default is the full set `I1`–`I8`, and every ordinary caller receives the full
+   evaluation** — `ASSAY`, `B0-IDONLY`, `B1-GREEDY`, `B2-LLM-DIRECT`, `A2-NOABSTAIN`
+   and `A3-NOLLM` are ordinary callers and none may pass anything else. The **empty**
+   set is selectable **only** from the `A1-NOVALIDATE` agent module, allowlisted by
+   path in the lint config — the mechanism rules 3 and 4 already use — so any other
+   path passing a non-default set fails the build rather than silently skipping a
+   gate. **No arbitrary caller may bypass S5.** This creates **no second
+   `ValidatedDecision` constructor and no second widening assertion**: the
+   non-exported brand, the single assertion in
+   `packages/engine/src/s5-validate.ts` and the one write path in `packages/ledger`
+   are untouched, which is what makes this a narrowing of who may select a set
+   rather than a weakening of the gate. `Decision.invariants_checked`
+   (`DATA_MODEL.md §13`) records the set actually evaluated, so a narrowed run is
+   visible in its own artifact and gate `G5` keeps its meaning
+   (`RECONCILIATION_SPEC.md §10.1`): an evaluated failure is recorded and refused,
+   and an empty `invariants_checked` states plainly that nothing was evaluated.
+   **`I9` is not in this set** — `RECONCILIATION_SPEC.md §7` evaluates it only when
+   the caller supplies two root hashes — so it is neither selected nor removed here,
+   and **no invariant definition changes**. Ledger-side enforcement is unaffected and
+   is not reachable by this parameter: `I1` is re-checked on the cumulative totals at
+   every append, and `G1`–`G5` run at close for every agent.
 5. Every observation reaches exactly one terminal state: `RECONCILED`,
    `ABSTAINED`, `EXCEPTION`, or `REFERENCE`. No fifth state, no drop path.
    `REFERENCE` is assigned statically at ingest from `Observation.kind`

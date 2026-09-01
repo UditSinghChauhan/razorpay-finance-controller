@@ -1,6 +1,21 @@
 # THREAT_MODEL — ASSAY
 
-**Spec version:** 1.4.30 · **Date:** 2026-09-01
+**Spec version:** 1.4.31 · **Date:** 2026-09-01
+
+**At spec 1.4.31** this document is unchanged apart from the version header, and
+**one control does the deciding rather than being relaxed**. Register row
+`DATA_MODEL.md §22.2` **M50** rules that `EVALUATION_SPEC.md §3.2`'s
+`A1-NOVALIDATE` removes stage `S5`'s **evaluation** of `I1`–`I8`, and **`§T8`'s
+lost-posting concern is what forecloses the alternative**: an `A1` that evaluated the
+invariants and recorded an empty `invariants_failed` anyway would be a system
+suppressing its own finding, which is `§T8` and not an ablation. Every control stands:
+`§T5`'s prevention is untouched, no untrusted source gains a route to a control
+account, and the ledger-side defences an attacker would have to defeat — the single
+write path, the non-exported brand, `I1` re-checked at every append, and gates
+`G1`–`G5` at close — **keep running for `A1` exactly as for `ASSAY`**, which is
+precisely why `PREREGISTRATION.md §10` **V26** records `A1`'s harm as a lower bound.
+**No threat row is opened, closed or reworded here and no `§T` control is weakened or
+made conditional on an agent.** See `DECISION_BRIEF.md §A.38`.
 
 **At spec 1.4.30** this document is unchanged apart from the version header, and
 one control is **strengthened rather than relaxed**. Register row
