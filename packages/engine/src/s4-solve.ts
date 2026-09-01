@@ -143,6 +143,142 @@ export interface SolveInput {
    * reconciled path and the materiality between them is `0`.
    */
   readonly bank_evidence: BankSideEvidence | null;
+  /**
+   * `§6`'s evidence margin **for this solve**, in integer basis points — spec
+   * 1.4.32, register row `DATA_MODEL.md §22.2` **M51**.
+   *
+   * **Omit it.** Absent — as it is on every caller today — the frozen
+   * {@link EPSILON_BPS} of `PREREGISTRATION.md §7` applies, which is `§6`'s
+   * `Δs < ε` test unchanged. `frozen.ts` remains the single authority for that
+   * value and this module holds no literal of its own.
+   *
+   * **Why it is here and not on `RunConfig`.** M51 keeps the scored unit at
+   * `(agent_id, split, seed, llm_mode)` — `EVALUATION_SPEC.md §7`'s M48 derives
+   * it as *"exactly four fields"* and `§7`'s bootstrap *"holds the other three
+   * fixed"* — so `EVALUATION_SPEC.md §5.1`'s ε sweep is **an evaluation inside
+   * one scored unit, never a fifth key dimension**. The parameter therefore
+   * belongs to the stage input, which is per-solve, rather than to the run
+   * identity. This is the same shape `ValidationInput.invariant_selection` takes
+   * for `M50`: an optional field, defaulted to the frozen behaviour, that no
+   * ordinary caller supplies.
+   *
+   * **Supplying it is not tuning.** `DECISION_BRIEF.md §L.4` bars *"changing any
+   * frozen threshold … on the basis of an observed result"*; `§5.3` makes
+   * reporting a metric at declared points **mandatory**. The frozen value stays
+   * in `frozen.ts` as the one every unswept call uses, and the declared grid is
+   * `PREREGISTRATION.md §7`'s, not this module's — nothing here knows the grid,
+   * its 21 points, or that a sweep exists.
+   *
+   * Malformed values are refused rather than clamped: see
+   * {@link SolveParameterError}.
+   */
+  readonly epsilon_bps?: number;
+  /**
+   * `§6`'s materiality **floor** for this solve, in paise — spec 1.4.32,
+   * register row `DATA_MODEL.md §22.2` **M51**.
+   *
+   * **Omit it.** Absent, the frozen {@link TAU}`.floor_paise` applies and `τ` is
+   * `PREREGISTRATION.md §7`'s `max(₹100.00, 10 bps of component value)`
+   * unchanged.
+   *
+   * **The floor moves; the rate does not.** `EVALUATION_SPEC.md §5.3`'s four
+   * figures are points for the **floor**, and spec 1.4.6 already records that the
+   * sweep *"sweeps τ over absolute values and does not read the base"*.
+   * {@link TAU}`.component_value_bps` is therefore not a parameter and is read
+   * from `frozen.ts` on every call, swept or not — {@link tauFor} takes the floor
+   * alone for exactly that reason.
+   *
+   * Malformed values are refused rather than clamped: see
+   * {@link SolveParameterError}.
+   */
+  readonly tau_floor_paise?: number;
+}
+
+// ---------------------------------------------------------------------------
+// Sweep parameters (M51)
+// ---------------------------------------------------------------------------
+
+/** Which supplied parameter was malformed. */
+export type SolveParameterCode = "EPSILON_BPS_INVALID" | "TAU_FLOOR_PAISE_INVALID";
+
+/**
+ * A supplied `§6` threshold is outside the domain the frozen text admits.
+ *
+ * **Fail closed rather than clamp.** A clamped ε or τ would return a `§6`
+ * outcome computed against a threshold the caller did not ask for, and
+ * `EVALUATION_SPEC.md §5.5` traces every reported number to a committed run
+ * artifact — a silently substituted threshold breaks that trace at its source.
+ * The shape follows `s1-s2-seam.ts`'s `IncoherentAnchorStateError`: a named
+ * error carrying a code, so a caller can branch on the kind without parsing a
+ * message.
+ */
+export class SolveParameterError extends Error {
+  readonly code: SolveParameterCode;
+  /** The value that was refused. */
+  readonly value: number;
+
+  constructor(code: SolveParameterCode, value: number, detail: string) {
+    super(`S4 parameter [${code}]: ${detail}`);
+    this.name = "SolveParameterError";
+    this.code = code;
+    this.value = value;
+  }
+}
+
+/**
+ * Resolve `ε` for one solve: the supplied value, or `PREREGISTRATION.md §7`'s.
+ *
+ * **The admitted domain is `[0, EVIDENCE_SCORE_MAX_BPS]` over the integers, and
+ * both bounds are read off frozen text rather than chosen.** `§6` fixes the
+ * type — *"The comparison `Δs < ε` is an **integer** comparison"* — and `Δs` is
+ * a difference of two `evidence_score_bps`, which `§4.2` bounds to
+ * `[0, 10_000]`; a threshold outside that range cannot separate any pair of
+ * scores the scorer can produce. `EVALUATION_SPEC.md §5.1`'s sweep domain is the
+ * same interval, so no second bound is introduced here. **No benchmark semantics
+ * are added**: this module does not know the grid, its spacing or its 21 points,
+ * and admits any integer in range — the declared points are `§7`'s.
+ */
+function resolveEpsilonBps(supplied: number | undefined): number {
+  if (supplied === undefined) return EPSILON_BPS;
+  if (
+    !Number.isSafeInteger(supplied) ||
+    supplied < 0 ||
+    supplied > EVIDENCE_SCORE_MAX_BPS
+  ) {
+    throw new SolveParameterError(
+      "EPSILON_BPS_INVALID",
+      supplied,
+      `epsilon_bps must be an integer in [0, ${String(EVIDENCE_SCORE_MAX_BPS)}] ` +
+        `(RECONCILIATION_SPEC.md §6's integer comparison over §4.2's score range); ` +
+        `received ${String(supplied)}. It is refused rather than clamped: a §6 outcome ` +
+        `computed against a threshold the caller did not ask for is untraceable.`,
+    );
+  }
+  return supplied;
+}
+
+/**
+ * Resolve `τ`'s floor for one solve: the supplied value, or `§7`'s `10_000`.
+ *
+ * **The admitted domain is the positive safe integers.** `DATA_MODEL.md §0`
+ * rule 5 makes every money quantity an integer paise value, and
+ * `PREREGISTRATION.md §7`'s declared floors are positive. Nothing narrower is
+ * imposed: the four declared sweep points are `§7`'s business, not this
+ * module's, and hard-coding them here would put benchmark semantics inside the
+ * engine.
+ */
+function resolveTauFloorPaise(supplied: number | undefined): number {
+  if (supplied === undefined) return TAU.floor_paise;
+  if (!Number.isSafeInteger(supplied) || supplied <= 0) {
+    throw new SolveParameterError(
+      "TAU_FLOOR_PAISE_INVALID",
+      supplied,
+      `tau_floor_paise must be a positive safe integer in paise ` +
+        `(DATA_MODEL.md §0 rule 5; PREREGISTRATION.md §7's declared floors are ` +
+        `positive); received ${String(supplied)}. It is refused rather than clamped.`,
+    );
+  }
+  return supplied;
 }
 
 // ---------------------------------------------------------------------------
@@ -419,12 +555,24 @@ function materiality(
  * `§6`: `τ = max(₹100.00, 10 bps of component value)`, where *"component
  * value"* is `Component.total_value_paise` (`DATA_MODEL.md §11`, spec 1.4.6) —
  * **not** the target amount and **not** a sum over `Candidate.member_obs_ids`.
+ *
+ * @param tauFloorPaise the floor in force for this call (spec 1.4.32, M51).
+ *   **Omit it** and `PREREGISTRATION.md §7`'s frozen `10_000` applies, which is
+ *   the rule above unchanged. Only the **floor** is a parameter: `TAU`'s
+ *   `component_value_bps` rate is read from `frozen.ts` on every call, swept or
+ *   not, because `EVALUATION_SPEC.md §5.3` sweeps the rupee figure and spec
+ *   1.4.6 records that the sweep *"does not read the base"*. Refused rather than
+ *   clamped when malformed — see {@link SolveParameterError}.
  */
-export function tauFor(component: DecomposedComponent): number {
+export function tauFor(
+  component: DecomposedComponent,
+  tauFloorPaise?: number,
+): number {
+  const floor = resolveTauFloorPaise(tauFloorPaise);
   const proportional = Math.floor(
     (component.total_value_paise * TAU.component_value_bps) / 10_000,
   );
-  return Math.max(TAU.floor_paise, proportional);
+  return Math.max(floor, proportional);
 }
 
 // ---------------------------------------------------------------------------
@@ -441,7 +589,14 @@ export function tauFor(component: DecomposedComponent): number {
  * candidate `S2` produced.
  */
 export function solve(input: SolveInput): SolveResult {
-  const tau = tauFor(input.component);
+  // Both `§6` thresholds are resolved and validated HERE, above every branch,
+  // so a malformed value fails closed whatever outcome the component would
+  // otherwise reach -- including the `INTRACTABLE` early return below, which
+  // never consults `epsilon`. Omitted fields resolve to `PREREGISTRATION.md
+  // §7`'s frozen values, which is why every existing caller is unchanged
+  // (spec 1.4.32, register row `DATA_MODEL.md §22.2` M51).
+  const tau = tauFor(input.component, input.tau_floor_paise);
+  const epsilonBps = resolveEpsilonBps(input.epsilon_bps);
 
   // §4.3: exceeding K_max or C_max yields INTRACTABLE -> abstention with
   // SEARCH_BOUND_EXCEEDED. Reported, never silently truncated.
@@ -532,7 +687,9 @@ export function solve(input: SolveInput): SolveResult {
   );
   const deltaS = Math.abs(best.evidence_score_bps - second.evidence_score_bps);
 
-  // §6's table, in its own order.
+  // §6's table, in its own order. `tau` and `epsilonBps` are the resolved
+  // values from the top of this function -- the frozen `§7` pair unless the
+  // caller supplied otherwise. NEITHER BRANCH READS A MODULE CONSTANT (M51).
   if (materialityPaise <= tau) {
     return {
       outcome: "IMMATERIALLY_AMBIGUOUS",
@@ -546,7 +703,7 @@ export function solve(input: SolveInput): SolveResult {
     };
   }
 
-  if (deltaS >= EPSILON_BPS) {
+  if (deltaS >= epsilonBps) {
     return {
       outcome: "DISCRIMINATED",
       best,
