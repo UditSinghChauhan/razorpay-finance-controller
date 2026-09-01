@@ -34,6 +34,7 @@ import { SPEC_VERSION } from "@assay/eval";
 import type {
   AbstentionRecord,
   Agent,
+  AgentId,
   AgentInput,
   AgentRun,
   AllocationEdge,
@@ -43,6 +44,8 @@ import type {
   ObservationOutcome,
   OpenExceptionRecord,
   PostedLine,
+  RunConfig,
+  ScoredLlmMode,
 } from "@assay/eval";
 import type { R3CertificateSummary } from "@assay/llm";
 import {
@@ -704,9 +707,49 @@ interface TargetOutcome {
   readonly generation: GenerationStatus;
 }
 
+/**
+ * The internal composition knobs `A2-NOABSTAIN` and `A3-NOLLM` vary.
+ *
+ * **`apps/cli`-internal only** — not part of `RunConfig` (`packages/eval`
+ * owns that, and `EVALUATION_SPEC.md §3.2` puts `llm_mode` there already, for
+ * `ASSAY` itself) and not exported from `packages/eval`'s public surface. This
+ * is the "configuration flag over `assay.ts`" `a1.ts`/`a2.ts`/`a3.ts`'s own
+ * docstrings describe: each ablation differs from `ASSAY` in exactly one field
+ * of this object, which is `§3.2`'s *"exactly one respect"* made a code fact
+ * rather than a documentation claim.
+ */
+interface AssayComposeOptions {
+  /** The `AgentId` this run reports as (`EVALUATION_SPEC.md §3`). */
+  readonly agentId: AgentId;
+  /**
+   * `A3-NOLLM`: forces `config.llm_mode` to `"offline"` regardless of what the
+   * caller's `AgentInput.config.llm_mode` says — `§3.2`'s *"A3-NOLLM is exactly
+   * ASSAY --llm=offline"*. `undefined` leaves `config.llm_mode` as given, which
+   * is `ASSAY`'s own behaviour.
+   */
+  readonly llmModeOverride?: ScoredLlmMode;
+  /**
+   * `A2-NOABSTAIN`: when a target would abstain (`classifyTarget`'s
+   * `reason !== null` branch), commit `result.best` instead, through the same
+   * `S5`/ledger path a `RECONCILED` decision uses. `I1`-`I9` still run on the
+   * forced commit — this flag changes nothing about `validate()` or about what
+   * `S4` computed, only what `classifyTarget` decides to *do* with an
+   * abstaining outcome. `false`/`undefined` is `ASSAY`'s own behaviour.
+   */
+  readonly commitOnAbstain?: boolean;
+}
+
 /** `ARCHITECTURE.md §10`'s interface, composed. */
-async function runAssay(input: AgentInput): Promise<AgentRun> {
-  const { observations, config } = input;
+async function runAssayComposed(
+  input: AgentInput,
+  options: AssayComposeOptions,
+): Promise<AgentRun> {
+  const { observations } = input;
+  const config: RunConfig =
+    options.llmModeOverride === undefined
+      ? input.config
+      : { ...input.config, llm_mode: options.llmModeOverride };
+  const commitOnAbstain = options.commitOnAbstain ?? false;
 
   // --- the provider -------------------------------------------------------
   // §3.2: `llm_mode` "is the whole of the difference" between ASSAY and
@@ -963,7 +1006,13 @@ async function runAssay(input: AgentInput): Promise<AgentRun> {
     const outcome = outcomes.get(target.obs_id);
     if (obs === undefined || outcome === undefined) continue;
 
-    const classification = classifyTarget(obs, outcome, bankSide, memberById);
+    const classification = classifyTarget(
+      obs,
+      outcome,
+      bankSide,
+      memberById,
+      commitOnAbstain,
+    );
     if (classification.certificate !== null) {
       certificateByComponent.set(outcome.comp_id, classification.certificate);
     }
@@ -1182,7 +1231,7 @@ async function runAssay(input: AgentInput): Promise<AgentRun> {
   };
 
   return {
-    agent_id: "ASSAY",
+    agent_id: options.agentId,
     config,
     outcomes: Object.freeze(observationOutcomes),
     components: Object.freeze(components),
@@ -1250,6 +1299,7 @@ function classifyTarget(
   outcome: TargetOutcome,
   bankSide: BankSide,
   memberById: ReadonlyMap<ObservationId, Member>,
+  commitOnAbstain: boolean,
 ): Classification {
   const result = outcome.solve;
   // §4.3's second trigger, which `solve` cannot see: "exceeding ... C_max
@@ -1262,7 +1312,13 @@ function classifyTarget(
     result.certificate_reason ??
     (outcome.generation === "INTRACTABLE" ? "SEARCH_BOUND_EXCEEDED" : null);
 
-  if (reason !== null) {
+  // `A2-NOABSTAIN` (`EVALUATION_SPEC.md §3.2`): "always commits the top
+  // candidate" instead of abstaining. This is the one branch that removes --
+  // whatever `result.best` is (possibly `null`, S4's "no feasible solution at
+  // all") falls straight into the same `best === null` / RECONCILED logic
+  // below that ASSAY already uses for a non-abstaining target. No certificate
+  // is built on this path, because it is never reached under `commitOnAbstain`.
+  if (reason !== null && !commitOnAbstain) {
     return {
       state: "ABSTAINED",
       exception_class: null,
@@ -1440,6 +1496,25 @@ function classifyUnpostable(
     );
   }
   return exceptionFor("E12_ADJUSTMENT_UNEXPLAINED");
+}
+
+/** `ASSAY` itself: the composition above with no option overridden. */
+async function runAssay(input: AgentInput): Promise<AgentRun> {
+  return runAssayComposed(input, { agentId: "ASSAY" });
+}
+
+/**
+ * The composition `A2-NOABSTAIN` and `A3-NOLLM` call, with their one differing
+ * option (`EVALUATION_SPEC.md §3.2`'s *"differs from ASSAY in exactly one
+ * respect"*). Not part of `packages/eval`'s public surface — an
+ * `apps/cli`-internal composition helper, the same status `AssayComposeOptions`
+ * has.
+ */
+export function runAssayAblation(
+  input: AgentInput,
+  options: AssayComposeOptions,
+): Promise<AgentRun> {
+  return runAssayComposed(input, options);
 }
 
 export const assayAgent: Agent = {

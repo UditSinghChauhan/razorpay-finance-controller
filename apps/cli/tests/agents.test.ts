@@ -82,7 +82,20 @@ const INPUT = {
   config: { llm_mode: "offline", strict_replay: true, split: "dev", seed: 2000 },
 } as const;
 
-describe("ASSAY runs, and the six that cannot say what they are waiting for", () => {
+/**
+ * The four agents Phase 3A composed: `ASSAY` itself, `B0-IDONLY` (no engine
+ * stage — `EVALUATION_SPEC.md §3.1`'s honest floor), and the two ablations
+ * whose removal is a configuration flag over `assay.ts`'s own composition
+ * (`§3.2`) — `A2-NOABSTAIN` (`commitOnAbstain: true`) and `A3-NOLLM`
+ * (`llmModeOverride: "offline"`). `A1-NOVALIDATE` is not among them: it is
+ * blocked on a governance gap `apps/cli/src/agents/a1.ts`'s own docstring
+ * states in full — `DECISION_BRIEF.md §L.1` rule 4 gives `ValidatedDecision`
+ * exactly one construction route, inside a passing call to `S5`'s `validate()`,
+ * and no sanctioned route exists for a decision that route would reject.
+ */
+const STILL_BLOCKED_AGENTS = ["A1-NOVALIDATE", "B1-GREEDY", "B2-LLM-DIRECT"] as const;
+
+describe("ASSAY, B0-IDONLY and two ablations compose; three still cannot say what they are waiting for", () => {
   it("composes the pipeline rather than reporting a blocker (spec 1.4.29)", async () => {
     // The one agent that is not blocked. `assay.ts` sequences S1 -> the S1/S2
     // seam -> S2 -> S3 -> S4 (with §6.2's loop where packages/probe's `decide`
@@ -111,9 +124,29 @@ describe("ASSAY runs, and the six that cannot say what they are waiting for", ()
     expect(run.probes_spent).toBe(0);
   });
 
-  it("names a blocker and exits UNAVAILABLE rather than returning a run", async () => {
-    for (const agent of ALL_AGENTS) {
-      if (agent.id === "ASSAY") continue;
+  it("Phase 3A: B0-IDONLY, A2-NOABSTAIN and A3-NOLLM also compose, each reporting its own agent_id", async () => {
+    // Every one of the three composes the SAME G1-G5 close gate and the SAME
+    // single write path ASSAY does -- none is a second stage implementation,
+    // and none bypasses packages/ledger's boundary. Driven on the empty
+    // observation set for the same reason ASSAY's own test above is: a
+    // populated run belongs to each agent's own dedicated suite
+    // (b0.test.ts, a1-a2-a3.test.ts).
+    for (const id of ["B0-IDONLY", "A2-NOABSTAIN", "A3-NOLLM"] as const) {
+      const run = await agentById(id).run(INPUT);
+      expect(run.agent_id, id).toBe(id);
+      expect(run.close, id).not.toBeNull();
+      expect(run.close?.period_status, id).toBe("CLOSED");
+      expect(run.close?.gate.failed_gates, id).toEqual([]);
+      expect(run.close?.trial_balance_ok, id).toBe(true);
+      expect(run.outcomes, id).toEqual([]);
+      expect(run.journal, id).toEqual([]);
+      expect(run.probes_spent, id).toBe(0);
+    }
+  });
+
+  it("names a blocker and exits UNAVAILABLE for the three still waiting", async () => {
+    for (const id of STILL_BLOCKED_AGENTS) {
+      const agent = agentById(id);
       await expect(agent.run(INPUT)).rejects.toBeInstanceOf(AgentUnavailableError);
       const error = await agent.run(INPUT).catch((e: unknown) => e);
       expect(error, agent.id).toBeInstanceOf(AgentUnavailableError);
@@ -125,34 +158,40 @@ describe("ASSAY runs, and the six that cannot say what they are waiting for", ()
     }
   });
 
-  it("gives the three ablations the SAME blocker", async () => {
-    // §3.2: an ablation is a control only while it "differs from ASSAY in
-    // exactly one respect". An ablation naming a different dependency set would
-    // already differ in a second respect nobody recorded, so the three share one
-    // blocker — `assay.ts`'s `assayPipelineBlocker`, which ASSAY itself no
-    // longer raises because the pipeline it names is now composed. What each
-    // ablation is waiting for is its own REMOVAL: `A3-NOLLM` is §3.2's
-    // "literally ASSAY --llm=offline" and is the nearest of the three.
-    const blockers = await Promise.all(
-      (["A1-NOVALIDATE", "A2-NOABSTAIN", "A3-NOLLM"] as const).map(async (id) =>
-        agentById(id)
-          .run(INPUT)
-          .catch((e: unknown) => (e instanceof AgentUnavailableError ? e.blockedBy : null)),
-      ),
-    );
-    expect(new Set(blockers).size).toBe(1);
-    expect(blockers[0]).not.toBeNull();
-  });
-
-  it("gives B0-IDONLY a narrower blocker than ASSAY, as §3.1's honest floor", async () => {
-    // B0 runs no engine stage, so S0 and the S1->S2 seam are not on its path. A
-    // floor that appeared to need the whole architecture would misstate what it
-    // measures.
-    const blocker = await agentById("B0-IDONLY")
+  it("gives A1-NOVALIDATE a blocker naming §L.1 rule 4, not the old pipeline blocker", async () => {
+    // A1 is no longer waiting on missing plumbing -- ASSAY, B0 and its two
+    // sibling ablations all compose now. What it is waiting on is a governance
+    // gap: DECISION_BRIEF.md §L.1 rule 4 gives ValidatedDecision exactly one
+    // construction route, and no sanctioned route exists for a decision that
+    // route rejects. This blocker must therefore differ from the other two
+    // still-blocked agents' (B1/B2, which are H2/live-credential gated) and
+    // must cite the invariant rather than a missing package.
+    const blocker = await agentById("A1-NOVALIDATE")
       .run(INPUT)
       .catch((e: unknown) => (e instanceof AgentUnavailableError ? e.blockedBy : ""));
-    expect(blocker).not.toContain("packages/engine");
-    expect(blocker).toContain("packages/ledger");
+    expect(blocker).toContain("ValidatedDecision");
+    expect(blocker).not.toContain("packages/domain (S0)");
+  });
+
+  it("B0-IDONLY's own source calls no S1-S4 stage function, as §3.1's honest floor requires", () => {
+    // B0 no longer throws, so §3.1's "honest floor" claim -- that it runs no
+    // engine stage -- is checked here at the source level rather than on a
+    // blocker string. It still shares packages/ledger's single write path and
+    // G1-G5 gate with ASSAY, confirmed at the run level by the CLOSED close
+    // report above; what must NOT appear is a call into S1's anchor(), S2's
+    // generateCandidates(), S3's decompose() or S4's solve() -- the boundary
+    // suite bans DECLARING these in apps/cli; this pins that B0 does not even
+    // CALL them, which is a narrower, B0-specific claim boundary.test.ts's
+    // general composition-root allowance does not make. Read as the `@assay/
+    // engine` IMPORT clause alone (not the whole file, which mentions
+    // `anchor()` in prose describing what it deliberately does not call) --
+    // the same "read the import shape from raw source" technique
+    // boundary.test.ts's own `probe/run.ts` check uses.
+    const source = agentSources.find((s) => s.name === "b0.ts")?.text ?? "";
+    const engineImport = /import\s*\{([^}]*)\}\s*from\s*"@assay\/engine"/s.exec(source)?.[1] ?? "";
+    for (const stage of ["anchor", "generateCandidates", "decompose", "solve"]) {
+      expect(engineImport, stage).not.toMatch(new RegExp(`\\b${stage}\\b`));
+    }
   });
 
   it("records B1-GREEDY as out of scope, not blocked on a package", async () => {
