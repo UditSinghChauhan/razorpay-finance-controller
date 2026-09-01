@@ -4,7 +4,6 @@ import { R3_PROBE_PRIORITY, offlineProvider } from "@assay/llm";
 import { describe, expect, it } from "vitest";
 
 import { agentById } from "../src/agents/index.js";
-import { AgentUnavailableError, EXIT } from "../src/errors.js";
 
 /**
  * `A1-NOVALIDATE`, `A2-NOABSTAIN`, `A3-NOLLM` — the three ablations `assay.ts`
@@ -12,8 +11,11 @@ import { AgentUnavailableError, EXIT } from "../src/errors.js";
  *
  * `apps/cli/tests/agents.test.ts` and `h1-integration.test.ts` are untouched by
  * this file, per the coordinator's split. This suite is everything specific to
- * the three ablations: `A1`'s governance-gap blocker, and `A2`/`A3`'s exact
- * semantics as configuration flags over `assay.ts`'s composition.
+ * `A2` and `A3`'s exact semantics as configuration flags over `assay.ts`'s
+ * composition. **`A1-NOVALIDATE`'s own semantics moved to
+ * `a1-novalidate.test.ts`** when it was built at spec 1.4.31 (register row
+ * `DATA_MODEL.md §22.2` **M50**); what remains here is its place in the shared
+ * `Agent` interface, asserted beside its two siblings.
  */
 
 const DAY = 86_400;
@@ -134,45 +136,6 @@ function config(over: Partial<RunConfig> = {}): RunConfig {
 function input(observations: readonly Observation[], over: Partial<RunConfig> = {}): AgentInput {
   return { observations, config: config(over) };
 }
-
-// ---------------------------------------------------------------------------
-// A1-NOVALIDATE — governance gap, not implemented
-// ---------------------------------------------------------------------------
-
-describe("A1-NOVALIDATE — a genuine governance gap, not a stub with the old message", () => {
-  it("still throws AgentUnavailableError, EXIT.UNAVAILABLE", async () => {
-    const error = await agentById("A1-NOVALIDATE")
-      .run(input([]))
-      .catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(AgentUnavailableError);
-    expect((error as AgentUnavailableError).exitCode).toBe(EXIT.UNAVAILABLE);
-    expect((error as AgentUnavailableError).agentId).toBe("A1-NOVALIDATE");
-  });
-
-  it("cites §L.1 rule 4's ValidatedDecision brand, not the old generic stage list", async () => {
-    const error = (await agentById("A1-NOVALIDATE")
-      .run(input([]))
-      .catch((e: unknown) => e)) as AgentUnavailableError;
-    // The precise governance gap, not "packages/domain (S0) ... the write path
-    // and the G1-G5 close gate" — those stages are now built and ASSAY composes
-    // them; the blocker A1 leaves behind must name the real, remaining gap.
-    expect(error.blockedBy).toContain("ValidatedDecision");
-    expect(error.message).toContain("DECISION_BRIEF.md §L.1 rule 4");
-    expect(error.message).toMatch(/validate\(\)/);
-    expect(error.message).not.toContain("packages/domain (S0)");
-  });
-
-  it("is deterministic — the same blocker on every call", async () => {
-    const a = await agentById("A1-NOVALIDATE")
-      .run(input([]))
-      .catch((e: unknown) => (e instanceof AgentUnavailableError ? e.message : null));
-    const b = await agentById("A1-NOVALIDATE")
-      .run(input([]))
-      .catch((e: unknown) => (e instanceof AgentUnavailableError ? e.message : null));
-    expect(a).not.toBeNull();
-    expect(a).toBe(b);
-  });
-});
 
 // ---------------------------------------------------------------------------
 // Fixture 1 — an AMBIGUOUS component (§6.6's chain never resolves it: assay.ts
@@ -425,8 +388,11 @@ describe("integration — A1/A2/A3 through the same composition root as ASSAY", 
     expect(agentById("A3-NOLLM").id).toBe("A3-NOLLM");
   });
 
-  it("A2 and A3 satisfy the Agent interface end to end on the empty observation set", async () => {
-    for (const id of ["A2-NOABSTAIN", "A3-NOLLM"] as const) {
+  it("all three satisfy the Agent interface end to end on the empty observation set", async () => {
+    // A1 joined its two siblings at spec 1.4.31 (M50). Its own behaviour is
+    // a1-novalidate.test.ts's; here it is one of three agents that must return
+    // an AgentRun through the same composition root.
+    for (const id of ["A1-NOVALIDATE", "A2-NOABSTAIN", "A3-NOLLM"] as const) {
       const run = await agentById(id).run(input([]));
       expect(run.agent_id).toBe(id);
       expect(run.close).not.toBeNull();
@@ -434,10 +400,10 @@ describe("integration — A1/A2/A3 through the same composition root as ASSAY", 
     }
   });
 
-  it("neither a2.ts nor a3.ts reaches the filesystem door or reimplements a stage", async () => {
+  it("none of a1.ts, a2.ts or a3.ts reaches the filesystem door or reimplements a stage", async () => {
     const { readFileSync } = await import("node:fs");
     const { fileURLToPath } = await import("node:url");
-    for (const name of ["a2.ts", "a3.ts"] as const) {
+    for (const name of ["a1.ts", "a2.ts", "a3.ts"] as const) {
       const path = fileURLToPath(new URL(`../src/agents/${name}`, import.meta.url));
       const text = readFileSync(path, "utf8");
       expect(text, name).not.toMatch(/from\s+["'][^"']*\.\.\/fs\//);

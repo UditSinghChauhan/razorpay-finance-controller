@@ -208,6 +208,51 @@ const dynamicImportBan = (pattern, message) => ({
   message: `${message} (dynamic import)`,
 });
 
+const NOVALIDATE_MSG =
+  'Only apps/cli/src/agents/a1.ts may select S5\'s empty allocation-scoped ' +
+  'invariant set. DECISION_BRIEF.md §L.1 rule 4 (spec 1.4.31, register row ' +
+  'DATA_MODEL.md §22.2 M50): "The default is the full set I1-I8, and every ' +
+  'ordinary caller receives the full evaluation ... The empty set is selectable ' +
+  'ONLY from the A1-NOVALIDATE agent module, allowlisted by path in the lint ' +
+  'config -- the mechanism rules 3 and 4 already use -- so any other path ' +
+  'passing a non-default set fails the build rather than silently skipping a ' +
+  'gate." ASSAY, B0, B1, B2, A2 and A3 are ordinary callers: assay.ts composes ' +
+  'all of them and may FORWARD the value it was handed, never originate one. ' +
+  'A test is not an exception either -- a suite that could select the empty set ' +
+  'would be a second production path in everything but name, and G5 would be ' +
+  'checking a gate no run had passed through. If a new agent genuinely needs ' +
+  'this, it is a specification amendment of M50\'s own shape, not a lint edit.';
+
+/**
+ * `§L.1` rule 4's M50 allowlist, as a `no-restricted-syntax` entry.
+ *
+ * The selection is a closed union in `packages/engine/src/s5-validate.ts` —
+ * `"ALLOCATION_SCOPED" | "NONE_A1_NOVALIDATE"` — so the type system already
+ * refuses an arbitrary subset, and this rule decides **who may write the second
+ * member**. Matching the literal is what makes the ban checkable at the one
+ * place the choice is expressed: a string that is not this literal does not
+ * type-check against the union, and a caller who forwards an
+ * `InvariantSelection | undefined` it was handed writes no literal at all, which
+ * is exactly the distinction rule 4 draws between originating and forwarding.
+ *
+ * Two selectors, because the literal can appear as a value or in a type
+ * position, and a ban that caught only one would be a ban on spelling.
+ */
+const NOVALIDATE_SELECTION_BANS = [
+  { selector: 'Literal[value="NONE_A1_NOVALIDATE"]', message: NOVALIDATE_MSG },
+  {
+    selector: 'TSLiteralType > Literal[value="NONE_A1_NOVALIDATE"]',
+    message: NOVALIDATE_MSG,
+  },
+  // The compose option itself, as an object-literal property. Banning the value
+  // alone would leave `runAssayAblation(input, { invariantSelection: s })`
+  // reachable from a2.ts, b0.ts or a test holding a selection from elsewhere.
+  // `Property` matches only where a value is BEING PASSED: assay.ts declares the
+  // field (a TSPropertySignature) and reads it (a MemberExpression), and neither
+  // is a Property, which is precisely the forward-but-never-originate line.
+  { selector: "Property[key.name='invariantSelection']", message: NOVALIDATE_MSG },
+];
+
 export default tseslint.config(
   {
     ignores: [
@@ -767,6 +812,11 @@ export default tseslint.config(
         ...CLI_NETWORK_DYNAMIC.map((mod) =>
           dynamicImportBan(`/^(node:)?${mod}$/`, CLI_NO_NETWORK_MSG),
         ),
+        // §L.1 rule 4's M50 clause, scoped to the WHOLE package including
+        // tests: apps/cli is where every agent lives, so it is the only place a
+        // second selector of the empty invariant set could appear. The single
+        // exception is restated for a1.ts at the bottom of this file.
+        ...NOVALIDATE_SELECTION_BANS,
       ],
     },
   },
@@ -814,6 +864,10 @@ export default tseslint.config(
         ...CLI_NETWORK_DYNAMIC.map((mod) =>
           dynamicImportBan(`/^(node:)?${mod}$/`, CLI_NO_NETWORK_MSG),
         ),
+        // Repeated, not inherited: the block above matches too, and flat config
+        // applies the LAST matching object per rule rather than merging, so
+        // dropping these here would reopen the ban under src/.
+        ...NOVALIDATE_SELECTION_BANS,
       ],
     },
   },
@@ -844,6 +898,60 @@ export default tseslint.config(
   // merge -- so dropping them here would silently reopen them under src/agents/.
   {
     files: ["apps/cli/src/agents/**"],
+    linterOptions: { noInlineConfig: true },
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            ...CLI_FS_PATHS.map((mod) => ({ name: mod, message: CLI_FS_DOOR_MSG })),
+            ...CLI_NETWORK_PATHS.map((mod) => ({ name: mod, message: CLI_NO_NETWORK_MSG })),
+          ],
+          patterns: [
+            { group: AGENT_FS_DOOR, message: AGENT_FS_DOOR_MSG },
+            { group: CLI_FS_PATTERNS, message: CLI_FS_DOOR_MSG },
+            { group: CLI_NETWORK_PATTERNS, message: CLI_NO_NETWORK_MSG },
+          ],
+        },
+      ],
+      "no-restricted-syntax": [
+        "error",
+        dynamicImportBan("/\\/fs\\//", AGENT_FS_DOOR_MSG),
+        ...CLI_FS_PATHS.map((mod) =>
+          dynamicImportBan(`/^(node:)?${mod}$/`, CLI_FS_DOOR_MSG),
+        ),
+        ...CLI_NETWORK_DYNAMIC.map((mod) =>
+          dynamicImportBan(`/^(node:)?${mod}$/`, CLI_NO_NETWORK_MSG),
+        ),
+        // Repeated for the same last-wins reason as the block above. This is the
+        // directory the ban is really about: a2.ts, a3.ts, b0.ts and assay.ts
+        // all live here and none of them may select the empty set.
+        ...NOVALIDATE_SELECTION_BANS,
+      ],
+    },
+  },
+
+  // --- §L.1 rule 4's M50 allowlist · the single permitted selector ---------
+  //
+  // Spec 1.4.31, register row DATA_MODEL.md §22.2 M50. §L.1 rule 4: "The empty
+  // set is selectable ONLY from the A1-NOVALIDATE agent module, allowlisted by
+  // path in the lint config -- the mechanism rules 3 and 4 already use -- so any
+  // other path passing a non-default set fails the build rather than silently
+  // skipping a gate."
+  //
+  // This is the second half of the allowlist, built exactly like rule 3's for
+  // consistency-gate.ts: a CONFIG-LEVEL override rather than a file-level
+  // `eslint-disable`, because the blocks above set noInlineConfig and an
+  // allowlist a file grants itself is not an allowlist.
+  //
+  // Everything else the agents block holds is REPEATED here, not inherited --
+  // flat config applies the last matching object per rule and does not merge --
+  // so a1.ts keeps G8's filesystem-door ban, the fs builtins ban and the network
+  // ban in full. The ONLY thing this block drops is NOVALIDATE_SELECTION_BANS.
+  // Widening it any further would hand the one file that may remove a
+  // validation gate the permissions no other agent has.
+  {
+    files: ["apps/cli/src/agents/a1.ts"],
     linterOptions: { noInlineConfig: true },
     rules: {
       "no-restricted-imports": [

@@ -345,3 +345,114 @@ describe("S4 → S5 integration", () => {
     expect(solveFixture(m, [[2], [1]]).ranked.map((x) => x.canonical_key)).toEqual(before);
   });
 });
+
+// ---------------------------------------------------------------------------
+// M50 — the selected allocation-scoped invariant set (spec 1.4.31)
+// ---------------------------------------------------------------------------
+
+/**
+ * `DATA_MODEL.md §22.2` **M50**: `EVALUATION_SPEC.md §3.2`'s `A1-NOVALIDATE`
+ * removes stage `S5`'s **evaluation** of the allocation-scoped invariants
+ * `I1`–`I8`. `DECISION_BRIEF.md §L.1` rule 4's M50 clause fixes the shape: the
+ * evaluated set is a parameter, **defaulting to the full set** for every
+ * ordinary caller, with the empty set selectable only from the path-allowlisted
+ * `A1-NOVALIDATE` module.
+ *
+ * These are the engine-side assertions of that clause. They compose no agent,
+ * build no ledger and produce no `AgentRun`, so they are not a second route by
+ * which a scored run could reach the empty set — `eslint.config.js` bans that
+ * literal in **every** `apps/cli` file, tests included, and `apps/cli` is where
+ * every agent lives.
+ */
+describe("M50 — validate() takes the evaluated invariant set, defaulting to all of I1-I8", () => {
+  it("omitting the field evaluates the full set, which is every existing caller", () => {
+    const result = validate(base());
+    expect(result.valid).toBe(true);
+    // All eight are EVALUATED. `invariants_checked` is the subset that had a
+    // comparand -- `I5` and `I6` report `checked: false` on this fixture, which
+    // is §7's "not checked rather than assumed satisfied" and is unchanged by
+    // M50. The distinction matters here: the empty selection produces no
+    // outcome at all, not eight skipped ones.
+    expect(result.outcomes.map((o) => o.id)).toEqual([...ALLOCATION_SCOPED_INVARIANTS]);
+    if (result.valid) {
+      expect(result.decision.invariants_checked).toEqual(["I1", "I2", "I3", "I4", "I7", "I8"]);
+      expect(result.decision.invariants_failed).toEqual([]);
+    }
+  });
+
+  it("the empty selection records invariants_checked: [] and invariants_failed: []", () => {
+    // M50's exact wording: the second is empty "because nothing was evaluated
+    // rather than because nothing failed", and the pair is what makes the
+    // removal visible in the artifact.
+    const result = validate(base({ invariant_selection: "NONE_A1_NOVALIDATE" }));
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      expect(result.decision.invariants_checked).toEqual([]);
+      expect(result.decision.invariants_failed).toEqual([]);
+    }
+    expect(result.outcomes).toEqual([]);
+  });
+
+  it("an allocation the full set REJECTS is minted under the empty selection", () => {
+    // The ablation itself, at the stage that performs it. `I3`'s payment
+    // identity is `credit === amount - fee`; this member misses it by ₹80.
+    const failing = base({ members: [member(1, { amount: 108_000 })] });
+
+    const withGate = validate(failing);
+    expect(withGate.valid).toBe(false);
+    expect(idsOf(withGate)).toEqual(["I3"]);
+
+    const withoutGate = validate({ ...failing, invariant_selection: "NONE_A1_NOVALIDATE" });
+    expect(withoutGate.valid).toBe(true);
+    if (withoutGate.valid) {
+      // Minted through the SAME single widening assertion -- there is no second
+      // constructor and this test could not reach one if there were.
+      expect(withoutGate.decision.invariants_checked).toEqual([]);
+      expect(withoutGate.decision.journal_lines).toEqual(failing.journal_lines);
+    }
+  });
+
+  it("the certificate/ABSTAINED biconditional is still enforced under the empty selection", () => {
+    // `ARCHITECTURE.md §4` boundary 3's obligation is not an allocation-scoped
+    // invariant and is not part of the removal, so S5 still refuses both halves.
+    const abstainNoCert = validate({
+      ...base({ type: "ABSTAINED", certificate: null }),
+      invariant_selection: "NONE_A1_NOVALIDATE",
+    });
+    expect(abstainNoCert.valid).toBe(false);
+
+    const reconciledWithCert = validate({
+      ...base({ type: "RECONCILED" }),
+      certificate: { comp_id: "comp_x" } as never,
+      invariant_selection: "NONE_A1_NOVALIDATE",
+    });
+    expect(reconciledWithCert.valid).toBe(false);
+  });
+
+  it("I9 stays run-scoped: the empty selection neither adds nor removes it", () => {
+    // §7 folds I9 in "only when the caller supplies both hashes", which is a
+    // property of `idempotency` and not of this field (M50).
+    const withHashes = validate({
+      ...base({ invariant_selection: "NONE_A1_NOVALIDATE" }),
+      idempotency: { first_root_hash: HASH, second_root_hash: HASH },
+    });
+    expect(withHashes.valid).toBe(true);
+    if (withHashes.valid) {
+      expect(withHashes.decision.invariants_checked).toEqual(["I9"]);
+    }
+
+    const disagreeing = validate({
+      ...base({ invariant_selection: "NONE_A1_NOVALIDATE" }),
+      idempotency: { first_root_hash: HASH, second_root_hash: "b".repeat(64) as never },
+    });
+    expect(disagreeing.valid).toBe(false);
+    expect(idsOf(disagreeing)).toEqual(["I9"]);
+  });
+
+  it("explicitly selecting the full set is identical to omitting the field", () => {
+    const omitted = validate(base());
+    const explicit = validate(base({ invariant_selection: "ALLOCATION_SCOPED" }));
+    expect(explicit.valid).toBe(omitted.valid);
+    expect(explicit.outcomes).toEqual(omitted.outcomes);
+  });
+});

@@ -23,6 +23,7 @@ import {
   type DecomposedComponent,
   type EvaluationContext,
   type GenerationStatus,
+  type InvariantSelection,
   type Member,
   type ScoredSolution,
   type SolveInput,
@@ -242,6 +243,32 @@ const ACTOR: EventActor = Object.freeze({
   llm_call_id: null,
 });
 
+/**
+ * The same actor with `A1-NOVALIDATE`'s removal named on it (spec 1.4.31, M50).
+ *
+ * `§16` types `LedgerEvent.actor.component` as a free token and `events.ts`
+ * accepts any non-spoofing string, so this **invents no field and no schema
+ * change** — it is `DECISION_BRIEF.md §A.38`'s *"already-existing allowed
+ * metadata surface"*, and it is the audit trail's own copy of a fact
+ * `Decision.invariants_checked` records on the decision side. A reader holding
+ * only the event log can see which run had the gate removed; a reader holding
+ * only the decisions can see it too; neither has to be trusted about the other.
+ *
+ * `ASSAY`'s actor is {@link ACTOR}, byte-identical to what it has always been,
+ * so no existing hash moves. `A1`'s events hash differently from `ASSAY`'s, which
+ * is correct — they are different agents' runs, and `I9`/metric 23 compare a run
+ * against **itself**, not against another agent.
+ */
+const ACTOR_A1_NOVALIDATE: EventActor = Object.freeze({
+  ...ACTOR,
+  component: "engine.s5_validate.a1_novalidate",
+});
+
+/** `ASSAY`'s actor, or `A1`'s when `S5`'s invariant evaluation was removed. */
+function actorFor(selection: InvariantSelection | undefined): EventActor {
+  return selection === undefined ? ACTOR : ACTOR_A1_NOVALIDATE;
+}
+
 const compare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
 type BankLineObs = Extract<Observation, { kind: "bank_line" }>;
@@ -459,6 +486,7 @@ function build(
   classification: Classification,
   observationEntityIds: ReadonlySet<string>,
   alreadyAllocated: ReadonlySet<string>,
+  invariantSelection: InvariantSelection | undefined,
 ): Built {
   const lines: JournalLine[] = [];
 
@@ -511,6 +539,15 @@ function build(
     // `I9` is run-level and evaluable only from two executions; `§7` folds it in
     // "only when the caller supplies both hashes", and one run supplies neither.
     idempotency: null,
+    // M50 (spec 1.4.31). Spread rather than assigned, so that for every agent
+    // but `A1-NOVALIDATE` the field is ABSENT rather than explicitly undefined:
+    // the `ValidationInput` ASSAY builds is the one it has always built, and
+    // `packages/engine`'s default of the full `I1`-`I8` set applies for the
+    // reason it always did. This file only FORWARDS the value; it cannot
+    // originate one: `eslint.config.js` bans both the empty selection's literal
+    // and the `invariantSelection` option key in every apps/cli file but a1.ts,
+    // and this file spells neither.
+    ...(invariantSelection === undefined ? {} : { invariant_selection: invariantSelection }),
     subject_obs_ids: [obs.obs_id],
     evidence_ids: [],
     certificate: classification.certificate,
@@ -737,6 +774,27 @@ interface AssayComposeOptions {
    * abstaining outcome. `false`/`undefined` is `ASSAY`'s own behaviour.
    */
   readonly commitOnAbstain?: boolean;
+  /**
+   * `A1-NOVALIDATE`: which allocation-scoped invariants stage `S5` evaluates
+   * (spec 1.4.31, register row `DATA_MODEL.md §22.2` **M50**).
+   *
+   * `undefined` — every agent but `A1` — is `packages/engine`'s default, the
+   * full set `I1`–`I8`, so `ASSAY`'s behaviour is unchanged in the strictest
+   * sense: the field is absent from the `ValidationInput` it builds.
+   *
+   * **This file forwards the value and cannot originate one.** The empty
+   * selection's literal is banned by `eslint.config.js` everywhere except
+   * `apps/cli/src/agents/a1.ts`, so the composition that `ASSAY`, `B0`,
+   * `A2` and `A3` all run through has no way to reach the empty set — which is
+   * what `DECISION_BRIEF.md §L.1` rule 4's M50 clause requires of it.
+   *
+   * Removing `S5`'s invariant **evaluation** is the whole of the difference.
+   * Nothing else moves: `journalFor` builds the same lines, the single write
+   * path still refuses a non-empty `invariants_failed` (`G5`), `I1` is still
+   * re-checked on the cumulative totals at every append, and `G1`–`G5` still run
+   * at close. `EVALUATION_SPEC.md §3.2`'s *"exactly one respect"*, literally.
+   */
+  readonly invariantSelection?: InvariantSelection;
 }
 
 /** `ARCHITECTURE.md §10`'s interface, composed. */
@@ -750,6 +808,10 @@ async function runAssayComposed(
       ? input.config
       : { ...input.config, llm_mode: options.llmModeOverride };
   const commitOnAbstain = options.commitOnAbstain ?? false;
+  // M50: `undefined` for every agent but `A1-NOVALIDATE`. Read once and passed
+  // down, so there is exactly one place the run's selection is decided.
+  const invariantSelection = options.invariantSelection;
+  const actor = actorFor(invariantSelection);
 
   // --- the provider -------------------------------------------------------
   // §3.2: `llm_mode` "is the whole of the difference" between ASSAY and
@@ -910,7 +972,7 @@ async function runAssayComposed(
   const certificateByComponent = new Map<ComponentId, AmbiguityCertificate>();
 
   function post(obs: Observation, proposed: Classification): Posted {
-    const attempt = build(obs, proposed, entityIds, allocatedEntityIds);
+    const attempt = build(obs, proposed, entityIds, allocatedEntityIds, invariantSelection);
     // §7: "any invariant failure rejects the allocation ... never partially
     // posted, never repaired, never downgraded to a warning", and §9 sends "an
     // S5 invariant failed" to EXCEPTION. §15's E05 is the tie-out that "fails by
@@ -918,7 +980,13 @@ async function runAssayComposed(
     // member is committed on a gate that refused it.
     const result = attempt.validation.valid
       ? attempt
-      : build(obs, exceptionFor("E05_AMOUNT_MISMATCH"), entityIds, allocatedEntityIds);
+      : build(
+          obs,
+          exceptionFor("E05_AMOUNT_MISMATCH"),
+          entityIds,
+          allocatedEntityIds,
+          invariantSelection,
+        );
 
     if (!result.validation.valid) {
       // Unreachable: the fallback allocates nothing, carries no certificate and
@@ -934,7 +1002,7 @@ async function runAssayComposed(
     const write = postValidatedDecision(
       writeState,
       result.validation.decision,
-      { evt_id: eventIdFor(obs.obs_id), ts: obs.ingested_at, actor: ACTOR },
+      { evt_id: eventIdFor(obs.obs_id), ts: obs.ingested_at, actor },
       store,
     );
     writeState = write.state;
@@ -1128,7 +1196,9 @@ async function runAssayComposed(
     close_event: {
       evt_id: idFor("evt_", `close/${runId}`) as EventId,
       ts: periodTo,
-      actor: ACTOR,
+      // The run's own actor, so one run carries one actor value across its
+      // decision events and its close event rather than two (M50).
+      actor,
     },
   });
 
