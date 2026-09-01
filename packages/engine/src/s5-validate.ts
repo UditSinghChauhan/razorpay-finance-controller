@@ -54,6 +54,47 @@ const ALLOCATION_SCOPED: readonly InvariantId[] = [
   "I8",
 ];
 
+/**
+ * Which allocation-scoped invariants this stage evaluates — spec 1.4.31,
+ * register row `DATA_MODEL.md §22.2` **M50**.
+ *
+ * **Two selections exist and no third is representable.** `"ALLOCATION_SCOPED"`
+ * is {@link ALLOCATION_SCOPED} — `I1`–`I8`, the full set — and is what every
+ * caller gets by omitting the field. `"NONE_A1_NOVALIDATE"` is the **empty**
+ * set, and exists for exactly one agent: `EVALUATION_SPEC.md §3.2`'s
+ * `A1-NOVALIDATE`, whose removed component is *"stage `S5`'s **evaluation** of
+ * the allocation-scoped invariants `I1`–`I8`"*.
+ *
+ * **This is not a general bypass, in three independent respects.** It is a
+ * closed union rather than an invariant list, so a caller cannot remove `I6`
+ * alone or keep a favourable subset — the only alternative to the full set is
+ * *nothing*, which is the one thing `§3.2` licenses and the one thing a reader
+ * can check at a glance. The `"NONE_A1_NOVALIDATE"` literal is banned by
+ * `eslint.config.js` everywhere except `apps/cli/src/agents/a1.ts`, which is the
+ * path-allowlist mechanism `DECISION_BRIEF.md §L.1` rules 3 and 4 already use
+ * and which `§L.1` rule 4's M50 clause requires here. And nothing about the
+ * **mint** moves: `validate()` still returns a branded {@link ValidatedDecision}
+ * only through the single widening assertion below, `packages/ledger` still
+ * exports no constructor, and `postValidatedDecision` is still the one write
+ * path.
+ *
+ * **`invariants_failed` stays honest under either selection.** Under
+ * `"NONE_A1_NOVALIDATE"` a decision records `invariants_checked: []` and
+ * `invariants_failed: []`, the second empty **because nothing was evaluated
+ * rather than because nothing failed** — the pair is what makes the removal
+ * visible in the artifact, and it is why gate `G5` keeps its meaning
+ * (`RECONCILIATION_SPEC.md §10.1`, clarified at spec 1.4.31). The rejected
+ * reading — evaluate the invariants and post the failures anyway — is not
+ * expressible here: an evaluated failure lands in `invariants_failed` and `G5`
+ * refuses it at the write path and again at close.
+ *
+ * **`I9` is outside this selection entirely.** It is run-scoped and is folded in
+ * *"only when the caller supplies both root hashes"* (`§7`), which is a property
+ * of {@link ValidationInput.idempotency} and not of this field. Selecting
+ * `"NONE_A1_NOVALIDATE"` neither adds nor removes it.
+ */
+export type InvariantSelection = "ALLOCATION_SCOPED" | "NONE_A1_NOVALIDATE";
+
 /** `DATA_MODEL.md §0` rule 5's canonical order for reporting: `I1`..`I9`. */
 const INVARIANT_ORDER: readonly InvariantId[] = [
   "I1",
@@ -100,6 +141,15 @@ export interface ValidationInput {
     readonly first_root_hash: Sha256;
     readonly second_root_hash: Sha256;
   } | null;
+  /**
+   * Which allocation-scoped invariants to evaluate (spec 1.4.31, M50).
+   *
+   * **Omit it.** Absent — as it is on every caller but one — the full set
+   * `I1`–`I8` is evaluated, which is `RECONCILIATION_SPEC.md §7`'s gate
+   * unchanged. See {@link InvariantSelection} for the one agent that supplies it
+   * and for why the alternative is *nothing* rather than a subset.
+   */
+  readonly invariant_selection?: InvariantSelection;
   readonly subject_obs_ids: readonly ObservationId[];
   readonly evidence_ids: readonly EvidenceId[];
   /** `§6`: non-null exactly when the decision abstains. */
@@ -378,18 +428,34 @@ export function checkIdempotency(first: Sha256, second: Sha256): InvariantOutcom
  * rejection names **every** invariant that failed rather than the first.
  * `§7` requires the rejected allocation to carry `invariants_failed`, and a
  * partial list would understate what is wrong with it.
+ *
+ * *"Every invariant"* means every invariant in the **selected** set, which is
+ * the full `I1`–`I8` unless `input.invariant_selection` says otherwise (spec
+ * 1.4.31, M50 — see {@link InvariantSelection}). The predicates below are
+ * unchanged and unreachable by that field: it decides **whether they run**, not
+ * what any of them means, and a selected invariant that fails still rejects the
+ * allocation on `§7`'s absolute terms.
  */
 export function validate(input: ValidationInput): ValidationResult {
-  const outcomes: InvariantOutcome[] = [
-    i1(input.journal_lines),
-    i2(input.members, input.already_allocated_entity_ids),
-    i3(input.members),
-    i4(input.members, input.target_amount_paise),
-    i5(input.bank_tie_out),
-    i6(input.referenced_ids, input.observation_entity_ids),
-    i7(input.members, input.journal_lines),
-    i8(input.members),
-  ];
+  // M50: the whole of the selection's effect. `ALLOCATION_SCOPED` is the default
+  // and is what every caller but `A1-NOVALIDATE` gets, because the field is
+  // optional and absent. The empty arm evaluates nothing rather than evaluating
+  // and discarding, which is the distinction the register row turns on: a
+  // discarded failure would have to be recorded somewhere or suppressed, and
+  // both are barred (`RECONCILIATION_SPEC.md §10.1` G5, `THREAT_MODEL.md §T8`).
+  const outcomes: InvariantOutcome[] =
+    (input.invariant_selection ?? "ALLOCATION_SCOPED") === "NONE_A1_NOVALIDATE"
+      ? []
+      : [
+          i1(input.journal_lines),
+          i2(input.members, input.already_allocated_entity_ids),
+          i3(input.members),
+          i4(input.members, input.target_amount_paise),
+          i5(input.bank_tie_out),
+          i6(input.referenced_ids, input.observation_entity_ids),
+          i7(input.members, input.journal_lines),
+          i8(input.members),
+        ];
   if (input.idempotency !== null) {
     outcomes.push(
       checkIdempotency(

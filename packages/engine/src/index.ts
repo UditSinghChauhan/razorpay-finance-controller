@@ -105,6 +105,7 @@ export {
   checkIdempotency,
   validate,
   type InvariantOutcome,
+  type InvariantSelection,
   type ValidationInput,
   type ValidationResult,
 } from "./s5-validate.js";

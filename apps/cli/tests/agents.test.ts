@@ -87,15 +87,18 @@ const INPUT = {
  * stage — `EVALUATION_SPEC.md §3.1`'s honest floor), and the two ablations
  * whose removal is a configuration flag over `assay.ts`'s own composition
  * (`§3.2`) — `A2-NOABSTAIN` (`commitOnAbstain: true`) and `A3-NOLLM`
- * (`llmModeOverride: "offline"`). `A1-NOVALIDATE` is not among them: it is
- * blocked on a governance gap `apps/cli/src/agents/a1.ts`'s own docstring
- * states in full — `DECISION_BRIEF.md §L.1` rule 4 gives `ValidatedDecision`
- * exactly one construction route, inside a passing call to `S5`'s `validate()`,
- * and no sanctioned route exists for a decision that route would reject.
+ * (`llmModeOverride: "offline"`). **`A1-NOVALIDATE` joined them at spec 1.4.31**
+ * (register row `DATA_MODEL.md §22.2` **M50**) with the same shape:
+ * `invariantSelection: "…"` selects the empty allocation-scoped invariant set,
+ * and nothing else about the composition moves. It was blocked until then on a
+ * governance question rather than on plumbing — `DECISION_BRIEF.md §L.1` rule 4
+ * gives `ValidatedDecision` exactly one construction route — which M50 answered
+ * by making the evaluated set a parameter of `validate()` that defaults to the
+ * full set and is narrowable only from `a1.ts`. The mint route did not move.
  */
-const STILL_BLOCKED_AGENTS = ["A1-NOVALIDATE", "B1-GREEDY", "B2-LLM-DIRECT"] as const;
+const STILL_BLOCKED_AGENTS = ["B1-GREEDY", "B2-LLM-DIRECT"] as const;
 
-describe("ASSAY, B0-IDONLY and two ablations compose; three still cannot say what they are waiting for", () => {
+describe("ASSAY, B0-IDONLY and three ablations compose; two still cannot say what they are waiting for", () => {
   it("composes the pipeline rather than reporting a blocker (spec 1.4.29)", async () => {
     // The one agent that is not blocked. `assay.ts` sequences S1 -> the S1/S2
     // seam -> S2 -> S3 -> S4 (with §6.2's loop where packages/probe's `decide`
@@ -124,14 +127,14 @@ describe("ASSAY, B0-IDONLY and two ablations compose; three still cannot say wha
     expect(run.probes_spent).toBe(0);
   });
 
-  it("Phase 3A: B0-IDONLY, A2-NOABSTAIN and A3-NOLLM also compose, each reporting its own agent_id", async () => {
+  it("B0-IDONLY, A1-NOVALIDATE, A2-NOABSTAIN and A3-NOLLM also compose, each reporting its own agent_id", async () => {
     // Every one of the three composes the SAME G1-G5 close gate and the SAME
     // single write path ASSAY does -- none is a second stage implementation,
     // and none bypasses packages/ledger's boundary. Driven on the empty
     // observation set for the same reason ASSAY's own test above is: a
     // populated run belongs to each agent's own dedicated suite
     // (b0.test.ts, a1-a2-a3.test.ts).
-    for (const id of ["B0-IDONLY", "A2-NOABSTAIN", "A3-NOLLM"] as const) {
+    for (const id of ["B0-IDONLY", "A1-NOVALIDATE", "A2-NOABSTAIN", "A3-NOLLM"] as const) {
       const run = await agentById(id).run(INPUT);
       expect(run.agent_id, id).toBe(id);
       expect(run.close, id).not.toBeNull();
@@ -158,19 +161,22 @@ describe("ASSAY, B0-IDONLY and two ablations compose; three still cannot say wha
     }
   });
 
-  it("gives A1-NOVALIDATE a blocker naming §L.1 rule 4, not the old pipeline blocker", async () => {
-    // A1 is no longer waiting on missing plumbing -- ASSAY, B0 and its two
-    // sibling ablations all compose now. What it is waiting on is a governance
-    // gap: DECISION_BRIEF.md §L.1 rule 4 gives ValidatedDecision exactly one
-    // construction route, and no sanctioned route exists for a decision that
-    // route rejects. This blocker must therefore differ from the other two
-    // still-blocked agents' (B1/B2, which are H2/live-credential gated) and
-    // must cite the invariant rather than a missing package.
-    const blocker = await agentById("A1-NOVALIDATE")
-      .run(INPUT)
-      .catch((e: unknown) => (e instanceof AgentUnavailableError ? e.blockedBy : ""));
-    expect(blocker).toContain("ValidatedDecision");
-    expect(blocker).not.toContain("packages/domain (S0)");
+  it("A1-NOVALIDATE composes rather than reporting a blocker (spec 1.4.31, M50)", async () => {
+    // The blocker this test used to assert is gone, and the reason it was there
+    // is what M50 settled: A1 was never waiting on missing plumbing -- ASSAY,
+    // B0 and its two sibling ablations all composed before it -- it was waiting
+    // on whether "remove S5's invariants" could be built without weakening
+    // §L.1 rule 4 for every other agent. It could: the evaluated set is now a
+    // parameter defaulting to the full set, the ValidatedDecision brand still
+    // has exactly one construction route, and packages/ledger is untouched.
+    //
+    // What A1 actually DOES is a1-novalidate.test.ts's; what is asserted here
+    // is only that it is no longer among the agents that cannot run.
+    const run = await agentById("A1-NOVALIDATE").run(INPUT);
+    expect(run.agent_id).toBe("A1-NOVALIDATE");
+    expect(run.close?.period_status).toBe("CLOSED");
+    expect(run.close?.gate.failed_gates).toEqual([]);
+    expect(STILL_BLOCKED_AGENTS).not.toContain("A1-NOVALIDATE");
   });
 
   it("B0-IDONLY's own source calls no S1-S4 stage function, as §3.1's honest floor requires", () => {

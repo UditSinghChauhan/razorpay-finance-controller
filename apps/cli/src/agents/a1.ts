@@ -1,99 +1,78 @@
-import type { Agent, AgentRun } from "@assay/eval";
+import type { Agent, AgentInput, AgentRun } from "@assay/eval";
 
-import { AgentUnavailableError } from "../errors.js";
+import { runAssayAblation } from "./assay.js";
 
 /**
- * `A1-NOVALIDATE` — ASSAY with stage `S5`'s invariants `I1`-`I9` removed.
+ * `A1-NOVALIDATE` — ASSAY with stage `S5`'s allocation-scoped invariant
+ * evaluation removed.
  *
  * `EVALUATION_SPEC.md §3.2`: *"The deterministic validator prevents real
- * financial error. Expected: higher `balance_harm_inr`, hallucinated IDs
- * admitted, trial balance breaks, runs end `BLOCKED`."*
+ * financial error."* Expected: higher `balance_harm_inr` and
+ * `misdirected_value_inr`, hallucinated IDs admitted, and allocations `S5` would
+ * have rejected **committed** rather than routed to an `E05` exception.
  *
- * ## This is not implemented, and the reason is a governance gap rather than
- * ## missing plumbing
+ * **Built at spec 1.4.31 on register row `DATA_MODEL.md §22.2` M50**, which
+ * settled the governance question this file previously reported as a blocker.
+ * The row ratifies three things and this file depends on all of them:
  *
- * For `A1` to be a real ablation rather than a relabeled `ASSAY`, some decision
- * that `I1`-`I9` would reject has to be able to reach the ledger anyway — that
- * is what *"hallucinated IDs admitted"* and *"trial balance breaks"* describe.
- * The write path this file would have to call to do that does not exist:
+ * 1. *"Removed"* means `S5` **does not evaluate** the allocation-scoped set
+ *    `I1`–`I8`. It does **not** mean *"evaluate and ignore the failures"* — an
+ *    evaluated failure must be recorded in `invariants_failed`, and gate `G5`
+ *    refuses to post an allocation carrying one, at the write path and again at
+ *    close. So this agent records `invariants_checked: []` and
+ *    `invariants_failed: []`, the second empty **because nothing was evaluated
+ *    rather than because nothing failed**.
+ * 2. `DECISION_BRIEF.md §L.1` rule 4's M50 clause permits `validate()` to take
+ *    the evaluated set as a parameter, **defaulting to the full set**, with the
+ *    empty set selectable **only from this file** — allowlisted by path in
+ *    `eslint.config.js`, the mechanism rules 3 and 4 already use. The
+ *    `"NONE_A1_NOVALIDATE"` literal below is the one occurrence in the
+ *    repository outside `packages/engine`'s own declaration, and lint fails the
+ *    build on any other.
+ * 3. `RECONCILIATION_SPEC.md §10.1`'s clarified `G5` asserts that no allocation
+ *    with a **recorded** failure was posted, and does not assert that any
+ *    invariant was evaluated. `Decision.invariants_checked` is where that shows,
+ *    which is why the removal is **visible in the artifact** rather than
+ *    inferred from the agent's name.
  *
- * - `postValidatedDecision` (`packages/ledger`) accepts **only** a
- *   `ValidatedDecision`.
- * - `ValidatedDecision` (`packages/ledger/src/validated-decision.ts`) can be
- *   **constructed only inside `packages/engine/src/s5-validate.ts`**, by a
- *   non-exported unique-symbol brand with **no exported constructor** anywhere
- *   else. `packages/ledger/src/index.ts` exports the *type*, never a builder.
- * - `validate()` itself (`packages/engine/src/s5-validate.ts`) has **no
- *   parameter to skip or downgrade a check** — every invariant runs
- *   unconditionally over `I1`-`I8`, plus `I9` when both root hashes are
- *   supplied — and a failing input returns `{ valid: false }`, never a branded
- *   value. `packages/engine/src/index.ts` exports `validate` and nothing that
- *   widens past it.
+ * **This is a configuration flag over `assay.ts`, not a fork** — the treatment
+ * `a2.ts` and `a3.ts` already receive, and what `EVALUATION_SPEC.md §3.2`
+ * requires to keep an ablation a valid control: *"an ablation differs from ASSAY
+ * in exactly one respect, so the difference is attributable."* Every other
+ * component is `ASSAY`'s own: `S0`–`S4`, the `§6.2` probe loop, `R1`–`R3`, the
+ * provider selection, `journalFor`'s posting rules, the single write path, and
+ * the `G1`–`G5` close gate.
  *
- * This is `DECISION_BRIEF.md §L.1` rule 4, verbatim: *"Only stage S5 may
- * construct a `ValidatedDecision`; `packages/ledger` exposes exactly one write
- * path and accepts only that type ... Enforcement is a non-exported
- * unique-symbol brand with no exported constructor."* `§L.1` is titled
- * *"Invariants that may never be violated"*, and this is one of the twelve on
- * it — not an oversight this file can route around.
+ * **What is NOT removed, and could not be.** `packages/ledger` is untouched by
+ * M50 and by this file. `I1` is re-checked on the **cumulative totals at every
+ * append**, independently of `S5`, so the trial balance cannot break; `G5`
+ * still runs; `G1`–`G4` still run; and the `ValidatedDecision` brand still has
+ * exactly one construction route, the single widening assertion inside
+ * `packages/engine/src/s5-validate.ts`. This agent mints through that route like
+ * every other, and no second constructor exists for it to use.
  *
- * **What was checked before concluding this, so the claim above is not a
- * paraphrase relied on secondhand:** `packages/engine/src/index.ts`'s full
- * export list (no alternate `S5` entry point); `packages/ledger/src/index.ts`
- * (exports `type ValidatedDecision`, never a constructor, and exactly the one
- * `postValidatedDecision` write path); `s5-validate.ts`'s `validate()` in full
- * (`i1` through `i8` run unconditionally, `i9` is conditional on two supplied
- * hashes, and no argument disables any of them); and `docs/` grepped for
- * `NOVALIDATE` (`PROJECT_SPEC.md` lines 22, 32, 334, 402; `PREREGISTRATION.md`
- * line 936; `DECISION_BRIEF.md` lines 2137, 2758) — every hit states that `A1`
- * is a required Tier-0 ablation with a stated hypothesis, and none licenses a
- * second construction route for `ValidatedDecision` or a skip mode for
- * `validate()`.
+ * **Two consequences of that, both disclosed rather than discovered.** `A1`
+ * reaches `CLOSED` or `OPEN` like every other agent and **not** `BLOCKED` —
+ * spec 1.4.31 withdrew that expectation, because `EVALUATION_SPEC.md §2`, `§4.9`
+ * and metric 14 all forbid it and a `BLOCKED` run is marked `invalid`, which
+ * would forfeit the very figure `PROJECT_SPEC.md §7` **S6** asks this ablation
+ * for. And `A1`'s harm is a **conservative lower bound** on the cost of removing
+ * validation, because the ledger-side enforcement above keeps intercepting what
+ * it always did: `PREREGISTRATION.md §10` **V26** records it, and no claim that
+ * `A1` reproduces a fully unvalidated ledger may be made.
  *
- * **What implementing this without weakening rule 4 would require, and why it
- * is not done here.** The only route into the ledger is a `ValidatedDecision`
- * that `validate()` refuses to mint for an invariant-failing input. Building one
- * anyway means either a second constructor for the type (voids the brand: any
- * caller could then mint one, not just `A1`) or a skip-checks mode inside
- * `validate()` itself (weakens the one gate every other agent — `ASSAY`
- * included — relies on to keep `§7`'s *"any invariant failure rejects the
- * allocation ... never partially posted, never repaired, never downgraded to a
- * warning"* true). Both are changes to `packages/engine/src/s5-validate.ts`'s
- * frozen enforcement mechanism, not to this file, and both are far larger and
- * more dangerous than one ablation: `RECONCILIATION_SPEC.md §7` calls `S5` *"the
- * only code path that may post to the ledger"*, for every agent, not for `A1`
- * conditionally. Resolving this is a specification amendment — the register
- * would need an entry the shape of M49's S4/journal seam fix: naming a second,
- * explicitly-scoped construction route (or a parameterised `validate()` that
- * still enforces `§L.1` rule 4 for every *other* caller), ratified in
- * `DECISION_BRIEF.md §L.1` itself, before any code changes. That amendment is
- * out of scope here and is not attempted.
- *
- * **What this file deliberately does not do.** It does not add a bypass flag to
- * `validate()`. It does not add a second `ValidatedDecision` constructor. It
- * does not call `ASSAY` unchanged and claim the ablation is implemented — a
- * rigged ablation would misrepresent an unremoved component as removed, which
- * is worse than reporting the gap: `EVALUATION_SPEC.md §3.2` makes exactly this
- * point about `A3` — *"a rigged ablation is worse than no ablation, because it
- * converts a real result into a fabricated one"* — and the same reasoning binds
- * `A1`.
+ * **`I9` is untouched and is not part of the removal.** It is run-scoped and
+ * `RECONCILIATION_SPEC.md §7` folds it in *"only when the caller supplies both
+ * hashes"*; `assay.ts` supplies neither, for `ASSAY` and for `A1` alike.
  */
 export const a1Agent: Agent = {
   id: "A1-NOVALIDATE",
-  async run(): Promise<AgentRun> {
-    throw new AgentUnavailableError(
-      "A1-NOVALIDATE",
-      "packages/ledger's ValidatedDecision constructor, which packages/engine/src/s5-validate.ts " +
-        "holds exclusively via a non-exported unique-symbol brand with no exported alternate route",
-      "DECISION_BRIEF.md §L.1 rule 4 (\"Invariants that may never be violated\"); " +
-        "ARCHITECTURE.md §4 boundary 3; RECONCILIATION_SPEC.md §7",
-      "A1-NOVALIDATE requires a decision that stage S5's invariants I1-I9 would reject to reach " +
-        "the ledger anyway, but the only write path (postValidatedDecision) accepts only a " +
-        "ValidatedDecision, and that type can be constructed nowhere but inside a passing call to " +
-        "validate() itself -- there is no skip-checks parameter and no second constructor. " +
-        "Implementing this ablation without inventing an unsanctioned bypass would mean weakening " +
-        "DECISION_BRIEF.md §L.1 rule 4 for every agent, which is a specification amendment (of the " +
-        "shape M49's S4/journal seam fix took), not an apps/cli change, and is not attempted here.",
-    );
+  run(input: AgentInput): Promise<AgentRun> {
+    return runAssayAblation(input, {
+      agentId: "A1-NOVALIDATE",
+      // The one respect in which this agent differs from ASSAY. Lint permits
+      // this literal in this file and nowhere else (M50; §L.1 rule 4).
+      invariantSelection: "NONE_A1_NOVALIDATE",
+    });
   },
 };
