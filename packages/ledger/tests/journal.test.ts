@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import type { SettlementId } from "@assay/domain";
+
 import {
   EXCEPTION_CLASSES,
   JournalError,
@@ -143,6 +145,7 @@ describe("P1 — payment captured at the gateway", () => {
 describe("P2 — settlement reconciled to a bank credit", () => {
   const request: PostingRequest = {
     occasion: "BANK_EVIDENCE",
+    allocated_to: SETL_ID,
     observation: paymentObservation(),
     ingest_valid: true,
     bank_evidence: BANK_EVIDENCE,
@@ -290,6 +293,7 @@ describe("E04 — AN1 alone must never manufacture a 1200_BANK realization", () 
     expect(() =>
       journalFor({
         occasion: "BANK_EVIDENCE",
+        allocated_to: SETL_ID,
         observation: line,
         ingest_valid: true,
         // `I5` is undefined — not satisfied — when no mapping exists.
@@ -298,26 +302,101 @@ describe("E04 — AN1 alone must never manufacture a 1200_BANK realization", () 
     ).toThrow(JournalError);
   });
 
-  it("one settlement's bank evidence cannot be attached to another's line", () => {
+  // --- M49's comparand (spec 1.4.30) --------------------------------------
+  // §17.1.1's "the settlement it is allocated to" is the ALLOCATION UNDER
+  // EVALUATION's, carried as `allocated_to`. The anti-cross-attachment guarantee
+  // is unchanged; only its comparand moved, from a field carrying AN1 to the
+  // allocation AN2 attests to.
+
+  it("one settlement's bank evidence cannot be attached to another's allocation", () => {
     expect(() =>
       journalFor({
         occasion: "BANK_EVIDENCE",
+        allocated_to: SETL_ID,
         observation: line,
         ingest_valid: true,
         bank_evidence: { ...BANK_EVIDENCE, settlement_id: entityId("setl_", 99) },
       }),
-    ).toThrow(/AN1/);
+    ).toThrow(/the settlement it is allocated to/);
   });
 
-  it("a line allocated to no settlement cannot take P2", () => {
+  it("rejects the mismatch from the OTHER side too — evidence right, allocation wrong", () => {
+    // The line and the evidence agree on setl_…01; the allocation names another
+    // settlement. Before M49 this passed, because the check read the line's own
+    // field and never saw the allocation. It is the direction that matters: a
+    // caller cannot post one settlement's bank credit under another's
+    // allocation by supplying evidence that happens to match the line.
     expect(() =>
       journalFor({
         occasion: "BANK_EVIDENCE",
+        allocated_to: entityId("setl_", 99),
+        observation: line,
+        ingest_valid: true,
+        bank_evidence: BANK_EVIDENCE,
+      }),
+    ).toThrow(/the settlement it is allocated to/);
+  });
+
+  it("a line §3 left UNANCHORED takes P2 under the allocation that explains it", () => {
+    // The M49 case, and the one the pre-1.4.30 reading refused. `settlement_id`
+    // is null — PREREGISTRATION.md §4.2's DROP_SETTLEMENT_ID, and every member
+    // RECONCILIATION_SPEC.md §3 leaves unanchored is such a line — while the
+    // allocation under evaluation is the settlement AN2 confirmed. §17.1.1
+    // conditions P2 on AN2 and NOT on AN1, so the bank leg posts.
+    const posting = postedOr(
+      journalFor({
+        occasion: "BANK_EVIDENCE",
+        allocated_to: SETL_ID,
         observation: paymentObservation({ settlement_id: null }),
         ingest_valid: true,
         bank_evidence: BANK_EVIDENCE,
       }),
-    ).toThrow(/carries no settlement_id/);
+      "P2 did not fire on an unanchored line",
+    );
+
+    expect(posting.rule).toBe("P2");
+    // The same four legs, on the same figures, as an AN1-anchored line.
+    expect(movements(posting)).toEqual({
+      "1200_BANK": CARD_LINE.credit,
+      "5100_PG_FEE_EXPENSE": CARD_LINE.feeExGst,
+      "1300_GST_INPUT_CREDIT": CARD_LINE.tax,
+      "1100_GATEWAY_RECEIVABLE": -CARD_LINE.amount,
+    });
+  });
+
+  it("a line naming ANOTHER settlement still takes P2 under this allocation", () => {
+    // A dangling settlement_id — one naming a settlement absent from the
+    // observation set — is also unanchored by S1 and also reaches the pool. M49
+    // does not read the field at all, so this posts exactly as the null case
+    // does. Re-imposing AN1 in the narrower "non-null must match" form would
+    // reject it and reopen what M49 closed.
+    const posting = postedOr(
+      journalFor({
+        occasion: "BANK_EVIDENCE",
+        allocated_to: SETL_ID,
+        observation: paymentObservation({
+          settlement_id: entityId("setl_", 77) as SettlementId,
+        }),
+        ingest_valid: true,
+        bank_evidence: BANK_EVIDENCE,
+      }),
+      "P2 did not fire on a dangling settlement_id",
+    );
+    expect(posting.rule).toBe("P2");
+  });
+
+  it("P4 takes the same comparand, on a refund line with no settlement_id", () => {
+    const posting = postedOr(
+      journalFor({
+        occasion: "BANK_EVIDENCE",
+        allocated_to: SETL_ID,
+        observation: refundObservation({ settlement_id: null }),
+        ingest_valid: true,
+        bank_evidence: BANK_EVIDENCE,
+      }),
+      "P4 did not fire on an unanchored refund line",
+    );
+    expect(posting.rule).toBe("P4");
   });
 });
 
@@ -347,6 +426,7 @@ describe("P3 and P4 — refunds", () => {
     const posting = postedOr(
       journalFor({
         occasion: "BANK_EVIDENCE",
+        allocated_to: SETL_ID,
         observation: refundObservation(),
         ingest_valid: true,
         bank_evidence: BANK_EVIDENCE,
@@ -957,6 +1037,7 @@ const EVERY_POSTING: readonly PostingRequest[] = [
   { occasion: "INGEST", observation: paymentObservation(), ingest_valid: true },
   {
     occasion: "BANK_EVIDENCE",
+    allocated_to: SETL_ID,
     observation: paymentObservation(),
     ingest_valid: true,
     bank_evidence: BANK_EVIDENCE,
@@ -964,6 +1045,7 @@ const EVERY_POSTING: readonly PostingRequest[] = [
   { occasion: "INGEST", observation: refundObservation(), ingest_valid: true },
   {
     occasion: "BANK_EVIDENCE",
+    allocated_to: SETL_ID,
     observation: refundObservation(),
     ingest_valid: true,
     bank_evidence: BANK_EVIDENCE,
@@ -1039,6 +1121,7 @@ describe("journal invariants, on every posting the table can produce", () => {
     const posting = postedOr(
       journalFor({
         occasion: "BANK_EVIDENCE",
+        allocated_to: SETL_ID,
         observation: paymentObservation(),
         ingest_valid: true,
         bank_evidence: BANK_EVIDENCE,

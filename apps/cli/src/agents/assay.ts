@@ -362,51 +362,6 @@ function readBankSide(
   return { evidence, tie_out: tieOut };
 }
 
-/**
- * `S4`'s `bank_evidence`, narrowed to what `§6`'s materiality can actually be
- * computed over.
- *
- * **A seam in `packages/engine`, reported here rather than repaired here.**
- * `§6` computes materiality *"by running both allocations through the ledger
- * projection in memory"*, and `s4-solve.ts`'s `balances` does that by calling
- * `journalFor` at the `BANK_EVIDENCE` occasion for **every member of each
- * candidate**. `journal.ts` then checks `AN1` on the line itself — *"without it
- * one settlement's bank evidence could be attached to another settlement's
- * line"* — and **throws** on a member whose `settlement_id` is null or names a
- * different settlement. Every member `§3` left unanchored is exactly such a
- * line, and `§4`'s targets are the settlements that still need constituents, so
- * the two meet on any target with more than one candidate.
- *
- * The composition root cannot resolve that: `journal.ts` owns the `AN1` check
- * and `s4-solve.ts` owns the loop. What it can do is refuse to hand a stage an
- * input the stage refuses, so the evidence is supplied only where every
- * `recon_line` it could reach already names the settlement it attests to. Where
- * it is withheld, `s4-solve.ts` states the consequence itself: *"with
- * `bank_evidence === null` neither allocation posts on the reconciled path and
- * the difference is `0`"* — so those targets reach `§6`'s
- * `IMMATERIALLY_AMBIGUOUS` rather than `AMBIGUOUS`.
- *
- * **That is a real reduction in abstention and it is disclosed, not absorbed.**
- * It is `packages/engine`'s and `packages/ledger`'s to settle — whether
- * `balances` should skip a member `AN1` did not anchor, or `P2` should be
- * unreachable for a proposed allocation at all — and settling it here would put
- * an `S4` reading in `apps/cli`, which `ARCHITECTURE.md §3` forbids.
- *
- * An `adjustment` member is not consulted: `§17.1.1` fires no rule for one at
- * this occasion, so `journalFor` returns a named non-posting rather than a
- * throw.
- */
-function solvableBankEvidence(
-  evidence: BankSideEvidence | null,
-  members: readonly Member[],
-): BankSideEvidence | null {
-  if (evidence === null) return null;
-  const usable = members.every(
-    (m) => m.kind !== "recon_line" || m.payload.settlement_id === evidence.settlement_id,
-  );
-  return usable ? evidence : null;
-}
-
 /** The members `AN1` anchored to one settlement, read off `S1`'s links. */
 function anchoredMembersOf(
   settlementObsId: ObservationId,
@@ -439,6 +394,17 @@ interface Classification {
   readonly bank_tie_out: TieOut | null;
   /** `§17.1.1`'s `P2`/`P4` trigger, where `S1` established it. */
   readonly bank_evidence: BankSideEvidence | null;
+  /**
+   * `§17.1.1`'s *"the settlement it is allocated to"* — the `setl_…` of the
+   * target this decision allocates the observation to (register row
+   * `DATA_MODEL.md §22.2` M49). `null` where the decision allocates nothing.
+   *
+   * Read from the **allocation**, not from the evidence: it is the target
+   * observation's own `payload.id`, while `bank_evidence.settlement_id` comes
+   * from the settlement `S1`'s `AN2` link names. `journal.ts` compares the two,
+   * so they must arrive from independent sources or the check is vacuous.
+   */
+  readonly allocated_to: string | null;
   readonly certificate: AmbiguityCertificate | null;
 }
 
@@ -447,6 +413,7 @@ const NOTHING = {
   target_amount: null,
   bank_tie_out: null,
   bank_evidence: null,
+  allocated_to: null,
   certificate: null,
 } as const;
 
@@ -497,12 +464,18 @@ function build(
   // runner passes only the accepted set -- so §17.1.1's trigger is satisfied.
   if (obs.kind === "recon_line") {
     lines.push(...journalFor({ occasion: "INGEST", observation: obs, ingest_valid: true }).lines);
-    if (classification.bank_evidence !== null) {
+    // §17.1.1 rows 2 and 4. Both halves are required and neither is inferred
+    // from the other: the evidence is `AN2`/`I5` as `S1` established them, and
+    // `allocated_to` is the settlement this decision allocates the line to
+    // (M49). A decision that allocates nothing has no allocation to post a bank
+    // leg under, whatever evidence exists for some other target.
+    if (classification.bank_evidence !== null && classification.allocated_to !== null) {
       lines.push(
         ...journalFor({
           occasion: "BANK_EVIDENCE",
           observation: obs,
           ingest_valid: true,
+          allocated_to: classification.allocated_to,
           bank_evidence: classification.bank_evidence,
         }).lines,
       );
@@ -826,7 +799,7 @@ async function runAssay(input: AgentInput): Promise<AgentRun> {
       mode_days: modeDays,
       target_entity_id: targetEntityId(target, byObsId),
       observationIdForEntityId: (id: string): ObservationId | undefined => obsIdByEntityId.get(id),
-      bank_evidence: solvableBankEvidence(bankSide.evidence.get(target.obs_id) ?? null, members),
+      bank_evidence: bankSide.evidence.get(target.obs_id) ?? null,
     } satisfies Omit<SolveInput, "recon_reports" | "probe_attempts">;
 
     const first = solve({ ...partial, recon_reports: [], probe_attempts: 0 });
@@ -973,7 +946,11 @@ async function runAssay(input: AgentInput): Promise<AgentRun> {
       members,
       target_amount: obs.kind === "settlement" ? obs.payload.amount : null,
       bank_tie_out: bankSide.tie_out.get(obs.obs_id) ?? null,
+      // §17.1.1: settlement and bank_line post nothing on the reconciled path --
+      // I4 and I5 make them aggregates, and P2 already posts the bank leg per
+      // line. A target is not ALLOCATED to a settlement; it is one.
       bank_evidence: null,
+      allocated_to: null,
       certificate: null,
     });
     // §4.6: `score_bps` is null "where the agent's gate consulted no score at
@@ -1016,6 +993,7 @@ async function runAssay(input: AgentInput): Promise<AgentRun> {
         abstainedComponents,
         certificateByComponent,
         bankSide,
+        byObsId,
       ),
     );
     settled.add(obs.obs_id);
@@ -1234,6 +1212,23 @@ function targetEntityId(
 }
 
 /**
+ * `§17.1.1`'s `allocated_to` for a committed allocation (M49): the `setl_…` of
+ * the target observation an accepted decision allocated a member to.
+ *
+ * The same field `targetEntityId` reads, reached from an `obs_id` rather than
+ * from an `S2` `Target`, because pass 2a holds the allocation edge and not the
+ * target record. `null` for a target that is not a settlement, which `§17.1.1`
+ * gives no `P2`/`P4` row anyway.
+ */
+function settlementEntityIdOf(
+  targetObsId: ObservationId,
+  byObsId: ReadonlyMap<ObservationId, Observation>,
+): string | null {
+  const obs = byObsId.get(targetObsId);
+  return obs === undefined || obs.kind !== "settlement" ? null : obs.payload.id;
+}
+
+/**
  * `§9` over one target.
  *
  * ```
@@ -1278,6 +1273,7 @@ function classifyTarget(
       target_amount: null,
       bank_tie_out: null,
       bank_evidence: null,
+      allocated_to: null,
       certificate: certificateFor(
         result,
         reason,
@@ -1319,7 +1315,9 @@ function classifyTarget(
     members,
     target_amount: obs.kind === "settlement" ? obs.payload.amount : null,
     bank_tie_out: bankSide.tie_out.get(obs.obs_id) ?? null,
+    // As above: the target carries no P2/P4 leg of its own.
     bank_evidence: null,
+    allocated_to: null,
     certificate: null,
   };
 }
@@ -1344,25 +1342,26 @@ function classifyMember(
   abstainedComponents: ReadonlySet<ComponentId>,
   certificateByComponent: ReadonlyMap<ComponentId, AmbiguityCertificate>,
   bankSide: BankSide,
+  byObsId: ReadonlyMap<ObservationId, Observation>,
 ): Classification {
   if (obs.kind === "adjustment") return exceptionFor("E12_ADJUSTMENT_UNEXPLAINED");
 
   const targetObsId = targetOfMember.get(obs.obs_id);
   if (targetObsId !== undefined) {
-    const evidence = bankSide.evidence.get(targetObsId) ?? null;
     return {
       state: "RECONCILED",
       exception_class: null,
       abstention_role: null,
       ...NOTHING,
       // §17.1.1's P2/P4 trigger, which fires on the line rather than on the
-      // aggregate: `assertBankEvidenceMatchesLine` requires the evidence to name
-      // the line's own settlement, so a settlement's bank credit cannot be
-      // attached to another settlement's line.
-      bank_evidence:
-        evidence !== null && obs.payload.settlement_id === evidence.settlement_id
-          ? evidence
-          : null,
+      // aggregate. The evidence is passed as `S1` established it: M49 fixes the
+      // trigger's "settlement it is allocated to" as the ALLOCATION's target,
+      // which for a committed decision is the target this member was allocated
+      // to, and `journal.ts` checks the evidence against that. A line `§3` left
+      // unanchored therefore posts its bank leg on the allocation that explains
+      // it, instead of losing it to a field `DROP_SETTLEMENT_ID` emptied.
+      bank_evidence: bankSide.evidence.get(targetObsId) ?? null,
+      allocated_to: settlementEntityIdOf(targetObsId, byObsId),
     };
   }
 
@@ -1380,6 +1379,7 @@ function classifyMember(
       target_amount: null,
       bank_tie_out: null,
       bank_evidence: null,
+      allocated_to: null,
       // §6 and ARCHITECTURE.md §4 boundary 3: an ABSTAINED decision carries a
       // certificate. The member's abstention IS the component's, so it carries
       // the component's rather than a second one minted for the same break.

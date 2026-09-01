@@ -356,10 +356,29 @@ export function canonicalAllocationKey(
  * the reconciled path and the difference is `0`. Spec 1.4.21 withdrew `§11`'s
  * illustrative ₹1,00,000 for exactly this reason; `§6`'s formula is normative
  * and is what this computes.
+ *
+ * **The allocation under evaluation is `§17.1.1`'s `allocated_to`, from spec
+ * 1.4.30 (register row `DATA_MODEL.md §22.2` M49).** The trigger reads *"the
+ * settlement it is **allocated to**"*, and for a proposed allocation that is the
+ * `Candidate.target_id` this solve is explaining — `target_entity_id`, the
+ * `setl_…` the same input already carries for `SE5`. It is emphatically **not**
+ * the member's own `ReconLine.settlement_id`: `§3` removes everything anchored
+ * from the search space, so every member of a proposed allocation carries `null`
+ * or a dangling id there, and reading the comparand off that field would make
+ * this function's result **identically zero for every component** — the state
+ * spec 1.4.21 forecloses when it holds that *"`P2` posts on `amount`,
+ * `fee − tax` and `tax` … and `AMBIGUOUS` stays reachable"*.
+ *
+ * **No member is skipped and no candidate is filtered.** Every member of the
+ * allocation is projected; `§6` ranks and does not re-admit, and `§17.1.1`'s
+ * non-posting grounds are a closed set that has no row for an unanchored member.
+ * A member whose kind fires no rule at this occasion — an `adjustment` — returns
+ * a named non-posting rather than a throw, and contributes nothing.
  */
 function balances(
   members: readonly Member[],
   bankEvidence: BankSideEvidence | null,
+  allocatedTo: string,
 ): Map<AccountCode, number> {
   const out = new Map<AccountCode, number>();
   if (bankEvidence === null) return out;
@@ -368,6 +387,7 @@ function balances(
       occasion: "BANK_EVIDENCE",
       observation: m,
       ingest_valid: true,
+      allocated_to: allocatedTo,
       bank_evidence: bankEvidence,
     });
     if (!decision.posts) continue;
@@ -383,9 +403,10 @@ function materiality(
   a: readonly Member[],
   b: readonly Member[],
   bankEvidence: BankSideEvidence | null,
+  allocatedTo: string,
 ): number {
-  const ba = balances(a, bankEvidence);
-  const bb = balances(b, bankEvidence);
+  const ba = balances(a, bankEvidence, allocatedTo);
+  const bb = balances(b, bankEvidence, allocatedTo);
   let max = 0;
   for (const account of new Set([...ba.keys(), ...bb.keys()])) {
     const delta = Math.abs((ba.get(account) ?? 0) - (bb.get(account) ?? 0));
@@ -497,10 +518,17 @@ export function solve(input: SolveInput): SolveResult {
     return out;
   };
 
+  // `§17.1.1`'s `allocated_to` (M49) is the target this solve is explaining.
+  // `bank_evidence` is non-null only for a settlement target -- `S1` establishes
+  // `AN2` from a settlement -- and such a target always carries its `setl_…`, so
+  // the two are non-null together. Where the id is absent there is no allocation
+  // target to attest to and the empty string cannot match a `setl_…` evidence
+  // record; `balances` has already returned empty on the `null` evidence branch.
   const materialityPaise = materiality(
     membersOf(best),
     membersOf(second),
     input.bank_evidence,
+    input.target_entity_id ?? "",
   );
   const deltaS = Math.abs(best.evidence_score_bps - second.evidence_score_bps);
 

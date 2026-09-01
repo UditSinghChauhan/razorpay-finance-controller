@@ -368,6 +368,7 @@ describe("amounts", () => {
     expect(() =>
       journalFor({
         occasion: "BANK_EVIDENCE",
+        allocated_to: SETL_ID,
         observation: paymentObservation({
           amount: Number.MAX_SAFE_INTEGER as never,
           credit: Number.MAX_SAFE_INTEGER as never,
@@ -386,6 +387,7 @@ describe("amounts", () => {
     expect(() =>
       journalFor({
         occasion: "BANK_EVIDENCE",
+        allocated_to: SETL_ID,
         observation: paymentObservation({ credit: 90_000 as never }),
         ingest_valid: true,
         bank_evidence: BANK_EVIDENCE,
@@ -425,6 +427,7 @@ describe("bank-side evidence names real identifiers", () => {
     expect(() =>
       journalFor({
         occasion: "BANK_EVIDENCE",
+        allocated_to: SETL_ID,
         observation: paymentObservation(),
         ingest_valid: true,
         bank_evidence: { ...BANK_EVIDENCE, bank_line_id: value },
@@ -436,6 +439,7 @@ describe("bank-side evidence names real identifiers", () => {
     expect(() =>
       journalFor({
         occasion: "BANK_EVIDENCE",
+        allocated_to: SETL_ID,
         observation: paymentObservation(),
         ingest_valid: true,
         bank_evidence: { ...BANK_EVIDENCE, settlement_id: "setl_short" },
@@ -447,6 +451,7 @@ describe("bank-side evidence names real identifiers", () => {
     expect(() =>
       journalFor({
         occasion: "BANK_EVIDENCE",
+        allocated_to: SETL_ID,
         observation: paymentObservation(),
         ingest_valid: true,
         bank_evidence: { ...BANK_EVIDENCE, an1_satisfied: true } as never,
@@ -462,6 +467,7 @@ describe("an unbalanced posting cannot escape by losing precision", () => {
     expect(() =>
       journalFor({
         occasion: "BANK_EVIDENCE",
+        allocated_to: SETL_ID,
         observation: paymentObservation({
           amount: Number.MAX_SAFE_INTEGER as never,
           credit: Number.MAX_SAFE_INTEGER as never,
@@ -609,6 +615,7 @@ describe("determinism", () => {
     P1,
     {
       occasion: "BANK_EVIDENCE",
+      allocated_to: SETL_ID,
       observation: paymentObservation(),
       ingest_valid: true,
       bank_evidence: BANK_EVIDENCE,
@@ -653,6 +660,7 @@ describe("determinism", () => {
     const p2 = posted(
       journalFor({
         occasion: "BANK_EVIDENCE",
+        allocated_to: SETL_ID,
         observation: paymentObservation(),
         ingest_valid: true,
         bank_evidence: BANK_EVIDENCE,
