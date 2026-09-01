@@ -212,5 +212,23 @@ export const BPS_DENOMINATOR = 10_000;
  * unchanged and neither reads tau; `C1`-`C8` are untouched so `constraint_set_hash`
  * does not move. **`BENCHMARK_VERSION` moves 1.0.8 -> 1.0.9** and `GT_VERSION` stays
  * 1.1.0; both remain `packages/generator`'s.
+ *
+ * **1.4.33 -> (M55) -- required nothing of this package, and the reason is structural
+ * rather than incidental.** M55 supplies metric 15's **per-case `balance_harm`**: the
+ * `EVALUATION_SPEC.md §4.4(a)` account-level absolute-difference sum with both journal
+ * projections restricted to the injected case's own `source_entity_id`, plus the
+ * structural zero for a case that posts no line. Every term in it is a **journal**
+ * quantity -- the agent's postings on one side, `GroundTruth.true_journal` on the
+ * other -- and this package produces neither: it emits `oracle_labels.jsonl` and
+ * nothing else. Tau reaches metric **4** through `PREREGISTRATION.md §5.4` and metric
+ * 4 is not touched here; metric 15's population is M52's, which is preserved verbatim
+ * and is `degradations`-derived rather than label-derived. So `oracle_labels.jsonl` is
+ * never regenerated, shadowed or overwritten, `BenchmarkManifest.oracle_labels_sha256`
+ * stays valid, and `AL4`/`AL7`'s aggregate-only rule on the test split is never
+ * approached. `SETTLEMENT_WINDOW_DAYS`, `K_ORACLE`, `C_ORACLE`, `TAU_FLOOR_PAISE` and
+ * `TAU_RATE_BPS` are unchanged; `§5.1`'s completeness gate and `§5.3`'s differential
+ * gate are unchanged; `C1`-`C8` are untouched so `constraint_set_hash` does not move.
+ * **`BENCHMARK_VERSION` moves 1.0.9 -> 1.0.10** and `GT_VERSION` stays 1.1.0; both
+ * remain `packages/generator`'s.
  */
-export const SPEC_VERSION = "1.4.32";
+export const SPEC_VERSION = "1.4.33";

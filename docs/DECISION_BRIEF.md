@@ -1,8 +1,32 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.32 · **Date:** 2026-09-02
+**Spec version:** 1.4.33 · **Date:** 2026-09-02
 **Reviewer role:** principal architect / skeptical reviewer
+
+**At spec 1.4.33** §A.40 records **one ratification**, taken at a governance gate held
+after spec 1.4.32 and — the condition that makes it legitimate — **before any
+benchmark data existed**: `bench/` absent, `runs/` holding only `.gitkeep`, no dataset
+generated, no agent scored, no metric computed and no seal tag cut. **M52** supplied
+metrics 15 and 16's two **populations** and said in terms that *"the formulas in
+`EVALUATION_SPEC.md §4.8` are unchanged; what is supplied is the universe"* — which
+left metric 15's **numerator** without one. *"Injected cases with `balance_harm > 0`"*
+names a **per-case** harm, and `§4.4(a)` defines only a **run-level aggregate** whose
+absolute value sits outside the per-account difference, so it does not decompose.
+**M55** ratifies one per-case decomposition — `§4.4(a)`'s two projections each
+restricted to the case's own `source_entity_id` (`DATA_MODEL.md §16`, `§12`/`M28`),
+Suspense excluded and the covered-set scope unchanged — and ratifies the **structural
+zero** for a case that posts no line, which contributes `0` **and stays in the
+denominator**. Two admissible alternatives are **rejected and preserved as rejected**:
+the leave-one-out marginal, and substituting `§4.4(b)`'s `misdirected_value_inr`.
+**`BENCHMARK_VERSION` moves 1.0.9 → 1.0.10** on `M39`'s precedent — an input to a
+frozen figure enters the pre-registered surface — while `GT_VERSION` stays 1.1.0,
+`constraint_set_hash` does not move, `RunKey` stays `(agent_id, split, seed,
+llm_mode)`, and `C1`–`C8`, `SE1`–`SE5`, `τ`, `ε` and every pre-existing `§7` threshold
+are unchanged. **`M52`'s populations are preserved verbatim and unnarrowed, metric 16
+is untouched, and the 28-metric list stays at 28.** The non-additivity is **disclosed
+rather than hidden**, at `PREREGISTRATION.md §10` **V30**. **No implementation code is
+touched and metric 15 remains unwired.** See `PREREGISTRATION.md` amendment 1.4.33.
 
 **At spec 1.4.32** §A.39 records **four rulings**, taken at a governance gate held
 after spec 1.4.31 and — the condition that makes them legitimate — **before any
@@ -2906,6 +2930,81 @@ requires. `A1-NOVALIDATE` remains an unimplemented Tier-0 ablation, and
 `apps/cli/src/agents/a1.ts` still reports it as blocked — on this row's authority
 now, rather than on an unresolved governance question.
 
+### A.40 Spec 1.4.33 / benchmark 1.0.10 — the numerator M52 left behind
+
+**The decision.** One ratification, closing the gap a governance review of `M52`'s
+implementation found. Register row `DATA_MODEL.md §22.2` **M55**. `SPEC_VERSION`
+**1.4.32 → 1.4.33**; **`BENCHMARK_VERSION` 1.0.9 → 1.0.10**; `GT_VERSION` stays
+**1.1.0**.
+
+**The defect.** `M52` closed with a sentence that is exactly right and exactly
+limited: *"The formulas in `EVALUATION_SPEC.md §4.8` are **unchanged**; what is
+supplied is the universe."* It supplied metric 15's **denominator** — the injected
+population — and stopped. The numerator is *"injected cases **with `balance_harm >
+0`**"*, and `§4.4(a)` defines `balance_harm_inr` as
+
+```
+  balance_harm_inr = Σ over AccountCode (excluding Suspense)
+                       | proj_agent(acct) − proj_truth(acct) |
+```
+
+with the absolute value **outside** the per-account difference and both projections
+taken over the whole covered set at once. That aggregate does not decompose —
+`|a₁+a₂ − t₁−t₂| ≠ |a₁−t₁| + |a₂−t₂|` — so *"cases with `balance_harm > 0`"* named a
+per-case quantity the corpus had never defined. Metric 15 was **half computable**: a
+determinate denominator over an indeterminate numerator.
+
+**Why this is a ratification and not a derivation.** At least three attributions are
+admissible on the frozen text and **none excludes the others**: restrict both
+projections to the case's own `source_entity_id`; recompute the run-level aggregate
+with the case removed and ask whether it moved (the leave-one-out marginal); or read
+`§4.4(b)`'s natively per-entity `misdirected_value_inr` in its place. They disagree
+whenever two cases' account errors cancel. That is precisely the situation `M35`,
+`M49` and `M50` legislate for — *"the phrase supported both readings and neither
+excluded the other … marked ratified rather than dressed as derivation"* — and `M55`
+takes the same form. A first attempt recorded these points as *"Derived"* inside
+`M52`'s own row; that was wrong on three counts and is not what shipped: it mislabelled
+an outcome-bearing choice, it put a decision in the register's *justification* column,
+and it would have made `M52` self-contradictory against its own closing sentence.
+
+**What is ratified.** The case is the injected observation. Its key is its own
+business identifier — `DATA_MODEL.md §16`'s *"the identifier of the observation whose
+obligation the posting records"*, through `§12`/`M28`'s relation, one-to-one on a
+conforming dataset. `case_balance_harm(o)` is `§4.4(a)`'s account-level
+absolute-difference sum with **both** projections restricted to that key, Suspense
+excluded and the covered-set scope applied unchanged. **The agent-side restriction is
+part of the ratification**, not a reading of `§4.4(a)`: that clause keys `proj_agent`
+by *"whose owning decision is `RECONCILED`"* and applies no `source_entity_id`
+predicate at all. A case of a reference kind (`§10.1`), or whose key falls outside
+`§16`'s `source_entity_id` grammar — an `order_…` — posts no line, so it contributes
+**`0` and stays in the denominator**; dropping it would narrow `M52`, and `§4.8`
+requires the opposite: *"measuring it anyway is the point."*
+
+**What is preserved.** `M52`'s two populations **verbatim and unnarrowed**, its
+TEST-only scope and its *"population, not bijection"* reading. Metric **16** entirely
+— formula and both populations. `§4.4`'s own two figures, including `balance_harm_inr`
+itself, which keeps its definition and its published value. `§8`'s list at **28**.
+`RunKey`, `RunConfig`, `§18`'s manifest shape, every `§7` threshold that existed
+before, `C1`–`C8` so `constraint_set_hash` does not move, and the oracle, which this
+row never reaches. **No `GroundTruth` field is added**, so `GT_VERSION` holds.
+
+**What is disclosed rather than hidden.** `PREREGISTRATION.md §10` **V30**: the
+per-case figures **do not sum** to `balance_harm_inr`, the choice among attributions
+is outcome-bearing, and the agent-side restriction is `M55`'s. Metric 15 publishes the
+share of injected cases carrying their own non-zero account-level difference — not a
+partition of the run-level figure — and no additivity may be claimed or implied. This
+is the corpus's settled disposal, the one `M54` took for metric 10: publish the honest
+quantity with its explanation attached, and never amend a definition to make a number
+look better.
+
+**Legitimacy and sequence.** Taken before any dataset existed, so `§6.2` **AL3** and
+`§L.4` are satisfied rather than merely not engaged; the definition is bound on the
+**M39** terms, unadjustable on TRAIN, DEV and TEST alike. **`BENCHMARK_VERSION` moves
+on `M39`'s precedent and not `M49`'s** — no conforming agent's postings change, but an
+input to a frozen figure enters the pre-registered surface. **No implementation code
+is touched**: `packages/eval/src/metrics/robustness.ts` is unmodified, metric 15 stays
+unwired, and the build follows per `§I`.
+
 ### A.39 Spec 1.4.32 / benchmark 1.0.9 — four figures that had no procedure
 
 **The decision.** Four rulings, closing the four evaluation-procedure gaps a
@@ -3083,6 +3182,22 @@ a choice, cut anything else first.
 ---
 
 ## E. Benchmark changes in this revision
+
+**At benchmark 1.0.10 (spec 1.4.33, `§A.40`).** `PREREGISTRATION.md §7` gains **one
+entry** — metric **15**'s per-case `balance_harm`: `EVALUATION_SPEC.md §4.4(a)`'s
+account-level absolute-difference sum with both projections restricted to the injected
+case's own `source_entity_id` (`DATA_MODEL.md §16`, `§12`/`M28`), Suspense excluded and
+the covered-set scope unchanged, plus the structural-zero rule for a case that posts no
+line, which contributes `0` **and stays in the denominator**. `EVALUATION_SPEC.md §4.8`
+gains that per-case quantity; `§4.4` is **read and not amended**, and its run-level
+`balance_harm_inr` keeps its definition and its value. **No metric formula changes,
+none is added, none is removed and none is renumbered** — the list stays at **28** —
+and `M52`'s two populations, metric **16** entire, `constraint_set_hash`, `C1`–`C8`,
+`SE1`–`SE5`, `τ`, `ε`, every pre-existing `§7` threshold, `RunKey`, `RunConfig`,
+`DATA_MODEL.md §18`'s manifest shape, the population parameters and `GT_VERSION`
+1.1.0 are all unmoved. The non-additivity of the per-case figures against
+`balance_harm_inr` is declared at `PREREGISTRATION.md §10` **V30**. Register row
+**M55**.
 
 **At benchmark 1.0.9 (spec 1.4.32, `§A.39`).** `PREREGISTRATION.md §7` gains **four
 entries** — the `EVALUATION_SPEC.md §5.1` **ε grid** (`{0, 500, …, 10_000}` bps, 21
@@ -3300,6 +3415,22 @@ gains `PREREGISTRATION.md §9` step 0's non-scored DEV baseline pass. **(7)**
 on a run; no run artifact exists"*, which **M54 supersedes**: the binding blocker is
 the absent truth side, which no run would supply, and the row should say so and name
 the `EXPLORATORY` marginal that replaces the matrix.
+
+**The follow-up spec 1.4.33 leaves (`§A.40`, register row M55).** Item **(4)** above
+is taken — `packages/eval/src/truth.ts` projects `degradations` into `M52`'s two
+populations, and it remains the single `@assay/generator` import site. What **M55**
+leaves is item **(8)**: `packages/eval/src/metrics/robustness.ts` consumes those
+populations for metrics 15 and 16. Metric **15** takes `M55`'s per-case harm, keyed by
+the injected observation's own business identifier and restricted on **both** journal
+sides, with a reference-kind or out-of-grammar case contributing `0` without leaving
+the denominator, and the `§10` **V30** disclosure printed beside the figure. Metric
+**16** needs **no** such ratification and none was taken: *"abstention rate on injected
+records"* is the share of the `M52` population whose own terminal state is `ABSTAINED`
+(`EVALUATION_SPEC.md §4.4`, `DATA_MODEL.md §10.1`, `§13`), which `AgentRun.outcomes`
+already carries per `obs_id` — so it is read there rather than off `AgentRun.abstentions`,
+whose key is `DATA_MODEL.md §16`'s Suspense-item key and therefore a different
+population. **This amendment takes none of that:** `robustness.ts` is untouched at
+spec 1.4.33, exactly as `§L.4`'s ratify-first order requires.
 
 ---
 

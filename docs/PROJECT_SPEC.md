@@ -2,8 +2,19 @@
 
 **Track:** 04 — AI Finance Controller
 **Status:** Specification. Frozen scope for implementation.
-**Spec version:** 1.4.32
+**Spec version:** 1.4.33
 **Date:** 2026-09-02
+
+**At spec 1.4.33** this document is unchanged apart from the version header, and
+**one `§7` success criterion is read rather than amended**. Register row
+`DATA_MODEL.md §22.2` **M55** supplies metric 15's per-case `balance_harm`. **S3** —
+harm on the covered set — is the criterion `EVALUATION_SPEC.md §4.4(a)` serves, and
+`M55` leaves `§4.4(a)`'s run-level `balance_harm_inr` and its covered-set restriction
+untouched: what it adds is a per-case reading used by metric **15** alone, whose
+expected value the threat model already fixes at **0**. **No success criterion moves,
+none is added and none is withdrawn**; `S1`–`S12` are untouched, as are `§9`'s dataset
+bound and `§10`'s demo script. Benchmark moves to **v1.0.10**. See
+`DECISION_BRIEF.md §A.40` and `PREREGISTRATION.md §10` **V30**.
 
 **At spec 1.4.32** this document is unchanged apart from the version header, and
 **two `§7` success criteria are read rather than amended**. Register rows

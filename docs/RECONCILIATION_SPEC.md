@@ -1,6 +1,18 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.4.32 · **Date:** 2026-09-02
+**Spec version:** 1.4.33 · **Date:** 2026-09-02
+
+**At spec 1.4.33** this document is unchanged apart from the version header. Register
+row `DATA_MODEL.md §22.2` **M55** supplies metric 15's per-case `balance_harm`, a
+**scorer-side** quantity read off two journals after a run; it reaches no stage, no
+gate and no threshold here. **No gate, invariant, constraint, threshold, anchor, probe
+or terminal state changes**: `§3`'s anchor table, `§4.1`'s `C1`–`C8`, `§4.2`'s
+`SE1`–`SE5`, `§6`'s four outcomes and materiality definition, `§6.1`, `§6.2`'s probe
+enum and `P_max`, `§7`'s `I1`–`I9`, `§8`, `§9`'s terminal states and `§10`'s five
+gates, three outcomes, close policy and procedure are all untouched. `§10.1`'s
+Suspense-item key is **read** by `M55` — it is `DATA_MODEL.md §16`'s
+`source_entity_id` — and is not amended. **`constraint_set_hash` does not move**;
+benchmark moves to **v1.0.10**. See `DECISION_BRIEF.md §A.40`.
 
 **At spec 1.4.32** this document is unchanged apart from the version header, and
 **`§6` and `§6.1` are the clauses the amendment reads to settle two questions**.

@@ -442,8 +442,33 @@ export const K_MAX = 22;
  * moves; `SPLIT_TABLE`, `SEED_BLOCKS`, `blockOf`, `AL7`'s successor rule and every
  * `target_record_count` are unchanged; `constraint_set_hash` is `packages/domain`'s
  * and is unmodified. **No dataset exists to regenerate.**
+ *
+ * **1.0.9 -> 1.0.10 at spec 1.4.33** (register row M55). One input to a figure on
+ * `PREREGISTRATION.md §8`'s frozen list enters the pre-registered surface: metric 15's
+ * **per-case `balance_harm`**. M52 supplied metrics 15 and 16's two populations and
+ * closed by saying the `EVALUATION_SPEC.md §4.8` formulas are unchanged and "what is
+ * supplied is the universe" -- which left metric 15's NUMERATOR without a per-case
+ * quantity, `§4.4(a)` defining `balance_harm_inr` as a run-level aggregate whose
+ * absolute value sits outside the per-account difference and which therefore does not
+ * decompose. M55 ratifies one decomposition, keyed by the injected observation's own
+ * `source_entity_id` (`DATA_MODEL.md §16`, `§12`/M28), and the structural zero for a
+ * case that posts no line and stays in the denominator. The bump is taken on **M39**'s
+ * precedent -- as 1.0.4 -> 1.0.5 and 1.0.8 -> 1.0.9 both were -- and NOT on M49's,
+ * whose test is whether a conforming agent's postings change: none does here. `§9`
+ * step 1 now tags `bench-v1.0.10` and step 5 requires this field to read `"1.0.10"`;
+ * `apps/cli` derives the tag from this constant, so M46's class of drift cannot recur.
+ *
+ * **Nothing this package produces changes.** M55 is entirely `packages/eval`'s: it
+ * reads the agent's journal and `GroundTruth.true_journal`, both of which this package
+ * already emits, and **adds no field** -- which is why `GT_VERSION` stays 1.1.0. M52's
+ * two populations are preserved verbatim and unnarrowed, so no `degradations` record,
+ * operator, family or rate is touched. No population, seed, family, rate, degradation
+ * operator, `§7` threshold this package reads, composition figure or artifact byte
+ * moves; `SPLIT_TABLE`, `SEED_BLOCKS`, `blockOf`, `AL7`'s successor rule and every
+ * `target_record_count` are unchanged; `constraint_set_hash` is `packages/domain`'s
+ * and is unmodified. **No dataset exists to regenerate.**
  */
-export const BENCHMARK_VERSION = "1.0.9";
+export const BENCHMARK_VERSION = "1.0.10";
 
 /** `DATA_MODEL.md §1`: `GroundTruth.gt_version`. */
 export const GT_VERSION = "1.1.0";
@@ -605,5 +630,25 @@ export const GT_VERSION = "1.1.0";
  * **`BENCHMARK_VERSION` moves 1.0.8 -> 1.0.9** on M39's precedent, four inputs to
  * frozen figures entering the pre-registered surface. `constraint_set_hash` is
  * `packages/domain`'s and is unmodified, and **no dataset exists to regenerate**.
+ *
+ * **1.4.32 -> 1.4.33 (M55) -- required ONE thing of this package, and it is
+ * `BENCHMARK_VERSION` above.** The amendment closes the gap M52 left behind it: M52
+ * supplied metrics 15 and 16's two populations and stated that `EVALUATION_SPEC.md
+ * §4.8`'s formulas are unchanged, which left metric 15's numerator -- "injected cases
+ * with `balance_harm > 0`" -- naming a per-case quantity `§4.4(a)` never defines, that
+ * clause giving only a run-level aggregate whose absolute value sits outside the
+ * per-account difference and which therefore does not decompose. **M55** ratifies one
+ * per-case decomposition, keyed by `DATA_MODEL.md §16`'s `source_entity_id` through
+ * `§12`/M28's relation, and the structural zero for a reference-kind or out-of-grammar
+ * case, which contributes 0 and stays in the denominator. **It reaches this package
+ * nowhere else**: the quantity is read by the scorer off the agent's journal and
+ * `GroundTruth.true_journal`, and **M52's populations, every degradation operator,
+ * family, rate and magnitude, and `GroundTruth`'s field list are preserved verbatim**
+ * -- so `GT_VERSION` stays **1.1.0**. `SPLIT_TABLE`, `SEED_BLOCKS`, `blockOf`, `AL7`'s
+ * successor rule, `§4.1`'s composition, every `target_record_count` and every `§7`
+ * threshold this package reads are unchanged; `constraint_set_hash` is
+ * `packages/domain`'s and is unmodified. **No dataset exists to regenerate**, and the
+ * implementation M55 authorises is deliberately not in this commit
+ * (`DECISION_BRIEF.md §A.40`, `§I`).
  */
-export const SPEC_VERSION = "1.4.32";
+export const SPEC_VERSION = "1.4.33";

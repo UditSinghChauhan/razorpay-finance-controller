@@ -340,6 +340,37 @@ export const LEGACY_MAX_UNRESOLVED_ABS_PAISE = 5_000_000;
  *     stays 1.1.0. **The implementation this row authorises is deliberately not in
  *     this commit** (`DECISION_BRIEF.md §A.39`, `§I`).
  *
+ *   - **1.4.33 (M55)** -- metric 15's per-case `balance_harm`, and the gap M52 left
+ *     behind it. M52 supplied metrics 15 and 16's two **populations** and closed by
+ *     saying that `EVALUATION_SPEC.md §4.8`'s formulas are unchanged and "what is
+ *     supplied is the universe"; metric 15's **numerator** is "injected cases with
+ *     `balance_harm > 0`", which names a **per-case** harm, while `§4.4(a)` defines
+ *     `balance_harm_inr` as a **run-level aggregate** whose absolute value sits
+ *     OUTSIDE the per-account difference and which therefore does not decompose --
+ *     `|a1+a2 - t1-t2| != |a1-t1| + |a2-t2|`. **M55 ratifies one decomposition**: for
+ *     injected observation `o`, `§4.4(a)`'s account-level absolute-difference sum with
+ *     BOTH projections restricted to the journal lines whose `source_entity_id` equals
+ *     `o`'s own business identifier (`DATA_MODEL.md §16`, through `§12`/M28's
+ *     one-to-one relation), Suspense excluded and the covered-set scope unchanged. The
+ *     **agent-side** restriction is part of that ratification, `§4.4(a)` keying
+ *     `proj_agent` by decision state alone. A reference-kind case (`§10.1`) or one
+ *     whose key falls outside `§16`'s `source_entity_id` grammar (an `order_...`)
+ *     contributes **0 and stays in the denominator**. The leave-one-out marginal and
+ *     substituting `§4.4(b)`'s `misdirected_value_inr` are **rejected and preserved as
+ *     rejected**. The per-case figures do **not** sum to `balance_harm_inr`, which
+ *     `PREREGISTRATION.md §10` **V30** declares. **`metrics/robustness.ts` is NOT
+ *     touched by this amendment and metric 15 stays unwired**; `truth.ts`'s M52
+ *     projection is unchanged; `metric-list.ts` stays at 28 and keeps its numbering;
+ *     **metric 16 is untouched**, formula and both populations; `run-key.ts` is
+ *     unchanged and `RunKey` stays `(agent_id, split, seed, llm_mode)`; `EPSILON_BPS`,
+ *     `C_REVIEW_PAISE`, `C_EXCEPTION_PAISE`, `K_SIGMA`, `TAU_SWEEP_FLOOR_PAISE`,
+ *     `C_REVIEW_SWEEP_PAISE`, `EPSILON_SWEEP_BPS` and every other constant below are
+ *     **unchanged**, the amendment adding one declaration to `§7` and revising none.
+ *     **`BENCHMARK_VERSION` moves 1.0.9 -> 1.0.10**, that constant being
+ *     `packages/generator`'s, and `GT_VERSION` stays 1.1.0. **The implementation this
+ *     row authorises is deliberately not in this commit** (`DECISION_BRIEF.md §A.40`,
+ *     `§I`).
+ *
  * **Nothing below moves with it**, and neither does `metric-list.ts`.
  */
-export const SPEC_VERSION = "1.4.32";
+export const SPEC_VERSION = "1.4.33";
