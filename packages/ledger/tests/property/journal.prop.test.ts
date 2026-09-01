@@ -15,6 +15,7 @@ import {
 
 import {
   BANK_EVIDENCE,
+  SETL_ID,
   adjustmentObservation,
   bankLineObservation,
   paymentObservation,
@@ -95,6 +96,7 @@ const postingRequest: fc.Arbitrary<{
   cardLine.map((line) => ({
     request: {
       occasion: "BANK_EVIDENCE" as const,
+      allocated_to: SETL_ID,
       observation: paymentObservation(line as never),
       ingest_valid: true,
       bank_evidence: BANK_EVIDENCE,
@@ -114,6 +116,7 @@ const postingRequest: fc.Arbitrary<{
   amount.map((gross) => ({
     request: {
       occasion: "BANK_EVIDENCE" as const,
+      allocated_to: SETL_ID,
       observation: refundObservation({ amount: gross, debit: gross } as never),
       ingest_valid: true,
       bank_evidence: BANK_EVIDENCE,
@@ -409,6 +412,7 @@ describe("the classes and kinds that post nothing", () => {
           },
           {
             occasion: "BANK_EVIDENCE" as const,
+            allocated_to: SETL_ID,
             observation: paymentObservation(line as never),
             ingest_valid: false,
             bank_evidence: BANK_EVIDENCE,

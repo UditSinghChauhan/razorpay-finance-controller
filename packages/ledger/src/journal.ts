@@ -185,6 +185,8 @@ export type ObservationState = (typeof OBSERVATION_STATES)[number];
  * - `INGEST` — "**`P1`** at ingest", "**`P3`** at ingest" (§17.1.1 rows 1, 3).
  * - `BANK_EVIDENCE` — "the settlement it is allocated to is **itself
  *   reconciled to a bank credit through real bank-side evidence**" (rows 2, 4).
+ *   The settlement it is allocated to is the **allocation under evaluation**'s,
+ *   carried on the request as `allocated_to` (register row M49, spec 1.4.30).
  * - `TERMINAL_STATE` — "**every terminal `ABSTAINED` or `EXCEPTION` state**",
  *   and the rows that post nothing whatever the state.
  * - `RESOLUTION` — `§17.1`'s `P7` row, "Resolution of a Suspense item".
@@ -290,9 +292,13 @@ export type NonPostingGround = (typeof NON_POSTING_GROUNDS)[number];
  *   behind it; a `bnk_…` cannot. This is the field that makes
  *   `E04_SETTLEMENT_NOT_IN_BANK` unable to manufacture a `1200_BANK`
  *   realization: an `E04` settlement has no bank line to name.
- * - `settlement_id` is checked against the recon line's own `settlement_id`, so
- *   one settlement's bank evidence cannot be attached to another settlement's
- *   line.
+ * - `settlement_id` is checked against the request's `allocated_to` — the
+ *   settlement the allocation under evaluation names (`§17.1.1`, register row
+ *   M49) — so one settlement's bank evidence cannot be attached to another
+ *   settlement's allocation. Before M49 the comparand was the recon line's own
+ *   `settlement_id`; that reading carried `AN1` into a rule this table
+ *   conditions on `AN2`, and `RECONCILIATION_SPEC.md §3` guarantees no member of
+ *   a proposed allocation satisfies it.
  * - `an2_satisfied` and `i5_satisfied` are typed `true`, not `boolean`, so
  *   "the anchor did not match" is unrepresentable rather than merely false. A
  *   caller with no evidence omits the occasion; it does not pass a negative
@@ -301,7 +307,10 @@ export type NonPostingGround = (typeof NON_POSTING_GROUNDS)[number];
  * `AN1` alone is deliberately **not** enough and is not among these fields.
  * It is "`recon_line.settlement_id === settlement.id`" on the basis "Same
  * system, same identifier" — "a **gateway-internal identity match that carries
- * no bank-side information**".
+ * no bank-side information**". **Nor is it necessary**: `§17.1.1` states `AN1`
+ * insufficient to debit `1200_BANK`, never required for it, and register row
+ * **M49** settles that a member `RECONCILIATION_SPEC.md §3` left unanchored posts
+ * `P2` under the allocation that explains it.
  */
 export interface BankSideEvidence {
   /** The settlement the line is allocated to (`AN1`). Must match the line's own. */
@@ -322,11 +331,37 @@ export interface IngestPostingRequest {
   readonly ingest_valid: boolean;
 }
 
-/** `DATA_MODEL.md §17.1.1` rows 2 and 4 — `P2` and `P4`, on real bank evidence. */
+/**
+ * `DATA_MODEL.md §17.1.1` rows 2 and 4 — `P2` and `P4`, on real bank evidence.
+ *
+ * **`allocated_to` is `§17.1.1`'s own phrase, supplied by the stage that knows
+ * it (register row M49, spec 1.4.30).** The trigger reads *"the settlement it is
+ * **allocated to** is itself reconciled to a bank credit"*, and M49 fixes that as
+ * the settlement of the **allocation under evaluation**: the
+ * `Candidate.target_id` for a proposed allocation, the target of the candidate
+ * `S5` validated for an accepted one. This module holds no candidate and no
+ * component, so the caller states it — the same division `bank_evidence` already
+ * uses for `AN2` and `I5`.
+ *
+ * **It is not `ReconLine.settlement_id`, and the distinction is the whole point.**
+ * That field carries `AN1`, which `§17.1.1` calls *"sufficient to reconcile a line
+ * to its settlement"* and **not** sufficient to debit `1200_BANK`; this table
+ * conditions `P2`/`P4` on `AN2`. `RECONCILIATION_SPEC.md §3` removes everything
+ * anchored from the search space, so every member reaching a proposed allocation
+ * carries a `settlement_id` that is `null` or names another settlement — reading
+ * the comparand off that field made `RECONCILIATION_SPEC.md §6`'s materiality
+ * identically zero and `AMBIGUOUS` unreachable, which spec 1.4.21 forecloses.
+ */
 export interface BankEvidencePostingRequest {
   readonly occasion: "BANK_EVIDENCE";
   readonly observation: Observation;
   readonly ingest_valid: boolean;
+  /**
+   * The settlement the allocation under evaluation names (`M49`). A `setl_…`;
+   * there is no `null`, because an allocation without a target is not an
+   * allocation.
+   */
+  readonly allocated_to: string;
   readonly bank_evidence: BankSideEvidence;
 }
 
@@ -400,7 +435,7 @@ export type JournalDecision = Posting | NonPosting;
 // ---------------------------------------------------------------------------
 
 const INGEST_KEYS = ["occasion", "observation", "ingest_valid"] as const;
-const BANK_EVIDENCE_KEYS = [...INGEST_KEYS, "bank_evidence"] as const;
+const BANK_EVIDENCE_KEYS = [...INGEST_KEYS, "allocated_to", "bank_evidence"] as const;
 const TERMINAL_KEYS = [
   ...INGEST_KEYS,
   "state",
@@ -570,6 +605,15 @@ function readRequest(request: PostingRequest): PostingRequest {
     return Object.freeze({
       occasion,
       ...common,
+      // M49's comparand, read through the same grammar check the evidence's own
+      // `settlement_id` gets: a token that is not a `setl_…` names no settlement,
+      // so it could not be an allocation's target.
+      allocated_to: readIdOfFamily(
+        record["allocated_to"],
+        `${path}.allocated_to`,
+        isSettlementId,
+        "setl_…",
+      ),
       bank_evidence: readEvidence(record["bank_evidence"], `${path}.bank_evidence`),
     });
   }
@@ -884,30 +928,33 @@ function reconLineOf(observation: Observation, rule: PostingRef) {
  * `P2`/`P4`'s bank-side condition, checked as far as this module can see it.
  *
  * `AN2` and `I5` themselves are stated by the caller and cannot be recomputed
- * here. `AN1` — "`recon_line.settlement_id === settlement.id`" — *is* visible,
- * because the recon line carries its own `settlement_id`, so it is checked:
- * without it one settlement's bank evidence could be attached to another
- * settlement's line, and the evidence would be true of a settlement this line
- * was never allocated to.
+ * here. What **is** checkable is that the evidence is about the settlement the
+ * allocation under evaluation names — `DATA_MODEL.md §17.1.1`'s *"the settlement
+ * it is allocated to"*, fixed by register row **M49** — so it is checked. Without
+ * it one settlement's bank evidence could be attached to another settlement's
+ * allocation, and the evidence would be true of a settlement this allocation
+ * never named. **That is the anti-cross-attachment guarantee, and it is
+ * unchanged; only its comparand moves**, from a field carrying `AN1` to the
+ * allocation `AN2` actually attests to.
+ *
+ * **No second check on `ReconLine.settlement_id` is added, and its absence is
+ * deliberate.** A member `RECONCILIATION_SPEC.md §3` left unanchored carries
+ * `null` there — `PREREGISTRATION.md §4.2`'s `DROP_SETTLEMENT_ID` — or a dangling
+ * id, since `S1` anchors only where the named settlement is present in the
+ * observation set. Rejecting either would reimpose `AN1` necessity in a narrower
+ * form and reopen exactly what M49 closed. `I2`'s one-allocation rule is stage
+ * `S5`'s (`RECONCILIATION_SPEC.md §7`) and is not re-adjudicated here.
  */
-function assertBankEvidenceMatchesLine(
-  settlementId: string | null,
+function assertBankEvidenceMatchesAllocation(
+  allocatedTo: string,
   evidence: BankSideEvidence,
 ): void {
-  if (settlementId === null) {
-    throw new JournalError(
-      "$.observation.payload.settlement_id",
-      `P2/P4 require the line to be allocated to the settlement the bank ` +
-        `evidence names (AN1, RECONCILIATION_SPEC.md §3); the line carries no ` +
-        `settlement_id`,
-    );
-  }
-  if (settlementId !== evidence.settlement_id) {
+  if (allocatedTo !== evidence.settlement_id) {
     throw new JournalError(
       "$.bank_evidence.settlement_id",
       `the bank evidence names ${JSON.stringify(evidence.settlement_id)} and the ` +
-        `line is allocated to ${JSON.stringify(settlementId)} (AN1, ` +
-        `RECONCILIATION_SPEC.md §3)`,
+        `allocation under evaluation is to ${JSON.stringify(allocatedTo)} ` +
+        `(DATA_MODEL.md §17.1.1's "the settlement it is allocated to", M49)`,
     );
   }
 }
@@ -988,7 +1035,7 @@ function buildLegs(rule: PostingRef, request: PostingRequest): Construction {
         throw new JournalError("$.occasion", "P2 is reached only from BANK_EVIDENCE");
       }
       const line = reconLineOf(observation, rule);
-      assertBankEvidenceMatchesLine(line.settlement_id, request.bank_evidence);
+      assertBankEvidenceMatchesAllocation(request.allocated_to, request.bank_evidence);
       // `fee` is GST-inclusive and `tax` is the component inside it (§6), so
       // `fee_ex_gst = fee − tax`. `sub` re-validates and refuses a result
       // outside the safe range; a negative one is refused below, because a
@@ -1033,7 +1080,7 @@ function buildLegs(rule: PostingRef, request: PostingRequest): Construction {
         throw new JournalError("$.occasion", "P4 is reached only from BANK_EVIDENCE");
       }
       const line = reconLineOf(observation, rule);
-      assertBankEvidenceMatchesLine(line.settlement_id, request.bank_evidence);
+      assertBankEvidenceMatchesAllocation(request.allocated_to, request.bank_evidence);
       return {
         legs: [dr("2200_REFUND_LIABILITY", line.amount), cr("1200_BANK", line.amount)],
         sourceEntityId: reconLineKey(line.entity_id, line.type),

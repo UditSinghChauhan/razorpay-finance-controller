@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { CERTIFICATE_REASONS } from "@assay/ledger";
+import { CERTIFICATE_REASONS, JournalError } from "@assay/ledger";
 
 import {
   EPSILON_BPS,
@@ -19,6 +19,8 @@ import {
   type Target,
 } from "@assay/engine";
 
+import type { BankSideEvidence } from "@assay/ledger";
+
 import { obsId, reconLine } from "./fixtures.js";
 
 /**
@@ -32,6 +34,7 @@ import { obsId, reconLine } from "./fixtures.js";
 const DAY = 86_400;
 const T0 = 1_782_900_000;
 const MODE = 2;
+const TARGET_ENTITY_ID = `setl_${"a".repeat(14)}`;
 
 /**
  * SE3 recomputed from §4.2 (spec 1.4.13), independently of the engine, as an
@@ -106,6 +109,7 @@ function input(o: {
   attempts?: number;
   exceeds?: boolean;
   observed?: readonly string[];
+  bankEvidence?: BankSideEvidence | null;
 }): SolveInput {
   const observed = new Set(o.observed ?? []);
   return {
@@ -117,16 +121,211 @@ function input(o: {
     candidates: o.candidates,
     members: o.members,
     mode_days: MODE,
-    target_entity_id: "setl_aaaaaaaaaaaaaa",
+    target_entity_id: TARGET_ENTITY_ID,
     recon_reports: o.reports ?? [],
     // The v1.4.14 relation: entity id -> observation id, PARTIAL. An id absent
     // from `observed` has no observation and is excluded from R* (spec 1.4.16).
     observationIdForEntityId: (e) =>
       observed.has(e) ? (e.replace("ent_", "obs_") as never) : undefined,
     probe_attempts: o.attempts ?? 0,
-    bank_evidence: null,
+    bank_evidence: o.bankEvidence ?? null,
   };
 }
+
+/**
+ * `AN2` evidence for `TARGET_ENTITY_ID`, which is what `§17.1.1` conditions
+ * `P2`/`P4` on. Named settlement matches the target, so M49's comparand agrees
+ * and the anti-cross-attachment check passes.
+ */
+const BANK_EVIDENCE: BankSideEvidence = {
+  settlement_id: TARGET_ENTITY_ID,
+  bank_line_id: `bnk_${"b".repeat(14)}`,
+  an2_satisfied: true,
+  i5_satisfied: true,
+};
+
+// ---------------------------------------------------------------------------
+// M49 — the branch that was unreachable before spec 1.4.30
+// ---------------------------------------------------------------------------
+
+/**
+ * `RECONCILIATION_SPEC.md §6`'s `AMBIGUOUS`, reached on the population that
+ * produces it (register row `DATA_MODEL.md §22.2` **M49**).
+ *
+ * Before spec 1.4.30 this describe block could not exist. `journal.ts` read
+ * `§17.1.1`'s *"the settlement it is allocated to"* off `ReconLine.settlement_id`
+ * — an `AN1` field — while `§3` removes everything anchored from the search
+ * space, so **every** member of a proposed allocation carried `null` or a
+ * dangling id there. With `bank_evidence` non-null `balances` threw; with it
+ * null the materiality was `0` and `§6` returned `IMMATERIALLY_AMBIGUOUS`. Both
+ * regimes made `materiality > τ` unattainable, so `AMBIGUOUS` and
+ * `DISCRIMINATED` were unreachable and `§6.2`'s probe loop never ran.
+ *
+ * The fixture is spec 1.4.21's own reachability argument, made concrete: *"`C6`
+ * pins `Σ credit − Σ debit` and **not** `Σ amount` or `Σ fee`, while `P2` posts
+ * on `amount`, `fee − tax` and `tax`"*. Two allocations tie out identically and
+ * move the control accounts by different totals.
+ *
+ * ```
+ *   A = {a1, a2}   amount 51_000  fee  1_000  credit 50_000  tax 305   each
+ *   B = {b1, b2}   amount 80_000  fee 30_000  credit 50_000  tax 305   each
+ *
+ *   C6   Σ credit − Σ debit = 100_000 = target.amount        for BOTH
+ *   P2   1200_BANK        +100_000                           for BOTH
+ *        1100_RECEIVABLE  −102_000  (A)   −160_000  (B)      Δ = 58_000
+ *        5100_FEE_EXPENSE  +1_390   (A)    +59_390  (B)      Δ = 58_000
+ *        1300_GST_INPUT      +610   (A)       +610  (B)      Δ =      0
+ *
+ *   materiality = 58_000 paise   τ = max(10_000, 10 bps of 1_000_000) = 10_000
+ *   Δs = 0 (identical lag multisets, SE5 = 0) < ε = 1500
+ * ```
+ *
+ * Every member carries `settlement_id: null` — `PREREGISTRATION.md §4.2`'s
+ * `DROP_SETTLEMENT_ID`, and the state `§3` leaves every unanchored member in.
+ */
+describe("§6 AMBIGUOUS is reachable on an AN2 target with unanchored members (M49)", () => {
+  const lag = 2 * DAY;
+  const line = (n: number, amount: number, fee: number): Member =>
+    reconLine(n, {
+      settlementId: null, // §3 left it unanchored; DROP_SETTLEMENT_ID emptied it
+      amount,
+      fee,
+      createdAt: T0,
+      settledAt: T0 + lag,
+    });
+
+  const a1 = line(1, 51_000, 1_000);
+  const a2 = line(2, 51_000, 1_000);
+  const b1 = line(3, 80_000, 30_000);
+  const b2 = line(4, 80_000, 30_000);
+  const members = [a1, a2, b1, b2];
+  const candidates = [cand([1, 2]), cand([3, 4])];
+
+  const ambiguous = (): ReturnType<typeof solve> =>
+    solve(input({ members, candidates, bankEvidence: BANK_EVIDENCE }));
+
+  it("does not throw — a member §3 left unanchored reaches the projection", () => {
+    // The exact failure M49 closed: journalFor at the BANK_EVIDENCE occasion,
+    // for every member of each candidate, on lines with no settlement_id.
+    expect(() => ambiguous()).not.toThrow();
+  });
+
+  it("computes a NON-ZERO materiality from the fee composition", () => {
+    const r = ambiguous();
+    // Recomputed here from §17.1's posting table, not read back from the engine:
+    // the max per-AccountCode delta is 1100_GATEWAY_RECEIVABLE's Σ amount.
+    const sumAmount = (ms: readonly Member[]): number =>
+      ms.reduce((a, m) => a + m.payload.amount, 0);
+    expect(r.materiality_paise).toBe(
+      Math.abs(sumAmount([a1, a2]) - sumAmount([b1, b2])),
+    );
+    expect(r.materiality_paise).toBe(58_000);
+    expect(r.materiality_paise).toBeGreaterThan(0);
+  });
+
+  it("exceeds τ and returns AMBIGUOUS with a certificate", () => {
+    const r = ambiguous();
+    expect(r.tau_paise).toBe(10_000);
+    expect(r.materiality_paise).toBeGreaterThan(r.tau_paise);
+    expect(r.delta_s_bps).toBe(0);
+    expect(r.delta_s_bps).toBeLessThan(EPSILON_BPS);
+    expect(r.outcome).toBe("AMBIGUOUS");
+    // §6: the second-best solution IS the certificate, so both must be present.
+    expect(r.best).not.toBeNull();
+    expect(r.second).not.toBeNull();
+    expect(r.certificate_reason).toBe("EVIDENCE_TIE");
+  });
+
+  it("is the branch the pre-M49 reading could not reach", () => {
+    // Same fixture, no AN2: §17.1.1 conditions P2/P4 on "AN2 satisfied against
+    // an actual bank_line", so neither allocation posts and the difference is 0.
+    // This is the ONLY outcome the whole population could produce before M49.
+    const withoutAn2 = solve(input({ members, candidates, bankEvidence: null }));
+    expect(withoutAn2.materiality_paise).toBe(0);
+    expect(withoutAn2.outcome).toBe("IMMATERIALLY_AMBIGUOUS");
+  });
+
+  it("DISCRIMINATED is reachable on the same population", () => {
+    // The other branch materiality > τ gates. One SE5 report names A's members,
+    // so Δs = 2000 bps ≥ ε = 1500 and §6 attaches the discriminator instead of
+    // abstaining. It too was unreachable while materiality was identically zero.
+    const r = solve(
+      input({
+        members,
+        candidates,
+        bankEvidence: BANK_EVIDENCE,
+        // The suite's own §12 relation: `ent_…N` resolves to `obs_…N`, which is
+        // `obsId(N)`. A report naming A's two members gives A a perfect Jaccard
+        // (SE5 = 2000 bps) and B a zero, which is the only route above ε.
+        reports: [
+          {
+            settlement_id: TARGET_ENTITY_ID,
+            constituent_entity_ids: ["ent_00000000000001", "ent_00000000000002"],
+          },
+        ],
+        observed: ["ent_00000000000001", "ent_00000000000002"],
+      }),
+    );
+    expect(r.materiality_paise).toBeGreaterThan(r.tau_paise);
+    expect(r.delta_s_bps).toBeGreaterThanOrEqual(EPSILON_BPS);
+    expect(r.outcome).toBe("DISCRIMINATED");
+  });
+
+  it("drops no candidate: every S2-admissible one is ranked", () => {
+    // §6 "ranks, it does not re-filter". An unanchored member is not a reason to
+    // omit a candidate, and M49 rejected the repairs that would have skipped one.
+    const three = [...candidates, cand([1, 3])];
+    const r = solve(input({ members, candidates: three, bankEvidence: BANK_EVIDENCE }));
+    expect(r.ranked).toHaveLength(three.length);
+    expect(new Set(r.ranked.map((s) => s.canonical_key)).size).toBe(three.length);
+  });
+
+  it("projects every member — an allocation is not silently shortened", () => {
+    // A one-member allocation against a two-member one. If `balances` skipped a
+    // member §3 left unanchored, both sides would project nothing and the
+    // materiality would collapse to 0 — the self-defeating repair M49 rejected.
+    const r = solve(
+      input({ members, candidates: [cand([1, 2]), cand([3])], bankEvidence: BANK_EVIDENCE }),
+    );
+    // §6 maximises over EVERY AccountCode. Here the widest is 1200_BANK, which
+    // P2 debits by `credit`: 100_000 against 50_000. A skipped member would
+    // shrink one side to nothing and take this to 0.
+    expect(r.materiality_paise).toBe(Math.abs(50_000 * 2 - 50_000));
+    expect(r.materiality_paise).toBe(50_000);
+  });
+
+  // --- G2 (post-M49 audit) --------------------------------------------------
+  // Every fixture above sets `target_entity_id` and `bank_evidence.settlement_id`
+  // to the SAME value, so a mutant that threads `balances` from
+  // `bank_evidence.settlement_id` instead of `SolveInput.target_entity_id` would
+  // make the anti-cross-attachment check compare the evidence against itself and
+  // never fail — and the whole suite would still pass. This is the one test that
+  // sets them apart, so it is the one test that mutant cannot survive.
+  it("rejects when target_entity_id and bank_evidence.settlement_id disagree (G2)", () => {
+    // input()'s target_entity_id is fixed at TARGET_ENTITY_ID -- setl_A. The
+    // evidence below names a DIFFERENT settlement -- setl_B -- so a correct
+    // threading of target_entity_id into journalFor's `allocated_to` must be
+    // what journal.ts rejects; if S4 threaded the evidence's OWN settlement_id
+    // instead, `allocated_to` would equal `evidence.settlement_id` by
+    // construction and this candidate pair would solve to AMBIGUOUS instead.
+    const mismatchedEvidence: BankSideEvidence = {
+      ...BANK_EVIDENCE,
+      settlement_id: `setl_${"b".repeat(14)}`, // setl_B -- differs from TARGET_ENTITY_ID (setl_A)
+    };
+    expect(mismatchedEvidence.settlement_id).not.toBe(TARGET_ENTITY_ID);
+
+    // Two admissible candidates reach the second-best branch, which is what
+    // makes `solve` call `materiality` -> `balances` -> `journalFor` at all.
+    const attempt = (): ReturnType<typeof solve> =>
+      solve(input({ members, candidates, bankEvidence: mismatchedEvidence }));
+
+    expect(attempt).toThrow(JournalError);
+    // §17.1.1's own phrase, from `assertBankEvidenceMatchesAllocation`'s
+    // diagnostic -- proof the rejection is M49's check and not some other
+    // failure mode reached by accident.
+    expect(attempt).toThrow(/the settlement it is allocated to/);
+  });
+});
 
 describe("frozen constants are not renormalised", () => {
   it("keeps 3500 / 2000 / 1500 / 1000 / 2000 summing to 10_000", () => {

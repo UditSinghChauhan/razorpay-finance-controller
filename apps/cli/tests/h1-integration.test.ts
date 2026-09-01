@@ -47,6 +47,8 @@ interface LineOpts {
   readonly credit?: number;
   readonly debit?: number;
   readonly amount?: number;
+  /** `null` is the state `RECONCILIATION_SPEC.md §3` leaves every unanchored member in. */
+  readonly settlementId?: string | null;
 }
 
 function reconLine(n: number, opts: LineOpts = {}): Member {
@@ -77,7 +79,7 @@ function reconLine(n: number, opts: LineOpts = {}): Member {
       // Identical lag on every member, so SE3 cannot separate the candidates
       // and the component is AMBIGUOUS before any probe runs.
       settled_at: T0 + MODE * DAY,
-      settlement_id: SETL,
+      settlement_id: opts.settlementId === undefined ? SETL : opts.settlementId,
       posted_at: null,
       credit_type: "default",
       payment_id: null,
@@ -502,6 +504,117 @@ function metaFor(systemPromptId: string, input: R3Input) {
     failure: null,
   };
 }
+
+// ---------------------------------------------------------------------------
+// M49 — the same chain, on the population §3 actually produces
+// ---------------------------------------------------------------------------
+
+/**
+ * `§6.6`'s chain over members `RECONCILIATION_SPEC.md §3` left **unanchored**.
+ *
+ * The suite above carries `settlement_id: SETL` on every member, so `journal.ts`
+ * accepted them under the pre-1.4.30 reading of `DATA_MODEL.md §17.1.1`. That is
+ * not the population `§4` sends to `S2`: `§3` removes everything anchored from
+ * the search space, so **every** member of a real proposed allocation carries
+ * `null` there — `PREREGISTRATION.md §4.2`'s `DROP_SETTLEMENT_ID` — or an id
+ * naming a settlement the observation set does not hold.
+ *
+ * Before register row **M49** this whole block was unreachable: `S4`'s
+ * `balances` threw `JournalError` on the first such member, and the composition
+ * root's workaround withheld the evidence instead, which sent the component to
+ * `IMMATERIALLY_AMBIGUOUS` and `§6.2`'s loop never ran. The chain below is
+ * therefore the first end-to-end evidence that `R3` is reachable at all.
+ *
+ * Nothing else moves: the same four members, the same two candidates, the same
+ * `AN2` evidence, the same committed recon report, the same offline provider and
+ * the same closed five-probe enum.
+ */
+const UNANCHORED_MEMBERS: readonly Member[] = [
+  reconLine(1, { credit: 50_000, settlementId: null }),
+  reconLine(2, { credit: 50_000, settlementId: null }),
+  reconLine(3, { credit: 150_000, settlementId: null }),
+  reconLine(4, { type: "refund", debit: 50_000, credit: 0, amount: 50_000, settlementId: null }),
+];
+
+const unanchoredSolveInput: Omit<SolveInput, "recon_reports" | "probe_attempts"> = {
+  ...solveInput,
+  component: { ...solveInput.component, member_obs_ids: UNANCHORED_MEMBERS.map((m) => m.obs_id) },
+  members: UNANCHORED_MEMBERS,
+  observationIdForEntityId: (e) => {
+    const found = UNANCHORED_MEMBERS.find(
+      (m) => (m as unknown as { payload: { entity_id: string } }).payload.entity_id === e,
+    );
+    return found?.obs_id;
+  },
+};
+
+describe("§6.6's chain runs on UNANCHORED members (M49)", () => {
+  const firstSolve = (): ReturnType<typeof solve> =>
+    solve({ ...unanchoredSolveInput, recon_reports: [], probe_attempts: 0 });
+
+  it("every member carries no settlement_id — the state §3 leaves them in", () => {
+    for (const m of UNANCHORED_MEMBERS) {
+      expect(
+        (m as unknown as { payload: { settlement_id: string | null } }).payload.settlement_id,
+      ).toBeNull();
+    }
+  });
+
+  it("S4 solves without throwing, and the materiality is non-zero", () => {
+    // The exact JournalError M49 closed, and the zero it collapsed to.
+    expect(() => firstSolve()).not.toThrow();
+    const first = firstSolve();
+    expect(first.materiality_paise).not.toBeNull();
+    expect(first.materiality_paise ?? 0).toBeGreaterThan(0);
+    expect(first.materiality_paise ?? 0).toBeGreaterThan(first.tau_paise);
+  });
+
+  it("S4 returns AMBIGUOUS, which is what gates the probe loop", () => {
+    const first = firstSolve();
+    expect(first.outcome).toBe("AMBIGUOUS");
+    expect(first.delta_s_bps).toBeLessThan(1500);
+    expect(first.certificate_reason).toBe("EVIDENCE_TIE");
+    expect(first.second).not.toBeNull();
+  });
+
+  it("the loop is ENTERED and R3 proposes from the frozen five", async () => {
+    const result = await runProbeLoop(runInput({ solveInput: unanchoredSolveInput }));
+    expect(result.state.attempts).toBe(1);
+    expect(result.events).toHaveLength(1);
+    expect(result.events[0]?.body.kind).toBe("PROBE");
+    expect(result.events[0]?.body.subject_ids).toEqual([SETL]);
+    // One probe was spent and it is recorded on the certificate's own field.
+    expect(result.state.probes_attempted).toHaveLength(1);
+    // §6.2's enum is closed at five and R3 proposed from within it: the loop
+    // accepted the proposal, so no rejection was recorded and no source was
+    // added — the dispatch that followed is fetch_settlement_recon's, the only
+    // probe §6.2 gives a source.
+    expect(result.stop).toBeNull();
+    expect(R3_PROBE_PRIORITY[0]).toBe("fetch_settlement_recon");
+  });
+
+  it("the probe result re-enters solve and resolves the ambiguity", async () => {
+    const result = await runProbeLoop(runInput({ solveInput: unanchoredSolveInput }));
+    // The dispatched report came back and was accumulated.
+    expect(result.state.reports).toHaveLength(1);
+    expect(result.state.reports[0]?.constituent_entity_ids).toEqual([entId(1), entId(2)]);
+    // SE5 at 2000 bps is the only route above ε = 1500 (§10 V20), so the re-solve
+    // leaves AMBIGUOUS and no certificate is owed.
+    expect(result.solve.outcome).not.toBe("AMBIGUOUS");
+    expect(result.solve.certificate_reason).toBeNull();
+    expect(result.solve.best?.candidate.member_obs_ids).toEqual([obsId(1), obsId(2)]);
+    // The re-solve still projects a real materiality — the probe discriminated,
+    // it did not make the two allocations post identically.
+    expect(result.solve.materiality_paise ?? 0).toBeGreaterThan(0);
+    expect(result.stop).toBeNull();
+  });
+
+  it("the proposer is logged, and no probe source was added", async () => {
+    const result = await runProbeLoop(runInput({ solveInput: unanchoredSolveInput }));
+    expect(result.events[0]?.proposer.type).toBe("llm");
+    expect(result.calls.every((c) => c.role === "R3_propose_probe")).toBe(true);
+  });
+});
 
 /** A provider that returns one fixed raw value, however malformed. */
 function stubProvider(raw: unknown): LlmProvider {
