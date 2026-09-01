@@ -275,6 +275,21 @@ export const LEGACY_MAX_UNRESOLVED_ABS_PAISE = 5_000_000;
  *     removed** — `metric-list.ts` stays at 28 — and `BENCHMARK_VERSION` does NOT
  *     move, staying 1.0.7.
  *
+ *   - **1.4.30 (M49)** — `DATA_MODEL.md §17.1.1`'s *"the settlement it is
+ *     allocated to"* is fixed as the settlement of the **allocation under
+ *     evaluation**. **It is not a `§7` parameter and reaches no constant in this
+ *     file.** Its consequence for this package is entirely on the **values**
+ *     metrics take, never on their definitions: it makes
+ *     `RECONCILIATION_SPEC.md §6`'s `AMBIGUOUS` reachable, so abstention-bearing
+ *     metrics stop reading a structurally empty population, and it restores the
+ *     `P2` bank leg on solved allocations, which `metric 13` and `§4.4`'s
+ *     `balance_harm_inr` project. **No metric definition changes, none is added
+ *     and none is removed** — `metric-list.ts` stays at 28 and keeps its
+ *     numbering — `§5.4`'s thirteen obligations and `§5.5`'s forbidden practices
+ *     are untouched, and no figure exists to move: `bench/` is absent and no
+ *     scored run has been produced. **`BENCHMARK_VERSION` moves 1.0.7 -> 1.0.8**,
+ *     that constant being `packages/generator`'s.
+ *
  * **Nothing below moves with it**, and neither does `metric-list.ts`.
  */
-export const SPEC_VERSION = "1.4.29";
+export const SPEC_VERSION = "1.4.30";

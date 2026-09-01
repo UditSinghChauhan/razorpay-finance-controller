@@ -404,8 +404,25 @@ export const K_MAX = 22;
  * stream)` namespace, which is a space of generation phases. No population, seed,
  * family, rate or `§7` threshold this package reads moves; `GT_VERSION` stays
  * 1.1.0 and no artifact byte changes.
+ *
+ * **1.0.7 -> 1.0.8 at spec 1.4.30** (register row M49). `DATA_MODEL.md §17.1.1`'s
+ * *"the settlement it is allocated to"* is fixed as the settlement of the
+ * **allocation under evaluation** rather than `ReconLine.settlement_id`. This is
+ * the first bump since 1.0.3 taken because the amendment changes **what a
+ * conforming agent posts** -- the `P2` bank leg now fires on a member
+ * `RECONCILIATION_SPEC.md §3` left unanchored, under the allocation that explains
+ * it -- so runs either side of it are not comparable, which is the property this
+ * constant exists to express. `§9` step 1 now tags `bench-v1.0.8` and step 5
+ * requires this field to read `"1.0.8"`; `apps/cli` derives the tag from this
+ * constant, so M46's class of drift cannot recur. **Nothing this package produces
+ * changes** -- the clause reaches `packages/ledger`'s posting function and
+ * `packages/engine`'s `S4`, and the generator writes the true state from
+ * omniscience, which already settles these lines under `P2`
+ * (`RECONCILIATION_SPEC.md §11`). No population, seed, family, rate, `§7`
+ * threshold, composition figure or artifact byte moves; `GT_VERSION` stays 1.1.0
+ * and **no dataset exists to regenerate**.
  */
-export const BENCHMARK_VERSION = "1.0.7";
+export const BENCHMARK_VERSION = "1.0.8";
 
 /** `DATA_MODEL.md §1`: `GroundTruth.gt_version`. */
 export const GT_VERSION = "1.1.0";
@@ -517,5 +534,19 @@ export const GT_VERSION = "1.1.0";
  * enters `§7`, no artifact surface changes and no metric moves. No population,
  * seed, family, rate, `§7` threshold, composition figure or artifact byte moves;
  * `GT_VERSION` stays 1.1.0.
+ *
+ * **1.4.29 -> 1.4.30 (M49) — required TWO things of this package and both are
+ * constants above.** The amendment fixes `DATA_MODEL.md §17.1.1`'s *"the
+ * settlement it is allocated to"* as the settlement of the allocation under
+ * evaluation, which changes what a conforming agent posts and therefore moves
+ * **`BENCHMARK_VERSION` 1.0.7 -> 1.0.8** as well as this constant. **What it does
+ * NOT touch is this package's entire output.** The clause reasons *about*
+ * `PREREGISTRATION.md §4.2`'s `DROP_SETTLEMENT_ID` -- the operator that produces
+ * the unanchored member -- and amends neither it nor its **10%** rate; `F08`
+ * stays test-only, `SPLIT_TABLE`, `SEED_BLOCKS` and `blockOf` are unchanged, and
+ * the clean-`bank_ref` share, every family rate and every `target_record_count`
+ * hold. `GT_VERSION` stays **1.1.0**: truth posts from omniscience and already
+ * settles these lines under `P2`, so no ground-truth byte moves. No dataset
+ * exists to regenerate.
  */
-export const SPEC_VERSION = "1.4.29";
+export const SPEC_VERSION = "1.4.30";

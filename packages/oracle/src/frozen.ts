@@ -165,5 +165,19 @@ export const BPS_DENOMINATOR = 10_000;
  * exactly as M43 left it. `SETTLEMENT_WINDOW_DAYS`, `K_ORACLE`, `C_ORACLE`,
  * `TAU_FLOOR_PAISE` and `TAU_RATE_BPS` are unchanged; `BENCHMARK_VERSION`
  * (1.0.7) and `GT_VERSION` (1.1.0) stay `packages/generator`'s.
+ *
+ * **1.4.29 -> 1.4.30 (M49) — required nothing of this package.** The amendment
+ * fixes `DATA_MODEL.md §17.1.1`'s *"the settlement it is allocated to"* as the
+ * settlement of the **allocation under evaluation**. That phrase governs a
+ * **posting trigger**, and this package posts nothing: `AL8` bars it from the
+ * ledger as it bars it from `§6.2`'s probe surface, and the oracle's business is
+ * enumeration and labels. `§6`'s materiality is `packages/engine`'s and is
+ * **read by no oracle** -- `TAU_FLOOR_PAISE` and `TAU_RATE_BPS` are this
+ * package's own transcription of `tau` for its labels and are unchanged, as are
+ * `SETTLEMENT_WINDOW_DAYS`, `K_ORACLE` and `C_ORACLE`. `DATA_MODEL.md §11.1`'s
+ * member-eligible set and `RECONCILIATION_SPEC.md §3`'s anchor semantics -- the
+ * two things the clause reasons *about* -- are cited by it and amended by none of
+ * it. **`BENCHMARK_VERSION` moves 1.0.7 -> 1.0.8** and `GT_VERSION` (1.1.0)
+ * stays; both remain `packages/generator`'s.
  */
-export const SPEC_VERSION = "1.4.29";
+export const SPEC_VERSION = "1.4.30";

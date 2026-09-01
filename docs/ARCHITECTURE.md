@@ -1,6 +1,15 @@
 # ARCHITECTURE — ASSAY
 
-**Spec version:** 1.4.29 · **Date:** 2026-08-31
+**Spec version:** 1.4.30 · **Date:** 2026-09-01
+
+**At spec 1.4.30** this document is unchanged apart from the version header.
+Register row `DATA_MODEL.md §22.2` **M49** reads `§4` boundary 3's *"`journal.ts`
+… takes a **proposed** allocation"* as it stands and settles which settlement that
+allocation names; the boundary itself is **not amended**, and neither is `§3`'s
+package ownership, `§6`'s probe surface, `§7.2`'s consistency gate, `§7.3`'s two
+gates, `§10`'s agent topology or `§11`'s PRNG. **No trust boundary, data flow,
+interface, provider, role, probe enum or gate definition changes.** Benchmark
+v1.0.7 → **v1.0.8**. See `DECISION_BRIEF.md §A.37`.
 
 **At spec 1.4.29** `§3` records two placements and `§10` one topology: the seven
 agent implementations are `apps/cli/src/agents/`'s and are **injected** into

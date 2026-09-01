@@ -1,6 +1,6 @@
 # `@assay/cli`
 
-Written against **specification 1.4.29 / benchmark 1.0.7**.
+Written against **specification 1.4.30 / benchmark 1.0.8**.
 
 `assay generate · oracle · run · bench · close · verify · seal · report`
 (`DECISION_BRIEF.md §C` T0-11; `report` appended at spec 1.4.29, register row

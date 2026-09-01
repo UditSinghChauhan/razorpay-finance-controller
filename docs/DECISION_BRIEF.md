@@ -1,8 +1,25 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.29 · **Date:** 2026-08-31
+**Spec version:** 1.4.30 · **Date:** 2026-09-01
 **Reviewer role:** principal architect / skeptical reviewer
+
+**At spec 1.4.30** §A.37 records **one ratification**, taken at a governance gate
+held after spec 1.4.29 and — the condition that makes it legitimate — **before any
+scored result existed**: `bench/` absent, `runs/` holding only `.gitkeep`, no
+dataset generated and no metric computed. `DATA_MODEL.md §17.1.1`'s *"the settlement
+it is allocated to"* is fixed as the settlement of the **allocation under
+evaluation** — the `Candidate.target_id` for a proposed allocation, the target of
+the candidate `S5` validated for an accepted one — and **not**
+`ReconLine.settlement_id`. The competing reading makes `RECONCILIATION_SPEC.md §6`'s
+materiality identically zero and its `AMBIGUOUS` and `DISCRIMINATED` outcomes
+unreachable, which spec 1.4.21's own reachability argument forecloses. Register row
+**M49**. **Benchmark v1.0.7 → v1.0.8**; `GT_VERSION` stays 1.1.0,
+`constraint_set_hash` does not move, `C1`–`C8`, `SE1`–`SE5`, `τ`, `ε`, every `§7`
+threshold, `I1`–`I9`, `§17.1`'s `P1`–`P8`, `§13`'s certificate, the closed
+five-probe enum and all **28** metric definitions are unchanged, and no artifact
+byte changes. `§H`'s `H1` disposition and `M41`'s finding are untouched. See
+`PREREGISTRATION.md` amendment 1.4.30.
 
 **At spec 1.4.29** §A.36 records **four ratifications** in three groups, taken at a
 governance gate held after spec 1.4.28 and — the condition that makes them
@@ -2600,6 +2617,105 @@ generation seed; `§4.1`'s composition and every `target_record_count`; `M42`, `
 §7` success criterion; and `GT_VERSION` **1.1.0**. **No artifact byte changes** and
 **no dataset exists to regenerate** — `bench/` is absent, `runs/` holds only
 `.gitkeep`, and no manifest, run, root hash or `bench-v1.0.7` tag was ever produced.
+
+### A.37 Spec 1.4.30 / benchmark 1.0.8 — the phrase that decided whether abstention exists
+
+**The decision.** One ratification. `DATA_MODEL.md §17.1.1`'s *"the settlement it is
+allocated to"* is the settlement of the **allocation under evaluation**: the
+`Candidate.target_id` for a *proposed* allocation, the target of the candidate `S5`
+validated for an *accepted* one. It is **not** `ReconLine.settlement_id`. Register
+row `DATA_MODEL.md §22.2` **M49**. **`BENCHMARK_VERSION` moves 1.0.7 → 1.0.8**;
+`SPEC_VERSION` **1.4.29 → 1.4.30**; `GT_VERSION` stays 1.1.0.
+
+**The condition that makes this legitimate is an ordering, and it holds.** The
+reading was fixed **before any scored result existed**: `bench/` absent, `runs/`
+holding only `.gitkeep`, no dataset generated, no agent scored, no metric computed
+and no seal tag cut. It is fixed **now** rather than at the seal because
+`PREREGISTRATION.md §10` **V17** already records that the candidate machinery is
+first exercised on the **sealed test split** — so a phrase that decides whether
+abstention can occur at all would otherwise have been settled after seeing the only
+run permitted to observe it.
+
+**The phrase was undefined for the only allocation `§6` projects.** *"Allocated
+to"* occurs **twice in the entire corpus**, both times in `§17.1.1`'s `P2`/`P4`
+trigger rows, and no clause defines it. The nearest definition is `I4`'s
+*"`settlement.amount = Σ credit − Σ debit` over its **allocated lines**"*
+(`RECONCILIATION_SPEC.md §7`) — the allocation `S4`/`S5` establish, not an observed
+field. `§L.1` rule 4 and `ARCHITECTURE.md §4` boundary 3 both fix `journal.ts` as
+*"a pure posting function over a **proposed** allocation"*, and a proposed
+allocation's target cannot be read off a field `S1` has already declined to anchor.
+
+**The competing reading is foreclosed by a frozen sentence, not by convenience.**
+Spec 1.4.21 — §A.28 above, and `PREREGISTRATION.md §7` — holds that *"materiality
+remains generally non-zero in the real case, because `C6` pins `Σ credit − Σ debit`
+and **not** `Σ amount` or `Σ fee`, while `P2` posts on `amount`, `fee − tax` and
+`tax` — so allocations differing in fee composition move the control accounts by
+different totals, and `AMBIGUOUS` stays reachable."* Two candidates for one target
+**share every anchored member** — `S2` puts the same `anchored_members` in each — so
+they can differ **only** in members `§3` left unanchored. That unamended sentence
+therefore asserts `P2` firing on unanchored members inside `§6`'s materiality
+projection, which the `AN1`-necessity reading makes impossible.
+
+**What the rejected reading costs, stated as a consequence rather than a risk.**
+Under it, `§6`'s materiality is **identically zero** for every component: with no
+`AN2` no bank leg posts either side, and with `AN2` the only members that
+distinguish the candidates are exactly the ones refused. `materiality > τ` is then
+unattainable, so `AMBIGUOUS` and `DISCRIMINATED` are unreachable, `§6.2`'s probe
+loop never runs, `R3` is never called in either arm, and `§11`'s worked example
+cannot reach the verdict `§11` states for it. `PREREGISTRATION.md §8`'s metric list,
+`EVALUATION_SPEC.md §4.13`'s `EXPLORATORY` line and §H's **H1** each presuppose the
+loop exists. A second consequence reaches the committed path: a line correctly
+allocated to an `AN2`-confirmed settlement would post `P1` and never `P2`, putting
+`proj_agent ≠ proj_truth` on a **correct** decision — the confound
+`EVALUATION_SPEC.md §4.4` exists to remove, and which `§17.1.1` itself cites in the
+`ledger_entry` row.
+
+**`AN1` was stated insufficient, never necessary.** `§17.1.1`'s own paragraph reads
+*"it is **sufficient** to reconcile a line to its settlement; it is **not
+sufficient** to debit `1200_BANK`"* — a bar on `AN1` **alone** carrying a bank leg,
+which is precisely what `AN2` clears. No frozen clause makes `AN1` a precondition of
+`P2`, and none of `M1`–`M48` registers one.
+
+**Ratified, and the record says so.** The phrase supported both readings and
+**neither excluded the other**; the frozen reachability argument selects one. This
+is marked a ratification rather than dressed as a derivation, on the `M35`
+precedent. **No new materiality definition was invented** — the tempting repair, and
+the wrong one, exactly as spec 1.4.21 said of the ₹1,00,000 figure.
+
+**Four repairs were rejected for want of textual support.** `journalFor` **skipping**
+an unanchored member: `NON_POSTING_GROUNDS` is a closed set, *"one member per clause
+of `§17.1.1`"*, and a silent skip is indistinguishable from `THREAT_MODEL.md §T8`'s
+lost posting. `S4` **excluding** the member from the balance, or **treating** its
+bank evidence as zero: both delete exactly the members two candidates differ in, so
+materiality stays identically zero — self-defeating rather than wrong. An
+`S1`/`S2` **guarantee** that such a member cannot reach `S4`: contradicted directly
+by `§3`'s *"everything anchored is removed from the search space"*, `§4`'s
+unanchored targets, `§11`'s `Component.member_obs_ids`, `§11`'s own `F08` worked
+example and `V17`.
+
+**Why the benchmark version moves when the last three amendments' did not.** M45–M48
+settled placement, output surface and procedure; none changed what a conforming
+agent **posts**. This one does — the `P2` bank leg on solved allocations — so runs
+either side of it are not comparable, which is what `BENCHMARK_VERSION` exists to
+express. `M46`'s precedent requires the bump to reach `PREREGISTRATION.md §9`'s code
+block in the same amendment that takes it, and it does: step 1 tags `bench-v1.0.8`
+and step 5 requires `"1.0.8"`.
+
+**What does not change.** Every metric formula, definition, universe and number, and
+the 28-metric list; `RECONCILIATION_SPEC.md §6`'s materiality formula, its four
+outcomes and its second-best certificate; `§6.2`'s probe loop, `P_max = 3`, the
+closed five-probe enum, `fetch_settlement_recon`'s source and the `A3-NOLLM` policy;
+`§11`'s worked example and verdict; `§3`'s anchor table and `AN5`'s retirement;
+`τ`, `ε`, `K_max`, `C_max`, `C1`–`C8` and therefore `constraint_set_hash`;
+`SE1`–`SE5` and their weights; `I1`–`I9`; `DATA_MODEL.md §17.1`'s `P1`–`P8`, `§17.2`,
+`§13`, `§11.1`, `§10`'s `Observation` and `§18`'s `BenchmarkManifest` **shape**;
+`AL1`–`AL8`; `§6.1`'s split and seed table and every generation seed; `§4.1`'s
+composition and every `target_record_count`; `M41`'s finding, `V17`, `V22`–`V25`,
+`§F`'s rows and §H's **H1** disposition; every `PROJECT_SPEC.md §7` success
+criterion; and `GT_VERSION` **1.1.0**. **No artifact byte changes** and **no dataset
+exists to regenerate** — `bench/` is absent, `runs/` holds only `.gitkeep`, and no
+manifest, run, root hash or seal tag was ever produced. Historical amendment records
+are preserved **verbatim**.
 
 ## B. Locked project definition
 
