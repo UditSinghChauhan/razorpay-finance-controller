@@ -1,6 +1,12 @@
 import type { Agent, AgentInput, AgentRun } from "@assay/eval";
 
-import { runAssayAblation } from "./assay.js";
+import {
+  runAssayAblation,
+  runAssayComposedFull,
+  type AssayComposeOptions,
+  type ComposedRun,
+} from "./assay.js";
+import type { SweepParameters } from "./sweep-runner.js";
 
 /**
  * `A1-NOVALIDATE` — ASSAY with stage `S5`'s allocation-scoped invariant
@@ -65,14 +71,41 @@ import { runAssayAblation } from "./assay.js";
  * `RECONCILIATION_SPEC.md §7` folds it in *"only when the caller supplies both
  * hashes"*; `assay.ts` supplies neither, for `ASSAY` and for `A1` alike.
  */
+/**
+ * `A1`'s composition, in one place, with the sweep parameters folded in.
+ *
+ * A single site for the option object matters here more than anywhere else:
+ * `"NONE_A1_NOVALIDATE"` is lint-allowlisted to **this file** (M50, `§L.1`
+ * rule 4), so a second construction of `A1`'s options elsewhere is not merely
+ * duplication — it is unbuildable. `bench/sweep.ts` therefore reaches `A1`
+ * through {@link a1Swept} rather than assembling options of its own.
+ */
+function optionsFor(sweep: SweepParameters): AssayComposeOptions {
+  return {
+    agentId: "A1-NOVALIDATE",
+    // The one respect in which this agent differs from ASSAY. Lint permits
+    // this literal in this file and nowhere else (M50; §L.1 rule 4).
+    invariantSelection: "NONE_A1_NOVALIDATE",
+    ...sweep,
+  };
+}
+
 export const a1Agent: Agent = {
   id: "A1-NOVALIDATE",
   run(input: AgentInput): Promise<AgentRun> {
-    return runAssayAblation(input, {
-      agentId: "A1-NOVALIDATE",
-      // The one respect in which this agent differs from ASSAY. Lint permits
-      // this literal in this file and nowhere else (M50; §L.1 rule 4).
-      invariantSelection: "NONE_A1_NOVALIDATE",
-    });
+    // No sweep: `packages/engine` resolves §7's frozen ε and τ, so the ordinary
+    // scored execution is byte-identical to the pre-M51 one.
+    return runAssayAblation(input, optionsFor({}));
   },
 };
+
+/**
+ * `A1` at supplied `§6` thresholds — `EVALUATION_SPEC.md §5.1`'s curve agent
+ * (spec 1.4.32, register row `DATA_MODEL.md §22.2` **M51**).
+ *
+ * `§5.1`: *"`B0`, `B1`, `B2` and `A2` are single points … ASSAY and `A1` are
+ * curves."* This is the second of the two.
+ */
+export function a1Swept(input: AgentInput, sweep: SweepParameters): Promise<ComposedRun> {
+  return runAssayComposedFull(input, optionsFor(sweep));
+}

@@ -254,17 +254,39 @@ describe("3 — no S1-S5 duplication", () => {
       expect(body, rel).not.toMatch(
         /\b(const|let|var|function)\s+(TAU|EPSILON_BPS|K_MAX|C_MAX|P_MAX|SE_WEIGHTS_BPS|C_REVIEW|C_EXCEPTION|K_SIGMA|QUEUE_TOP_N)\b/,
       );
-      if (rel.startsWith("agents/")) {
-        // The single exception, and it is exactly one name reached through
-        // exactly one package: EPSILON_BPS from @assay/engine.
-        expect(body.replace(/\bEPSILON_BPS\b/g, ""), rel).not.toMatch(FROZEN);
-        // And where it does appear it is reached from the package that freezes
+      // Two exceptions, and each is exactly ONE name reached through exactly one
+      // package. The declaration ban above is universal and neither weakens it.
+      //
+      //   agents/**       EPSILON_BPS from @assay/engine. DATA_MODEL.md §13
+      //                   makes `epsilon_bps` a REQUIRED AmbiguityCertificate
+      //                   field -- the certificate "records whichever margin was
+      //                   in force" -- and no engine result type carries it.
+      //
+      //   bench/sweep.ts  EPSILON_BPS from @assay/eval, added at spec 1.4.32
+      //                   (register row DATA_MODEL.md §22.2 M51). §7 freezes the
+      //                   ε grid so that the frozen operating point LIES ON IT,
+      //                   and `assertGridIsFrozen` is the fail-closed check that
+      //                   it does -- a check that cannot be written without
+      //                   naming the value it checks for. Naming it under a
+      //                   different identifier would be the "second spelling"
+      //                   this whole test exists to prevent, which is why the
+      //                   exception is granted rather than routed around.
+      const exception =
+        rel.startsWith("agents/") || rel === "bench/sweep.ts"
+          ? { name: /\bEPSILON_BPS\b/g, from: rel.startsWith("agents/") ? "engine" : "eval" }
+          : null;
+      if (exception !== null) {
+        expect(body.replace(exception.name, ""), rel).not.toMatch(FROZEN);
+        // And where it does appear it is reached from a package that freezes
         // it. Import shapes are read from the RAW source: `code()` blanks string
         // literals, so a module specifier is invisible to it — the same reading
         // `probe/run.ts`'s `solve` assertion uses.
         if (FROZEN.test(body)) {
           expect(text, rel).toMatch(
-            /import\s*\{[^}]*\bEPSILON_BPS\b[^}]*\}\s*from\s*"@assay\/engine"/s,
+            new RegExp(
+              `import\\s*\\{[^}]*\\bEPSILON_BPS\\b[^}]*\\}\\s*from\\s*"@assay/${exception.from}"`,
+              "s",
+            ),
           );
         }
         continue;

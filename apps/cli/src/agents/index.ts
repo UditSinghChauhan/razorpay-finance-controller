@@ -2,13 +2,14 @@ import { AGENT_IDS, agentDeclaration, tier0Agents, type Agent, type AgentId } fr
 
 import { ALL } from "../args.js";
 import { UsageError } from "../errors.js";
-import { a1Agent } from "./a1.js";
+import { a1Agent, a1Swept } from "./a1.js";
 import { a2Agent } from "./a2.js";
 import { a3Agent } from "./a3.js";
 import { assayAgent } from "./assay.js";
 import { b0Agent } from "./b0.js";
 import { b1Agent } from "./b1.js";
 import { b2Agent } from "./b2.js";
+import { SWEPT_AGENT_IDS, assaySwept, isSweptAgent, type SweptRunner } from "./sweep-runner.js";
 
 /**
  * The seven agents, constructed here and **injected** into `packages/eval`.
@@ -155,5 +156,30 @@ export function selectAgents(raw: string): readonly Agent[] {
   return Object.freeze(ALL_AGENTS.filter((agent) => chosen.has(agent.id)));
 }
 
+/**
+ * `EVALUATION_SPEC.md §5.1`'s two curve agents, wired to their runners.
+ *
+ * Built here because this is the one module that already imports every agent:
+ * `a1Swept` must be defined in `a1.ts`, whose option object carries the
+ * empty-invariant-selection literal lint allowlists to that file alone (M50), and
+ * `sweep-runner.ts` cannot import it back without a cycle.
+ *
+ * `agents.test.ts` pins the key set against {@link SWEPT_AGENT_IDS}, so a runner
+ * added here without a `§5.1` sentence behind it fails the suite.
+ */
+export const SWEPT_RUNNERS: ReadonlyMap<AgentId, SweptRunner> = Object.freeze(
+  new Map<AgentId, SweptRunner>([
+    ["ASSAY", assaySwept],
+    ["A1-NOVALIDATE", a1Swept],
+  ]),
+);
+
+/** The swept runner for one `§5.1` curve agent, or `undefined` for a single point. */
+export function sweptRunnerFor(id: AgentId): SweptRunner | undefined {
+  return SWEPT_RUNNERS.get(id);
+}
+
 export { agentDeclaration };
+export { SWEPT_AGENT_IDS, isSweptAgent, type SweptRunner };
+export type { SweepParameters } from "./sweep-runner.js";
 export { a1Agent, a2Agent, a3Agent, assayAgent, b0Agent, b1Agent, b2Agent };
