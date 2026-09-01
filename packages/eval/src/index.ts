@@ -121,9 +121,12 @@ export {
 } from "./run-key.js";
 
 export {
+  type DegradationPopulations,
   type ScoringTruth,
   type TrueEdge,
   type TrueJournalRow,
+  INJECTING_OPS,
+  degradationPopulations,
   projectTruth,
   scoringTruth,
   trueTargetByEntity,
