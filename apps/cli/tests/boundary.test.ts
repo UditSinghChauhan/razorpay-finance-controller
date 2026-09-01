@@ -125,6 +125,26 @@ const sources = files.map((file) => ({
 
 const inFsModule = (rel: string): boolean => rel.startsWith("fs/");
 
+/**
+ * The two composition roots, and the one licence they hold.
+ *
+ * *"A composition root may CALL a stage; it may not BE one."* `probe/run.ts`
+ * has held it since spec 1.4.25 — it sequences `RECONCILIATION_SPEC.md §6.6`'s
+ * chain and invokes `packages/engine`'s own `solve` — and `src/agents/**` holds
+ * it from spec 1.4.29 (`DATA_MODEL.md §22.2` M47) for the same reason and no
+ * wider one: an agent is *"a composition of engine, llm, probe and ledger behind
+ * `@assay/eval`'s one interface"* (`src/index.ts`), so it necessarily calls
+ * every stage it composes.
+ *
+ * **What the licence is not.** It permits a CALL and an IMPORT; it permits no
+ * declaration. Every assertion below that bans *declaring* a stage, minting a
+ * `ValidatedDecision`, spelling a frozen threshold's value, reaching `../fs/`,
+ * naming a probe, opening a transport or writing a decimal literal applies to
+ * these two files exactly as it applies to every other one.
+ */
+const isCompositionRoot = (rel: string): boolean =>
+  rel === "probe/run.ts" || rel.startsWith("agents/");
+
 describe("1 — one door", () => {
   it("imports node: builtins only under src/fs/", () => {
     // ARCHITECTURE.md §3 gives apps/cli "all filesystem I/O". The property that
@@ -215,23 +235,58 @@ describe("3 — no S1-S5 duplication", () => {
     // §L.1 rule 12 freezes tau, epsilon, K_max, C_max, P_max, C_review,
     // C_exception, k_sigma, queue_top_n and the SE1-SE5 weights. A second
     // spelling of any of them, anywhere, is a second thing to keep in step.
+    //
+    // Reading the owning package's own constant is not a second spelling, and
+    // `src/agents/**` has one place it must: `DATA_MODEL.md §13` makes
+    // `epsilon_bps` a REQUIRED field of an `AmbiguityCertificate` — the
+    // certificate "records whichever margin was in force" — and no result type
+    // in `packages/engine` carries it, while `tau_paise` and
+    // `materiality_paise` arrive on `SolveResult`. So the composition root
+    // imports `EPSILON_BPS` from the module that freezes it and compares it
+    // against nothing. The declaration ban below is unchanged and is what §L.1
+    // rule 12 actually protects: no file here may DECLARE a threshold, and
+    // nothing outside `src/agents/**` may name one at all.
+    const FROZEN =
+      /\b(TAU|EPSILON_BPS|K_MAX|C_MAX|P_MAX|SE_WEIGHTS_BPS|C_REVIEW|C_EXCEPTION|K_SIGMA|QUEUE_TOP_N)\b/;
     for (const { rel, text } of sources) {
-      expect(code(text), rel).not.toMatch(
-        /\b(TAU|EPSILON_BPS|K_MAX|C_MAX|P_MAX|SE_WEIGHTS_BPS|C_REVIEW|C_EXCEPTION|K_SIGMA|QUEUE_TOP_N)\b/,
+      const body = code(text);
+      // Nobody declares one, anywhere -- including the composition roots.
+      expect(body, rel).not.toMatch(
+        /\b(const|let|var|function)\s+(TAU|EPSILON_BPS|K_MAX|C_MAX|P_MAX|SE_WEIGHTS_BPS|C_REVIEW|C_EXCEPTION|K_SIGMA|QUEUE_TOP_N)\b/,
       );
+      if (rel.startsWith("agents/")) {
+        // The single exception, and it is exactly one name reached through
+        // exactly one package: EPSILON_BPS from @assay/engine.
+        expect(body.replace(/\bEPSILON_BPS\b/g, ""), rel).not.toMatch(FROZEN);
+        // And where it does appear it is reached from the package that freezes
+        // it. Import shapes are read from the RAW source: `code()` blanks string
+        // literals, so a module specifier is invisible to it — the same reading
+        // `probe/run.ts`'s `solve` assertion uses.
+        if (FROZEN.test(body)) {
+          expect(text, rel).toMatch(
+            /import\s*\{[^}]*\bEPSILON_BPS\b[^}]*\}\s*from\s*"@assay\/engine"/s,
+          );
+        }
+        continue;
+      }
+      expect(body, rel).not.toMatch(FROZEN);
     }
   });
 
   it("evaluates no constraint and enumerates no candidate", () => {
     for (const { rel, text } of sources) {
       const body = code(text);
-      expect(body, rel).not.toMatch(/\b(checkC[1-8]|HARD_CONSTRAINTS|generateCandidates|isAdmissible)\b/);
       // A composition root may CALL a stage; it may not BE one. `probe/run.ts`
-      // sequences §6.6's chain and invokes the engine's own `solve`, which is
-      // the whole of spec 1.4.25's composition — so the ban is on declaring a
-      // stage, not on calling one.
-      expect(body, rel).not.toMatch(/\b(function|const|let)\s+(anchor|decompose|solve|evaluate)\b/);
-      if (rel === "probe/run.ts") continue;
+      // sequences §6.6's chain and invokes the engine's own `solve`, and
+      // `agents/**` composes S1-S5 behind ARCHITECTURE.md §10's one interface —
+      // so the ban is on declaring a stage, not on calling one.
+      expect(body, rel).not.toMatch(/\b(function|const|let)\s+(anchor|decompose|solve|evaluate|generateCandidates)\b/);
+      // `S2`'s enumeration is the engine's and is never re-derived: an agent
+      // may call `generateCandidates`, and no file may spell a constraint check
+      // or a second admissibility test.
+      expect(body, rel).not.toMatch(/\b(checkC[1-8]|HARD_CONSTRAINTS|isAdmissible)\b/);
+      if (isCompositionRoot(rel)) continue;
+      expect(body, rel).not.toMatch(/\bgenerateCandidates\b/);
       expect(body, rel).not.toMatch(/\b(anchor|decompose|solve|evaluate)\s*\(/);
     }
   });
@@ -251,8 +306,27 @@ describe("3 — no S1-S5 duplication", () => {
   it("mints no ValidatedDecision and posts no journal line", () => {
     // §L.1 rule 4: only packages/engine/src/s5-validate.ts may construct one,
     // and packages/ledger has "exactly one write path".
+    //
+    // The name `ValidatedDecision` stays banned in every file, composition roots
+    // included: the widening assertion is the engine's and the type is never
+    // spelled here, so a cast to it cannot be written. `appendEvent` stays
+    // banned for the same reason — appending is the write path's, and
+    // `postValidatedDecision` is how a composition root reaches it.
     for (const { rel, text } of sources) {
-      expect(code(text), rel).not.toMatch(/ValidatedDecision|journalFor|appendEvent\s*\(/);
+      const body = code(text);
+      // Word-bounded: `postValidatedDecision` is packages/ledger's ONE mutating
+      // function and is how a composition root reaches the write path at all,
+      // while the bare type name is what a widening assertion would have to
+      // spell. §L.1 rule 4 admits the first and permits the second nowhere here.
+      expect(body, rel).not.toMatch(/\bValidatedDecision\b|appendEvent\s*\(/);
+      // `journalFor` is packages/ledger's pure function over a PROPOSED
+      // allocation (ARCHITECTURE.md §4 boundary 3), which is what makes it
+      // callable before S5 rather than after it. An agent must call it to have
+      // journal lines for `I1` to balance; declaring one here would fork
+      // §17.1.1's table, and that is what stays banned.
+      expect(body, rel).not.toMatch(/\b(function|const|let)\s+journalFor\b/);
+      if (isCompositionRoot(rel)) continue;
+      expect(body, rel).not.toMatch(/journalFor/);
     }
   });
 });
@@ -303,8 +377,16 @@ describe("4 — it dispatches the probe loop; it does not own it", () => {
       // declaring one here would fork the §16 body.
       expect(body, rel).not.toMatch(/(function|const)\s+probeEventBody\b/);
       expect(body, rel).not.toMatch(/\bP_MAX\b/);
+      // `attempts_remaining` is budget arithmetic and `probeEventBody` is §16's
+      // body: both stay inside src/probe/ for every file.
       if (rel.startsWith("probe/")) continue;
-      expect(body, rel).not.toMatch(/probeEventBody|attempts_remaining|probes_attempted/);
+      expect(body, rel).not.toMatch(/probeEventBody|attempts_remaining/);
+      // `probes_attempted` is NOT budget arithmetic: DATA_MODEL.md §13 makes it
+      // a field of the AmbiguityCertificate — "what we tried before giving up" —
+      // which the agent mints and packages/probe reports. It is read from the
+      // loop's own state and never counted here.
+      if (rel.startsWith("agents/")) continue;
+      expect(body, rel).not.toMatch(/probes_attempted/);
     }
   });
 

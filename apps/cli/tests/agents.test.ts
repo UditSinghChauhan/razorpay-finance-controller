@@ -77,14 +77,45 @@ describe("the constructed set is EVALUATION_SPEC.md §3's table", () => {
   });
 });
 
-describe("every agent reports the package that owes it, and none stands in", () => {
+const INPUT = {
+  observations: [],
+  config: { llm_mode: "offline", strict_replay: true, split: "dev", seed: 2000 },
+} as const;
+
+describe("ASSAY runs, and the six that cannot say what they are waiting for", () => {
+  it("composes the pipeline rather than reporting a blocker (spec 1.4.29)", async () => {
+    // The one agent that is not blocked. `assay.ts` sequences S1 -> the S1/S2
+    // seam -> S2 -> S3 -> S4 (with §6.2's loop where packages/probe's `decide`
+    // requires it) -> §17.1.1's postings -> S5 -> the single write path -> the
+    // G1-G5 close gate, calling each through the package that owns it.
+    //
+    // Driven on the empty observation set, which is the one input this suite can
+    // supply without a dataset: PREREGISTRATION.md §9 sequences every real
+    // generation after the seal tag, so the populated path belongs to the
+    // integration suite and not here. It is still the whole pipeline — every
+    // stage is entered — and it is enough to pin that ASSAY returns an AgentRun.
+    const run = await agentById("ASSAY").run(INPUT);
+
+    expect(run.agent_id).toBe("ASSAY");
+    expect(run.config).toEqual(INPUT.config);
+    // EVALUATION_SPEC.md §2: "Every run attempts a period close." `null` here
+    // means no close was attempted, which §2 forbids for a scored run.
+    expect(run.close).not.toBeNull();
+    expect(run.close?.period_status).toBe("CLOSED");
+    // G1-G5 all passed, so §10.2 reached a report rather than BLOCKED.
+    expect(run.close?.gate.failed_gates).toEqual([]);
+    expect(run.close?.trial_balance_ok).toBe(true);
+    // No observation, so no terminal state, no posting and no probe.
+    expect(run.outcomes).toEqual([]);
+    expect(run.journal).toEqual([]);
+    expect(run.probes_spent).toBe(0);
+  });
+
   it("names a blocker and exits UNAVAILABLE rather than returning a run", async () => {
     for (const agent of ALL_AGENTS) {
-      const input = { observations: [], config: {
-        llm_mode: "offline", strict_replay: true, split: "dev", seed: 2000,
-      } } as const;
-      await expect(agent.run(input)).rejects.toBeInstanceOf(AgentUnavailableError);
-      const error = await agent.run(input).catch((e: unknown) => e);
+      if (agent.id === "ASSAY") continue;
+      await expect(agent.run(INPUT)).rejects.toBeInstanceOf(AgentUnavailableError);
+      const error = await agent.run(INPUT).catch((e: unknown) => e);
       expect(error, agent.id).toBeInstanceOf(AgentUnavailableError);
       if (error instanceof AgentUnavailableError) {
         expect(error.exitCode, agent.id).toBe(EXIT.UNAVAILABLE);
@@ -94,16 +125,18 @@ describe("every agent reports the package that owes it, and none stands in", () 
     }
   });
 
-  it("gives ASSAY and its three ablations the SAME blocker", async () => {
+  it("gives the three ablations the SAME blocker", async () => {
     // §3.2: an ablation is a control only while it "differs from ASSAY in
     // exactly one respect". An ablation naming a different dependency set would
-    // already differ in a second respect nobody recorded.
+    // already differ in a second respect nobody recorded, so the three share one
+    // blocker — `assay.ts`'s `assayPipelineBlocker`, which ASSAY itself no
+    // longer raises because the pipeline it names is now composed. What each
+    // ablation is waiting for is its own REMOVAL: `A3-NOLLM` is §3.2's
+    // "literally ASSAY --llm=offline" and is the nearest of the three.
     const blockers = await Promise.all(
-      (["ASSAY", "A1-NOVALIDATE", "A2-NOABSTAIN", "A3-NOLLM"] as const).map(async (id) =>
+      (["A1-NOVALIDATE", "A2-NOABSTAIN", "A3-NOLLM"] as const).map(async (id) =>
         agentById(id)
-          .run({ observations: [], config: {
-            llm_mode: "offline", strict_replay: true, split: "dev", seed: 2000,
-          } })
+          .run(INPUT)
           .catch((e: unknown) => (e instanceof AgentUnavailableError ? e.blockedBy : null)),
       ),
     );
@@ -116,9 +149,7 @@ describe("every agent reports the package that owes it, and none stands in", () 
     // floor that appeared to need the whole architecture would misstate what it
     // measures.
     const blocker = await agentById("B0-IDONLY")
-      .run({ observations: [], config: {
-        llm_mode: "offline", strict_replay: true, split: "dev", seed: 2000,
-      } })
+      .run(INPUT)
       .catch((e: unknown) => (e instanceof AgentUnavailableError ? e.blockedBy : ""));
     expect(blocker).not.toContain("packages/engine");
     expect(blocker).toContain("packages/ledger");
@@ -126,9 +157,7 @@ describe("every agent reports the package that owes it, and none stands in", () 
 
   it("records B1-GREEDY as out of scope, not blocked on a package", async () => {
     const blocker = await agentById("B1-GREEDY")
-      .run({ observations: [], config: {
-        llm_mode: "offline", strict_replay: true, split: "dev", seed: 2000,
-      } })
+      .run(INPUT)
       .catch((e: unknown) => (e instanceof AgentUnavailableError ? e.blockedBy : ""));
     expect(blocker).toContain("H2");
     expect(blocker).not.toContain("packages/");
