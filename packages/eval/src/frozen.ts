@@ -309,6 +309,37 @@ export const LEGACY_MAX_UNRESOLVED_ABS_PAISE = 5_000_000;
  *     **`BENCHMARK_VERSION` does NOT move, staying 1.0.8**: no conforming agent's
  *     postings change, the only arm the row settles having never produced one.
  *
+ *   - **1.4.32 (M51-M54)** -- the four evaluation-procedure gaps closed before
+ *     generation. **This is the first amendment since 1.4.28 that reaches this
+ *     package's scope, and it reaches it in three places without moving a constant
+ *     below.** M51 fixes the sweep contract: the `EVALUATION_SPEC.md §5.1` epsilon
+ *     grid is `{0, 500, ..., 10_000}` bps -- 21 uniform points with **1500 among
+ *     them** -- so `EPSILON_SWEEP_BPS`'s two endpoints are joined by a frozen
+ *     discretization in `PREREGISTRATION.md §7`; a sweep point is an evaluation
+ *     **inside one scored unit**, keyed `(RunKey, parameter_name, parameter_value)`,
+ *     so **`run-key.ts` is unchanged and `RunKey` stays `(agent_id, split, seed,
+ *     llm_mode)`**; the epsilon and tau sweeps are `apps/cli`'s, this package
+ *     integrating points it is handed exactly as `metrics/risk-coverage.ts` already
+ *     says of itself; and `C_review` and `C_exception` are swept **together** over
+ *     `C_REVIEW_SWEEP_PAISE`'s three points, which `metrics/sensitivity.ts`'s
+ *     `cReviewSweep` does not yet do. M52 defines metrics 15 and 16's two
+ *     populations, which `metrics/robustness.ts` already takes as caller-supplied
+ *     sets and `truth.ts` will project from `GroundTruth.degradations`. M53 defines
+ *     `abstention_rate_by_value` on `EVALUATION_SPEC.md §4.1`'s denominator and
+ *     freezes metric 17's baseline into `§7`, which `metrics/abstention.ts` already
+ *     takes as an argument rather than deriving. M54 records metric **10** as **not
+ *     computable on the frozen population**. **No metric definition changes in the
+ *     sense that matters here and none is added or removed** -- `metric-list.ts`
+ *     stays at 28 and keeps its numbering; what metrics 15, 16 and 17 gain is the
+ *     **universe** their unchanged formulas quantify over, the benchmark-v1.0.3
+ *     treatment of metric 13. `TAU_SWEEP_FLOOR_PAISE`, `C_REVIEW_SWEEP_PAISE`,
+ *     `EPSILON_SWEEP_BPS`, `EPSILON_BPS`, `C_REVIEW_PAISE`, `C_EXCEPTION_PAISE`,
+ *     `K_SIGMA` and every other constant below are **unchanged**, the amendment
+ *     adding declarations to `§7` and revising none. **`BENCHMARK_VERSION` moves
+ *     1.0.8 -> 1.0.9**, that constant being `packages/generator`'s, and `GT_VERSION`
+ *     stays 1.1.0. **The implementation this row authorises is deliberately not in
+ *     this commit** (`DECISION_BRIEF.md §A.39`, `§I`).
+ *
  * **Nothing below moves with it**, and neither does `metric-list.ts`.
  */
-export const SPEC_VERSION = "1.4.31";
+export const SPEC_VERSION = "1.4.32";

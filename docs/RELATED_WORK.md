@@ -1,6 +1,17 @@
 # RELATED_WORK — ASSAY
 
-**Spec version:** 1.4.31 · **Date:** 2026-09-01
+**Spec version:** 1.4.32 · **Date:** 2026-09-02
+
+**At spec 1.4.32** this document is unchanged apart from the version header. Register
+rows `DATA_MODEL.md §22.2` **M51**–**M54** settle the ε/τ/cost sweep contract, two
+robustness populations, metric 17's baseline and metric 10's non-computability. **One
+`§4` positioning claim is read and holds:** the risk–coverage curve and `AURC` this
+document cites from the selective-prediction literature (Geifman & El-Yaniv) are
+metric 3, and `M51` supplies the grid that produces the curve rather than changing
+what is claimed from it. No positioning claim, prior-art comparison or differentiator
+moves, and `§1.4`'s statement — that ASSAY consumes the Razorpay recon report as
+authoritative input and claims no gap in it — is untouched. See `DECISION_BRIEF.md
+§A.39`.
 
 **At spec 1.4.31** this document is unchanged apart from the version header. Register
 row `DATA_MODEL.md §22.2` **M50** settles what `EVALUATION_SPEC.md §3.2`'s

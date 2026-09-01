@@ -1,6 +1,27 @@
 # ARCHITECTURE — ASSAY
 
-**Spec version:** 1.4.31 · **Date:** 2026-09-01
+**Spec version:** 1.4.32 · **Date:** 2026-09-02
+
+**At spec 1.4.32** this document changes **one word in one `§9` API row** — the
+telemetry endpoint's *"rolling dev baseline"* becomes the **frozen** DEV baseline of
+`PREREGISTRATION.md §7`, register row `DATA_MODEL.md §22.2` **M53** retiring
+*"rolling"* as a window this benchmark has no axis for — and is otherwise unchanged
+apart from the version header. **No endpoint, method, path, payload or consumer
+moves.** **Three further clauses are load-bearing for the amendment without being
+amended by it**. Register rows `DATA_MODEL.md §22.2` **M51**–**M54** close the four
+evaluation-procedure gaps. `§10`'s pipeline and its scored-unit line are what put the
+ε and τ sweeps in `apps/cli` rather than in `packages/eval`: **M37**'s finding that
+*"hosting the run loop puts the system under test inside the thing measuring it"* and
+**M47**'s injection direction both stand unchanged, and a sweep re-executes an agent,
+which only the composition root may construct. `§7.1`'s and `§7.3`'s oracle
+independence is why **M51** does **not** re-run the oracle at a swept τ. `§11`'s
+vendored PRNG, `§3`'s single filesystem door, `§4`'s trust boundaries, every package
+ownership row, the provider and role tables, the probe enum and the gate definitions
+are **unchanged**; `§9`'s telemetry endpoint keeps its shape, **M53** supplying
+the universe of a field `DATA_MODEL.md §21` already declares. **No trust boundary,
+data flow, interface, package ownership, provider, role, probe enum, gate definition
+or failure-handling row changes**, and benchmark moves to **v1.0.9**. See
+`DECISION_BRIEF.md §A.39`.
 
 **At spec 1.4.31** this document is unchanged apart from the version header, and
 **two of its clauses are load-bearing for the amendment without being amended by
@@ -850,7 +871,7 @@ Internal HTTP, `apps/api`, consumed only by `apps/web`. Local bind only.
 | `GET` | `/runs/:id/exceptions` | Exception + abstention queue, **ranked by rupee value**, filterable by class. |
 | `GET` | `/runs/:id/decisions/:decision_id` | Full drill-down: evidence, constraints, certificate, hash-chain segment. |
 | `GET` | `/runs/:id/ledger/verify` | Recomputes the hash chain from genesis, re-projects balances, re-checks the Suspense identity. Returns pass/fail per check. |
-| `GET` | `/runs/:id/abstention-telemetry` | Abstention rate by value against the rolling dev baseline, source attribution, spike flag (`THREAT_MODEL.md §T9`). |
+| `GET` | `/runs/:id/abstention-telemetry` | Abstention rate by value against the **frozen DEV baseline** of `PREREGISTRATION.md §7`, source attribution, spike flag (`THREAT_MODEL.md §T9`). The word *"rolling"* stood here through spec 1.4.31 and is retired by register row `DATA_MODEL.md §22.2` **M53**: it named a window this benchmark has no axis for. |
 | `GET` | `/bench/:version` | Static benchmark report JSON. |
 
 `/ledger/verify` exists so a reviewer can check tamper-evidence live rather than

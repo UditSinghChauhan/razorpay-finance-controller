@@ -1,6 +1,27 @@
 # EVALUATION_SPEC — ASSAY
 
-**Spec version:** 1.4.31 · **Date:** 2026-09-01
+**Spec version:** 1.4.32 · **Date:** 2026-09-02
+
+**At spec 1.4.32** this document closes the four evaluation-procedure gaps that
+`§5.1`, `§5.3`, `§4.8`, `§4.10` and `§6` left open, in the one amendment cycle that
+precedes generation. Register rows `DATA_MODEL.md §22.2` **M51**–**M54**. **`§2`'s
+protocol loop** gains the nested sweeps it already reported but never produced;
+**`§5.1`** gains the ε grid — `{0, 500, …, 10_000}` bps, 21 points, `1500` among them
+— and states that the curve runs under `--llm=offline` with the replay curve deferred
+to `DECISION_BRIEF.md §F` **F2**; **`§5.3`** becomes normative on each sweep's owner,
+execution depth and output, and records that `C_review` **and** `C_exception` move
+together over `{₹100, ₹250, ₹1,000}`; **`§4.8`** gains the two populations metrics 15
+and 16 quantify over; **`§4.10`** gains `abstention_rate_by_value`'s universe; and
+**`§6`** and `§5.4` item 5 record metric 10 as **not computable on the frozen
+population**, with its reason. **No metric formula changes, none is added, none is
+removed and none is renumbered** — the frozen list stays at **28**, `§5.4`'s
+**thirteen** obligations and `§5.5`'s forbidden practices are untouched, and `RunKey`
+stays `(agent_id, split, seed, llm_mode)`: a sweep point is an evaluation **inside**
+one scored unit, never a fifth key dimension. What metrics 15, 16 and 17 gain is the
+**universe** their formulas quantify over, on the benchmark-v1.0.3 precedent that
+supplied metric 13's item partition. Benchmark v1.0.8 → **v1.0.9**; `GT_VERSION`
+stays 1.1.0 and `constraint_set_hash` does not move. See `DECISION_BRIEF.md §A.39`
+and `PREREGISTRATION.md §10` **V27**–**V29**.
 
 **At spec 1.4.31** this document amends **§3.2's `A1-NOVALIDATE` row**, and adds one
 sentence to `§5.4` item 5 and one bullet to `§6`. Two expectations that row carried
@@ -201,6 +222,28 @@ integral, **AURC**, denominated in rupees.
         run agent on observations only, --llm=replay --strict-replay
         attempt period close -> CLOSED | OPEN | BLOCKED
         score(agent output, ground truth, oracle labels) -> metrics.json
+
+        # NESTED SWEEPS (spec 1.4.32, register row M51). Every point below is an
+        # evaluation INSIDE this scored unit and never an additional one: the
+        # RunKey stays (agent_id, split, seed, llm_mode), and each point is
+        # written into THIS metrics.json keyed by
+        #   (RunKey, parameter_name, parameter_value).
+        if agent in {ASSAY, A1}:                     # §5.1: the others are
+          for eps in {0, 500, 1000, ..., 10_000}:    #   single points and get
+            re-run agent at eps, --llm=offline       #   no curve
+            -> (coverage_by_value, balance_harm)     # 21 points; 1500 is one
+                                                     # metric 3, aurc_inr
+        for tau_floor in {1_000, 10_000,             # paise: Rs 10 / 100 /
+                          100_000, 1_000_000}:       #   1,000 / 10,000
+          re-run agent at tau_floor                  # ENGINE ONLY. The oracle is
+          -> (coverage_by_value,                     #   NOT re-run and
+              count(AMBIGUOUS),                      #   oracle_labels.jsonl is
+              count(IMMATERIALLY_AMBIGUOUS))         #   NOT regenerated (§5.3)
+                                                     # metric 26, tau_sensitivity
+        for c in {10_000, 25_000, 100_000}:          # paise: Rs 100 / 250 / 1,000
+          re-score THIS unit at C_review = c         # NO re-run: post-hoc, and
+                          and C_exception = c        #   both costs move together
+          -> net_cost_inr                            # metric 26, c_review_sens.
   aggregate over seeds -> mean ± bootstrap 95% CI -> report.html
 ```
 
@@ -246,6 +289,27 @@ Rules:
 - **Every run attempts a period close.** A run that ends `BLOCKED` is a defect
   and fails the build; the distribution of `CLOSED` vs `OPEN` is a reported
   result.
+- **A sweep point is an evaluation inside one scored unit, never a scored unit of
+  its own** (spec 1.4.32, register row `DATA_MODEL.md §22.2` **M51**). Three
+  clauses force it and none of them is amended. `§7`'s **M48** derives the scored
+  unit as *"exactly four fields"* — `(agent_id, split, seed, llm_mode)` — and a
+  fifth key dimension contradicts that derivation; `§7` says the bootstrap
+  *"resamples `seed` and holds the other three fixed"*, which a fifth dimension
+  falsifies; and `§5.4` item 5 with `§5.5` requires every frozen metric to carry a
+  CI, so `aurc_inr` is **one scalar per scored unit** bootstrapped over seed, which
+  places the whole curve inside it. `RunConfig` therefore keeps its four fields,
+  and `§5.3`'s batch-size row is the contrast that settles it: this specification
+  creates a **separate operation** where it wants one — *"a separate scaling run …
+  produces no close-loop metric"* (`§4.7`) — and creates none for ε, τ or the cost
+  parameters.
+- **The three sweeps sit at three different execution depths, and this is read off
+  the frozen text rather than chosen** (M51). ε is read at `RECONCILIATION_SPEC.md
+  §6` step 3's `Δs ≥ ε` branch, inside stage **S4**, so an ε point is a **full
+  agent re-execution**; the τ **floor** is read at the same step's materiality
+  branch, so a τ point is likewise an agent re-execution, but the **oracle is not
+  re-run** (`§5.3`); `C_review` and `C_exception` are read by the **scorer alone**
+  — `§4.5` and `§4.3` — so a cost point is a post-hoc re-evaluation of one unit's
+  artifacts and re-executes nothing.
 
 ## 3. Agents under evaluation
 
@@ -734,6 +798,60 @@ attacker who cannot move money may still be able to inflate the exception queue
 until the analyst stops reading it — a denial-of-service on human attention. If
 ASSAY is vulnerable here, the report says so.
 
+**The two populations these metrics quantify over, supplied at spec 1.4.32
+`[ASSAY-MODEL]`, register row `DATA_MODEL.md §22.2` M52.** Through spec 1.4.31
+*"injected cases"*, *"injected records"* and *"matched clean controls"* were named
+here and in `THREAT_MODEL.md §T9` M6 and **defined nowhere**, so metric 15's whole
+denominator and metric 16's subtrahend had no computable universe. Both formulas
+above are **unchanged**; what is supplied is what they range over — the defect
+`PREREGISTRATION.md §8` records for metric 13 at benchmark v1.0.3, where a metric
+quantified over *"each open Suspense item"* with no field defining an item.
+
+```
+  injected  = observations appearing in a GroundTruth.degradations record whose
+              op is INJECT_NOTES or CONFLICT_REFERENCE
+
+  matched   = observations in the SAME (split, seed) dataset, of an
+  clean       Observation.kind present in that dataset's injected set, and
+  control     appearing in NO degradations record
+```
+
+**Why those two operators and no others — derived.** `PREREGISTRATION.md §4.3`'s
+frozen operator→family table assigns `INJECT_NOTES` and `CONFLICT_REFERENCE` to
+**`F10`**, and `§4.1` calls `F10` *"Adversarial metadata — Merchant-controlled
+`notes` fields carrying instruction-shaped text; conflicting references;
+forged-looking IDs"*. The remaining exercised operators belong to `F08` (*"Bank
+narration corruption"*) and `F04` (*"Duplicate bank credit"*) — an export-format
+defect and a bank behaviour, neither an attack. Reading *"injected"* as *"degraded"*
+is foreclosed by this section's own gloss: *"no LLM output is numeric and `I6`
+rejects unknown IDs"* are defences against planted text and forged identifiers, and
+neither is engaged by a truncated narration or an absent `settlement_id`.
+
+**Why a population and not a pairing — derived.** `forced_abstention_rate` is a
+**difference of two rates**, and a rate needs a set rather than a bijection. The
+pairing reading would require either a `GroundTruth` field recording each injected
+record's partner — moving `GT_VERSION` and making the truth artifact serve the
+scorer — or a matching algorithm no frozen clause states. Neither is required by
+this formula, so neither is adopted.
+
+**What *"matched"* adds beyond *"clean"*, and why it is the kind — forced.** Both
+populations are drawn from **one dataset**, so seed, period, generation parameters
+and the agent under test are held constant by construction. The one further
+restriction the metric's own arithmetic requires is `Observation.kind`: a control of
+a kind that can never reach `ABSTAINED` (`DATA_MODEL.md §17.1.1`) contributes a
+structural zero to a rate this metric subtracts. No further dimension is matched, and
+`PREREGISTRATION.md §10` **V27** declares the residual.
+
+**Both metrics are TEST-only, and the report says so on DEV — derived.**
+`PREREGISTRATION.md §6.1` makes `F07`–`F10` test-only and assigns `F10` to seeds
+**9100–9104** alone; `THREAT_MODEL.md §T9` M6 already scoped the metric to *"the
+sealed adversarial split"*. On DEV the injected set is **empty**, so metrics 15 and
+16 are undefined rather than zero and are reported *"not exercised on DEV"* — the
+treatment `PREREGISTRATION.md §10` **V14** already gives a DEV-unexercisable
+quantity. **No `GroundTruth` field is added**: both populations are computed from
+`degradations` and `Observation.kind`, which already exist, so `GT_VERSION` stays
+`1.1.0` and no dataset is regenerated.
+
 ### 4.9 Close-loop outcome
 
 ```
@@ -827,6 +945,42 @@ cannot bury a large genuine one. `abstention_spike_flag` is expected to fire on
 the F10 adversarial split and not to fire on clean splits; a flag that fires
 everywhere is a broken baseline, and one that fires nowhere is a broken detector.
 
+**`abstention_rate_by_value`'s universe, supplied at spec 1.4.32
+`[ASSAY-MODEL]`, register row `DATA_MODEL.md §22.2` M53.** The quantity was named
+here and in `DATA_MODEL.md §21` and **defined nowhere** — no numerator, no
+denominator — so metric 17 was not computable. The formula
+`rate > baseline + k·σ` is **unchanged** and `k_sigma = 3` is unchanged:
+
+```
+  abstention_rate_by_value = Σ recon_line.amount over recon_line observations
+                             whose component reached ABSTAINED
+                             ───────────────────────────────────────────────
+                                          batch_value_paise
+```
+
+**Both sides sit on the `recon_line` universe, and `§4.1`'s four constraints force
+it unchanged.** The denominator must be computable from observations alone,
+agent-independent, carry each economic event once, and be rupee-denominated;
+`batch_value_paise = Σ recon_line.amount` is the one candidate satisfying all four,
+and `§4.9` already uses it as the close denominator. A numerator over **all**
+observations against this denominator is unbounded above, and a numerator and
+denominator both over all observations reproduces exactly the defect `§4.1`
+corrected — *"one economic rupee is counted several times on both sides at
+inconsistent weights, and the ratio is not bounded by 1.0"*. A universe of open
+Suspense items is likewise refused: `DATA_MODEL.md §17.1.1` gives seven exception
+classes no item, so the rate would silently exclude value the flag exists to detect,
+and it would be a close-loop quantity rather than an abstention rate.
+
+**The baseline is a frozen constant, not a computation.** It is
+`PREREGISTRATION.md §7`'s — the mean and **sample** standard deviation of this rate
+over the five DEV seeds `2000`–`2004`, keyed per `(agent_id, llm_mode)` and produced
+by `§9`'s **non-scored pre-seal DEV baseline pass**. TEST scoring **reads** that
+pair and computes no baseline of its own; no run contributes to the baseline it is
+judged against. `PREREGISTRATION.md §10` **V28** declares the residual: the baseline
+is built on DEV's `F01`–`F06`, while the flag's expected firing site is `F10` at
+seeds `9100`–`9104` beside `F07`–`F09`, so the comparison crosses a
+family-composition boundary and `n = 5` bounds what a `3σ` bar can resolve.
+
 ### 4.11 Provider independence
 
 ```
@@ -905,6 +1059,47 @@ This single figure carries the argument: it shows simultaneously that ASSAY
 achieves high coverage, that its harm at that coverage is low, and that the
 alternatives sit above and to the left.
 
+**The ε grid, ratified at spec 1.4.32 `[ASSAY-MODEL]`, register row `DATA_MODEL.md
+§22.2` M51.** Through spec 1.4.31 this section declared the interval and no
+discretization, so metric 3 — a **primary** metric — had no determinate procedure
+and an implementer's grid would have parameterized it after the fact. The grid is
+frozen in `PREREGISTRATION.md §7`, bound by `§6.2` `AL3` and listed in
+`DECISION_BRIEF.md §L.1` rule 12, on the **M39** terms that froze the `A3-NOLLM`
+probe policy — before any figure exists:
+
+```
+  ε grid   {0, 500, 1000, 1500, 2000, ..., 9500, 10_000} bps   21 points
+```
+
+**The step is forced up to one choice.** A uniform step `s` must divide `10_000` to
+reach this section's declared endpoint and must divide `1500` so that the frozen
+operating point lies on the curve, hence `s | gcd(10_000, 1500) = 500`; the coarsest
+such `s` is **500**. Uniformity is the only free choice, and it is ratified rather
+than derived.
+
+**`ε = 1500` must be a grid point, and that is derived rather than convenient.**
+`§5.2`'s table and `§5.4` item 5 report `coverage_by_value` and `balance_harm_inr`
+at the frozen ε; `§5.1` plots those same two quantities as this curve's axes. A grid
+omitting `1500` would publish a primary figure on which the run every other number
+describes cannot be located, and a reader could not check one against the other.
+
+**The curve runs under `--llm=offline`, and the replay curve is deferred to
+`DECISION_BRIEF.md §F` F2 (M51).** Varying ε changes which components abstain and
+therefore which `R3` probes fire, so a swept run's cache keys differ from the
+recorded pass's; `§2` populates the cache from *"one recorded `--llm=<live provider>
+--record` pass"* and `--strict-replay` makes a miss a hard error. Under F2's standing
+disposition — *"Ship with `--llm=offline` + `replay` only"* — no live pass exists to
+record the other 20 points. `--llm=offline` reaches no cache, and `§2` requires every
+configuration to be run offline in any case (metric 24), so choosing it **adds no
+obligation and opens no new branch**: metric 3 under `--llm=replay` is deferred
+exactly as `DECISION_BRIEF.md §C` T0-10 defers `B2-LLM-DIRECT`, and the report says
+which mode produced the curve.
+
+**Only `ASSAY` and `A1-NOVALIDATE` are swept.** This section already says `B0`,
+`B1`, `B2` and `A2` *"are single points"*; they contribute one point at the frozen ε
+and no curve, and `metrics/risk-coverage.ts`'s `is_single_point` records that their
+`AURC` is not comparable with a curve's.
+
 ### 5.2 The comparison table
 
 One row per agent, columns: `coverage_by_value`, `coverage_by_value_bank`,
@@ -921,8 +1116,68 @@ significantly different** — no bolding of a 2% lead over a 15% interval.
 |---|---|---|
 | τ (materiality) | ₹10 / ₹100 / ₹1,000 / ₹10,000 | Prevents τ from being tuned to inflate coverage; shows the `AMBIGUOUS` → `IMMATERIALLY_AMBIGUOUS` shift |
 | ε (evidence margin) | 0 → 10_000 bps | Generates the risk–coverage curve |
-| `C_review` | ₹100 / ₹250 / ₹1,000 | Any conclusion that flips must be flagged as unstable |
+| `C_review` **and `C_exception`, moved together** | ₹100 / ₹250 / ₹1,000 | Any conclusion that flips must be flagged as unstable |
 | Batch size | 1k / 10k / 100k | Throughput scaling, deterministic path. Measures metrics 21 and 22 only; produces no close-loop metric and does not alter the dataset sizes frozen in `PREREGISTRATION.md §4.1` |
+
+**The sweep procedure is normative from spec 1.4.32, register row `DATA_MODEL.md
+§22.2` M51.** The table above declared four ranges and no procedure; what follows
+states, for each, who executes it, what it re-runs and what it reports. Every point
+is a nested evaluation inside one scored unit and is written into that unit's
+`metrics.json` keyed `(RunKey, parameter_name, parameter_value)` — `§2`'s rules and
+`§7`'s M48 layout, neither amended.
+
+| Sweep | Owner | Re-runs | Reports |
+|---|---|---|---|
+| ε | `apps/cli` `bench` | the **agent**, S0–S5 and the ledger write, per point | `(coverage_by_value, balance_harm)` per point → metric 3 `aurc_inr` |
+| τ **floor** | `apps/cli` `bench` | the **agent** only | `coverage_by_value`, `count(AMBIGUOUS)`, `count(IMMATERIALLY_AMBIGUOUS)` per point → metric 26 `tau_sensitivity` |
+| `C_review` / `C_exception` | `packages/eval` scorer | **nothing** — post-hoc over one unit's artifacts | `net_cost_inr` per point → metric 26 `c_review_sensitivity` |
+| Batch size | the `§4.7` separate scaling run | — | metrics 21 and 22 only |
+
+**Why `apps/cli` owns the two that re-execute.** `ARCHITECTURE.md §10` and register
+row **M37** keep the run loop out of `packages/eval` — *"hosting the run loop puts
+the system under test inside the thing measuring it"* — and **M47** makes `apps/cli`
+the composition root that constructs and injects agents. `packages/eval` integrates
+points it is handed, which `metrics/risk-coverage.ts` already states of itself. The
+cost sweep re-executes nothing and stays where it is.
+
+**`tau_sensitivity`'s output is derived, not chosen.** `RECONCILIATION_SPEC.md §6.1`
+states what this sweep exists to show — *"raising τ moves cases from `AMBIGUOUS` to
+`IMMATERIALLY_AMBIGUOUS` and the shift is visible in the report.
+`EVALUATION_SPEC.md §5.3` reports a τ sensitivity sweep **for exactly this
+reason**"* — and this table's own *"Why"* column names coverage inflation beside it.
+The three quantities above are that statement, and only that statement. **The τ
+sweep moves the floor, not the rate**: `PREREGISTRATION.md §7` freezes
+`τ = max(₹100, 10 bps of component value)`, this table's four figures are points for
+the **floor**, and spec 1.4.6 already records that the sweep *"sweeps τ over absolute
+values and does not read the base"*.
+
+**The Ambiguity Oracle is not re-run at a swept τ, and `oracle_labels.jsonl` is
+never regenerated, shadowed or overwritten (M51).** All three reported quantities are
+**engine-side**: coverage is read off the decisions, and the two counts off stage
+`S4`'s outcome (`RECONCILIATION_SPEC.md §6` step 3). None reads an oracle label. τ
+enters the oracle only through `PREREGISTRATION.md §5.4`'s ambiguity definition,
+which feeds **metric 4** — and metric 4 is not swept. The sealed artifact and its
+`BenchmarkManifest.oracle_labels_sha256` are therefore untouched, `AL4`/`AL7`'s
+aggregate-only rule on the test split is never approached, and this sweep creates
+**no new artifact**.
+
+**`C_review` and `C_exception` are swept together, over one shared point set
+(M51).** `§4.5` opens *"`C_review` **and** `C_exception` are assumptions, not
+measurements"* and continues *"A sensitivity sweep at ₹100 / ₹250 / ₹1,000 is
+mandatory"*; `§4.5` again says the `E13` constant *"scales … with `C_exception`, so
+the two move together"*; `PREREGISTRATION.md §8` says twice that *"metric 26's cost
+sweep scales that term"*, which a fixed `C_exception` — an additive constant —
+cannot do; and `DECISION_BRIEF.md §E` item 2 states it outright: *"both frozen,
+**both swept at ₹100 / ₹250 / ₹1,000**"*. Holding `C_exception` at ₹500 makes four
+frozen sentences vacuous. The contrary evidence is two **labels** — this row's
+header through spec 1.4.31 and `§8`'s metric name `c_review_sensitivity` — and
+`§8`'s rows 5, 6, 21, 22, 25 and 26 each name two or more quantities on one line, so
+an under-inclusive label there is that section's own established form rather than a
+statement of scope. **No scale factor is introduced**: both parameters take the same
+three values. `C_exception`'s frozen **₹500 is deliberately not among them**, and
+that is consistent rather than an oversight — this row's job is `§5.3`'s stability
+verdict, *"any conclusion that flips"*, not a curve that must locate the reported
+run. Only the ε grid carries that obligation, and `§5.1` discharges it.
 
 ### 5.4 What the report must contain
 
@@ -943,9 +1198,14 @@ significantly different** — no bolding of a 2% lead over a 15% interval.
    carries `invariants_checked` from the run artifact — the **empty set** (spec
    1.4.31, register row `DATA_MODEL.md §22.2` M50) — so the removed gate is shown
    rather than asserted, beside `PREREGISTRATION.md §10` **V26**'s statement that
-   `A1`'s harm figure is a conservative lower bound. This is an existing obligation
-   read onto an existing field, and the count of obligations in this list is
-   **thirteen**, unchanged.
+   `A1`'s harm figure is a conservative lower bound. **Metric 10
+   `exception_class_confusion` is carried in that table as `NOT COMPUTABLE ON THE
+   FROZEN POPULATION`, with `§6`'s reason printed beside it** (spec 1.4.32, register
+   row `DATA_MODEL.md §22.2` **M54**) — the metric keeps its number and its place on
+   `PREREGISTRATION.md §8`'s list of 28, and what is published is its honest state
+   rather than a fabricated matrix, `§5.5` barring *"any number that does not exist
+   in a committed run artifact"*. This is an existing obligation read onto existing
+   fields, and the count of obligations in this list is **thirteen**, unchanged.
 6. **Two columns for every primary metric:** `--llm=replay` and `--llm=offline`,
    with the delta and whether the CIs overlap (metric 24, `offline_parity`).
 7. The risk–coverage figure and reliability diagram.
@@ -996,8 +1256,36 @@ report is a deliverable, not a footnote.
 For each of the 14 exception classes: count, total rupee value, mean value,
 `owner_role`, and three redacted examples with their analyst questions. Plus:
 
-- **Exception class confusion matrix** — R2's classification against the
-  generator's known cause. Measures whether the triage is trustworthy.
+- **Exception class confusion matrix — `NOT COMPUTABLE ON THE FROZEN POPULATION`,
+  spec 1.4.32, register row `DATA_MODEL.md §22.2` M54.** The line's purpose is
+  unchanged — *R2's classification against the generator's known cause*, measuring
+  whether the triage is trustworthy — and metric 10 keeps its number and its place
+  on `PREREGISTRATION.md §8`'s list of **28**. What is recorded is that the
+  measurement has no truth side on this benchmark, and the reason is structural:
+  **`GroundTruth` carries no exception-cause field** — `DATA_MODEL.md §1` declares
+  `gt_version`, `seed`, `family_id`, `allocations`, `bank_mappings`,
+  `ledger_mappings`, `true_journal`, `true_balances` and `degradations`, and none of
+  them is a class — **and no frozen table supplies a mapping from a degradation
+  operator to an `ExceptionClass`.** `PREREGISTRATION.md §4.3`'s table maps
+  operators to **families**; `DATA_MODEL.md §15` maps a class to its **meaning**;
+  `§17.1.1` runs the wrong way, `PREREGISTRATION.md §8` saying so in terms — *"`§17.1.1`
+  selects a *posting* from a class, **never a class from a posting**"*. Constructing
+  one is refused rather than deferred, on four frozen grounds: six exercised
+  operators cannot cover fourteen classes; `E01`, `E02`, `E04`, `E10`, `E11`, `E12`
+  and `E13` arise from the **true state**, which `PREREGISTRATION.md §4.3` puts
+  beyond every operator's reach — *"applied to observations only, never to the true
+  state"*; the relation is one-to-many and state-dependent, `DUPLICATE_ROW` reaching
+  `E08` or `E09` and `MANGLE_UTR(TRUNCATE)` reaching `E14` only where a collision is
+  realized; and a degraded record often reaches **no** exception at all,
+  `DROP_SETTLEMENT_ID` being designed so that *"a soft path survives"*. Inventing the
+  pairing is what `§4.3`'s own disposal rule forbids — *"Assigning them would invent
+  a family pairing this specification does not state."* **What is published instead**
+  is the computable half, labelled `EXPLORATORY` per `PREREGISTRATION.md §8`: the
+  **marginal distribution of R2's assigned exception classes**, which is an agent
+  output and does exist in the run artifact. It carries no truth axis, and **no
+  claim of classification accuracy, triage trustworthiness or a confusion matrix may
+  be made from it.** `E12` and `E13`'s existing exclusions are unchanged and are not
+  the reason for this line. See `PREREGISTRATION.md §10` **V29**.
 - **Suspense reconciliation** — proof of gate G3, exactly:
   `Σ |item_net_paise| = Σ abstained value + Σ open exception value` over open
   Suspense items, keyed by `JournalLine.source_entity_id`. Reported with the

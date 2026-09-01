@@ -1,8 +1,31 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.31 · **Date:** 2026-09-01
+**Spec version:** 1.4.32 · **Date:** 2026-09-02
 **Reviewer role:** principal architect / skeptical reviewer
+
+**At spec 1.4.32** §A.39 records **four rulings**, taken at a governance gate held
+after spec 1.4.31 and — the condition that makes them legitimate — **before any
+benchmark data existed**: `bench/` absent, `runs/` holding only `.gitkeep`, no
+dataset generated, no agent scored, no metric computed and no seal tag cut. Four
+quantities on `PREREGISTRATION.md §8`'s frozen list of 28 had **no determinate
+procedure or no computable universe**. **M51** fixes the ε/τ/cost sweep contract: the
+ε grid `{0, 500, …, 10_000}` bps with **1500 on it**, a sweep point as an evaluation
+**inside one scored unit**, `apps/cli` owning the two sweeps that re-execute an
+agent, the oracle **not** re-run at a swept τ, and `C_review` and `C_exception` moved
+**together**. **M52** supplies metrics 15 and 16's injected and matched-clean-control
+populations. **M53** supplies `abstention_rate_by_value`'s universe and metric 17's
+DEV baseline, produced by `PREREGISTRATION.md §9`'s new **step 0**. **M54** records
+metric 10 as **not computable on the frozen population** and preserves the three
+rejected repairs as rejected. **`BENCHMARK_VERSION` moves 1.0.8 → 1.0.9** on `M39`'s
+precedent — four inputs to frozen figures enter the pre-registered surface — while
+`GT_VERSION` stays 1.1.0, `constraint_set_hash` does not move, `RunKey` stays
+`(agent_id, split, seed, llm_mode)`, and `C1`–`C8`, `SE1`–`SE5`, `τ`, `ε` and every
+pre-existing `§7` threshold are unchanged. **The 28-metric list stays at 28**, none
+added, removed or renumbered; metrics 15, 16 and 17 gain the **universe** their
+formulas quantify over, which is the benchmark-v1.0.3 treatment of metric 13. **No
+implementation code is touched and neither the scorer nor `bench` is begun.** See
+`PREREGISTRATION.md` amendment 1.4.32 and `§10` **V27**–**V29**.
 
 **At spec 1.4.31** §A.38 records **one ratification and two withdrawals**, taken at a
 governance gate held after spec 1.4.30 and — the condition that makes them
@@ -2883,6 +2906,103 @@ requires. `A1-NOVALIDATE` remains an unimplemented Tier-0 ablation, and
 `apps/cli/src/agents/a1.ts` still reports it as blocked — on this row's authority
 now, rather than on an unresolved governance question.
 
+### A.39 Spec 1.4.32 / benchmark 1.0.9 — four figures that had no procedure
+
+**The decision.** Four rulings, closing the four evaluation-procedure gaps a
+governance audit found in `EVALUATION_SPEC.md §5.1`, `§5.3`, `§4.8`, `§4.10` and
+`§6`. Register rows `DATA_MODEL.md §22.2` **M51**–**M54**. `SPEC_VERSION`
+**1.4.31 → 1.4.32**; **`BENCHMARK_VERSION` 1.0.8 → 1.0.9**; `GT_VERSION` stays
+**1.1.0**.
+
+**The defect they share.** Four quantities on `PREREGISTRATION.md §8`'s frozen list
+of 28 were **stated but not executable**. Metric 3 `aurc_inr` — a *primary* metric —
+declared an ε interval and no discretization. Metric 26 named a τ range and no output
+quantity, and its cost half contradicted itself across four clauses. Metrics 15 and
+16 quantified over *"injected cases"* and *"matched clean controls"*, defined nowhere.
+Metric 17 compared a `rate_by_value` with no numerator or denominator against a
+*"rolling"* baseline over a benchmark with no time axis. Metric 10 asked for a
+confusion matrix against a truth side that does not exist. This is the shape `§A.20`
+and `§A.7` each found once before — *"a formula that could not be evaluated"*, *"the
+gate that could not be satisfied"* — and the corpus's own remedy is the one applied:
+supply the universe, never amend the formula to fit what happens to be computable.
+
+**The condition that makes these legitimate.** No dataset has been generated, no
+agent scored, no metric computed, `bench/` is absent, `runs/` holds only `.gitkeep`
+and no seal tag exists. Every one of the four is an **input to a frozen figure**, so
+`PREREGISTRATION.md §6.2` `AL3` and `§L.4` require it to be fixed before the figure
+it feeds exists — and each is bound on the **M39** terms that froze the `A3-NOLLM`
+probe policy for exactly this reason. Nothing here responds to a result, because
+there is no result.
+
+**M51 — the sweep contract.** The ε grid is `{0, 500, …, 10_000}` bps, 21 uniform
+points. The step is forced up to one choice: a uniform `s` must divide `10_000` to
+reach `§5.1`'s endpoint and `1500` so the frozen operating point lies on the curve,
+so `s | gcd(10_000, 1500) = 500` and the coarsest is 500. **`1500` must be on the
+grid** because `§5.2` and `§5.4` item 5 report the curve's own two axes at the frozen
+ε, and a grid without it publishes a primary figure the reported run cannot be
+located on. **A sweep point is an evaluation inside one scored unit** — M48's *"exactly
+four fields"*, `§7`'s bootstrap holding *"the other three fixed"*, and `§5.4`/`§5.5`'s
+CI requirement each independently forbid a fifth key dimension — so `RunKey` is
+untouched and every point lands in its unit's own `metrics.json`. **ε and τ re-execute
+the agent and belong to `apps/cli`**, `M37` and `M47` keeping the run loop out of the
+measurement package; the cost sweep re-executes nothing and stays in the scorer.
+**The oracle is not re-run at a swept τ**, because `RECONCILIATION_SPEC.md §6.1`
+fixes what that sweep reports and all three quantities are engine-side — which
+dissolves what looked like the hardest problem in the set, and leaves
+`oracle_labels.jsonl` and its manifest digest untouched. **The curve runs offline**,
+`§F` **F2** being applied rather than reopened. And the contradicted cost sweep is
+resolved **in favour of the sentences over the labels**: `§4.5`, `§8` twice and `§E`
+item 2 all say both parameters move, and only that reading leaves no frozen clause
+vacuous.
+
+**M52 — two populations.** `injected` is `INJECT_NOTES` or `CONFLICT_REFERENCE`, the
+two operators `§4.3`'s frozen table assigns to `F10`, the one family `§4.1` calls
+adversarial; reading it as *"degraded"* is foreclosed by `§4.8`'s own gloss about
+numeric output and `I6`. The control is the same dataset, the same
+`Observation.kind`, no degradation record — the smallest reading that leaves
+*"matched"* doing work, with the residual declared at `§10` **V27** rather than
+patched by an invented covariate. **No ground-truth field**, so `GT_VERSION` holds.
+
+**M53 — a baseline that had to be measured.** `abstention_rate_by_value` takes
+`§4.1`'s four-constraint denominator unchanged. The baseline is the five DEV seeds,
+per `(agent_id, llm_mode)` — pooling would make the detector structurally non-firing,
+which `§4.10` itself calls broken. It is the **one** `§7` entry whose value cannot be
+chosen a priori, so `PREREGISTRATION.md §9` gains **step 0**: a non-scored pre-seal
+DEV pass, between generation and the tag. `§L.4` is not engaged, because the
+procedure and population are frozen **before** the measurement and the numbers follow
+with no choice at the moment of computation — the form `M44`'s consistency draw
+already takes.
+
+**M54 — the measurement that cannot be built, and is not faked.** `GroundTruth`
+carries no exception-cause field and no frozen table maps an operator to a class; one
+cannot be constructed, because most classes arise from the true state that `§4.3`
+puts beyond every operator's reach and the relation is one-to-many besides. Three
+repairs were considered and **all three rejected**, the first two because they would
+couple the generator to the engine's classification — the coupling
+`PREREGISTRATION.md §5.1`/`§5.2` exist to prevent and `§10` **V1** names as this
+project's least-eliminable threat. Metric 10 keeps its number, the list stays at 28,
+and what is published is the honest state plus an `EXPLORATORY` marginal that
+supports no claim. **This is a real gap in the deliverable and `§10` V29 says so** —
+`EVALUATION_SPEC.md §6` calls the exception report a deliverable, and the part that
+would show the triage is trustworthy is absent.
+
+**The benchmark version moves on `M39`'s precedent, not `M49`'s.** No conforming
+agent's postings change — `M49`'s test — but four inputs to figures on `§8`'s list
+enter the pre-registered surface, which is the ground on which 1.0.4 → 1.0.5 moved
+when `§7` gained the `A3-NOLLM` policy. `§9` step 1's tag and step 5's literal are
+carried with it on `M46`'s precedent. **No artifact byte changes and no dataset
+exists to regenerate.**
+
+**What this amendment does not do.** It does not implement the scorer, `bench`, the
+sweep loops, the baseline pass or metric 10's `EXPLORATORY` marginal; it touches no
+file in `packages/eval`, `apps/cli`, `packages/engine`, `packages/generator`,
+`packages/ledger` or `packages/oracle` beyond the three version constants and one
+test's assertion of a version literal. The ε and τ parameters that `SolveInput` will
+need are **ratified here and built later**, the order `§A.37` and `§A.38` both used.
+`assay bench` still reports itself blocked, and `packages/eval/src/metric-list.ts`
+still records metric 10's blocker in terms this row supersedes — an implementation
+follow-up, named in `§I`.
+
 ## B. Locked project definition
 
 > **ASSAY is a settlement reconciliation controller for Razorpay-shaped payment
@@ -2963,6 +3083,22 @@ a choice, cut anything else first.
 ---
 
 ## E. Benchmark changes in this revision
+
+**At benchmark 1.0.9 (spec 1.4.32, `§A.39`).** `PREREGISTRATION.md §7` gains **four
+entries** — the `EVALUATION_SPEC.md §5.1` **ε grid** (`{0, 500, …, 10_000}` bps, 21
+points, `1500` among them), the **cost sweep's point set** with `C_review` and
+`C_exception` moved together, metrics **15/16's two populations**, and metric
+**17's rate and DEV baseline** — and `§9` gains a **step 0**, the non-scored pre-seal
+DEV baseline pass. `EVALUATION_SPEC.md §2`, `§5.1` and `§5.3` become normative on
+each sweep's owner, execution depth and output; `§4.8` and `§4.10` gain the universes
+metrics 15, 16 and 17 quantify over; `§6` and `§5.4` item 5 record metric **10** as
+**not computable on the frozen population**. **No metric formula changes, none is
+added, none is removed and none is renumbered** — the list stays at **28** — and
+`constraint_set_hash`, `C1`–`C8`, `SE1`–`SE5`, `τ`, `ε`, every pre-existing `§7`
+threshold, `RunKey`, `DATA_MODEL.md §18`'s manifest shape, the population parameters
+and `GT_VERSION` 1.1.0 are all unmoved. **Item 2 below is the clause that settles the
+cost sweep** and is preserved verbatim: it is the only frozen statement of that
+sweep's content for `C_exception`. Register rows **M51**–**M54**.
 
 **At benchmark 1.0.5 (spec 1.4.25, `§A.32`).** `PREREGISTRATION.md §7` gains the
 **`A3-NOLLM` probe priority policy** — the control arm's `R3`, stated for the first
@@ -3144,6 +3280,26 @@ Slip plan: if 26 Aug slips, cut R2 and run template triage. If 29 Aug slips,
 restrict the oracle to the dev split and say so in the report. If 30 Aug slips,
 cut `B2-LLM-DIRECT` and keep the ablations — the controls matter more than the
 baselines.
+
+**The implementation follow-ups spec 1.4.32 leaves, named so they are not lost
+(`§A.39`, register rows M51–M54).** The amendment is docs-only by design — `§L.4`'s
+order is ratify first, build after — and it leaves exactly this work, in this
+sequence. **(1)** `packages/engine` takes ε and the τ floor as parameters of the
+solve call, `frozen.ts` keeping `PREREGISTRATION.md §7`'s values as the default every
+unswept caller uses. **(2)** `apps/cli`'s `bench` gains the ε and τ loops and writes
+each point into its unit's `metrics.json` under `(RunKey, parameter_name,
+parameter_value)`. **(3)** `packages/eval/src/metrics/sensitivity.ts` sweeps
+`C_review` and `C_exception` **together**, its present `cReviewSweep` holding
+`C_exception` fixed against M51. **(4)** `packages/eval/src/truth.ts` projects
+`degradations` into M52's two populations — the first time the scorer reads that
+field, and it stays the single `@assay/generator` import site. **(5)**
+`packages/eval/src/metrics/abstention.ts` gains M53's rate; the baseline stays a
+supplied argument, which its present signature already has right. **(6)** `apps/cli`
+gains `PREREGISTRATION.md §9` step 0's non-scored DEV baseline pass. **(7)**
+`packages/eval/src/metric-list.ts` records metric 10's blocker as *"R2 triage output
+on a run; no run artifact exists"*, which **M54 supersedes**: the binding blocker is
+the absent truth side, which no run would supply, and the row should say so and name
+the `EXPLORATORY` marginal that replaces the matrix.
 
 ---
 
@@ -3377,6 +3533,29 @@ with a version bump, not a judgement call at the keyboard.
     is unadjustable on TRAIN and DEV, and an override is non-authoritative and
     refused on a sealed or official run. It was fixed **before any dev
     consistency-gate result existed**.
+
+    **Added at spec 1.4.32, register rows M51–M53 — four evaluation inputs**, all of
+    `PREREGISTRATION.md §7` and all taking the same stricter terms as the `A3-NOLLM`
+    policy, because each parameterises a figure on `§8`'s frozen list rather than
+    ranking candidates inside one agent: (a) the **ε sweep grid**
+    `{0, 500, …, 10_000}` bps — 21 uniform points with `1500` among them, swept for
+    `ASSAY` and `A1` only, under `--llm=offline` — which produces metric 3
+    `aurc_inr`, a **primary** metric; (b) the **cost sweep point set**
+    `{₹100, ₹250, ₹1,000}`, over which `C_review` **and `C_exception` move
+    together**, `C_exception`'s frozen ₹500 deliberately not among them; (c)
+    metrics 15 and 16's **injected** and **matched clean control** populations —
+    `INJECT_NOTES` or `CONFLICT_REFERENCE` for the first, same dataset plus same
+    `Observation.kind` plus no degradation record for the second; and (d) metric
+    17's **`abstention_rate_by_value`** and its **DEV baseline** — the mean and
+    sample stddev over seeds `2000`–`2004`, keyed per `(agent_id, llm_mode)`, taken
+    by `PREREGISTRATION.md §9`'s **step 0** before the tag. All four were fixed
+    **before any dataset existed**, and (d) is frozen as a *procedure plus a
+    population* rather than as a hand-chosen number, the form the `§5.3` draw
+    established — `§7` records why `§L.4` is therefore not engaged by it. **The
+    frozen values of `τ`, `ε`, `C_review` and `C_exception` above are unchanged**:
+    a sweep reports a metric at declared points and is what `EVALUATION_SPEC.md
+    §5.3` makes mandatory, which is the opposite of the result-driven revision this
+    rule and `§L.4` forbid.
 
 ### L.2 Build order (do not reorder)
 

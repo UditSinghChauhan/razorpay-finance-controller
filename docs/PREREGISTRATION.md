@@ -1,6 +1,6 @@
-# PREREGISTRATION — ASSAY Benchmark v1.0.8
+# PREREGISTRATION — ASSAY Benchmark v1.0.9
 
-**Spec version:** 1.4.31 · **Benchmark version:** 1.0.8
+**Spec version:** 1.4.32 · **Benchmark version:** 1.0.9
 
 **Status: FROZEN on commit. Amendments require a version bump and a new seal.**
 **Date frozen:** 2026-08-23 · **Amended:** 2026-08-24 (benchmark 1.0.1),
@@ -8,9 +8,11 @@
 2026-08-30 (benchmark 1.0.4), 2026-08-31 (benchmark 1.0.5) and
 2026-08-31 (benchmark 1.0.6) and 2026-08-31 (benchmark 1.0.7) and
 2026-09-01 (benchmark 1.0.8); spec 1.4.30 amends `§9`'s literals at benchmark
-1.0.8, and **spec 1.4.31 amends no pre-registered quantity and does not move the
-benchmark version** — it opens `§10` **V26** and changes nothing else here — see
-below
+1.0.8, and spec 1.4.31 amends no pre-registered quantity and does not move the
+benchmark version — it opens `§10` **V26** and changes nothing else there; and
+2026-09-02 (benchmark 1.0.9), where **spec 1.4.32 adds four entries to `§7`**, a
+**step 0** to `§9`, dependency statements to `§8` and threat rows `§10`
+**V27**–**V29** — see below
 · **Sealed at:** _(pending — see §9)_
 
 **Amendment 1.1.1 (pre-seal, factual correction).** Applied before the seal and
@@ -1332,6 +1334,65 @@ regenerate.** `V17` and `V22`–`V25`, `§F`'s rows and `§H`'s dispositions are
 and are not reopened; `§10` **V26** is opened by this amendment. Historical amendment
 records are preserved **verbatim**.
 
+**Amendment 1.4.32 / benchmark 1.0.9 (pre-seal, the four evaluation-procedure gaps
+closed before generation).** Applied before the seal, before any dataset was
+generated, before any agent was scored and before any metric was computed — `bench/`
+absent, `runs/` holding only `.gitkeep`, no seal tag cut. Four register rows,
+`DATA_MODEL.md §22.2` **M51**–**M54**; record at `DECISION_BRIEF.md §A.39`; threat
+rows `§10` **V27**–**V29**.
+
+Four quantities on `§8`'s frozen list of 28 had **no determinate procedure or no
+computable universe**, and every one of them is an input to a figure this
+specification requires. **M51** closes the ε/τ/cost sweep contract: `§7` gains the
+**ε grid**, `EVALUATION_SPEC.md §5.1` and `§5.3` become normative on each sweep's
+owner, execution depth and output, and `§2`'s protocol loop gains the nested sweeps
+it reported but never produced. **M52** supplies the two populations metrics 15 and
+16 quantify over. **M53** supplies `abstention_rate_by_value`'s universe and the
+metric-17 baseline, and adds this section's `§9` **step 0**. **M54** records metric
+10 as **not computable on the frozen population**, with its reason, and refuses to
+construct the mapping that would make it computable.
+
+**This is the ordering the whole cycle exists to preserve.** Every one of the four
+is an input to a frozen figure, so `§6.2` **AL3** and `DECISION_BRIEF.md §L.4`
+require it to be fixed **before** the figure it feeds exists. The ε grid, the two
+robustness populations and the metric-17 baseline procedure are therefore bound on
+the **M39** terms — `AL3`, `DECISION_BRIEF.md §L.1` rule 12, unadjustable on TRAIN,
+DEV and TEST alike — and were fixed while no dataset existed to consult.
+
+**What moves, stated exactly.** `EVALUATION_SPEC.md §4.8` gains the universes of
+metrics **15** and **16**; `§4.10` gains the universe of metric **17**. **No formula
+changes**, and both are the defect this section already recorded for metric 13 at
+benchmark v1.0.3 — a metric quantified over a term with no field defining it.
+Metric **26**'s reported points move, because `C_exception` is swept with
+`C_review`, and metric **2**'s value moves at every swept point with it. **`§8`'s
+list stays at 28 metrics**, none added, none removed, none renumbered, and every
+other definition, universe and requirement is unchanged.
+
+**Nothing else pre-registered moves.** `§4.1`'s composition and every
+`target_record_count`; `§4.2`'s generation parameters; `§4.3`'s degradation
+operators, their families, rates and magnitudes; `§5`'s oracle, `§5.3`'s two gates
+and their frozen draw; `§5.4`'s ambiguity definition; `§6.1`'s split and seed table
+and every generation seed; `§6.2`'s `AL1`–`AL8`; and **every threshold in `§7` that
+existed before this amendment** — `τ`, `ε`, `K_max`, `C_max`, `P_max`, `C_review`,
+`C_exception`, `k_sigma`, `queue_top_n`, `max_unresolved_ratio_bps`, the `SE1`–`SE5`
+weights, the `A3-NOLLM` probe priority policy and the `§5.3` consistency draw — are
+unchanged. `§7` **gains** entries; it revises none. `C1`–`C8` are untouched so
+`constraint_set_hash` does not move.
+
+**`BENCHMARK_VERSION` moves 1.0.8 → 1.0.9.** The bump is taken on **M39**'s
+precedent rather than **M49**'s: no conforming agent's postings change, but four
+inputs to figures on `§8`'s list enter the pre-registered surface, which is the
+ground on which 1.0.4 → 1.0.5 moved when `§7` gained the `A3-NOLLM` policy. `§9`
+step 1's tag and step 5's literal are carried with it, on `M46`'s precedent that a
+bump must reach `§9`'s code block in the same amendment that takes it. `SPEC_VERSION`
+moves **1.4.31 → 1.4.32**; `GT_VERSION` stays **1.1.0**, no `GroundTruth` field being
+added by any of the four; `RunKey` stays `(agent_id, split, seed, llm_mode)` and
+`DATA_MODEL.md §18`'s `BenchmarkManifest` **shape** stays closed. **No artifact byte
+changes and no dataset exists to regenerate.** `V17` and `V22`–`V26`, `§F`'s rows and
+`§H`'s dispositions are unchanged and are not reopened — **F2** is applied rather
+than revisited, `EVALUATION_SPEC.md §5.1`'s offline curve taking its standing
+disposition. Historical amendment records are preserved **verbatim**.
+
 ---
 
 ## 1. Pre-registration discipline, and its honest limits
@@ -2455,8 +2516,16 @@ test split. Rules AL1–AL8 target that, because it is the real risk here.
 
   Abstention spike detection (THREAT_MODEL.md §T9, M2):
       k_sigma               = 3
-      baseline              = rolling mean/stddev of abstention-rate-by-value
-                              over the DEV split, computed before the seal
+      baseline              = the mean and SAMPLE standard deviation of
+                              abstention_rate_by_value over the five DEV seeds
+                              2000-2004, computed before the seal by §9 step 0.
+                              RESTATED at spec 1.4.32 (register row M53): the
+                              superseded wording read "rolling mean/stddev ...
+                              over the DEV split", and "rolling" named a window
+                              this benchmark has no axis for -- a (split, seed)
+                              dataset is one period and seeds are not ordered in
+                              time. The scope, the statistic and the population
+                              are given in full below.
       queue_top_n           = 20   (value-ranked; M1 requires the largest
                               exception to always appear within it)
 
@@ -2531,6 +2600,112 @@ test split. Rules AL1–AL8 target that, because it is the real risk here.
   SE1-SE5 weights and does not reach a gate's pass criterion. An override may
   exist for local exploration only, is explicitly NON-AUTHORITATIVE, and is
   refused on a sealed or official run.
+
+  §5.1 epsilon sweep grid (RATIFIED at spec 1.4.32, register row M51; it
+  parameterises metric 3 `aurc_inr`, a PRIMARY metric, so it is frozen on the
+  A3-NOLLM terms and was fixed before any curve existed):
+
+      domain              [0, 10_000] bps -- EVALUATION_SPEC.md §5.1's "vary
+                          epsilon from 0 to 10_000 bps" and §5.3's range
+      grid                UNIFORM, step 500 bps
+                            {0, 500, 1000, 1500, ..., 9500, 10_000}  21 points
+      operating point     1500 bps IS a grid point, and must be
+
+      why 500             a uniform step s must divide 10_000 to reach §5.1's
+                          declared endpoint and must divide 1500 so the frozen
+                          operating point lies on the curve, so
+                          s | gcd(10_000, 1500) = 500. The COARSEST such s is
+                          500. Uniformity is the ONLY free choice here; every
+                          other property is read off frozen text.
+      why 1500 must be    §5.2's table and §5.4 item 5 report coverage_by_value
+      on the grid         and balance_harm_inr at the frozen epsilon, and §5.1
+                          plots those same two quantities as the curve's axes. A
+                          grid omitting 1500 publishes a primary figure on which
+                          the reported run cannot be located.
+
+      swept agents        ASSAY and A1-NOVALIDATE only. §5.1: "B0, B1, B2 and A2
+                          are single points"; they contribute one point at the
+                          frozen epsilon and no curve.
+      llm_mode            offline. Varying epsilon changes which probes fire and
+                          therefore the replay cache keys, and DECISION_BRIEF.md
+                          §F F2 leaves no live pass to record the other 20
+                          points; offline reaches no cache and §2 requires it of
+                          every configuration in any case. Metric 3 under
+                          --llm=replay is DEFERRED to F2, as §C T0-10 defers
+                          B2-LLM-DIRECT. This applies F2; it does not reopen it.
+      identity            a sweep point is (RunKey, parameter_name,
+                          parameter_value) and is written into the SAME
+                          metrics.json as its scored unit. RunKey stays
+                          (agent_id, split, seed, llm_mode) -- M48 unamended.
+
+  Cost sweep points (spec 1.4.32, register row M51):
+
+      C_review            {10_000, 25_000, 100_000} paise  (Rs 100/250/1,000)
+      C_exception         THE SAME THREE POINTS, moved together with C_review
+
+      BOTH are swept, over one shared point set, and NO SCALE FACTOR IS
+      INTRODUCED. DECISION_BRIEF.md §E item 2 is the only clause stating this
+      sweep's content for C_exception and states it outright -- "both frozen,
+      both swept at Rs 100 / Rs 250 / Rs 1,000" -- and it is the only reading
+      under which EVALUATION_SPEC.md §4.5's "the two move together" and §8's two
+      "metric 26's cost sweep scales that term" are non-vacuous, a fixed
+      C_exception being an additive constant that cannot scale.
+
+      C_exception's frozen Rs 500 is deliberately NOT among the three points,
+      and that is consistent rather than an oversight: §5.3's cost row delivers
+      a stability verdict -- "any conclusion that flips" -- not a curve that must
+      locate the reported run. Only the epsilon grid carries that obligation.
+
+  Metric 15 / 16 populations (RATIFIED at spec 1.4.32, register row M52; frozen
+  on the A3-NOLLM terms, both being universes of figures on §8's list):
+
+      injected            observations appearing in a GroundTruth.degradations
+                          record whose op is INJECT_NOTES or CONFLICT_REFERENCE
+                          -- the two operators §4.3's frozen table assigns to
+                          F10, the one family §4.1 calls "Adversarial metadata"
+      matched clean       observations in the SAME (split, seed) dataset, of an
+      control             Observation.kind present in that dataset's injected
+                          set, appearing in NO degradations record
+      reading             POPULATION, not bijection: §4.8's metric is a
+                          difference of two RATES and needs no pairing
+      scope               TEST seeds 9100-9104 only. F10 exists nowhere else
+                          (§6.1, §4.1), so on DEV the injected set is EMPTY and
+                          both metrics are reported "not exercised on DEV"
+      derivation only     both populations are computed from degradations and
+                          Observation.kind, which already exist. NO GroundTruth
+                          field is added and GT_VERSION stays 1.1.0.
+
+  Metric 17 abstention baseline (RATIFIED at spec 1.4.32, register row M53;
+  this entry supplies what the k_sigma block above leaves open):
+
+      rate                abstention_rate_by_value =
+                            SUM recon_line.amount over recon_line observations
+                            whose component reached ABSTAINED
+                            / batch_value_paise
+                          Both sides on the recon_line universe, forced by
+                          EVALUATION_SPEC.md §4.1's four constraints applied
+                          unchanged; any wider numerator is unbounded above.
+      population          the five DEV seeds 2000-2004, ONE RATE EACH; n = 5
+      statistic           the mean and the SAMPLE standard deviation of those
+                          five rates
+      scope               keyed per (agent_id, llm_mode). NOT pooled across
+                          agents -- A2-NOABSTAIN never abstains and ASSAY does,
+                          so a pooled sigma makes the detector structurally
+                          non-firing, which §4.10 names as broken, and a shared
+                          baseline would make one agent's flag depend on
+                          another's behaviour against EVALUATION_SPEC.md §2's
+                          "attributable to the agent alone". NOT pooled across
+                          llm_mode: R3 probes resolve abstentions, so the two
+                          modes carry genuinely different rates.
+      producer            §9 step 0's NON-SCORED pre-seal DEV baseline pass
+      consumer            TEST scoring READS this table. No baseline is computed
+                          at scoring time on any split, and no run contributes
+                          to the baseline it is judged against.
+      table               (agent_id, llm_mode) -> (mean_bps, stddev_bps),
+                          recorded here once step 0 has run and EMPTY until
+                          then. It is NOT a BenchmarkManifest field:
+                          DATA_MODEL.md §18's shape stays closed.
+      k_sigma             3, unchanged, above.
 ```
 
 These weights are set by judgement, not fitted. They may be adjusted on the
@@ -2551,6 +2726,28 @@ bound by `AL3`, listed in `DECISION_BRIEF.md §L.1` rule 12, and unadjustable on
 TRAIN, DEV or TEST. A defect in it is corrected only through a new benchmark version
 that states what was observed first (`DECISION_BRIEF.md §F` F9, `§L.4`), with both
 results reported.
+
+**The metric-17 baseline is a measurement, not a tuned parameter, and `§L.4` is
+therefore not engaged `[ASSAY-MODEL]`, spec 1.4.32, register row M53.** Every other
+entry in this section is choosable *a priori*; this one is not, because its value can
+only be produced by running agents on DEV data. `DECISION_BRIEF.md §L.4` forbids
+*"changing any frozen threshold or decision parameter listed in `PREREGISTRATION.md
+§7` **on the basis of an observed result**"*, and the prohibited move is **selecting**
+a value in order to obtain an outcome. Nothing is selected here. The population, the
+statistic, the scope and the rate's formula are all fixed **above, before the
+measurement is taken**, and the two numbers are then a total function of that
+declaration admitting no human choice at the moment of computation — the property
+`AL7`'s successor rule (*"the LOWEST INTEGER STRICTLY GREATER…"*) and the `A3-NOLLM`
+policy's *"LEXICOGRAPHICALLY SMALLEST eligible argument"* were both written to
+secure. **This section already carries the precedent**: the `§5.3` consistency draw
+(M44) is a `§7` entry whose content is a **procedure plus a fixed input** rather than
+a hand-chosen number, on the reasoning that *"a frozen seed over a free sampler is
+vacuous"*. The baseline is frozen the same way — procedure and population together —
+and `§9` **step 0** fixes when it is taken so that no scored run can influence it. A
+value **revised** after a scored figure has been seen is exactly what `§L.4`
+prohibits, and this entry does not authorise one: a defect in the baseline is
+corrected only through a new benchmark version that states what was observed first
+(`DECISION_BRIEF.md §F` F9, `§L.4`).
 
 **Justification for `C_review` = ₹250:** approximately 15 minutes of a finance
 analyst's time at a fully-loaded rate of ~₹1,000/hour. This is an assumption, not
@@ -2599,7 +2796,14 @@ claim about ASSAY's performance. Full definitions in `EVALUATION_SPEC.md §4`.
     are **excluded from this matrix**, because a deterministic assignment is not a
     classification judgement and counting it would inflate apparent triage
     accuracy. They are still reported in the exception table
-    (`EVALUATION_SPEC.md §6`).
+    (`EVALUATION_SPEC.md §6`). **Recorded `NOT COMPUTABLE ON THE FROZEN
+    POPULATION` at spec 1.4.32 (register row `DATA_MODEL.md §22.2` M54):** ground
+    truth carries no exception-cause field and no frozen table maps a degradation
+    operator to an `ExceptionClass`, so the matrix has no truth axis. The metric
+    **keeps its number and its place on this list of 28**; what is published is
+    that state with `EVALUATION_SPEC.md §6`'s reason, plus the marginal
+    distribution of R2's assigned classes labelled `EXPLORATORY`, which supports
+    no claim about triage accuracy. See `§10` **V29**.
 
 **Close-loop (added in spec 1.1 — the loop must be shown to terminate):**
 11. `period_status_distribution` — share of seeded runs ending `CLOSED` / `OPEN` / `BLOCKED`
@@ -2625,9 +2829,20 @@ claim about ASSAY's performance. Full definitions in `EVALUATION_SPEC.md §4`.
 14. `close_gate_failures` — per-gate failure counts across all runs; `BLOCKED` must be 0
 
 **Robustness and the DoS surface:**
-15. `injection_financial_success_rate`
-16. `forced_abstention_rate` under adversarial input
-17. `abstention_spike_flag` — fires on the F10 split, not on clean splits
+15. `injection_financial_success_rate` — over the **injected** population defined
+    at `EVALUATION_SPEC.md §4.8` and frozen in `§7` (spec 1.4.32, register row
+    `DATA_MODEL.md §22.2` M52). Formula unchanged; **TEST-only**, `F10` existing
+    only at seeds `9100`–`9104`.
+16. `forced_abstention_rate` under adversarial input — the same **injected**
+    population against the **matched clean control** population, both defined at
+    `EVALUATION_SPEC.md §4.8` and frozen in `§7` (M52). Formula unchanged;
+    **TEST-only**, and reported *"not exercised on DEV"* where the injected set is
+    empty.
+17. `abstention_spike_flag` — fires on the F10 split, not on clean splits.
+    `abstention_rate_by_value`'s universe is supplied at `EVALUATION_SPEC.md
+    §4.10` and its baseline is frozen in `§7`, produced by `§9` **step 0** (spec
+    1.4.32, register row `DATA_MODEL.md §22.2` M53). The formula
+    `rate > baseline + k·σ` and `k_sigma = 3` are unchanged. See `§10` **V28**.
 18. `attributable_to_untrusted_text_rate`
 19. `largest_exception_in_top_n` — must be `true` on every run (M1)
 20. `hallucinated_id_rate` and `id_rejection_rate`
@@ -2643,7 +2858,14 @@ claim about ASSAY's performance. Full definitions in `EVALUATION_SPEC.md §4`.
     `--llm=offline`, and the delta in every primary metric between
     `--llm=offline` and `--llm=replay` is reported
 25. `component_size_distribution` and `intractable_rate`
-26. `tau_sensitivity` and `c_review_sensitivity` sweeps
+26. `tau_sensitivity` and `c_review_sensitivity` sweeps — procedure, owner and
+    output made normative at `EVALUATION_SPEC.md §5.3` (spec 1.4.32, register row
+    `DATA_MODEL.md §22.2` M51). `tau_sensitivity` reports `coverage_by_value`,
+    `count(AMBIGUOUS)` and `count(IMMATERIALLY_AMBIGUOUS)` at each of the four τ
+    **floors**; `c_review_sensitivity` moves `C_review` **and `C_exception`
+    together** over ₹100 / ₹250 / ₹1,000. The metric is **not renamed** — `§8`'s
+    names are frozen, and rows 5, 6, 21, 22, 25 and 26 each already name two or
+    more quantities on one line.
 
 **Coverage views (added in benchmark v1.0.1 — reconciliation is three-sided):**
 27. `coverage_by_value_bank` — Σ `bank_line` value reconciled / Σ `bank_line` value
@@ -2931,6 +3153,64 @@ constraint and no ambiguity definition. **Benchmark version moves 1.0.4 → 1.0.
 because the pre-registered parameter set gains a control-arm policy and the
 certificate gains a legal value.
 
+**Spec 1.4.32 / benchmark v1.0.9 dependency statement (register rows `DATA_MODEL.md
+§22.2` M51–M54).** Every affected quantity is listed here so that no reader has to
+infer which numbers moved.
+
+**Definition amended — the universe supplied, the formula untouched:** metric **15**
+`injection_financial_success_rate` and metric **16** `forced_abstention_rate` (M52,
+`EVALUATION_SPEC.md §4.8`), and metric **17** `abstention_spike_flag`'s
+`abstention_rate_by_value` (M53, `§4.10`). All three were **not computable** before
+this amendment — `injected`, `matched clean controls` and `rate_by_value` were named
+and defined nowhere — which is the same defect this section records for metric **13**
+at benchmark v1.0.3, where the metric quantified over *"each open Suspense item"*
+with **no field defining an item**. Stating that these metrics are "unaffected"
+would be false: they had no determinate value, and they have one now.
+
+**Formula unchanged, reported values move because a swept parameter's range
+changed:** metric **26**'s `c_review_sensitivity` half, because `C_exception` is
+swept with `C_review` rather than held at ₹500 (M51); and metric **2**
+`net_cost_inr` **at each swept point**, since its exception term is
+`|open_exceptions| × C_exception`. The `E13` constant this section already tracks —
+one `C_exception` per ledger entry — moves with it, which is precisely what
+`EVALUATION_SPEC.md §4.5`'s *"the two move together and the sweep is read
+accordingly"* asserts. **Metric 2's authoritative figure does not move**: it is
+reported at the frozen `C_review = ₹250` and `C_exception = ₹500`, which no sweep
+changes, and `DECISION_BRIEF.md §L.4` bars moving either frozen value.
+
+**Formula unchanged, becomes computable where it previously was not:** metric **3**
+`aurc_inr` and metric **26**'s `tau_sensitivity` half (M51). Both are on this list
+and neither had a determinate procedure: `EVALUATION_SPEC.md §5.1` declared an
+interval with no discretization, and `§5.3` named a τ range with no output quantity.
+The ε grid and `tau_sensitivity`'s three reported quantities supply them. **The
+direction cannot be predicted** and none is claimed.
+
+**Recorded as not computable, definition untouched:** metric **10**
+`exception_class_confusion` (M54). It **stays on this list at number 10** and the
+list stays at **28**.
+
+**Explicitly unaffected, with the reason:** metrics **1**, **9**, **27** and **28** —
+no observation changes terminal state and no coverage universe moves; metric **4**
+`abstention_precision` / `_recall` — its comparand is the oracle, and the oracle is
+**not re-run at a swept τ** (`EVALUATION_SPEC.md §5.3`), so `oracle_labels.jsonl` and
+`BenchmarkManifest.oracle_labels_sha256` are untouched; metric **6**
+`balance_harm_inr` and `misdirected_value_inr` — read at the frozen ε for the
+authoritative figure, and swept only as the ε curve's y-axis; metric **8**
+`gap_to_oracle` — a difference of two `net_cost_inr` values, in which a common cost
+parameter cancels; metrics **11**–**14** and gate `G3` — no sweep alters a close
+outcome, and the close policy is a ratio of unresolved **value**, not of cost;
+metrics **18**, **19**, **20**, **21**–**23**, **24** and **25**. **Every threshold
+in `§7` that existed before this amendment**, the `§5.3` consistency draw and the
+`A3-NOLLM` probe priority policy included — `§7` **gains** entries and revises none.
+`§4.1`–`§4.3`, `§5`, `§6.1` and `§6.2` — **the data-generating process is identical
+to benchmark v1.0.0 through v1.0.8**, and no dataset exists to regenerate.
+
+**Success criteria.** No threshold moves and no criterion is added, withdrawn or
+restated. **S3**'s and **S2**'s bars are untouched. **S6** reads metric 6 at the
+frozen ε, which the sweep does not move. **S7** stays conditional on `§F` **F2**, and
+the deferral of metric 3's `--llm=replay` column is that same condition applied to
+one more quantity rather than a new one.
+
 **Stopping rule:** the sealed test run is executed **once** per benchmark
 version. Its output is reported whatever it says. If a bug is found after the
 seal, the fix requires a new benchmark version with fresh seeds, and **both**
@@ -2939,10 +3219,25 @@ results are reported, with the reason for the re-run.
 ## 9. Seal procedure
 
 ```
-  1. Freeze code:  git tag -s bench-v1.0.8 -m "ASSAY benchmark v1.0.8 seal"
+  0. Baseline:     assay generate --split dev --seeds 2000-2004
+                   assay oracle   --split dev --seeds 2000-2004
+                   <non-scored DEV baseline pass>   # spec 1.4.32, M53
+     # THE ONE STEP THAT MUST PRECEDE THE TAG AND IS NOT A SCORED RUN.
+     # It runs every agent over the five DEV seeds under each llm_mode, records
+     #   abstention_rate_by_value per (agent_id, llm_mode, seed), and writes the
+     #   mean and SAMPLE stddev into §7's metric-17 baseline table.
+     # It EMITS NO metrics.json, is NOT a scored run, and reports NO scored
+     #   number of its own -- so no run contributes to the baseline it is later
+     #   judged against, and §5.5's "committed run artifact" rule is not
+     #   engaged by it.
+     # It must be taken BEFORE step 1: §7 requires the baseline "computed before
+     #   the seal", and step 8 forbids code changes between 6 and 8.
+     # DEV generation is permitted before the seal in any case -- §6.1's
+     #   forbidden list bars --split test, not --split dev.
+  1. Freeze code:  git tag -s bench-v1.0.9 -m "ASSAY benchmark v1.0.9 seal"
      # THE TAG IS THE SEAL (spec 1.4.29, M45). §6.1's "before the seal" means
      #   before this tag exists; step 6's commit SHA is the seal POINT.
-  2. Generate:     assay generate --split test --seal-tag bench-v1.0.8 \
+  2. Generate:     assay generate --split test --seal-tag bench-v1.0.9 \
                      --seeds 9000-9004,9100-9104
      # --seal-tag is the OPERATOR'S ATTESTATION that step 1 was taken (M45).
      #   Without it --split test stays refused and AL7 stays fail-closed.
@@ -2960,7 +3255,7 @@ results are reported, with the reason for the re-run.
      and once:        sha256 bench/test/recon_report.jsonl         # spec 1.4.22
   5. Commit hashes into bench/test/<seed>/benchmark_manifest.json, ONE PER (split, seed)
      # ground truth itself NOT committed
-     # `benchmark_version` must read "1.0.8" (DATA_MODEL.md §18)
+     # `benchmark_version` must read "1.0.9" (DATA_MODEL.md §18)
      # `seeds` is the singleton [<seed>]; `record_counts` holds THAT seed's
      #   families (§4.1, M42)
      # `recon_report_sha256` must be present and non-null (spec 1.4.22). It is the
@@ -2981,6 +3276,17 @@ results are reported, with the reason for the re-run.
 Step 3 is a gate, not a formality: if the oracle cannot recover the true
 allocation for every target, the constraint set is wrong and nothing downstream
 is trustworthy.
+
+**Step 0 is numbered 0 rather than inserted, and that is deliberate (spec 1.4.32,
+register row `DATA_MODEL.md §22.2` M53).** Steps 1 through 8 are cross-referenced by
+number across this corpus — *"`§9` step 1's tag"*, *"`§9` step 3"*, *"`§9` step 5"*,
+*"no code changes between 6 and 8"* — so renumbering them would silently break every
+citation. The new step therefore takes the one number that was free. It is the only
+step in this procedure that **must** run after generation and **before** the tag:
+`§7`'s metric-17 baseline is *"computed before the seal"*, its value can only be
+produced by running agents on DEV, and step 8 bars code changes once the seal point
+is recorded. The full ordering the amendment fixes is **generate DEV → step 0 →
+step 1 → steps 2–6 → step 7's scored run**.
 
 **Step 3 is enforced at step 5 from spec 1.4.27, register row M43.** Through spec
 1.4.26 this section sequenced the gate and nothing checked that it had run: `assay
@@ -3076,6 +3382,9 @@ Stated here, before results, so they cannot be presented later as afterthoughts.
 | V24 | The `§5.3` consistency gate's `R = 20,000` pair draw has **no frozen sampler and no frozen seed**, so "the gate passed" is not by itself a reproducible statement | **Declared, not repaired, at spec 1.4.27.** `§7` freezes `R` and freezes nothing about the draw; `ARCHITECTURE.md §7.3` says only *"randomly sampled … deliberately including inadmissible ones"*. Spec 1.4.27 (M43) wires the gate into `assay oracle` and **deliberately resolves neither**: deriving a seed from the dataset seed would have been a choice made silently because a candidate happened to be deterministic, which is the failure `DATA_MODEL.md §22.2` exists to prevent and which M38's record names in terms. The draw's seed is therefore an **operator input** and the command **fails closed** without one, so a gate run always names the seed that produced it, and the seed is recorded in `oracle_gate.json` beside the result. | **Real and bounded.** It binds the **dev build gate only**: the consistency gate is dev-scoped by `§5.3`, the `§9` seal path is completeness-only, and no `§8` metric, no threshold and no artifact digest depends on the draw. Two runs under the same operator-supplied seed agree; two runs under different seeds test different pairs and may disagree about *which* pair exposed a divergence, never about whether the engine and the oracle agree on a pair both evaluated. **`R = 20,000` is unchanged and is not renegotiated here**, and `AL3` is not extended to cover the draw — doing either would freeze a parameter this amendment is declining to choose. Closing it requires a ratification of the sampler and its seed, which no result may inform (`DECISION_BRIEF.md §L.4`). **CLOSED at spec 1.4.28, register row M44, and the row above is preserved as written.** `§7` now carries the whole draw — `R = 20,000` unchanged, one independent draw per `(dev, seed)` dataset, `CONSISTENCY_DRAW_SEED = 417203`, the 1..4 member-set bound, the two pools, the empty `anchored`/`allocated`, the draw order and the one-word-per-index rule — and `AL3` binds it. The seed was fixed **before any dev consistency-gate result existed**: no dev dataset had been generated, `bench/` was absent and the gate had never been run, so no observation could have informed it. The command no longer fails closed; it defaults to the frozen seed, and an override is non-authoritative and refused on a sealed or official run. **The closure creates a new and different residual, stated apart as `V25`** rather than folded in here, because irreproducibility and bounded coverage are not the same threat. |
 | V25 | Freezing the `§5.3` draw fixes **which** 20,000 pairs the consistency gate tests, so its coverage is a fixed slice of the pair space and *"the gate passed"* means *"passed on this sample"* | **Accepted as the price of closing `V24`, and disclosed rather than argued away.** The two threats trade against each other and cannot both be eliminated: a **free** seed makes the gate irreproducible and lets an author re-roll after a failure, concealing an engine/oracle divergence behind a report line that says only *"consistency: passing"*; a **frozen** seed removes that choice and fixes the slice. Spec 1.4.28 takes the second, because `ARCHITECTURE.md §7.2` makes the gate's whole purpose *"a checked property rather than a claim"* and a criterion the author selects after seeing it is not checked. **`R = 20,000` is unchanged and is not raised to compensate** — raising it having reasoned about coverage would be a result-free change to a `§7` constant, but it would also be a parameter change made to answer a disclosure, and `§4.1`'s standing treatment of a declared-but-bounded control is to report the bound rather than tune around it. | **Real, and smaller than it looks, but not zero.** The draw is **per `(dev, seed)`** and the five dev datasets carry different observation pools, so one frozen seed yields five different samples and 100,000 pairs in total, not one sample re-tested; and the pairs are drawn from the **whole** member-eligible pool rather than from true allocations, so most fail `C6` and the sample is dominated by the inadmissible cases `§5.3` asks for. What remains uncovered is any divergence that this particular path through the stream never reaches. **Nothing downstream depends on the draw:** the gate is not on `§8`'s list of 28, `oracle_gate.json` enters no digest (`§9` step 4, M43), and no metric, threshold or artifact byte is a function of it — so the residual is bounded to the gate's own power and reaches no reported figure. `AL4` permits inspecting DEV *"without limit"*, so a developer may run further seeds during development; what `AL3` forbids is choosing **which run counts** after seeing it. Widening coverage is available to a future amendment — a larger `R`, or a declared set of seeds — and no such policy is decided here. |
 | V26 | `A1-NOVALIDATE` measures the removal of stage `S5`'s invariant gate, **not** an unvalidated ledger, so its harm figure is a lower bound rather than the full cost of removing validation | **Derived from the frozen ledger boundary, not from a measured result.** `EVALUATION_SPEC.md §3.2`'s ablation removes `S5`'s **evaluation** of the allocation-scoped invariants `I1`–`I8` (spec 1.4.31, register row `DATA_MODEL.md §22.2` **M50**). Everything the ledger enforces on its own keeps running for `A1`: `I1` is re-checked on the cumulative totals at **every append** — `DATA_MODEL.md §17`'s *"at every point in the event log, `Σ dr_paise === Σ cr_paise`"* — `§17.1`'s `P1`–`P8` balance by construction, `RECONCILIATION_SPEC.md §10.1`'s `G1`–`G5` all run at close, and `§L.1` rule 4's single write path and non-exported brand are untouched. So an unsafe allocation that would break the books in a system with no such boundary is still intercepted here, and the harm that reaches `EVALUATION_SPEC.md §4.4`'s `balance_harm_inr` is only the part the invariant gate alone was catching | **Accepted and disclosed; the direction is the honest one.** The bias **understates** `ASSAY`'s benefit rather than inflating it, so `PROJECT_SPEC.md §7` **S6** — *"a statistically significant ₹-harm increase"* — is made harder to satisfy, not easier, and a significant result under it remains sound. `EVALUATION_SPEC.md §5.4` item 5 requires the figure to be reported beside `A1`'s `invariants_checked: []` and this row, and `§5.5` already bars overstating a result: **no claim that `A1` reproduces a fully unvalidated ledger may be made**, and the report states what was and was not removed. Removing the ledger-side enforcement as well was **rejected** — it would weaken `§L.1` rule 4 and gate `G2` for every agent, breaking `PROJECT_SPEC.md §7` **S5**'s *"trial balance = 0 … on every run"* to make one control arm worse, which is the disproportion `DECISION_BRIEF.md §A.38` records. **Quantifying the gap is not attempted**: it would need a second ablation with the ledger boundary removed, which no frozen document declares and which `§8`'s metric list has no room for |
+| V27 | Metric 16's *"matched clean controls"* are matched on **dataset co-membership and `Observation.kind` only**, not on amount, method, capture day or family, so `forced_abstention_rate` carries a residual composition confound | **Declared at spec 1.4.32 (register row M52), not repaired.** `EVALUATION_SPEC.md §4.8` and `THREAT_MODEL.md §T9` M6 use the word *"matched"* and define no dimension, and every candidate dimension is a free choice that would move a frozen metric — which `AL3` and `§L.4` forbid taking after a figure exists, and which `M39`'s precedent requires be fixed before one does. What is adopted is the smallest non-vacuous reading: one dataset holds seed, period, generation parameters and the agent constant by construction, and `Observation.kind` is forced on top of that because a control of a kind that can never reach `ABSTAINED` (`DATA_MODEL.md §17.1.1`) contributes a structural zero to a rate this metric subtracts. The residual is that injected `F10` records and their controls may differ in amount, method and capture day, so a non-zero `forced_abstention_rate` is not attributable to the injection alone. **Bounded, not eliminated**: the sign and magnitude are reported with this row attached, and no claim of attack-specific attribution is made from the figure alone. `M52` adds no `GroundTruth` field, so nothing here is repairable by regeneration either |
+| V28 | Metric 17's baseline is built on **DEV `F01`–`F06`** while the flag's expected firing site is **`F10` at TEST seeds `9100`–`9104` beside `F07`–`F09`**, so the comparison crosses a family-composition boundary; and `n = 5` bounds what a `3σ` bar can resolve | **Declared at spec 1.4.32 (register row M53), and it is a consequence of the frozen holdout rather than of the amendment.** `§6.1` makes `F07`–`F10` **test-only**, so no DEV dataset can contain the adversarial family and no baseline computed *"over the DEV split"* — which `§7` and `THREAT_MODEL.md §T9` M2 both require — can be composition-matched to the split it judges. A fired flag is therefore confounded by the family mix and is **not attributable to the injection alone**; `EVALUATION_SPEC.md §4.10`'s expectation that it *"fires on the F10 adversarial split and not on clean splits"* is read with that attached. Separately, the statistic is a **sample** standard deviation over five points, so a `3σ` threshold sits near the maximum of a five-point sample and the detector's power is correspondingly low. Neither is repaired: widening the baseline population would require generating `F07`–`F10` into DEV, which `§6.1`'s forbidden list bars and which would destroy the family-level holdout `V3` depends on. The figure is published with this row beside it |
+| V29 | Metric 10 `exception_class_confusion` is **not computable on the frozen population**, so no measurement of R2's triage accuracy is published | **Declared at spec 1.4.32 (register row M54).** `GroundTruth` carries no exception-cause field (`DATA_MODEL.md §1`) and no frozen table maps a degradation operator to an `ExceptionClass` — `§4.3`'s table maps operators to **families**, `DATA_MODEL.md §15` maps a class to its **meaning**, and `§17.1.1` runs the other way, `§8` saying so in terms. Three repairs were considered and **all three are rejected**: a ground-truth cause field, which would require the generator to know the engine's classification rules and so couple truth to the system under test — the coupling `§5.1`/`§5.2` exist to prevent and **V1** declares as this project's least-eliminable threat — and would move `GT_VERSION`; a specification-side derived mapping, which carries the same coupling and cannot be built, seven classes arising from the **true state** that `§4.3` puts beyond every operator's reach and the relation being one-to-many and state-dependent; and a narrowed matrix universe, which needs the same realization tests and would additionally choose its universe by what happened to be derivable. **The residual is a real gap in the evaluation**: `EVALUATION_SPEC.md §6` calls the exception report a deliverable, and the part of it that would show the triage is trustworthy is absent. What is published is the marginal distribution of R2's assigned classes, `EXPLORATORY`, supporting no claim. The metric keeps its number and the list stays at **28** |
 
 **The claim ASSAY is entitled to make, and no more:**
 

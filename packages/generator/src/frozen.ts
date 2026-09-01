@@ -421,8 +421,29 @@ export const K_MAX = 22;
  * (`RECONCILIATION_SPEC.md §11`). No population, seed, family, rate, `§7`
  * threshold, composition figure or artifact byte moves; `GT_VERSION` stays 1.1.0
  * and **no dataset exists to regenerate**.
+ *
+ * **1.0.8 -> 1.0.9 at spec 1.4.32** (register rows M51-M54). Four inputs to figures
+ * on `PREREGISTRATION.md §8`'s frozen list enter the pre-registered surface: the
+ * `EVALUATION_SPEC.md §5.1` **epsilon sweep grid** and the cost sweep's point set
+ * (M51), metrics 15 and 16's **injected** and **matched clean control** populations
+ * (M52), and metric 17's `abstention_rate_by_value` with its **DEV baseline** (M53).
+ * The bump is taken on **M39**'s precedent -- 1.0.4 -> 1.0.5, when `§7` gained the
+ * `A3-NOLLM` probe priority policy -- and NOT on M49's, whose test is whether a
+ * conforming agent's postings change: none does here. `§9` step 1 now tags
+ * `bench-v1.0.9` and step 5 requires this field to read `"1.0.9"`; `apps/cli` derives
+ * the tag from this constant, so M46's class of drift cannot recur.
+ *
+ * **Nothing this package produces changes.** M51 and M53 reach `packages/engine`,
+ * `packages/eval` and `apps/cli`; M52 reads `GroundTruth.degradations` and
+ * `Observation.kind`, both of which this package already emits, and **adds no field**
+ * -- which is why `GT_VERSION` stays 1.1.0; M54 records a metric as not computable
+ * and asks nothing of any package. No population, seed, family, rate, degradation
+ * operator, `§7` threshold this package reads, composition figure or artifact byte
+ * moves; `SPLIT_TABLE`, `SEED_BLOCKS`, `blockOf`, `AL7`'s successor rule and every
+ * `target_record_count` are unchanged; `constraint_set_hash` is `packages/domain`'s
+ * and is unmodified. **No dataset exists to regenerate.**
  */
-export const BENCHMARK_VERSION = "1.0.8";
+export const BENCHMARK_VERSION = "1.0.9";
 
 /** `DATA_MODEL.md §1`: `GroundTruth.gt_version`. */
 export const GT_VERSION = "1.1.0";
@@ -566,5 +587,23 @@ export const GT_VERSION = "1.1.0";
  * invariants an agent evaluates. `SPLIT_TABLE`, `SEED_BLOCKS`, `blockOf`, every
  * family rate, every `target_record_count`, every degradation operator and its
  * rate are unchanged, and **no dataset exists to regenerate**.
+ *
+ * **1.4.31 -> 1.4.32 (M51-M54) -- required TWO things of this package and both are
+ * constants above.** The amendment closes four evaluation-procedure gaps, and one of
+ * them reasons *about* this package's output without amending it: **M52** defines
+ * metric 15's and metric 16's populations as `GroundTruth.degradations` filtered on
+ * `op` -- `INJECT_NOTES` and `CONFLICT_REFERENCE`, the two operators
+ * `PREREGISTRATION.md §4.3`'s frozen table assigns to `F10` -- against the same
+ * dataset's records carrying no degradation record at all. **Both are read off what
+ * `degrade.ts` already writes and what `§4.3` already assigns**; no operator, family
+ * pairing, rate or magnitude moves, `DegradationRecord`'s three fields are unchanged,
+ * and **no `GroundTruth` field is added**, so `GT_VERSION` stays **1.1.0**. M52's
+ * TEST-only scope is `§6.1`'s existing holdout read rather than a new rule: `F10` is
+ * assigned seeds 9100-9104 and `SPLIT_TABLE` is untouched. M51 (sweep contract), M53
+ * (metric 17's rate and baseline) and M54 (metric 10 not computable) reach
+ * `packages/engine`, `packages/eval` and `apps/cli` and require nothing here.
+ * **`BENCHMARK_VERSION` moves 1.0.8 -> 1.0.9** on M39's precedent, four inputs to
+ * frozen figures entering the pre-registered surface. `constraint_set_hash` is
+ * `packages/domain`'s and is unmodified, and **no dataset exists to regenerate**.
  */
-export const SPEC_VERSION = "1.4.31";
+export const SPEC_VERSION = "1.4.32";

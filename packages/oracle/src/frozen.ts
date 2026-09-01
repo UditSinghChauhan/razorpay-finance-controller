@@ -192,5 +192,25 @@ export const BPS_DENOMINATOR = 10_000;
  * `TAU_RATE_BPS` are unchanged; `C1`-`C8` are untouched so `constraint_set_hash`
  * does not move. **`BENCHMARK_VERSION` does NOT move, staying 1.0.8**, and
  * `GT_VERSION` stays 1.1.0; both remain `packages/generator`'s.
+ *
+ * **1.4.31 -> 1.4.32 (M51-M54) -- required nothing of this package, and the reason
+ * is a ruling rather than a silence.** M51 fixes the `EVALUATION_SPEC.md §5.3` tau
+ * sweep and **rules that the Ambiguity Oracle is NOT re-run at a swept tau**:
+ * `RECONCILIATION_SPEC.md §6.1` fixes what that sweep reports -- `coverage_by_value`,
+ * `count(AMBIGUOUS)` and `count(IMMATERIALLY_AMBIGUOUS)` -- and all three are read
+ * off the engine's stage `S4` and the decisions, never off an oracle label. Tau
+ * reaches this package only through `PREREGISTRATION.md §5.4`'s ambiguity definition,
+ * which feeds **metric 4**, and metric 4 is not swept. So `oracle_labels.jsonl` is
+ * never regenerated, shadowed or overwritten, `BenchmarkManifest.oracle_labels_sha256`
+ * stays valid, `AL4`/`AL7`'s aggregate-only rule on the test split is never
+ * approached, and **`TAU_FLOOR_PAISE` and `TAU_RATE_BPS` remain this package's
+ * transcription of the frozen tau for its own labels and are unchanged** -- the
+ * sweep moves the engine's floor, not theirs. M52 (metrics 15/16's populations), M53
+ * (metric 17's rate and baseline) and M54 (metric 10 not computable) are the
+ * scorer's and reach no oracle. `SETTLEMENT_WINDOW_DAYS`, `K_ORACLE` and `C_ORACLE`
+ * are unchanged; `§5.1`'s completeness gate and `§5.3`'s differential gate are
+ * unchanged and neither reads tau; `C1`-`C8` are untouched so `constraint_set_hash`
+ * does not move. **`BENCHMARK_VERSION` moves 1.0.8 -> 1.0.9** and `GT_VERSION` stays
+ * 1.1.0; both remain `packages/generator`'s.
  */
-export const SPEC_VERSION = "1.4.31";
+export const SPEC_VERSION = "1.4.32";
