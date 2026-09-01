@@ -1,6 +1,17 @@
 # EVALUATION_SPEC — ASSAY
 
-**Spec version:** 1.4.29 · **Date:** 2026-08-31
+**Spec version:** 1.4.30 · **Date:** 2026-09-01
+
+**At spec 1.4.30** this document is unchanged apart from the version header.
+Register row `DATA_MODEL.md §22.2` **M49** fixes `§17.1.1`'s *"the settlement it
+is allocated to"* as the allocation under evaluation. **No metric formula,
+definition, universe, number or count changes** — the frozen list stays at **28**
+— and `§5.4`'s thirteen obligations, `§5.5`'s forbidden practices, `§5.3`'s τ
+sensitivity sweep and `§4.13`'s `EXPLORATORY` line are untouched. **Metric
+*values* will move**, because the clause makes `RECONCILIATION_SPEC.md §6`'s
+`AMBIGUOUS` reachable and restores the `P2` bank leg on solved allocations; no
+figure exists to move, `bench/` being absent and no scored run having been
+produced. Benchmark v1.0.7 → **v1.0.8**. See `DECISION_BRIEF.md §A.37`.
 
 **At spec 1.4.29** `§7`'s command block records the artifact locations a scored run
 writes (register row `DATA_MODEL.md §22.2` M48): `metrics.json` is keyed

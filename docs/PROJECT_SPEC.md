@@ -2,8 +2,14 @@
 
 **Track:** 04 — AI Finance Controller
 **Status:** Specification. Frozen scope for implementation.
-**Spec version:** 1.4.29
-**Date:** 2026-08-31
+**Spec version:** 1.4.30
+**Date:** 2026-09-01
+
+**At spec 1.4.30** this document is unchanged apart from the version header. **No
+success criterion moves.** `S4`'s *"abstains where the evidence is genuinely
+ambiguous"* is **read, not amended** — register row `DATA_MODEL.md §22.2` M49
+makes the abstention path reachable rather than changing what the criterion asks.
+See `DECISION_BRIEF.md §A.37`.
 
 **At spec 1.4.29** this document is unchanged apart from the version header. **No
 success criterion moves.** `S10`'s *"every claimed number traceable to a committed run

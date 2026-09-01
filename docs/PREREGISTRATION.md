@@ -1,13 +1,14 @@
-# PREREGISTRATION — ASSAY Benchmark v1.0.7
+# PREREGISTRATION — ASSAY Benchmark v1.0.8
 
-**Spec version:** 1.4.29 · **Benchmark version:** 1.0.7
+**Spec version:** 1.4.30 · **Benchmark version:** 1.0.8
 
 **Status: FROZEN on commit. Amendments require a version bump and a new seal.**
 **Date frozen:** 2026-08-23 · **Amended:** 2026-08-24 (benchmark 1.0.1),
 2026-08-25 (benchmark 1.0.2), 2026-08-26 (benchmark 1.0.3),
 2026-08-30 (benchmark 1.0.4), 2026-08-31 (benchmark 1.0.5) and
-2026-08-31 (benchmark 1.0.6) and 2026-08-31 (benchmark 1.0.7); spec 1.4.29
-amends `§6.1` and `§9` at benchmark 1.0.7 — see below
+2026-08-31 (benchmark 1.0.6) and 2026-08-31 (benchmark 1.0.7) and
+2026-09-01 (benchmark 1.0.8); spec 1.4.30 amends `§9`'s literals at benchmark
+1.0.8 — see below
 · **Sealed at:** _(pending — see §9)_
 
 **Amendment 1.1.1 (pre-seal, factual correction).** Applied before the seal and
@@ -1247,6 +1248,47 @@ disposition are unchanged and are not reopened. Historical amendment records,
 including spec 1.4.27's and spec 1.4.28's statements that the refusal was not lifted,
 are preserved **verbatim** and are not rewritten as though this reading existed
 earlier.
+
+**Amendment 1.4.30 / benchmark 1.0.8 (pre-seal, one phrase disambiguated before any
+result existed).** Applied before the seal, before any dataset was generated, before
+any agent was scored and before any metric was computed — `bench/` absent, `runs/`
+holding only `.gitkeep`. One ratification. Register row `DATA_MODEL.md §22.2`
+**M49**; record at `DECISION_BRIEF.md §A.37`.
+
+`DATA_MODEL.md §17.1.1`'s *"the settlement it is allocated to"* — a phrase that
+occurs twice in the corpus, both times in the `P2`/`P4` trigger rows, and is defined
+nowhere — is fixed as the settlement of the **allocation under evaluation**: the
+`Candidate.target_id` for a proposed allocation, the target of the candidate `S5`
+validated for an accepted one, and **not** `ReconLine.settlement_id`. The competing
+reading makes `RECONCILIATION_SPEC.md §6`'s materiality identically zero and its
+`AMBIGUOUS` and `DISCRIMINATED` outcomes unreachable, which spec 1.4.21's own
+reachability argument — *"`P2` posts on `amount`, `fee − tax` and `tax` … and
+`AMBIGUOUS` stays reachable"*, quoted in `§7` below — forecloses.
+
+**`BENCHMARK_VERSION` moves 1.0.7 → 1.0.8**, because the clause changes what a
+conforming agent **posts** and runs either side of it are not comparable. `§9` step
+1's tag and step 5's literal are carried with it, on `M46`'s precedent that a bump
+must reach `§9`'s code block in the same amendment that takes it. `SPEC_VERSION`
+moves **1.4.29 → 1.4.30**; `GT_VERSION` stays **1.1.0**.
+
+**Nothing pre-registered moves.** `§4.1`'s composition and every
+`target_record_count`; `§4.2`'s generation parameters and `DROP_SETTLEMENT_ID`'s
+10% rate; `§4.3`'s degradation operators; `§5`'s oracle and `§5.3`'s two gates and
+their frozen draw; `§6.1`'s split and seed table and every generation seed; `§7`'s
+thresholds in full — `τ`, `ε`, `K_max`, `C_max`, `P_max`, `C_review`,
+`C_exception`, `k_sigma`, `queue_top_n`, `max_unresolved_ratio_bps`, the `SE1`–`SE5`
+weights, the `A3-NOLLM` probe priority policy and the `§5.3` consistency draw; and
+`§8`'s list of 28 metrics with every definition. `C1`–`C8` are untouched so
+`constraint_set_hash` does not move. **`§10` V17 is unchanged and is the row that
+matters here**: it already records that every DEV settlement is fully `AN1`-anchored
+and that the candidate machinery is first exercised on the sealed test split — which
+is why this phrase had to be settled **now**, before that run, rather than after it.
+`V22`–`V25`, `§F`'s F-rows and `§H`'s **H1** disposition are unchanged and are not
+reopened; `M41`'s finding that H1's affirmative claim is non-answerable on the
+conforming v1.0.0 population **stands**, this row making the probe loop reachable and
+changing no policy it runs under. **No artifact byte changes and no dataset exists to
+regenerate.** Historical amendment records are preserved **verbatim**, including
+spec 1.4.29's statements at benchmark 1.0.7.
 
 ---
 
@@ -2855,10 +2897,10 @@ results are reported, with the reason for the re-run.
 ## 9. Seal procedure
 
 ```
-  1. Freeze code:  git tag -s bench-v1.0.7 -m "ASSAY benchmark v1.0.7 seal"
+  1. Freeze code:  git tag -s bench-v1.0.8 -m "ASSAY benchmark v1.0.8 seal"
      # THE TAG IS THE SEAL (spec 1.4.29, M45). §6.1's "before the seal" means
      #   before this tag exists; step 6's commit SHA is the seal POINT.
-  2. Generate:     assay generate --split test --seal-tag bench-v1.0.7 \
+  2. Generate:     assay generate --split test --seal-tag bench-v1.0.8 \
                      --seeds 9000-9004,9100-9104
      # --seal-tag is the OPERATOR'S ATTESTATION that step 1 was taken (M45).
      #   Without it --split test stays refused and AL7 stays fail-closed.
@@ -2876,7 +2918,7 @@ results are reported, with the reason for the re-run.
      and once:        sha256 bench/test/recon_report.jsonl         # spec 1.4.22
   5. Commit hashes into bench/test/<seed>/benchmark_manifest.json, ONE PER (split, seed)
      # ground truth itself NOT committed
-     # `benchmark_version` must read "1.0.7" (DATA_MODEL.md §18)
+     # `benchmark_version` must read "1.0.8" (DATA_MODEL.md §18)
      # `seeds` is the singleton [<seed>]; `record_counts` holds THAT seed's
      #   families (§4.1, M42)
      # `recon_report_sha256` must be present and non-null (spec 1.4.22). It is the

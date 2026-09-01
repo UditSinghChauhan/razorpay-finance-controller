@@ -1,6 +1,19 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.4.29 · **Date:** 2026-08-31
+**Spec version:** 1.4.30 · **Date:** 2026-09-01
+
+**At spec 1.4.30** this document is unchanged apart from the version header. The
+amendment fixes `DATA_MODEL.md §17.1.1`'s *"the settlement it is allocated to"* as
+the settlement of the **allocation under evaluation** (register row
+`DATA_MODEL.md §22.2` M49), which is what makes `§6`'s materiality non-zero and
+`§6`'s `AMBIGUOUS` and `DISCRIMINATED` outcomes reachable — the reachability
+**spec 1.4.21 already asserted** here and in `§11`. **`§6` is not amended**: its
+materiality formula, its four outcomes, `τ`, `ε` and the second-best certificate
+are untouched, as are `§6.2`'s probe loop, its `P_max` budget, its closed
+five-probe enum and its committed surface, `§11`'s worked example and verdict, and
+`§3`'s anchor table. **No constraint, signal, weight, threshold, probe, probe
+source or outcome rule changes** and `constraint_set_hash` does not move.
+Benchmark v1.0.7 → **v1.0.8**. See `DECISION_BRIEF.md §A.37`.
 
 **At spec 1.4.29** this document is unchanged apart from the version header. The
 amendment settles agent **placement** (register row `DATA_MODEL.md §22.2` M47) and the

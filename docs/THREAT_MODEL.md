@@ -1,6 +1,18 @@
 # THREAT_MODEL — ASSAY
 
-**Spec version:** 1.4.29 · **Date:** 2026-08-31
+**Spec version:** 1.4.30 · **Date:** 2026-09-01
+
+**At spec 1.4.30** this document is unchanged apart from the version header, and
+one control is **strengthened rather than relaxed**. Register row
+`DATA_MODEL.md §22.2` **M49** keeps `DATA_MODEL.md §17.1.1`'s anti-cross-attachment
+guarantee whole — one settlement's bank evidence still cannot attach to another
+settlement's line — by comparing the evidence's `settlement_id` against the
+**allocation's target** rather than against a `ReconLine` field that `§3` left
+unset. `§T5`'s prevention is untouched: `AN5` stays retired, the merchant ledger
+stays soft evidence, and no untrusted source gains a route to a control account.
+`§T8`'s lost-posting concern is what **rejects** the skip repair. **No threat row
+is opened, closed or reworded and no `§T` control is weakened.** See
+`DECISION_BRIEF.md §A.37`.
 
 **At spec 1.4.29** this document is unchanged apart from the version header, and one
 disclosure belongs here. `PREREGISTRATION.md §9`'s `--seal-tag` is an **operator
