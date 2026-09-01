@@ -1,6 +1,6 @@
-# PREREGISTRATION — ASSAY Benchmark v1.0.9
+# PREREGISTRATION — ASSAY Benchmark v1.0.10
 
-**Spec version:** 1.4.32 · **Benchmark version:** 1.0.9
+**Spec version:** 1.4.33 · **Benchmark version:** 1.0.10
 
 **Status: FROZEN on commit. Amendments require a version bump and a new seal.**
 **Date frozen:** 2026-08-23 · **Amended:** 2026-08-24 (benchmark 1.0.1),
@@ -12,7 +12,9 @@
 benchmark version — it opens `§10` **V26** and changes nothing else there; and
 2026-09-02 (benchmark 1.0.9), where **spec 1.4.32 adds four entries to `§7`**, a
 **step 0** to `§9`, dependency statements to `§8` and threat rows `§10`
-**V27**–**V29** — see below
+**V27**–**V29**; and 2026-09-02 (benchmark 1.0.10), where **spec 1.4.33 adds a fifth
+entry to `§7`** — metric 15's per-case `balance_harm` — carries `§9`'s literals with
+the bump and opens `§10` **V30** — see below
 · **Sealed at:** _(pending — see §9)_
 
 **Amendment 1.1.1 (pre-seal, factual correction).** Applied before the seal and
@@ -1393,6 +1395,74 @@ changes and no dataset exists to regenerate.** `V17` and `V22`–`V26`, `§F`'s 
 than revisited, `EVALUATION_SPEC.md §5.1`'s offline curve taking its standing
 disposition. Historical amendment records are preserved **verbatim**.
 
+**Amendment 1.4.33 / benchmark 1.0.10 (pre-seal, metric 15's per-case harm).**
+Applied before the seal, before any dataset was generated, before any agent was
+scored and before any metric was computed — `bench/` absent, `runs/` holding only
+`.gitkeep`, no seal tag cut. One register row, `DATA_MODEL.md §22.2` **M55**; record
+at `DECISION_BRIEF.md §A.40`; threat row `§10` **V30**.
+
+**The gap `M52` left behind it.** `M52` supplied metrics 15 and 16's two
+**populations** and closed by saying, in terms, *"the formulas in
+`EVALUATION_SPEC.md §4.8` are **unchanged**; what is supplied is the universe"*. That
+is exact, and it is why a second gap survived: metric 15's numerator is *"injected
+cases **with `balance_harm > 0`**"*, and `EVALUATION_SPEC.md §4.4(a)` defines
+`balance_harm_inr` as a **run-level aggregate** — the absolute value taken **outside**
+the per-account difference, over the whole covered set at once. Such an aggregate does
+**not** decompose into per-case parts, so *"cases with `balance_harm > 0`"* named a
+per-case quantity this specification had never defined. Metric 15's **denominator** was
+computable from `M52` and its **numerator** was not.
+
+**What M55 fixes.** `§7` gains a fifth entry: one deterministic per-case harm, keyed by
+the injected observation's own business identifier (`DATA_MODEL.md §16`, through
+`§12`/`M28`'s relation), with `EVALUATION_SPEC.md §4.4(a)`'s two projections each
+restricted to that key and `§4.4(a)`'s covered-set scope and Suspense exclusion
+applied unchanged; and one structural-zero rule for a case that posts no line, which
+contributes `0` **and stays in the denominator**. Two other admissible attributions —
+a leave-one-out marginal on the run-level aggregate, and substituting `§4.4(b)`'s
+`misdirected_value_inr` — are **rejected and preserved as rejected**.
+
+**This is a ratification, and the record says so.** More than one attribution is
+admissible on the frozen text and none excludes the others, so `M55` is marked
+**ratified** rather than dressed as derivation, on the **M35**/**M49**/**M50**
+precedent. It is an input to a figure on `§8`'s list, so `§6.2` **AL3** and
+`DECISION_BRIEF.md §L.4` require it fixed **before** the figure it feeds exists; it is
+therefore bound on the **M39** terms — unadjustable on TRAIN, DEV and TEST alike — and
+was fixed while no dataset existed to consult.
+
+**What moves, stated exactly.** `EVALUATION_SPEC.md §4.8` gains metric **15**'s
+per-case harm; **no formula changes**, `§4.4`'s two figures are untouched, and
+`§4.4(a)`'s run-level `balance_harm_inr` keeps its definition and its published value.
+Metric **16** is **not touched** — neither its formula nor either of its `M52`
+populations — and `M52`'s populations are preserved **verbatim and unnarrowed**.
+**`§8`'s list stays at 28 metrics**, none added, none removed, none renumbered.
+
+**Nothing else pre-registered moves.** `§4.1`'s composition and every
+`target_record_count`; `§4.2`'s generation parameters; `§4.3`'s degradation operators,
+their families, rates and magnitudes; `§5`'s oracle, `§5.3`'s two gates and their
+frozen draw; `§5.4`'s ambiguity definition; `§6.1`'s split and seed table and every
+generation seed; `§6.2`'s `AL1`–`AL8`; and **every threshold in `§7` that existed
+before this amendment** — `τ`, `ε`, `K_max`, `C_max`, `P_max`, `C_review`,
+`C_exception`, `k_sigma`, `queue_top_n`, `max_unresolved_ratio_bps`, the `SE1`–`SE5`
+weights, the `A3-NOLLM` probe priority policy, the `§5.3` consistency draw, the ε and
+cost sweep grids, the metric-15/16 populations and the metric-17 baseline — are
+unchanged. `§7` **gains** one entry; it revises none. `C1`–`C8` are untouched so
+`constraint_set_hash` does not move.
+
+**`BENCHMARK_VERSION` moves 1.0.9 → 1.0.10.** The bump is taken on **M39**'s precedent
+rather than **M49**'s: no conforming agent's postings change, but an input to a figure
+on `§8`'s list enters the pre-registered surface, which is the ground on which
+1.0.4 → 1.0.5 and 1.0.8 → 1.0.9 both moved. `§9` step 1's tag and step 5's literal are
+carried with it, on `M46`'s precedent that a bump must reach `§9`'s code block in the
+same amendment that takes it; `§9`'s **step 0** is unchanged. `SPEC_VERSION` moves
+**1.4.32 → 1.4.33**; `GT_VERSION` stays **1.1.0**, no `GroundTruth` field being added;
+`RunKey` stays `(agent_id, split, seed, llm_mode)` and `DATA_MODEL.md §18`'s
+`BenchmarkManifest` **shape** stays closed. **No artifact byte changes and no dataset
+exists to regenerate.** `V17` and `V22`–`V29`, `§F`'s rows and `§H`'s dispositions are
+unchanged and are not reopened; `§10` **V30** is opened by this amendment. **No
+implementation is taken:** `packages/eval/src/metrics/robustness.ts` is untouched and
+metric 15 stays unwired, per `DECISION_BRIEF.md §I`. Historical amendment records are
+preserved **verbatim**.
+
 ---
 
 ## 1. Pre-registration discipline, and its honest limits
@@ -2706,6 +2776,43 @@ test split. Rules AL1–AL8 target that, because it is the real risk here.
                           then. It is NOT a BenchmarkManifest field:
                           DATA_MODEL.md §18's shape stays closed.
       k_sigma             3, unchanged, above.
+
+  Metric 15 per-case balance_harm (RATIFIED at spec 1.4.33, register row M55;
+  frozen on the A3-NOLLM terms, being an input to a figure on §8's list):
+
+      case                one INJECTED observation of the M52 population above.
+                          That population is NOT narrowed by this entry and no
+                          GroundTruth field is added.
+      key                 the observation's OWN business identifier --
+                          DATA_MODEL.md §16's "the identifier of the observation
+                          whose obligation the posting records" -- resolved
+                          through §12/M28's relation, one-to-one on a conforming
+                          dataset.
+      harm                case_balance_harm(o) =
+                            SUM over AccountCode (excluding Suspense) of
+                              | proj_agent_o(acct) - proj_truth_o(acct) |
+                          with EVALUATION_SPEC.md §4.4(a)'s TWO projections each
+                          restricted to the journal lines whose source_entity_id
+                          is that key, and §4.4(a)'s covered-set scope and
+                          Suspense exclusion applied UNCHANGED. The agent-side
+                          restriction is part of this ratification: §4.4(a)
+                          keys proj_agent by "whose owning decision is
+                          RECONCILED" and applies no source_entity_id predicate.
+      structural zero     a reference-kind case (DATA_MODEL.md §10.1), or one
+                          whose key falls outside §16's source_entity_id grammar
+                          pay_... | rfnd_... | adj_... | setl_... | bnk_...
+                          (an order_...), contributes 0 AND STAYS IN THE
+                          DENOMINATOR. It posts no line, so its harm is 0 by the
+                          frozen text; dropping it would narrow M52.
+      not additive        the per-case figures do NOT sum to §4.4(a)'s run-level
+                          balance_harm_inr, which keeps its own definition and
+                          value. §10 V30 is reported with the metric and no
+                          additivity may be claimed or implied.
+      rejected            the leave-one-out marginal on the run-level aggregate,
+                          and substituting §4.4(b) misdirected_value_inr. Both
+                          are preserved as rejected (M55).
+      metric 16           UNCHANGED. This entry touches neither its formula nor
+                          either of its M52 populations.
 ```
 
 These weights are set by judgement, not fitted. They may be adjusted on the
@@ -2831,8 +2938,12 @@ claim about ASSAY's performance. Full definitions in `EVALUATION_SPEC.md §4`.
 **Robustness and the DoS surface:**
 15. `injection_financial_success_rate` — over the **injected** population defined
     at `EVALUATION_SPEC.md §4.8` and frozen in `§7` (spec 1.4.32, register row
-    `DATA_MODEL.md §22.2` M52). Formula unchanged; **TEST-only**, `F10` existing
-    only at seeds `9100`–`9104`.
+    `DATA_MODEL.md §22.2` M52), counting the cases whose **per-case
+    `balance_harm`** is non-zero under the decomposition frozen in `§7` at spec
+    1.4.33 (register row `DATA_MODEL.md §22.2` **M55**). Formula unchanged;
+    **TEST-only**, `F10` existing only at seeds `9100`–`9104`. A case that posts
+    no line contributes `0` and stays in the denominator. The per-case figures do
+    not sum to `§4.4(a)`'s run-level `balance_harm_inr` — see `§10` **V30**.
 16. `forced_abstention_rate` under adversarial input — the same **injected**
     population against the **matched clean control** population, both defined at
     `EVALUATION_SPEC.md §4.8` and frozen in `§7` (M52). Formula unchanged;
@@ -3153,6 +3264,23 @@ constraint and no ambiguity definition. **Benchmark version moves 1.0.4 → 1.0.
 because the pre-registered parameter set gains a control-arm policy and the
 certificate gains a legal value.
 
+**Spec 1.4.33 / benchmark v1.0.10 dependency statement (register row `DATA_MODEL.md
+§22.2` M55).** One quantity is affected and it is listed here so that no reader has to
+infer which numbers moved.
+
+**Definition amended — the per-case quantity supplied, the formula untouched:** metric
+**15** `injection_financial_success_rate` (M55, `EVALUATION_SPEC.md §4.4`, `§4.8`).
+`M52` made its **denominator** computable and left its **numerator** without one:
+*"cases with `balance_harm > 0"`* named a per-case harm, while `§4.4(a)` defines only
+a run-level aggregate that does not decompose. `§7` now carries one deterministic
+per-case decomposition and one structural-zero rule. Stating that metric 15 is
+"unaffected" would be false: its numerator had no determinate value, and it has one
+now. **Metric 16 `forced_abstention_rate` is genuinely unaffected** — neither its
+formula nor either of its `M52` populations is touched — and so is `§4.4`'s own
+`balance_harm_inr`, which keeps its definition and its published value. **The per-case
+figures do not sum to it**; `§10` **V30** carries that residual. Every other metric on
+this list is unchanged, and the list stays at **28**.
+
 **Spec 1.4.32 / benchmark v1.0.9 dependency statement (register rows `DATA_MODEL.md
 §22.2` M51–M54).** Every affected quantity is listed here so that no reader has to
 infer which numbers moved.
@@ -3234,10 +3362,10 @@ results are reported, with the reason for the re-run.
      #   the seal", and step 8 forbids code changes between 6 and 8.
      # DEV generation is permitted before the seal in any case -- §6.1's
      #   forbidden list bars --split test, not --split dev.
-  1. Freeze code:  git tag -s bench-v1.0.9 -m "ASSAY benchmark v1.0.9 seal"
+  1. Freeze code:  git tag -s bench-v1.0.10 -m "ASSAY benchmark v1.0.10 seal"
      # THE TAG IS THE SEAL (spec 1.4.29, M45). §6.1's "before the seal" means
      #   before this tag exists; step 6's commit SHA is the seal POINT.
-  2. Generate:     assay generate --split test --seal-tag bench-v1.0.9 \
+  2. Generate:     assay generate --split test --seal-tag bench-v1.0.10 \
                      --seeds 9000-9004,9100-9104
      # --seal-tag is the OPERATOR'S ATTESTATION that step 1 was taken (M45).
      #   Without it --split test stays refused and AL7 stays fail-closed.
@@ -3255,7 +3383,7 @@ results are reported, with the reason for the re-run.
      and once:        sha256 bench/test/recon_report.jsonl         # spec 1.4.22
   5. Commit hashes into bench/test/<seed>/benchmark_manifest.json, ONE PER (split, seed)
      # ground truth itself NOT committed
-     # `benchmark_version` must read "1.0.9" (DATA_MODEL.md §18)
+     # `benchmark_version` must read "1.0.10" (DATA_MODEL.md §18)
      # `seeds` is the singleton [<seed>]; `record_counts` holds THAT seed's
      #   families (§4.1, M42)
      # `recon_report_sha256` must be present and non-null (spec 1.4.22). It is the
@@ -3385,6 +3513,7 @@ Stated here, before results, so they cannot be presented later as afterthoughts.
 | V27 | Metric 16's *"matched clean controls"* are matched on **dataset co-membership and `Observation.kind` only**, not on amount, method, capture day or family, so `forced_abstention_rate` carries a residual composition confound | **Declared at spec 1.4.32 (register row M52), not repaired.** `EVALUATION_SPEC.md §4.8` and `THREAT_MODEL.md §T9` M6 use the word *"matched"* and define no dimension, and every candidate dimension is a free choice that would move a frozen metric — which `AL3` and `§L.4` forbid taking after a figure exists, and which `M39`'s precedent requires be fixed before one does. What is adopted is the smallest non-vacuous reading: one dataset holds seed, period, generation parameters and the agent constant by construction, and `Observation.kind` is forced on top of that because a control of a kind that can never reach `ABSTAINED` (`DATA_MODEL.md §17.1.1`) contributes a structural zero to a rate this metric subtracts. The residual is that injected `F10` records and their controls may differ in amount, method and capture day, so a non-zero `forced_abstention_rate` is not attributable to the injection alone. **Bounded, not eliminated**: the sign and magnitude are reported with this row attached, and no claim of attack-specific attribution is made from the figure alone. `M52` adds no `GroundTruth` field, so nothing here is repairable by regeneration either |
 | V28 | Metric 17's baseline is built on **DEV `F01`–`F06`** while the flag's expected firing site is **`F10` at TEST seeds `9100`–`9104` beside `F07`–`F09`**, so the comparison crosses a family-composition boundary; and `n = 5` bounds what a `3σ` bar can resolve | **Declared at spec 1.4.32 (register row M53), and it is a consequence of the frozen holdout rather than of the amendment.** `§6.1` makes `F07`–`F10` **test-only**, so no DEV dataset can contain the adversarial family and no baseline computed *"over the DEV split"* — which `§7` and `THREAT_MODEL.md §T9` M2 both require — can be composition-matched to the split it judges. A fired flag is therefore confounded by the family mix and is **not attributable to the injection alone**; `EVALUATION_SPEC.md §4.10`'s expectation that it *"fires on the F10 adversarial split and not on clean splits"* is read with that attached. Separately, the statistic is a **sample** standard deviation over five points, so a `3σ` threshold sits near the maximum of a five-point sample and the detector's power is correspondingly low. Neither is repaired: widening the baseline population would require generating `F07`–`F10` into DEV, which `§6.1`'s forbidden list bars and which would destroy the family-level holdout `V3` depends on. The figure is published with this row beside it |
 | V29 | Metric 10 `exception_class_confusion` is **not computable on the frozen population**, so no measurement of R2's triage accuracy is published | **Declared at spec 1.4.32 (register row M54).** `GroundTruth` carries no exception-cause field (`DATA_MODEL.md §1`) and no frozen table maps a degradation operator to an `ExceptionClass` — `§4.3`'s table maps operators to **families**, `DATA_MODEL.md §15` maps a class to its **meaning**, and `§17.1.1` runs the other way, `§8` saying so in terms. Three repairs were considered and **all three are rejected**: a ground-truth cause field, which would require the generator to know the engine's classification rules and so couple truth to the system under test — the coupling `§5.1`/`§5.2` exist to prevent and **V1** declares as this project's least-eliminable threat — and would move `GT_VERSION`; a specification-side derived mapping, which carries the same coupling and cannot be built, seven classes arising from the **true state** that `§4.3` puts beyond every operator's reach and the relation being one-to-many and state-dependent; and a narrowed matrix universe, which needs the same realization tests and would additionally choose its universe by what happened to be derivable. **The residual is a real gap in the evaluation**: `EVALUATION_SPEC.md §6` calls the exception report a deliverable, and the part of it that would show the triage is trustworthy is absent. What is published is the marginal distribution of R2's assigned classes, `EXPLORATORY`, supporting no claim. The metric keeps its number and the list stays at **28** |
+| V30 | Metric 15's per-case `balance_harm` is a **decomposition chosen by ratification**, and the per-case figures **do not sum** to `EVALUATION_SPEC.md §4.4(a)`'s published run-level `balance_harm_inr` | **Declared at spec 1.4.33 (register row M55), not repaired.** `§4.4(a)` places the absolute value **outside** the per-account difference and takes it over the whole covered set at once, so `\|a₁+a₂ − t₁−t₂\| ≠ \|a₁−t₁\| + \|a₂−t₂\|`: account-level errors from two cases may cancel in the aggregate while each case's own figure is non-zero, and the reverse. `§4.8` needs a per-case reading — *"cases with `balance_harm > 0`"* — and the frozen text supplies no decomposition, so **M55** adopts one. A different admissible attribution, the leave-one-out marginal `M55` rejects, would count a different set of cases; the choice is therefore **outcome-bearing**, which is why it is marked *ratified* rather than *derived*. What metric 15 publishes is **the share of injected cases carrying their own non-zero account-level difference**, not a partition of `balance_harm_inr`, and the two quantities are reported side by side with **no additivity between them claimed or implied**. A second residual rides on the same row: the agent-side restriction by `source_entity_id` is `M55`'s, not `§4.4(a)`'s, which keys `proj_agent` by decision state alone. **Bounded, not eliminated.** `M55` is fixed **before any dataset exists**, so `§6.2` **AL3** and `DECISION_BRIEF.md §L.4` are satisfied rather than merely not engaged, and the definition is unadjustable on TRAIN, DEV and TEST alike. Repair is not available without a per-case formula `§4.4` does not state, and supplying one would amend a frozen metric after the fact — which `AL3` forbids and `M39`'s precedent requires be settled before a figure exists. `M52`'s populations are **not** narrowed to compensate, and no `GroundTruth` field is added, so nothing here is repairable by regeneration either |
 
 **The claim ASSAY is entitled to make, and no more:**
 

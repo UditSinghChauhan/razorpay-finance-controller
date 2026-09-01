@@ -1,6 +1,25 @@
 # THREAT_MODEL — ASSAY
 
-**Spec version:** 1.4.32 · **Date:** 2026-09-02
+**Spec version:** 1.4.33 · **Date:** 2026-09-02
+
+**At spec 1.4.33** this document is unchanged apart from the version header. Register
+row `DATA_MODEL.md §22.2` **M55** supplies the per-case `balance_harm` that `§T1`'s
+**Verification** line — *"Family `F10`, held out until the sealed run.
+`injection_financial_success_rate` must be 0"* — needs in order to be **checkable**:
+`M52` gave that metric its population and `M55` gives it the per-case quantity its
+numerator tests. **The target is unchanged and is not weakened:** it stays `0`, and
+`M55`'s structural zero for a reference-kind or out-of-grammar case is
+`DATA_MODEL.md §10.1` and `§16` read back, not a relaxation — the case stays in the
+denominator, so the rate can still rise. `§T1`'s controls table and its *"Residual
+risk"* paragraph are untouched, and `§T9`'s **`M6`** `forced_abstention_rate` is
+**untouched**, `M52`'s populations standing verbatim. **No
+mitigation is weakened, added, removed or made conditional**, `M1`–`M6` keep their
+mechanisms, metrics and targets, `§T1`–`§T8` and `§T10` onward are unchanged, and **no
+`§T` control is weakened**. One residual is added at `PREREGISTRATION.md §10` **V30**
+— the per-case figures do not sum to `EVALUATION_SPEC.md §4.4(a)`'s run-level
+`balance_harm_inr` — and `§T9`'s own *"Residual risk, stated honestly"* paragraph is
+untouched and joined by it. Benchmark moves to **v1.0.10**. See
+`DECISION_BRIEF.md §A.40`.
 
 **At spec 1.4.32** this document restates the **baseline wording in `§T9`'s `M2`
 row** and is otherwise unchanged apart from the version header. **`§T9`'s mitigation

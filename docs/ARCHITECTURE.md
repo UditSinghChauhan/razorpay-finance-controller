@@ -1,6 +1,19 @@
 # ARCHITECTURE — ASSAY
 
-**Spec version:** 1.4.32 · **Date:** 2026-09-02
+**Spec version:** 1.4.33 · **Date:** 2026-09-02
+
+**At spec 1.4.33** this document is unchanged apart from the version header. Register
+row `DATA_MODEL.md §22.2` **M55** supplies metric 15's per-case `balance_harm`, which
+`§3`'s package ownership already places: the scorer is `packages/eval`'s and the
+quantity is read off the agent's journal and the truth journal, both of which
+`§7.2`'s independence keeps on opposite sides of the measurement. `§7.1`'s and
+`§7.3`'s oracle independence is untouched — `M55` never reaches an oracle label — and
+so are `§11`'s vendored PRNG, `§3`'s single filesystem door, `§4`'s trust boundaries,
+`§8`'s debit-positive projection, every package ownership row, the provider and role
+tables, the probe enum and the gate definitions. **No trust boundary, data flow,
+interface, package ownership, provider, role, probe enum, gate definition or
+failure-handling row changes**, and benchmark moves to **v1.0.10**. See
+`DECISION_BRIEF.md §A.40`.
 
 **At spec 1.4.32** this document changes **one word in one `§9` API row** — the
 telemetry endpoint's *"rolling dev baseline"* becomes the **frozen** DEV baseline of

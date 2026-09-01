@@ -167,14 +167,14 @@ describe("M42 — one BenchmarkManifest per (split, seed)", () => {
     expect(total).toBeLessThanOrEqual(20_000);
   });
 
-  it("reads benchmark_version 1.0.9", async () => {
+  it("reads benchmark_version 1.0.10", async () => {
     const root = splitRoot();
     const result = await run(sealable(root, 2000));
     const manifest = JSON.parse(
       result.sink.files.get(join(join(join(root, "dev"), "2000"), "benchmark_manifest.json")) ?? "{}",
     ) as { benchmark_version: string };
     expect(manifest.benchmark_version).toBe(BENCHMARK_VERSION);
-    expect(manifest.benchmark_version).toBe("1.0.9");
+    expect(manifest.benchmark_version).toBe("1.0.10");
   });
 
   it("gives every manifest of one split the SAME recon_report_sha256", async () => {

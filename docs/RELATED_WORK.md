@@ -1,6 +1,16 @@
 # RELATED_WORK — ASSAY
 
-**Spec version:** 1.4.32 · **Date:** 2026-09-02
+**Spec version:** 1.4.33 · **Date:** 2026-09-02
+
+**At spec 1.4.33** this document is unchanged apart from the version header. Register
+row `DATA_MODEL.md §22.2` **M55** supplies metric 15's per-case `balance_harm`. **No
+positioning claim depends on it:** `§4`'s selective-prediction citation is metric 3's
+risk–coverage curve and `AURC`, which read `EVALUATION_SPEC.md §4.4(a)`'s **run-level**
+`balance_harm_inr` — untouched by `M55` — while metric 15 is the prompt-injection
+robustness figure this document's threat-side discussion cites, whose expected value is
+0. No prior-art comparison or differentiator moves, and `§1.4`'s statement — that ASSAY
+consumes the Razorpay recon report as authoritative input and claims no gap in it — is
+untouched. See `DECISION_BRIEF.md §A.40`.
 
 **At spec 1.4.32** this document is unchanged apart from the version header. Register
 rows `DATA_MODEL.md §22.2` **M51**–**M54** settle the ε/τ/cost sweep contract, two
