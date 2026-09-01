@@ -2,8 +2,21 @@
 
 **Track:** 04 — AI Finance Controller
 **Status:** Specification. Frozen scope for implementation.
-**Spec version:** 1.4.31
-**Date:** 2026-09-01
+**Spec version:** 1.4.32
+**Date:** 2026-09-02
+
+**At spec 1.4.32** this document is unchanged apart from the version header, and
+**two `§7` success criteria are read rather than amended**. Register rows
+`DATA_MODEL.md §22.2` **M51**–**M54** close the four evaluation-procedure gaps.
+**S6** — *"ablation `A1-NOVALIDATE` shows a statistically significant ₹-harm
+increase"* — reads metric 6 at the **frozen** ε, which `M51`'s sweep does not move:
+the ε grid produces metric 3's curve and leaves every authoritative figure at
+`PREREGISTRATION.md §7`'s values. **S7** stays **conditional on `DECISION_BRIEF.md
+§F` F2**, and `M51`'s deferral of metric 3's `--llm=replay` column is that same
+standing condition applied to one more quantity rather than a new one. **No success
+criterion moves, none is added and none is withdrawn**; `S1`–`S12` are untouched, as
+are `§9`'s dataset bound and `§10`'s demo script. Benchmark moves to **v1.0.9**. See
+`DECISION_BRIEF.md §A.39` and `PREREGISTRATION.md §10` **V27**–**V29**.
 
 **At spec 1.4.31** this document is unchanged apart from the version header, and
 **two `§7` success criteria are read rather than amended**. Register row

@@ -1,6 +1,24 @@
 # THREAT_MODEL — ASSAY
 
-**Spec version:** 1.4.31 · **Date:** 2026-09-01
+**Spec version:** 1.4.32 · **Date:** 2026-09-02
+
+**At spec 1.4.32** this document restates the **baseline wording in `§T9`'s `M2`
+row** and is otherwise unchanged apart from the version header. **`§T9`'s mitigation
+table is what the amendment makes measurable**. Register rows
+`DATA_MODEL.md §22.2` **M52** and **M53** supply the universes that `M2`'s
+`spike_flag` and `M6`'s `forced_abstention_rate` were stated in but never given:
+`abstention_rate_by_value` and its DEV baseline for `M2`, and the *"injected
+records"* and *"matched clean controls"* populations for `M6`. **No mitigation is
+weakened, added, removed or made conditional**, and `M1`–`M6` keep their mechanisms,
+metrics and targets exactly as written. Two residual risks this section already
+gestured at are now **declared** rather than left implicit, at `PREREGISTRATION.md
+§10` **V27** and **V28**: `M6`'s controls are matched on dataset co-membership and
+`Observation.kind` only, and `M2`'s baseline is built on DEV's `F01`–`F06` while the
+flag's expected firing site is `F10` on the sealed split — so a fired flag is
+confounded by the family mix. `§T9`'s own *"Residual risk, stated honestly"*
+paragraph is untouched and is joined by these two rather than replaced. `§T1`–`§T8`
+and `§T10` onward are unchanged, and **no `§T` control is weakened**. Benchmark moves
+to **v1.0.9**. See `DECISION_BRIEF.md §A.39`.
 
 **At spec 1.4.31** this document is unchanged apart from the version header, and
 **one control does the deciding rather than being relaxed**. Register row
@@ -479,7 +497,7 @@ attack, ASSAY abstains *more* and says so loudly.
 | # | Mitigation | Mechanism | Metric | Target |
 |---|---|---|---|---|
 | M1 | **Value-ranked queue** | The exception queue is ordered by rupee value, never by arrival time. The top 20 by value are always surfaced first. | `largest_exception_in_top_n` | **must be `true` on every run** |
-| M2 | **Spike detection** | Abstention rate *by value* is compared against a rolling baseline computed on the dev split. `spike_flag = rate > baseline + 3σ`. | `spike_flag`, `abstention_rate_by_value` vs `baseline_rate_by_value` | flag fires on the F10 adversarial split, does not fire on clean splits |
+| M2 | **Spike detection** | Abstention rate *by value* is compared against the **frozen DEV baseline** of `PREREGISTRATION.md §7` — the mean and sample stddev over seeds 2000–2004, per `(agent_id, llm_mode)`, taken by `§9` step 0 before the seal. `spike_flag = rate > baseline + 3σ`. Through spec 1.4.31 this read *"a rolling baseline"*; register row `DATA_MODEL.md §22.2` **M53** retires *"rolling"*, which named a window this benchmark has no axis for, and the **mechanism, metric and target are otherwise unchanged**. | `spike_flag`, `abstention_rate_by_value` vs `baseline_rate_by_value` | flag fires on the F10 adversarial split, does not fire on clean splits |
 | M3 | **Source attribution** | Every abstention records whether the component contained quarantined untrusted text, and which source system supplied it. | `attributable_to_untrusted_text_rate`, `by_source_system` | a flood is traceable to its source within one run |
 | M4 | **Immaterial auto-resolve** | Ambiguity below τ never enters the queue at all (`RECONCILIATION_SPEC.md §6.1`). | count of `IMMATERIALLY_AMBIGUOUS` | sub-τ noise contributes zero queue items |
 | M5 | **Cost visibility** | Queue length is priced: `\|abstained\| × C_review` appears on the close report as a rupee figure. | `over_abstention_cost_inr` | the analyst-time cost of an attack is a number, not a feeling |

@@ -1,6 +1,23 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.4.31 · **Date:** 2026-09-01
+**Spec version:** 1.4.32 · **Date:** 2026-09-02
+
+**At spec 1.4.32** this document is unchanged apart from the version header, and
+**`§6` and `§6.1` are the clauses the amendment reads to settle two questions**.
+Register rows `DATA_MODEL.md §22.2` **M51**–**M54**. `§6` step 3 is where **ε** and
+the **τ floor** are read — inside stage `S4` — which is what makes each ε or τ sweep
+point a full agent re-execution rather than a re-scoring, and what leaves the cost
+parameters, which `§6` never reads, to the scorer alone. **`§6.1` fixes what the τ
+sweep reports**: *"raising τ moves cases from `AMBIGUOUS` to
+`IMMATERIALLY_AMBIGUOUS` and the shift is visible in the report. `EVALUATION_SPEC.md
+§5.3` reports a τ sensitivity sweep for exactly this reason"* — three engine-side
+quantities, which is why the Ambiguity Oracle is **not** re-run at a swept τ. **No
+gate, invariant, constraint, threshold, anchor, probe or terminal state changes**:
+`§3`'s anchor table, `§4.1`'s `C1`–`C8`, `§4.2`'s `SE1`–`SE5`, `§6`'s four outcomes
+and materiality definition, `§6.2`'s probe enum and `P_max`, `§7`'s `I1`–`I9`,
+`§8`, `§9`'s terminal states and `§10`'s five gates, three outcomes, close policy and
+procedure are all untouched. **`constraint_set_hash` does not move**; benchmark moves
+to **v1.0.9**. See `DECISION_BRIEF.md §A.39`.
 
 **At spec 1.4.31** this document adds **one clarifying paragraph to `§10.1`** and
 changes no gate, invariant, constraint or threshold. Register row `DATA_MODEL.md
