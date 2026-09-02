@@ -1,6 +1,31 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.4.36 · **Date:** 2026-09-02
+**Spec version:** 1.4.37 · **Date:** 2026-09-02
+
+**At spec 1.4.37** this document is unchanged apart from the version header. Register
+row `DATA_MODEL.md §22.2` **M59** records that `PREREGISTRATION.md §9` **step 0 has
+been taken**, returning `mean_bps = stddev_bps = 0` for all five `offline` Tier-0 keys,
+and transcribes those rows **unchanged** into `§7` and into
+`packages/eval/src/frozen.ts`'s `METRIC_17_BASELINE`. It ratifies **one** choice `M53`
+and `M58` left open: a measured `(0, 0)` pair **is** a baseline, so
+`metric17BaselineFor` returns it and the **flag is computed** rather than reported
+UNAVAILABLE, `EVALUATION_SPEC.md §5.5`'s unavailable-with-reason governing a key `§7`
+records **no pair** for. The detector consequence is arithmetic and not a redefinition:
+on `(0, 0)` the unchanged expression evaluates to `rate > 0 + 3 · 0`, so the published
+flag identifies **the presence of any positive abstained `recon_line` value** rather
+than an excursion above a non-degenerate reference. **The measurement being zero is
+entailed by structure already recorded before the seal** — `PREREGISTRATION.md §10`
+**V17**'s fully `AN1`-anchored DEV population, `F08`'s `DROP_SETTLEMENT_ID` being
+test-only, and **V28**'s test-only `F07`–`F10` — so nothing here is a discovery.
+**`EVALUATION_SPEC.md §4.10`'s formula is preserved verbatim and `k_sigma` stays 3**;
+`M53`'s and `M58`'s rulings are untouched and **V33** is not edited. `EVALUATION_SPEC.md
+§8`'s list stays at **28**, `GT_VERSION` stays **1.1.0**, `constraint_set_hash` does
+not move, `§9`'s eight steps keep their number, order, command and flag, and `bench/`
+is step 0's evidence and is **not** regenerated. **Benchmark stays v1.0.13** — this
+record changes no rule, so `M39`'s test is not met and `M49`'s is not met either. This
+is the **first amendment in this corpus taken after a measured figure exists** and it
+does not claim otherwise. See `DECISION_BRIEF.md §A.44` and `PREREGISTRATION.md §10`
+**V34**.
 
 **At spec 1.4.36** this document is unchanged apart from the version header. Register
 row `DATA_MODEL.md §22.2` **M58** ratifies **two** choices `PREREGISTRATION.md §7`'s

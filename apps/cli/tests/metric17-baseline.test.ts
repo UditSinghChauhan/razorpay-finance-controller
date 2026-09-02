@@ -438,10 +438,16 @@ describe("6. the baseline is a total function of its inputs", () => {
 // ---------------------------------------------------------------------------
 
 describe("7. §7 is the record, and it is empty before step 0 is transcribed into it", () => {
-  // @STEP-0-TRANSITION — §7's pre-step-0 state.
-  // Becomes: the five measured offline rows §9 step 0 transcribed.
-  it("holds no row, which is §7's own state today", () => {
-    expect(METRIC_17_BASELINE).toEqual([]);
+  // @STEP-0-TRANSITION — APPLIED at spec 1.4.37 (M59): the five measured
+  // offline rows §9 step 0 transcribed, replacing §7's pre-step-0 empty state.
+  it("holds the five measured offline rows §9 step 0 transcribed", () => {
+    expect(METRIC_17_BASELINE).toEqual([
+      { agent_id: "ASSAY", llm_mode: "offline", mean_bps: 0, stddev_bps: 0 },
+      { agent_id: "B0-IDONLY", llm_mode: "offline", mean_bps: 0, stddev_bps: 0 },
+      { agent_id: "A1-NOVALIDATE", llm_mode: "offline", mean_bps: 0, stddev_bps: 0 },
+      { agent_id: "A2-NOABSTAIN", llm_mode: "offline", mean_bps: 0, stddev_bps: 0 },
+      { agent_id: "A3-NOLLM", llm_mode: "offline", mean_bps: 0, stddev_bps: 0 },
+    ]);
   });
 
   it("carries §7's four fields and no seed, run_id or hash", async () => {
@@ -521,13 +527,14 @@ describe("8. TEST scoring reads §7's frozen baseline", () => {
 });
 
 describe("9/10. an unrecorded baseline fails closed, and nothing is recomputed", () => {
-  // @STEP-0-TRANSITION — (ASSAY, offline) gains a row, so
-  // this key stops being unrecorded. The fail-closed BEHAVIOUR must keep a
-  // subject: re-point the case at a key §7 still records none for — (ASSAY,
-  // replay), which §F F2 defers — so "UNAVAILABLE rather than false" is still
-  // asserted against a real absence and not deleted with the empty table.
+  // @STEP-0-TRANSITION — APPLIED at spec 1.4.37 (M59). (ASSAY, offline) gained
+  // a measured row, so it is no longer unrecorded; the fail-closed BEHAVIOUR
+  // keeps its subject by re-pointing at a key §7 still records none for —
+  // (ASSAY, replay), which §F F2 defers — so "UNAVAILABLE rather than false" is
+  // still asserted against a real absence rather than deleted with the empty
+  // table.
   it("publishes metric 17 UNAVAILABLE on TEST rather than a flag of false", () => {
-    const metrics = scoreAbstentionSpike(spikeRun(), "test", "ASSAY", "offline");
+    const metrics = scoreAbstentionSpike(spikeRun(), "test", "ASSAY", "replay");
     expect(metrics.abstention_spike_flag).toBeNull();
     expect(metrics.abstention_spike_flag).not.toBe(false);
     expect(metrics.state).toBe(METRIC_17_BASELINE_NOT_RECORDED);
@@ -536,47 +543,74 @@ describe("9/10. an unrecorded baseline fails closed, and nothing is recomputed",
     expect(metrics.baseline_stddev_bps).toBeNull();
   });
 
+  // M59's other half, asserted against the same run: a key §7 DOES record —
+  // with a measured (0, 0) — is NOT unavailable. The flag is computed, the pair
+  // is echoed as integer bps, and the bar is `rate > 0`.
+  it("M59 — a measured (0, 0) key is recorded, so the flag is computed not null", () => {
+    const metrics = scoreAbstentionSpike(spikeRun(), "test", "ASSAY", "offline");
+    expect(metrics.state).toBeNull();
+    expect(metrics.state).not.toBe(METRIC_17_BASELINE_NOT_RECORDED);
+    expect(metrics.baseline_mean_bps).toBe(0);
+    expect(metrics.baseline_stddev_bps).toBe(0);
+    expect(metrics.k_sigma).toBe(K_SIGMA);
+    // The unchanged formula on a (0, 0) pair: 0.4 > 0 + 3*0.
+    expect(metrics.abstention_spike_flag).toBe(true);
+  });
+
   it("still publishes the rate — §4.10's input is a property of the run alone", () => {
     const metrics = scoreAbstentionSpike(spikeRun(), "test", "ASSAY", "offline");
     expect(metrics.abstention_rate_by_value).toBe(0.4);
   });
 
-  // @STEP-0-TRANSITION — only the trailing `toEqual([])`
-  // goes; the before/after comparison is the actual subject and gets STRONGER
-  // once the table is populated.
+  // @STEP-0-TRANSITION — APPLIED at spec 1.4.37 (M59). Only the trailing
+  // `toEqual([])` went; the before/after comparison is the actual subject and
+  // is STRONGER now that the table is populated — scoring reads five real rows
+  // and still moves none of them.
   it("does not mutate §7's table while scoring", () => {
     const before = JSON.stringify(METRIC_17_BASELINE);
     scoreAbstentionSpike(spikeRun(), "test", "ASSAY", "offline");
     scoreAbstentionSpike(spikeRun(), "test", "B0-IDONLY", "replay");
     expect(JSON.stringify(METRIC_17_BASELINE)).toBe(before);
-    expect(METRIC_17_BASELINE).toEqual([]);
+    expect(METRIC_17_BASELINE).toHaveLength(5);
   });
 
-  // @STEP-0-TRANSITION — with a row recorded, `loud` gains
-  // a fired flag and `quiet` does not, so the invariant to assert becomes the
-  // real one: both read the SAME recorded pair, and the pair does not move with
-  // the run's rate. Re-point at (ASSAY, replay) for the null-flag half.
+  // @STEP-0-TRANSITION — APPLIED at spec 1.4.37 (M59). With a row recorded the
+  // invariant asserted is the real one: two runs an order of magnitude apart in
+  // rate read the SAME recorded pair, and the pair does not move with the run's
+  // rate. (ASSAY, replay) carries the null-flag half, §F F2 still deferring it.
   it("derives no baseline from the run it judges — the scorer has no such seam", () => {
-    // Two runs whose rates differ by an order of magnitude reach the SAME state,
-    // because nothing about the run can produce a baseline.
+    const loudRun = {
+      ...spikeRun(),
+      outcomes: spikeRun().outcomes.map((o) => ({ ...o, state: "ABSTAINED" as const })),
+    };
+    // Two runs whose rates differ by an order of magnitude reach the SAME state
+    // and echo the SAME pair, because nothing about the run can produce one.
     const quiet = scoreAbstentionSpike(spikeRun(), "test", "ASSAY", "offline");
-    const loud = scoreAbstentionSpike(
-      { ...spikeRun(), outcomes: spikeRun().outcomes.map((o) => ({ ...o, state: "ABSTAINED" as const })) },
-      "test",
-      "ASSAY",
-      "offline",
-    );
+    const loud = scoreAbstentionSpike(loudRun, "test", "ASSAY", "offline");
+    expect(quiet.abstention_rate_by_value).toBe(0.4);
     expect(loud.abstention_rate_by_value).toBe(1);
     expect(quiet.state).toBe(loud.state);
-    expect(loud.abstention_spike_flag).toBeNull();
+    expect(loud.baseline_mean_bps).toBe(quiet.baseline_mean_bps);
+    expect(loud.baseline_stddev_bps).toBe(quiet.baseline_stddev_bps);
+    // A key §7 records no row for stays UNAVAILABLE however loud the run is.
+    const deferred = scoreAbstentionSpike(loudRun, "test", "ASSAY", "replay");
+    expect(deferred.abstention_spike_flag).toBeNull();
+    expect(deferred.baseline_mean_bps).toBeNull();
   });
 
-  // @STEP-0-TRANSITION — becomes the pair of cases §10 V28
-  // actually requires: no disclosure where there is no flag (a key §7 records
-  // none for), and the disclosure ATTACHED where a flag exists.
+  // @STEP-0-TRANSITION — APPLIED at spec 1.4.37 (M59). Now the pair of cases
+  // §10 V28 actually requires: no disclosure where there is no flag (a key §7
+  // records none for), and the disclosure ATTACHED where a flag exists.
   it("carries no V28 disclosure where there is no flag to qualify", () => {
-    expect(scoreAbstentionSpike(spikeRun(), "test", "ASSAY", "offline").v28_disclosure).toBeNull();
+    // (ASSAY, replay) — §F F2 defers it, so there is no flag to qualify.
+    expect(scoreAbstentionSpike(spikeRun(), "test", "ASSAY", "replay").v28_disclosure).toBeNull();
     expect(V28_BASELINE_COMPOSITION).toMatch(/V28/);
+  });
+
+  it("attaches V28 to a flag that exists — the verdict carries its qualification", () => {
+    const metrics = scoreAbstentionSpike(spikeRun(), "test", "ASSAY", "offline");
+    expect(metrics.abstention_spike_flag).not.toBeNull();
+    expect(metrics.v28_disclosure).toBe(V28_BASELINE_COMPOSITION);
   });
 });
 
@@ -801,13 +835,17 @@ describe("17. M58 — the transcription path is printed, and this pass writes ne
     expect(result.sink.files.size).toBe(0);
   });
 
-  // @STEP-0-TRANSITION — the subject is that the PASS
-  // writes nothing, which survives population; what changes is the empty-table
-  // assertion standing in for it. Becomes: the constant is byte-identical
-  // before and after the pass runs.
-  it("leaves METRIC_17_BASELINE empty — nothing is guessed or prefilled by the pass", async () => {
+  // @STEP-0-TRANSITION — APPLIED at spec 1.4.37 (M59). The subject is that the
+  // PASS writes nothing, which survives population; what changed is the
+  // empty-table assertion standing in for it. It is now the stronger form: the
+  // constant is byte-identical before and after the pass runs, so the pass
+  // cannot be the thing that populates it — the transcription is a deliberate
+  // source edit, never a side effect of running step 0 again.
+  it("does not write METRIC_17_BASELINE — the pass transcribes nothing itself", async () => {
+    const before = JSON.stringify(METRIC_17_BASELINE);
     await run(baselineArgv());
-    expect(METRIC_17_BASELINE).toEqual([]);
+    expect(JSON.stringify(METRIC_17_BASELINE)).toBe(before);
+    expect(METRIC_17_BASELINE).toHaveLength(5);
   });
 });
 
@@ -848,14 +886,25 @@ describe("18. M58 — TEST scoring READS the transcription and recomputes nothin
     }
   });
 
-  // @STEP-0-TRANSITION — becomes the positive form: a TEST
-  // unit reads the TRANSCRIBED pair, echoes it unchanged in integer bps, and
-  // recomputes nothing. The UNAVAILABLE half moves to a key F2 still defers.
-  it("reads the transcription for a TEST unit and finds §7's frozen empty table", () => {
-    // The transcription is empty at this pre-step-0 checkpoint, so the honest
-    // answer is UNAVAILABLE with its reason — never a recomputed pair.
+  // @STEP-0-TRANSITION — APPLIED at spec 1.4.37 (M59). Now the positive form: a
+  // TEST unit reads the TRANSCRIBED pair, echoes it unchanged in integer bps and
+  // recomputes nothing. The UNAVAILABLE half moved to a key F2 still defers.
+  it("reads the transcription for a TEST unit and echoes §7's pair unchanged", () => {
     const metrics = scoreAbstentionSpike(spikeRun(), BASELINE_CONSUMING_SPLIT, "ASSAY", "offline");
-    expect(METRIC_17_BASELINE).toEqual([]);
+    // The echoed pair is §7's own row, in §7's integer-bps encoding.
+    const row = METRIC_17_BASELINE.find(
+      (r) => r.agent_id === "ASSAY" && r.llm_mode === "offline",
+    );
+    expect(row).toBeDefined();
+    expect(metrics.baseline_mean_bps).toBe(row?.mean_bps);
+    expect(metrics.baseline_stddev_bps).toBe(row?.stddev_bps);
+    expect(metrics.state).toBeNull();
+    expect(metrics.abstention_spike_flag).not.toBeNull();
+  });
+
+  it("answers UNAVAILABLE with its reason for a key §F F2 still defers", () => {
+    // The honest answer where §7 records no pair — never a recomputed one.
+    const metrics = scoreAbstentionSpike(spikeRun(), BASELINE_CONSUMING_SPLIT, "ASSAY", "replay");
     expect(metrics.baseline_mean_bps).toBeNull();
     expect(metrics.baseline_stddev_bps).toBeNull();
     expect(metrics.abstention_spike_flag).toBeNull();
@@ -1155,26 +1204,42 @@ describe("23. F5 — every assertion that changes when §7 is transcribed is mar
     expect(SITES.reduce((total, [, n]) => total + n, 0)).toBe(13);
   });
 
-  // @STEP-0-TRANSITION — the control itself, and deliberately the last marker
-  // to fall: it asserts the empty state directly so that a transcription taken
-  // without touching this suite cannot come out green. Becomes the populated
-  // assertion — five offline rows, one per agent in BASELINE_AGENT_IDS.
-  it("leaves the pre-step-0 assertions ASSERTING, so the transition cannot pass silently", () => {
-    // The markers are documentation; these are the control. §7 is empty, so a
-    // transcription taken without updating the marked cases FAILS the suite —
-    // which is what makes the transcription one deliberate commit rather than a
-    // constant edit that quietly re-greens.
-    expect(METRIC_17_BASELINE).toEqual([]);
-    expect(METRIC_17_BASELINE).toHaveLength(0);
+  // @STEP-0-TRANSITION — APPLIED at spec 1.4.37 (M59). The control itself, and
+  // deliberately the last marker to fall: it asserted the empty state directly
+  // so that a transcription taken without touching this suite could not come out
+  // green. It is now the populated assertion — five offline rows, one per agent
+  // in BASELINE_AGENT_IDS — and it plays the same role in the other direction:
+  // a row silently added to or dropped from §7's transcription FAILS here.
+  it("holds exactly §9 step 0's transcription, so no row can be added or dropped silently", () => {
+    expect(METRIC_17_BASELINE).toHaveLength(5);
+    expect(METRIC_17_BASELINE.map((r) => `${r.agent_id}/${r.llm_mode}`)).toEqual([
+      "ASSAY/offline",
+      "B0-IDONLY/offline",
+      "A1-NOVALIDATE/offline",
+      "A2-NOABSTAIN/offline",
+      "A3-NOLLM/offline",
+    ]);
+    // The measured figures, transcribed unchanged and never recomputed.
+    for (const row of METRIC_17_BASELINE) {
+      expect(row.mean_bps).toBe(0);
+      expect(row.stddev_bps).toBe(0);
+    }
   });
 
-  it("keeps §7's own rules true of whatever is transcribed — offline-only, five agents", () => {
-    // Holds vacuously today and is the check on the populated table tomorrow:
+  it("keeps §7's own rules true of what is transcribed — offline-only, five agents", () => {
     // §9 step 0 is offline-only at this checkpoint (F3) over the five runnable
     // agents (F2), so no other key may appear in the transcription.
+    expect(METRIC_17_BASELINE).not.toHaveLength(0);
     for (const row of METRIC_17_BASELINE) {
       expect(BASELINE_AGENT_IDS).toContain(row.agent_id);
       expect(row.llm_mode).toBe("offline");
     }
+    // The seven keys §7 records no pair for are absent from the constant, which
+    // transcribes PAIRS and has no field for a reason (M58, carried by M59).
+    for (const agent of BASELINE_AGENT_IDS) {
+      expect(METRIC_17_BASELINE.some((r) => r.agent_id === agent && r.llm_mode === "replay"))
+        .toBe(false);
+    }
+    expect(METRIC_17_BASELINE.some((r) => r.agent_id === "B2-LLM-DIRECT")).toBe(false);
   });
 });

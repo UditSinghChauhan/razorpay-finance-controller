@@ -1,6 +1,29 @@
 # EVALUATION_SPEC — ASSAY
 
-**Spec version:** 1.4.36 · **Date:** 2026-09-02
+**Spec version:** 1.4.37 · **Date:** 2026-09-02
+
+**At spec 1.4.37** this document adds **one reading paragraph** to `§4.10` and changes
+nothing else. Register row `DATA_MODEL.md §22.2` **M59** records that
+`PREREGISTRATION.md §9` **step 0** has been taken and returned
+`mean_bps = stddev_bps = 0` for all five `offline` Tier-0 keys, and ratifies that a
+measured `(0, 0)` pair **is a baseline**: `metric17BaselineFor` returns it, the flag is
+**computed** rather than reported UNAVAILABLE, and `§5.5`'s unavailable-with-reason
+governs a key `§7` records **no pair** for rather than a key whose measured pair is
+zero. The paragraph states the arithmetic consequence and **defines nothing**: on
+`(0, 0)` the unchanged expression evaluates to `rate > 0 + 3 · 0`, so what the published
+flag identifies for such a key is **the presence of any positive abstained `recon_line`
+value**, not an excursion above a non-degenerate reference. **`§4.10`'s formula
+`rate > baseline + k·σ` is preserved verbatim, `k_sigma` stays 3, and the rate's
+numerator, denominator, universe, population, producer and consumer do not move** — M58's
+encoding, rounding and transcription rules stand entire and M53's are untouched. The
+measurement being zero follows from structure already recorded before the seal:
+`PREREGISTRATION.md §10` **V17**'s fully `AN1`-anchored DEV population, `F08`'s
+`DROP_SETTLEMENT_ID` being test-only, and **V28**'s test-only `F07`–`F10`. `§4.1`–`§4.9`
+and `§4.11`–`§4.13` are unchanged, `§4.6`'s M57 semantics stand entire, `§5.1`–`§5.5` are
+untouched, `§3.2`'s ablation table is untouched, and `§8`'s list stays at **28**.
+**Benchmark stays v1.0.13.** **This amendment is taken after a measured figure exists**
+and does not claim otherwise; the legitimacy argument is at `DATA_MODEL.md §22.2`
+**M59**. See `DECISION_BRIEF.md §A.44` and `PREREGISTRATION.md §10` **V34**.
 
 **At spec 1.4.36** this document supplies **metric 17's missing baseline encoding** in
 `§4.10` and changes nothing else. Register row `DATA_MODEL.md §22.2` **M58** ratifies
@@ -1295,6 +1318,54 @@ committed run artifact. The **rate** is published regardless.
 `PREREGISTRATION.md §10` **V33** declares this ruling's own residual: a full-precision
 rate against a quantized bar moves the comparison by up to `2` bps, and a genuinely
 non-zero `σ` below `0.5` bps records as `0`.
+
+**A measured `(0, 0)` pair is a baseline, and the bar it makes — reading supplied at
+spec 1.4.37 `[ASSAY-MODEL]`, register row `DATA_MODEL.md §22.2` M59.**
+`PREREGISTRATION.md §9` step 0 has been taken and recorded `mean_bps = stddev_bps = 0`
+for all five `offline` Tier-0 keys. **Nothing in this section changes**: the formula
+above is preserved verbatim, `k_sigma` stays `3`, and the rate's numerator, denominator,
+universe, population, producer and consumer do not move. What is stated is a
+**consequence of applying the frozen expression to a measured input**, and it is
+arithmetic rather than a definition:
+
+```
+  a measured (0, 0)       IS a baseline. metric17BaselineFor returns the row, the
+                          FLAG IS COMPUTED, and §5.5's "unavailable with its
+                          reason" is NOT engaged -- that rule governs a key §7
+                          records NO PAIR for, which is a different condition from
+                          a key whose measured pair is zero.
+
+  the bar it makes        rate > 0 / 10_000 + 3 * 0 / 10_000
+                            = rate > 0 + 3 * 0
+                            = rate > 0
+
+  what the flag means     the comparison is STRICT, so a scored run carrying no
+                          abstained recon_line value yields FALSE and one carrying
+                          ANY positive abstained recon_line value yields TRUE. For
+                          such a key the published flag identifies THE PRESENCE OF
+                          ANY POSITIVE ABSTAINED recon_line VALUE, not an excursion
+                          above a non-degenerate reference; "spike" in the field's
+                          name is read with this paragraph attached.
+```
+
+**This section's own expectation is met on its own terms.** A clean split does not
+fire and the `F10` adversarial split, carrying abstained value, does — so the flag is
+neither the *"broken baseline"* that fires everywhere nor the *"broken detector"* that
+fires nowhere. **No frequency, magnitude or expected firing rate is asserted here**, no
+scored run existing.
+
+**Why the measurement is zero is already on the record and is not a new finding.**
+`PREREGISTRATION.md §10` **V17** states that *"every DEV settlement is fully
+`AN1`-anchored"* because `F08`'s `DROP_SETTLEMENT_ID` is **test-only**, so *"the
+completeness gate passes on DEV without ever enumerating a candidate"*; **V28** states
+that `§6.1` makes `F07`–`F10` test-only. A population enumerating no candidate presents
+no `AMBIGUOUS` or `INTRACTABLE` target, so `RECONCILIATION_SPEC.md §9`'s abstention
+branch is not reached and no `recon_line` reaches `ABSTAINED`. `A2-NOABSTAIN` is zero on
+a second and independent ground, being the agent `§3.2` defines as never abstaining.
+`PREREGISTRATION.md §10` **V34** declares this reading's residual: on such a bar the
+flag's power to discriminate a graded abstention increase is absent by construction, and
+neither the DEV population nor this detector may be changed in response — `§6.2` **AL3**
+and `DECISION_BRIEF.md §L.4` forbid revising a pre-registered quantity from a result.
 
 ### 4.11 Provider independence
 

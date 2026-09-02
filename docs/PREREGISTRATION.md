@@ -1,6 +1,6 @@
 # PREREGISTRATION — ASSAY Benchmark v1.0.13
 
-**Spec version:** 1.4.36 · **Benchmark version:** 1.0.13
+**Spec version:** 1.4.37 · **Benchmark version:** 1.0.13
 
 **Status: FROZEN on commit. Amendments require a version bump and a new seal.**
 **Date frozen:** 2026-08-23 · **Amended:** 2026-08-24 (benchmark 1.0.1),
@@ -27,7 +27,22 @@ corpus, adding the baseline pair's **encoding and rounding rule** and its
 **source-transcription rule**, adding **no** `§7` entry and **no** metric, amending
 `§8`'s row **17** with the ratified encoding, adding a **clarification only** to
 `§9`'s step 0 while preserving all eight steps in number, order, command and flag,
-carrying `§9`'s literals with the bump and opening `§10` **V33** — see below
+carrying `§9`'s literals with the bump and opening `§10` **V33** — see below; and
+2026-09-02 at **benchmark 1.0.13 UNCHANGED**, where **spec 1.4.37 TRANSCRIBES `§9`
+step 0's measured metric-17 baseline into `§7`** and ratifies what `EVALUATION_SPEC.md
+§4.10` publishes against it. Step 0 has been **taken**, returning
+`mean_bps = stddev_bps = 0` for all five `offline` Tier-0 keys; `§7`'s metric-17 entry
+gains a `measured`, a `deferred` and a `consequence` row and its `rate`, `population`,
+`statistic`, `scope`, `producer`, `consumer`, `table`, `rounding`, `transcription` and
+`k_sigma` rows are **preserved verbatim**. It adds **no** `§7` entry and **no** metric,
+leaves `§8`'s list at **28** with metric 17's name, number and formula untouched and
+`k_sigma` at **3**, preserves all **eight** `§9` steps in number, order, command and
+flag, and opens `§10` **V34**. **The benchmark version does not move** — the precedent
+being spec 1.4.31, which likewise amended no pre-registered quantity — so `§9`'s
+literals and step 1's `bench-v1.0.13` tag are **carried unchanged**. **This is the
+first amendment in this corpus taken after a measured figure exists**, and it says so
+rather than claiming otherwise: see `DATA_MODEL.md §22.2` **M59** and
+`DECISION_BRIEF.md §A.44` for the legitimacy argument
 · **Sealed at:** _(pending — see §9)_
 
 **Amendment 1.1.1 (pre-seal, factual correction).** Applied before the seal and
@@ -3165,6 +3180,112 @@ test split. Rules AL1–AL8 target that, because it is the real risk here.
                           is NOT a BenchmarkManifest field.
       k_sigma             3, unchanged, above.
 
+      measured            TRANSCRIBED at spec 1.4.37, register row M59. §9 step
+                          0 has been TAKEN. These are its measured rows, copied
+                          UNCHANGED from the pass's own table in M58's field
+                          order. Nothing here is computed, re-derived, rounded a
+                          second time or adjusted, and NO value was measured
+                          twice:
+
+                            agent_id       llm_mode   mean_bps  stddev_bps
+                            ASSAY          offline           0           0
+                            B0-IDONLY      offline           0           0
+                            A1-NOVALIDATE  offline           0           0
+                            A2-NOABSTAIN   offline           0           0
+                            A3-NOLLM       offline           0           0
+
+                          This table is AUTHORITATIVE. Its executable
+                          transcription is METRIC_17_BASELINE in
+                          packages/eval/src/frozen.ts, which carries these same
+                          five rows and these four fields only; any divergence
+                          between the two is a SEAL/REPRODUCIBILITY FAILURE.
+
+      deferred            The seven (agent_id, llm_mode) keys below carry NO
+                          PAIR. §7 records them HERE, with their reasons; they
+                          are NOT written into METRIC_17_BASELINE, which
+                          transcribes PAIRS and has no field for a reason. Each
+                          reads metric17BaselineFor(...) === null, which is §7's
+                          UNAVAILABLE -- never a pair of zeros and never a
+                          spike_flag of false. §7 is therefore COMPLETE about
+                          what it does not hold.
+
+                            B2-LLM-DIRECT  replay     DECISION_BRIEF.md §C T0-10
+                            B2-LLM-DIRECT  offline    / §F F2: this baseline is
+                                                      conditional on a metered
+                                                      credential to populate its
+                                                      replay cache; F2 records
+                                                      that credential as
+                                                      Unresolved and its
+                                                      pre-declared response
+                                                      defers the agent to tier
+                                                      H2 rather than weakening
+                                                      it. §9 step 0 applies that
+                                                      disposition and does not
+                                                      reopen it.
+
+                            ASSAY          replay     DECISION_BRIEF.md §F F2:
+                            B0-IDONLY      replay     no recorded replay cache
+                            A1-NOVALIDATE  replay     exists at this checkpoint
+                            A2-NOABSTAIN   replay     (EVALUATION_SPEC.md §2
+                            A3-NOLLM       replay     populates it from one
+                                                      recorded --llm=<live
+                                                      provider> --record pass,
+                                                      which F2 leaves untaken),
+                                                      so step 0's replay rows are
+                                                      deferred exactly as F2
+                                                      already defers
+                                                      B2-LLM-DIRECT and metric
+                                                      3's --llm=replay column.
+                                                      NOTHING is fabricated in
+                                                      their place.
+
+      consequence         RATIFIED at spec 1.4.37, register row M59. A measured
+                          (0, 0) pair IS a baseline: metric17BaselineFor returns
+                          it, the flag is COMPUTED, and EVALUATION_SPEC.md §5.5's
+                          unavailable-with-reason is NOT engaged -- that
+                          convention governs a key §7 records NO PAIR for, which
+                          is a different condition from a key whose measured pair
+                          is zero. The detector is UNCHANGED and this is its
+                          arithmetic, not a redefinition: on (0, 0) the frozen
+                          expression
+                                                      rate > mean_bps / 10_000
+                                                             + k_sigma * stddev_bps / 10_000
+                          evaluates to rate > 0 + 3 * 0, i.e. rate > 0. The
+                          comparison being strict, a scored run carrying no
+                          abstained recon_line value yields false and one
+                          carrying any positive abstained recon_line value yields
+                          true. WHAT THE PUBLISHED FLAG IDENTIFIES FOR SUCH A KEY
+                          IS THEREFORE THE PRESENCE OF ANY POSITIVE ABSTAINED
+                          recon_line VALUE, NOT AN EXCURSION ABOVE A
+                          NON-DEGENERATE REFERENCE; the word "spike" in the
+                          field's name is read with this row attached.
+                          §4.10's expectation is met on its own terms -- a clean
+                          run does not fire, an F10 run carrying abstained value
+                          does -- and NO frequency, magnitude or expected firing
+                          rate is asserted, no scored run existing.
+                          WHY THE MEASUREMENT IS ZERO, from already-recorded
+                          structure and not from a new finding: §10 V17 records
+                          that every DEV settlement is fully AN1-anchored because
+                          F08's DROP_SETTLEMENT_ID is TEST-ONLY, so no DEV target
+                          enumerates a candidate; §10 V28 records that §6.1 makes
+                          F07-F10 test-only. A population enumerating no
+                          candidate presents no AMBIGUOUS or INTRACTABLE target,
+                          so no recon_line reaches ABSTAINED. A2-NOABSTAIN is
+                          zero on a second and independent ground, being the
+                          agent EVALUATION_SPEC.md §3.2 defines as never
+                          abstaining; that ground is V33's and is unchanged.
+                          V33 is NOT edited and its A2-NOABSTAIN instance is not
+                          withdrawn: this row records a SECOND instance, and a
+                          zero MEAN besides, which V33's "the bar collapses to
+                          mean_bps" does not describe.
+                          REJECTED and preserved as rejected: reporting the flag
+                          UNAVAILABLE for a measured (0, 0) key; re-running step
+                          0; widening the DEV population (§6.1's forbidden list,
+                          AL7, V28); and altering the detector, threshold or
+                          formula (§6.2 AL3, DECISION_BRIEF.md §L.1 rule 12 and
+                          §L.4, which forbids revising from a result).
+                          Residual: §10 V34.
+
   Metric 15 per-case balance_harm (RATIFIED at spec 1.4.33, register row M55;
   frozen on the A3-NOLLM terms, being an input to a figure on §8's list):
 
@@ -4109,6 +4230,7 @@ Stated here, before results, so they cannot be presented later as afterthoughts.
 | V31 | Under `§9` step 7 the scoring process **holds ground truth in memory** while it scores the run it just executed, so `AL5`'s guarantee now rests on an **emission** boundary rather than on the read refusal that stood before spec 1.4.34 | **Declared at spec 1.4.34 (register row M56), not repaired, because there is nothing here to repair without making `§9` step 7 inexecutable.** `EVALUATION_SPEC.md §2` has always defined a scored unit as `score(agent output, ground truth, oracle labels)`, and `§9` step 7 is the only run that ever scores TEST; a scorer that cannot see the answer key cannot mark the paper. What changes at this amendment is **where** the guarantee is enforced, not **whether**. **What still holds structurally:** `AL1` and `AL2` bar `packages/engine` and `packages/oracle` by name and are untouched; `AgentInput` carries `observations` and `config` and nothing else, so no agent, baseline or ablation has anything to read *with*; `packages/eval/src/truth.ts` is the single import site for `packages/generator` in the scorer, asserted by a counting test, and it *"exposes no path, no reader and no `GroundTruth` re-export"*, converting the record into a projection before any metric module sees it; and the emitted artifact is a closed record of scalars, so no `GroundTruth` field has a field to be written into. **The residual, stated plainly:** the process boundary is now the last line rather than the second-to-last, and a future metric module that widened what it projects could in principle carry a truth field into an artifact where the pre-M56 read refusal would have thrown first. **Bounded, not eliminated**: `AL4` still bars inspection of TEST outputs before the sealed run, `AL7` still burns a seed on any breach, `§9` step 5 still commits only the ground-truth **digest** and `.gitignore` still holds the artifact back, so a leak would have to survive all four to reach a reader. `§10` **V3**'s *"Developer tunes against the test split … Moderate — self-enforced"* carries the same class of residual and is unchanged. **Fixed before any figure exists** — `bench/` absent, `runs/` holding only `.gitkeep`, no seal tag cut — so `§6.2` **AL3** and `DECISION_BRIEF.md §L.4` are satisfied rather than merely not engaged |
 | V32 | Metric 7's correctness predicate is **set equality on the allocation**, which is **not equivalent** to the edge-level reading `EVALUATION_SPEC.md §4.2` uses for metric 5, and its population is the **accept side of the very threshold ε that calibration exists to justify** | **Declared at spec 1.4.35 (register row M57), not repaired, because neither half can be repaired without reopening a ratified reading.** **The predicate.** `§4.6` named `accuracy(bin)` and defined it nowhere; set equality and edge-level agreement were both admissible and they disagree on a decision asserting a **subset** of the true members, which set equality counts **wrong** and edge-level agreement counts **right**. The consequence is that `accuracy(bin)` is weakly lower than an edge-wise reading would give and `ece` is generally a different number, so **metric 7 is not comparable with any externally computed edge-wise calibration figure** and no such comparison may be drawn in the report. **This is a disclosure, not a defect:** the gate's claim is that *this allocation explains this target*, and partial credit is reported where `§4.2` put it — **metric 5** `match_precision` / `match_recall` / `match_f1`, whose definitions this amendment does not touch. **The population.** Only `RECONCILIATION_SPEC.md §6` step 3's `DISCRIMINATED` decisions enter, because they are the only ones whose gate the ε-gap decided; an `AMBIGUOUS` decision **abstains** and has no committed allocation for `accuracy(bin)` to test. Metric 7 therefore observes the **accept** side of ε alone, and **miscalibration below ε is structurally unobservable to it** — `EVALUATION_SPEC.md §4.3`'s metrics 4 and `§4.13`'s metric 8 are where the abstain side is scored, against the oracle. **Sparse or empty bins are a structural property of that population, never grounds for a definition change.** Bins below ε cannot be populated by construction, and an agent whose gate consults no score contributes no prediction at all, so its cell reads **unavailable with its reason** rather than `0.0` (`§5.5`, `M56`). Widening the population to restore density would mean including `UNIQUE` decisions with an **invented** score or `IMMATERIALLY_AMBIGUOUS` decisions whose gate consulted no gap — both **rejected and preserved as rejected** at `M57` — and `§6.2` **AL3** with `DECISION_BRIEF.md §L.4` forbid revisiting the choice once a figure has been seen. **No population size, frequency or expected value is claimed here:** `bench/` is absent, `runs/` holds only `.gitkeep`, no dataset has been generated and no metric has been computed, so the statement is structural rather than empirical. **Fixed before any figure exists** — which is what makes it legitimate, on `M55`'s and `M56`'s own condition |
 | V33 | Metric 17's `abstention_spike_flag` compares a **full-precision rate** against a **quantized bar**, so a rate lying within roughly **2 bps** of the true full-precision bar may fall on the opposite side of the flag from where unrounded arithmetic would place it; and where an agent's five DEV rates agree to within `5e-5`, `stddev_bps` rounds to **0** and the bar collapses to `mean_bps` | **Declared at spec 1.4.36 (register row M58), not repaired, because the alternative is worse and the residual is the price of an auditable record.** `§7`'s table names `mean_bps` and `stddev_bps`, and `DATA_MODEL.md §0` rule 5 requires an integer-bps encoding for *"every dimensionless ratio that … a gate or invariant compares"* — which this pair is, being the right-hand side of `§4.10`'s detector. Rule 5's carve-out cannot be reached: it is **enumerated and closed** (*"the four `coverage_by_value*` figures and `coverage_by_count` in `CloseReport` (§20)"*) and it is **conditioned** on being *"derived display values computed at render from the authoritative integer paise fields"*, while the baseline is a statistic over five runs that no longer exist as artifacts when the flag is evaluated. **The quantization band is bounded and stated:** `round_half_up` moves each figure by at most `0.5` bps, so the bar `mean_bps + 3·stddev_bps` moves by at most `2` bps against a rate that is not rounded at all. **The `σ = 0` case is real and is not a rounding artifact alone:** an agent that never abstains — `A2-NOABSTAIN` is the declared instance — has five identical DEV rates and a **true** sample σ of exactly zero, so the collapsed bar is the detector behaving correctly on a degenerate population, not a defect introduced here; what M58 adds is the narrower band `0 < σ < 0.5 bps` in which a genuinely non-zero σ records as `0`. **The rejected alternative carried a worse residual.** Full-precision internal values with `_bps` as display-only would relocate the rounding decision into the `§7` transcription and leave it **unspecified** there, since a markdown table cannot carry a double without a decimal-place convention; and it would make `M58`'s own companion rule — *"any divergence between `§7` and `METRIC_17_BASELINE` is a seal failure"* — **unenforceable**, because no exact comparison exists between a truncated rendering and a full-precision literal. An integer-vs-integer check is one a reviewer can actually perform, and that is what the disclosure buys. **`M27`'s precedent is followed, not contradicted:** that row quantized the **recorded, compared** term (`mode_days`, floored) and left the continuous term continuous (`lag_days`, *"the unfloored real quotient"*), scoping the rationale *"to the mode alone"*; M58 quantizes the recorded baseline pair and leaves the run's own rate at full precision, which is the same shape. **`V28` is unchanged and rides beside this row:** `n = 5` already bounds what a `3σ` bar can resolve, and the family-composition boundary already confounds a fired flag; this residual is **additional to** those and repairs neither. **No figure is claimed:** `bench/` is absent, `runs/` holds only `.gitkeep`, no dataset has been generated, no baseline has been measured and no flag has been evaluated, so the band is stated **structurally** and no frequency, magnitude or expected effect is asserted. **Fixed before any figure exists**, which is what makes it legitimate, on `M55`'s, `M56`'s and `M57`'s own condition: `§6.2` **AL3** and `DECISION_BRIEF.md §L.4` are satisfied rather than merely not engaged |
+| V34 | Metric 17's DEV baseline measured at `§9` step 0 is **`(0, 0)` for every Tier-0 agent under `offline`**, so `EVALUATION_SPEC.md §4.10`'s bar collapses to `0` for all of them and the published `abstention_spike_flag` distinguishes *any abstained value* from *none* rather than resolving a `3σ` excursion; the flag's power to discriminate a graded abstention increase is therefore not merely low, as **V28** already records for `n = 5`, but **absent by construction** on this baseline | **Declared at spec 1.4.37 (register row M59), not repaired, because both repairs are foreclosed by the frozen corpus and the second is foreclosed twice.** **Repair 1 — widen the DEV population so a non-degenerate baseline can be measured.** Rejected, and already rejected once: **V28** records that *"widening the baseline population would require generating `F07`–`F10` into DEV, which `§6.1`'s forbidden list bars and which would destroy the family-level holdout `V3` depends on"*, and `§6.2` **AL7**'s burn rule attaches to any breach of that list. **V17** records the same structure from the oracle's side — *"every DEV settlement is fully `AN1`-anchored"*, `F08`'s `DROP_SETTLEMENT_ID` being test-only — and disposes of it the same way, *"accepted, and recorded before the seal"*. **Repair 2 — floor the bar, impose a minimum `σ`, relax `>` to `≥`, or move `k_sigma`.** Rejected on two independent grounds. First, `k_sigma = 3` is frozen in `§7` and bound by `§6.2` **AL3**; `M58` preserved `§4.10`'s formula *"VERBATIM"*; `DECISION_BRIEF.md §L.1` rule 12 lists the threshold among the constants no composition root may respell. Second, and dispositively, the change would be made **in response to a measured figure**, which `DECISION_BRIEF.md §L.4` forbids — *"forbids revising it from a result"* — and would leave the detector tuned on its own output. **The distinction this row turns on:** a detector whose usefulness is bounded by its population is a **disclosure**; a detector adjusted because its output was seen is a **defect in the procedure**. This row takes the first and refuses the second. **What is bounded, not eliminated:** on the sealed run a fired flag remains confounded by **V28**'s family-composition boundary and now carries, in addition, no separation between a single abstained paisa and a flood. **What still carries the magnitude:** `abstention_rate_by_value` is published beside the flag on **every** run and is a property of that run alone, unaffected by the baseline; it is the quantity a reader must use to judge size, and `EVALUATION_SPEC.md §4.3`'s metric 4 and `§4.13`'s metric 8 remain where the abstain side is scored against the oracle. **No figure beyond the measured baseline is claimed:** no scored run exists, `runs/` holds only `.gitkeep`, no TEST seed has been generated or inspected, no flag has been evaluated on any scored unit, and this row asserts **no frequency, magnitude or expected effect** for the sealed run. **Unlike `V28`–`V33`, this row is opened AFTER a measured figure exists**, and it does not claim the *"fixed before any figure exists"* condition those rows close on; the legitimacy argument that replaces it is stated in full at `DATA_MODEL.md §22.2` **M59** and rests on the figure having come from the already-frozen procedure, on nothing here tuning or revising it, on no scored TEST result having been observed, and on no threshold or benchmark parameter moving |
 
 **The claim ASSAY is entitled to make, and no more:**
 

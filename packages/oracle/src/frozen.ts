@@ -291,5 +291,26 @@ export const BPS_DENOMINATOR = 10_000;
  * completeness gate and `§5.3`'s differential gate are unchanged; `C1`-`C8` are
  * untouched so `constraint_set_hash` does not move. **`BENCHMARK_VERSION` moves
  * 1.0.12 -> 1.0.13** and `GT_VERSION` stays 1.1.0; both remain `packages/generator`'s.
+ *
+ * **1.4.36 -> 1.4.37 (M59) -- required nothing of this package, though it CITES this
+ * package's behaviour as the reason its figure is what it is.** `§9` step 0 has been
+ * taken and returned `(0, 0)` for all five `offline` Tier-0 keys. `PREREGISTRATION.md
+ * §10` **V17** already recorded WHY, before the seal: every DEV settlement is fully
+ * `AN1`-anchored because `F08`'s `DROP_SETTLEMENT_ID` is the only operator detaching a
+ * line from its batch identifier and `F08` is TEST-ONLY, so `enumerate.ts`'s candidate
+ * search runs on no DEV target -- *"the completeness gate passes on DEV without ever
+ * enumerating a candidate"* -- and `classify.ts` therefore emits no
+ * `TRULY_AMBIGUOUS` or `IMMATERIALLY_AMBIGUOUS` label on DEV. **That is V17 being
+ * observed, not a new property**, and M59 records the consequence for metric 17
+ * rather than changing anything here. `unanchoredMembers`'s `settlement_id === null`
+ * test, `§3`'s anchor rule, `classify`'s five-value `AmbiguityLabel` vocabulary,
+ * `tauFor`, `TAU_RATE_BPS`, `TAU_FLOOR_PAISE`, `K_ORACLE`, `C_ORACLE`,
+ * `SETTLEMENT_WINDOW_DAYS`, `§5.1`'s completeness gate and `§5.3`'s differential gate
+ * are all **unchanged**; `C1`-`C8` are untouched so `constraint_set_hash` does not
+ * move. **Metric 4 -- the one figure this package's labels decide -- is untouched.**
+ * `BENCHMARK_VERSION` STAYS **1.0.13** and `GT_VERSION` stays 1.1.0; both remain
+ * `packages/generator`'s. The existing `bench/dev` oracle gates and labels are `§9`
+ * step 0's evidence and are **not** re-derived; each gate's `spec_version` stamp
+ * records the version under which the gate RAN and correctly reads `1.4.36`.
  */
-export const SPEC_VERSION = "1.4.36";
+export const SPEC_VERSION = "1.4.37";
