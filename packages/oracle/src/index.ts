@@ -101,6 +101,7 @@ export {
 
 export {
   type AccountBalances,
+  AMBIGUITY_LABELS,
   type AmbiguityLabel,
   type OracleLabel,
   type MaterialityPaise,

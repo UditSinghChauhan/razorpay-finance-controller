@@ -24,6 +24,7 @@ import {
   runSweeps,
   runTauSweep,
   type SweepPoint,
+  type RiskAxis,
 } from "../src/bench/sweep.js";
 import type { SweepParameters, SweptRunner } from "../src/agents/sweep-runner.js";
 import { CliError } from "../src/errors.js";
@@ -57,6 +58,17 @@ const CONFIG: RunConfig = Object.freeze({
 });
 
 const EMPTY_INPUT: AgentInput = Object.freeze({ observations: [], config: CONFIG });
+
+/**
+ * `§5.1`'s risk axis, absent.
+ *
+ * These cases exercise the **walk** — the grids, the order, the point identity
+ * and the refusals — none of which reads ground truth. `null` is what
+ * `bench/scorer.ts` returns for a scored unit that was given no answer key, so
+ * the sweep is driven here exactly as it is on a `dev` unit. The axis's own
+ * wiring is `truth-scoring.test.ts`'s.
+ */
+const NO_HARM: RiskAxis = () => null;
 
 function stubRun(agentId: AgentId): AgentRun {
   return {
@@ -129,7 +141,7 @@ describe("A/B. the ε grid is §7's 21 points and contains the operating point",
 describe("C/D. points execute in the frozen declared order", () => {
   it("walks ε ascending, one execution per point", async () => {
     const { runner, calls } = recorder();
-    const points = await runEpsilonSweep(runner, EMPTY_INPUT, "ASSAY");
+    const points = await runEpsilonSweep(runner, EMPTY_INPUT, "ASSAY", NO_HARM);
     expect(calls.map((c) => c.epsilonBps)).toStrictEqual([...EPSILON_GRID_BPS]);
     expect(points.map((p) => p.parameter_value)).toStrictEqual([...EPSILON_GRID_BPS]);
     expect(calls).toHaveLength(21);
@@ -148,7 +160,7 @@ describe("C/D. points execute in the frozen declared order", () => {
     return Promise.all([
       (async () => {
         const { runner, calls } = recorder();
-        await runEpsilonSweep(runner, EMPTY_INPUT, "ASSAY");
+        await runEpsilonSweep(runner, EMPTY_INPUT, "ASSAY", NO_HARM);
         for (const c of calls) expect(c.tauFloorPaise).toBeUndefined();
       })(),
       (async () => {
@@ -161,7 +173,7 @@ describe("C/D. points execute in the frozen declared order", () => {
 
   it("marks the operating point on the ε curve and nowhere else", async () => {
     const { runner } = recorder();
-    const points = await runEpsilonSweep(runner, EMPTY_INPUT, "ASSAY");
+    const points = await runEpsilonSweep(runner, EMPTY_INPUT, "ASSAY", NO_HARM);
     const flagged = points.filter((p) => p.is_operating_point);
     expect(flagged).toHaveLength(1);
     expect(flagged[0]?.parameter_value).toBe(EPSILON_BPS);
@@ -201,7 +213,7 @@ describe("F/N. RunKey is the same across every sweep point and gains no field", 
   it("keys every point of a sweep under one unchanged RunKey", async () => {
     const key = runKey("ASSAY", CONFIG);
     const { runner } = recorder();
-    const sweeps = await runSweeps(runner, EMPTY_INPUT, "ASSAY");
+    const sweeps = await runSweeps(runner, EMPTY_INPUT, "ASSAY", NO_HARM);
     // The key is the enclosing artifact's and is written once; no point carries
     // one of its own, and none of the four fields is a sweep parameter.
     expect(Object.keys(key).sort()).toStrictEqual(["agent_id", "llm_mode", "seed", "split"]);
@@ -254,7 +266,14 @@ describe("G/H. the sweeps nest inside one metrics.json beside the base metrics",
     const metrics = readFileSync(join(SRC, "artifacts", "metrics.ts"), "utf8");
     expect(metrics).toMatch(/readonly base: BaseMetrics;/);
     expect(metrics).toMatch(/readonly sweeps: AgentSweeps;/);
-    expect(bench).toMatch(/Object\.freeze\(\{ key, base, sweeps \}\)/);
+    // One `ScoredMetrics` literal, carrying the base and the sweeps side by
+    // side. `risk_coverage` joined them when metric 3 was wired: §5.1's AURC is
+    // a function of the CURVE and so of the unit rather than of one execution,
+    // which is why M51 puts the whole curve inside one scored unit. It is a
+    // sibling of `sweeps`, not a replacement for `base`.
+    expect(bench).toMatch(
+      /Object\.freeze\(\{\s*key,\s*base,\s*sweeps,\s*risk_coverage: \w+,\s*\}\)/,
+    );
   });
 
   it("gives a single-point agent an empty pair of curves, not a missing field", async () => {
@@ -281,13 +300,13 @@ describe("L. a failed or missing point is refused, never dropped", () => {
   };
 
   it("refuses a curve when one execution throws", async () => {
-    await expect(runEpsilonSweep(throwingAt(4), EMPTY_INPUT, "ASSAY")).rejects.toThrow(CliError);
+    await expect(runEpsilonSweep(throwingAt(4), EMPTY_INPUT, "ASSAY", NO_HARM)).rejects.toThrow(CliError);
     // The refusal names the point, so a reader knows which one was lost.
-    await expect(runEpsilonSweep(throwingAt(4), EMPTY_INPUT, "ASSAY")).rejects.toThrow(
+    await expect(runEpsilonSweep(throwingAt(4), EMPTY_INPUT, "ASSAY", NO_HARM)).rejects.toThrow(
       /epsilon_bps=1500/,
     );
     // The last point is as fatal as the first: no partial curve is published.
-    await expect(runEpsilonSweep(throwingAt(21), EMPTY_INPUT, "ASSAY")).rejects.toThrow(CliError);
+    await expect(runEpsilonSweep(throwingAt(21), EMPTY_INPUT, "ASSAY", NO_HARM)).rejects.toThrow(CliError);
     await expect(runTauSweep(throwingAt(4), EMPTY_INPUT, "ASSAY")).rejects.toThrow(
       /tau_floor_paise=1000000/,
     );
@@ -308,8 +327,8 @@ describe("L. a failed or missing point is refused, never dropped", () => {
 
 describe("M. identical inputs give identical sweeps", () => {
   it("produces byte-identical point sequences across two executions", async () => {
-    const a = await runSweeps(recorder().runner, EMPTY_INPUT, "ASSAY");
-    const b = await runSweeps(recorder().runner, EMPTY_INPUT, "ASSAY");
+    const a = await runSweeps(recorder().runner, EMPTY_INPUT, "ASSAY", NO_HARM);
+    const b = await runSweeps(recorder().runner, EMPTY_INPUT, "ASSAY", NO_HARM);
     expect(a).toStrictEqual(b);
   });
 
@@ -326,7 +345,7 @@ describe("M. identical inputs give identical sweeps", () => {
 // ---------------------------------------------------------------------------
 
 describe("K. the τ sweep never consults the Ambiguity Oracle", () => {
-  it("imports no oracle anywhere on the sweep path", () => {
+  it("runs no oracle anywhere on the sweep path", () => {
     const SRC = join(import.meta.dirname, "..", "src");
     for (const rel of [
       ["bench", "sweep.ts"],
@@ -339,18 +358,40 @@ describe("K. the τ sweep never consults the Ambiguity Oracle", () => {
       // import specifier is checked against the raw text, where it lives.
       const body = text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
       expect(text, rel.join("/")).not.toMatch(/from "@assay\/oracle"/);
-      expect(body, rel.join("/")).not.toMatch(/oracle_labels/);
+      // M51's rule is that the oracle is not RE-RUN and its labels are not
+      // regenerated -- "all three reported quantities are engine-side". None of
+      // these files may enumerate, decompose or classify a target, and none may
+      // hold a τ to do it with. What `bench.ts` does with the labels §9 step 3
+      // already wrote is a different question, answered by the case below.
       expect(body, rel.join("/")).not.toMatch(/labelAll|completenessGate|oracleContext/);
+      expect(body, rel.join("/")).not.toMatch(/tauFor|classify\(/);
+    }
+    // The sweep modules themselves never name the artifact in code. They
+    // DOCUMENT that it is not regenerated, which is the claim, so comments are
+    // stripped before the check for the same reason as above.
+    for (const rel of [["bench", "sweep.ts"], ["agents", "sweep-runner.ts"]]) {
+      const text = readFileSync(join(SRC, ...rel), "utf8");
+      const body = text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+      expect(body, rel.join("/")).not.toMatch(/oracle_labels/);
     }
   });
 
-  it("writes exactly one artifact per scored unit, so no label file can be touched", () => {
+  it("reads oracle_labels.jsonl and writes exactly one artifact, so no label file is touched", () => {
     const bench = readFileSync(
       join(import.meta.dirname, "..", "src", "commands", "bench.ts"),
       "utf8",
     );
+    // One write per scored unit, and it is the metrics artifact. §5.3 (M51):
+    // `oracle_labels.jsonl` "is never regenerated, shadowed or overwritten", so
+    // the file appears on the READ side only -- EVALUATION_SPEC.md §2's third
+    // argument to `score(agent output, ground truth, oracle labels)`, which
+    // metric 4 and metric 8's reference policy both need.
     expect(bench.match(/sink\.write\(/g)).toHaveLength(1);
-    expect(bench).not.toMatch(/ORACLE_LABELS|oracle_labels\.jsonl/);
+    expect(bench).toMatch(/context\.sink\.write\(metricsPath\(runId, key\), encodeMetrics/);
+    expect(bench).toMatch(/loadOracleLabels\(join\(seedDir, ORACLE_LABELS\)\)/);
+    // Nothing writes it, shadows it or names a second copy of it.
+    expect(bench).not.toMatch(/write\([^)]*ORACLE_LABELS/);
+    expect(bench).not.toMatch(/encodeJsonl/);
   });
 });
 
@@ -502,13 +543,17 @@ describe("I/J. a swept threshold reaches stage S4 and moves §6's outcome", () =
 describe("the point identity is M51's", () => {
   it("carries the parameter name and value, and no run key", async () => {
     const { runner } = recorder();
-    const [point] = await runEpsilonSweep(runner, EMPTY_INPUT, "ASSAY");
+    const [point] = await runEpsilonSweep(runner, EMPTY_INPUT, "ASSAY", NO_HARM);
     const shape: SweepPoint | undefined = point;
     expect(shape?.parameter_name).toBe("epsilon_bps");
     expect(shape?.parameter_value).toBe(0);
     expect(Object.keys(shape ?? {}).sort()).toStrictEqual([
-      "abstentions", "coverage_by_value", "decisions", "is_operating_point",
-      "parameter_name", "parameter_value", "solve_outcomes",
+      // `balance_harm_paise` is §5.1's y-axis and §5.3's own output column for
+      // this sweep — "(coverage_by_value, balance_harm) per point" — not a fifth
+      // key dimension. M51's identity is the two `parameter_*` fields, and they
+      // are unchanged.
+      "abstentions", "balance_harm_paise", "coverage_by_value", "decisions",
+      "is_operating_point", "parameter_name", "parameter_value", "solve_outcomes",
     ]);
   });
 });

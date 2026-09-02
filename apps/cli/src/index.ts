@@ -58,23 +58,55 @@ export {
   datasetGroundTruth, loadGroundTruth, readGroundTruthRecord,
 } from "./artifacts/ground-truth.js";
 export {
+  M54_METRIC_10_NOT_COMPUTABLE,
+  METRIC_7_ECE_UNRATIFIED,
   V30_NON_ADDITIVITY,
   encodeMetrics,
   type BaseMetrics,
+  type RiskCoverageMetrics,
   type RobustnessMetrics,
   type ScoredMetrics,
+  type TruthMetrics,
+  type TruthReport,
 } from "./artifacts/metrics.js";
+export { loadOracleLabels, readOracleLabelRecord } from "./artifacts/oracle-labels.js";
+export { valueByEntityId, valueOf } from "./values.js";
 export {
   EMPTY_INJECTED_POPULATION,
   EXERCISED_SPLIT,
+  NO_RISK_AXIS,
+  TRUTH_SCORED_SPLITS,
+  balanceHarmOf,
   isExercisedSplit,
+  isTruthScoredSplit,
   notExercised,
   notExercisedOnSplit,
   overDataset,
+  overTruth,
+  scoreRiskCoverage,
   scoreRobustness,
+  scoreTruth,
+  truthNotScored,
+  truthNotScoredOnSplit,
   type RobustnessDataset,
   type RobustnessSource,
+  type TruthDataset,
+  type TruthSource,
 } from "./bench/scorer.js";
+export {
+  EPSILON_GRID_BPS,
+  EPSILON_OPERATING_POINT_BPS,
+  NO_SWEEPS,
+  TAU_FLOOR_GRID_PAISE,
+  assertGridIsFrozen,
+  runEpsilonSweep,
+  runSweeps,
+  runTauSweep,
+  type AgentSweeps,
+  type EpsilonSweepPoint,
+  type RiskAxis,
+  type SweepPoint,
+} from "./bench/sweep.js";
 export { loadLedgerEvents } from "./artifacts/ledger-events.js";
 export { loadReplayCache, ReplayCacheError } from "./artifacts/replay-cache.js";
 export {
