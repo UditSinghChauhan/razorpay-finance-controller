@@ -522,8 +522,43 @@ export const K_MAX = 22;
  * `SPLIT_TABLE`, `SEED_BLOCKS`, `blockOf`, `AL7`'s successor rule and every
  * `target_record_count` are unchanged; `constraint_set_hash` is `packages/domain`'s
  * and is unmodified. **No dataset exists to regenerate.**
+ *
+ * **1.0.12 -> 1.0.13 at spec 1.4.36** (register row M58). The pre-registered surface
+ * changes in what the SEALED RUN YIELDS for metric 17 `abstention_spike_flag`.
+ * `PREREGISTRATION.md §7` named the baseline table's fields `mean_bps` and
+ * `stddev_bps` and stated NO ROUNDING RULE -- no mode, no point of application, no
+ * statement of whether the two figures round independently, and no statement of which
+ * values the detector reads. Two readings were admissible and they DISAGREE
+ * NUMERICALLY, therefore on the flag and on the echoed baseline pair, so the metric
+ * had no determinate value and `EVALUATION_SPEC.md §5.5` bars inventing one. M58
+ * ratifies: integer basis points; the five per-seed rates entering the mean and SAMPLE
+ * standard deviation at FULL PRECISION; each statistic converted to bps and rounded
+ * EXACTLY ONCE at the end of `§9` step 0 by `round_half_up` with ties away from zero;
+ * the two figures rounded INDEPENDENTLY; and the detector reading the ROUNDED pair
+ * against the run's own FULL-PRECISION rate. It further ratifies that `§7` is the
+ * AUTHORITATIVE record and `packages/eval/src/frozen.ts`'s `METRIC_17_BASELINE` its
+ * EXECUTABLE TRANSCRIPTION, transcribed after step 0 and BEFORE step 1's tag. The bump
+ * is taken on **M39**'s precedent -- as 1.0.4 -> 1.0.5, 1.0.8 -> 1.0.9, 1.0.9 ->
+ * 1.0.10, 1.0.10 -> 1.0.11 and 1.0.11 -> 1.0.12 all were -- and NOT on M49's, whose
+ * test is whether a conforming agent's postings change: none does. **M50's and M45's
+ * non-bumps are distinguished, not overlooked:** M50 WITHDREW expectations and changed
+ * nothing a scored artifact contains, and M45 governed WHEN the test dataset becomes
+ * reachable, whereas this one changes an artifact's CONTENTS. `§9` step 1 now tags
+ * `bench-v1.0.13` and step 5 requires this field to read `"1.0.13"`; `apps/cli` derives
+ * the tag from this constant, so M46's class of drift cannot recur.
+ *
+ * **Nothing this package produces changes.** M58 is a rule about how a MEASUREMENT
+ * TAKEN BY `§9` STEP 0 is encoded and recorded, and this package neither takes it nor
+ * reads it. `GroundTruth`'s field list, `true_journal`, `degradations` and every
+ * emitted byte are untouched, which is why `GT_VERSION` stays 1.1.0 -- metric 17 reads
+ * no ground truth at all. No population, seed, family, rate, degradation operator, `§7`
+ * threshold this package reads, composition figure or artifact byte moves;
+ * `SPLIT_TABLE`, `SEED_BLOCKS`, `blockOf`, `AL7`'s successor rule and every
+ * `target_record_count` are unchanged; `constraint_set_hash` is `packages/domain`'s
+ * and is unmodified. **No dataset exists to regenerate, and `§9` step 0 has NOT been
+ * taken**, so no baseline figure exists anywhere in this repository.
  */
-export const BENCHMARK_VERSION = "1.0.12";
+export const BENCHMARK_VERSION = "1.0.13";
 
 /** `DATA_MODEL.md §1`: `GroundTruth.gt_version`. */
 export const GT_VERSION = "1.1.0";
@@ -745,5 +780,29 @@ export const GT_VERSION = "1.1.0";
  * `constraint_set_hash` is `packages/domain`'s and is unmodified. **No dataset exists
  * to regenerate**, and the implementation M57 authorises is deliberately not in this
  * commit (`DECISION_BRIEF.md §A.42`, `§I`).
+ *
+ * **1.4.35 -> 1.4.36 (M58) -- required ONE thing of this package, and it is
+ * `BENCHMARK_VERSION` above.** The amendment ratifies metric 17's baseline ENCODING --
+ * `mean_bps`/`stddev_bps` are integer basis points, the five per-seed rates enter the
+ * mean and SAMPLE stddev at full precision, each statistic is rounded ONCE at the end
+ * of `§9` step 0 by `round_half_up` with ties away from zero, the two INDEPENDENTLY,
+ * and the detector reads the ROUNDED pair against a FULL-PRECISION rate -- and the
+ * RECORD RELATIONSHIP: `PREREGISTRATION.md §7` is authoritative and
+ * `packages/eval/src/frozen.ts`'s `METRIC_17_BASELINE` its executable transcription,
+ * empty until step 0, written before step 1's tag, never recomputed at scoring time,
+ * and never a `BenchmarkManifest` field. **It reaches this package nowhere else.** The
+ * measurement is taken by `apps/cli` over agent output and the rate reads no
+ * `GroundTruth`, so no field is added, retyped, renamed, read differently or
+ * regenerated and `GT_VERSION` stays **1.1.0**; the degradation operators, families,
+ * rates and magnitudes and every emitted byte are preserved verbatim. `SPLIT_TABLE`,
+ * `SEED_BLOCKS`, `blockOf`, `AL7`'s successor rule, `§4.1`'s composition, every
+ * `target_record_count` and every `§7` threshold this package reads are unchanged;
+ * `§7` gains no entry at this amendment and REVISES ONE -- M53's metric-17 entry, the
+ * first `§7` revision in this corpus, legitimate only because `§9` step 0 has NOT run
+ * and no rate, mean or sigma exists -- and `§8`'s list stays at 28 with metric 17
+ * keeping its name and number and NO formula changed, `k_sigma` staying 3;
+ * `constraint_set_hash` is `packages/domain`'s and is unmodified. **No dataset exists
+ * to regenerate**, and the implementation M58 authorises is deliberately not in this
+ * commit (`DECISION_BRIEF.md §A.43`, `§I`).
  */
-export const SPEC_VERSION = "1.4.35";
+export const SPEC_VERSION = "1.4.36";

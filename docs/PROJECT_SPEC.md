@@ -2,8 +2,25 @@
 
 **Track:** 04 — AI Finance Controller
 **Status:** Specification. Frozen scope for implementation.
-**Spec version:** 1.4.35
+**Spec version:** 1.4.36
 **Date:** 2026-09-02
+
+**At spec 1.4.36** this document is unchanged apart from the version header, and **one
+`§7` success criterion is read rather than amended**. Register row `DATA_MODEL.md
+§22.2` **M58** ratifies metric 17's baseline **encoding** — integer basis points,
+`round_half_up` ties away from zero applied **once** at the end of
+`PREREGISTRATION.md §9` step 0, the two figures rounded **independently**, the detector
+reading the **rounded** pair against a **full-precision** rate — and the **record
+relationship**: `PREREGISTRATION.md §7` is authoritative and
+`packages/eval/src/frozen.ts`'s `METRIC_17_BASELINE` its executable transcription,
+empty until step 0. **S10** — every claimed number traceable to a committed run
+artifact — is the criterion the ruling serves twice over: a baseline with no
+determinate encoding cannot yield a traceable number, and a source constant that could
+diverge from `§7` unnoticed would break the trace at its other end, which is why any
+divergence is ruled a **seal failure**. **No success criterion moves, none is added and
+none is withdrawn**; `S1`–`S12` are untouched, as are `§9`'s dataset bound and `§10`'s
+demo script. Benchmark moves to **v1.0.13**. See `DECISION_BRIEF.md §A.43` and
+`PREREGISTRATION.md §10` **V33**.
 
 **At spec 1.4.35** this document is unchanged apart from the version header, and **one
 `§7` success criterion is read rather than amended**. Register row `DATA_MODEL.md

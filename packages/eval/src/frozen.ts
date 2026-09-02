@@ -21,6 +21,8 @@
  * Every constant below cites the clause it is transcribed from.
  */
 
+import type { AgentId, ScoredLlmMode } from "./agent.js";
+
 /**
  * `C_review` — the analyst cost of one abstention, in paise.
  *
@@ -165,10 +167,184 @@ export const CONSISTENCY_MEMBER_SET_MAX = 4;
  * `k_sigma` for the abstention spike detector (`PREREGISTRATION.md §7`,
  * `THREAT_MODEL.md §T9` M2).
  *
- * "`k_sigma` = 3", against a "rolling mean/stddev of abstention-rate-by-value
- * over the DEV split, computed before the seal". Metric 17.
+ * `§7`: *"`k_sigma` = 3"*, against the baseline `§7`'s metric-17 entry records —
+ * *"the mean and the SAMPLE standard deviation"* of `abstention_rate_by_value`
+ * over the five DEV seeds `2000`-`2004`, *"computed before the seal by `§9` step
+ * 0"*. Metric 17.
+ *
+ * **The word *"rolling"* stood in `§7` through spec 1.4.31 and is RETIRED**
+ * (`DATA_MODEL.md §22.2` **M53**): it *"named a window this benchmark has no
+ * axis for"*, and **`k_sigma` itself is unchanged at 3**. See
+ * {@link METRIC_17_BASELINE}.
+ *
+ * **`k_sigma` is unchanged again at spec 1.4.36 (`DATA_MODEL.md §22.2` M58),
+ * and what M58 fixes is the ENCODING of the two operands beside it**: the
+ * baseline pair is integer basis points rounded `round_half_up` once at the end
+ * of `§9` step 0, and the comparison
+ * `rate > mean_bps / 10_000 + K_SIGMA * stddev_bps / 10_000` puts the run's
+ * **full-precision** rate against that **rounded** bar. `EVALUATION_SPEC.md
+ * §4.10`'s formula is preserved verbatim. See {@link Metric17BaselineRow} for
+ * the rule and `PREREGISTRATION.md §10` **V33** for its residual.
  */
 export const K_SIGMA = 3;
+
+// ---------------------------------------------------------------------------
+// Metric 17's abstention baseline — RATIFIED at spec 1.4.32, register row M53
+// ---------------------------------------------------------------------------
+
+/**
+ * The five DEV seeds metric 17's baseline is taken over
+ * (`PREREGISTRATION.md §7`, `§6.1`).
+ *
+ * `§7`'s metric-17 entry: *"population — the five DEV seeds `2000`-`2004`, ONE
+ * RATE EACH; `n = 5`"*. **Ratified, not derived** (M53): *"rolling"* named a
+ * window this benchmark has no axis for — *"a `(split, seed)` dataset is one
+ * period and seeds are not ordered in time"* — and the five declared DEV seeds
+ * are *"the only computable reading of `over the DEV split`"*.
+ *
+ * **Transcribed here rather than imported.** `packages/generator/src/frozen.ts`
+ * carries `§6.1`'s split table and `truth.ts` is this package's single
+ * `@assay/generator` import site (`tests/discipline.test.ts` counts it), so the
+ * seeds enter the measurement layer the way every other `§7` parameter does —
+ * as a second transcription of one written specification, which is what a
+ * differential test compares. `tests/metrics.test.ts` runs that comparison.
+ *
+ * `n = 5` is {@link SEEDS_PER_CONFIGURATION} and this list's length; the two
+ * agree because `§7` states both, and a baseline taken over any other number of
+ * seeds is refused rather than scaled.
+ */
+export const METRIC_17_BASELINE_SEEDS = Object.freeze([2_000, 2_001, 2_002, 2_003, 2_004] as const);
+
+/**
+ * `PREREGISTRATION.md §6.1`'s split for the baseline population.
+ *
+ * `§7`'s producer row is *"`§9` step 0's NON-SCORED pre-seal DEV baseline
+ * pass"*, and `§9` step 0 runs `--split dev`. Held as a constant so the
+ * producer names the split from the frozen text rather than from a literal.
+ */
+export const METRIC_17_BASELINE_SPLIT = "dev" as const;
+
+/**
+ * One row of `PREREGISTRATION.md §7`'s metric-17 baseline table.
+ *
+ * `§7`: *"table — `(agent_id, llm_mode) -> (mean_bps, stddev_bps)`"*. The key is
+ * the pair and **not** a `RunKey`: `§7` keys the baseline per `(agent_id,
+ * llm_mode)` and M53 gives the reason in both directions — *"`A2-NOABSTAIN`
+ * never abstains while `ASSAY` does, so a pooled σ makes the flag structurally
+ * non-firing"*, and *"a shared baseline would make one agent's flag depend on
+ * another's behaviour"*. `llm_mode` is separated on the same ground, *"`R3`
+ * probes resolving abstentions"*. Seed is **not** a key: the five seeds are the
+ * sample the statistic is taken over.
+ *
+ * **Both figures are integer basis points, and the rule is RATIFIED at spec
+ * 1.4.36, register row `DATA_MODEL.md §22.2` M58.** `§7` named these two fields
+ * and stated **no rounding rule**; two readings were admissible and they
+ * disagree numerically, therefore on `abstention_spike_flag`. What M58 freezes:
+ *
+ * - the pair is **integer basis points** — `DATA_MODEL.md §0` rule 5 binds
+ *   *"every dimensionless ratio that … a gate or invariant compares"*, and this
+ *   pair **is** the right-hand side of `EVALUATION_SPEC.md §4.10`'s detector;
+ *   rule 5's `§20` carve-out is enumerated, closed, and conditioned on values
+ *   *"computed at render from the authoritative integer paise fields"*, which a
+ *   statistic over five prior runs is not;
+ * - the five per-seed rates enter the mean and the sample standard deviation at
+ *   **full precision** and are **not** rounded first;
+ * - each statistic is converted to bps and rounded **exactly once**, at the end
+ *   of `PREREGISTRATION.md §9` step 0's arithmetic;
+ * - the mode is **`round_half_up`, ties away from zero**;
+ * - `mean_bps` and `stddev_bps` are rounded **independently**, each from its own
+ *   full-precision result; `stddev_bps` is never re-derived from `mean_bps` nor
+ *   from rounded inputs;
+ * - the **detector reads the rounded pair**, against the run's own
+ *   **full-precision** rate, with `K_SIGMA` unchanged at 3. **No second,
+ *   unrounded baseline exists anywhere in the system.**
+ *
+ * **This is metric 17's rule and is NOT a claim that half-up is this corpus's
+ * only rounding or quantization mode.** `M27` ratified a **floor** for
+ * `mode_days`, `EVALUATION_SPEC.md §4.6`'s bin selection **floors**, and
+ * remainder distribution **floors**; all are unchanged. What M58 takes from
+ * `M27` is its **structure** — `M27` quantized the recorded, compared term while
+ * leaving `lag_days` *"the unfloored real quotient"*, and M58 quantizes the
+ * recorded baseline pair while leaving the run's rate at full precision.
+ *
+ * `PREREGISTRATION.md §10` **V33** discloses the cost: a full-precision rate
+ * against a quantized bar moves the comparison by up to 2 bps, and a genuinely
+ * non-zero σ below 0.5 bps records as 0.
+ */
+export interface Metric17BaselineRow {
+  readonly agent_id: AgentId;
+  readonly llm_mode: ScoredLlmMode;
+  /**
+   * The mean of the five DEV rates, in integer basis points — `round_half_up`,
+   * ties away from zero, applied **once** at the end of `§9` step 0 to the
+   * full-precision mean (M58).
+   */
+  readonly mean_bps: number;
+  /**
+   * Their **sample** standard deviation (`n - 1`), in integer basis points —
+   * rounded **independently** of {@link Metric17BaselineRow.mean_bps} and by the
+   * same rule, from its own full-precision value (M58).
+   */
+  readonly stddev_bps: number;
+}
+
+/**
+ * `PREREGISTRATION.md §7`'s metric-17 baseline table, transcribed — **and it is
+ * EMPTY, which is the frozen state and not an omission.**
+ *
+ * `§7`: *"recorded here once step 0 has run and **EMPTY until then**"*. `§9`
+ * step 0 — the non-scored pre-seal DEV pass — has not been taken: `bench/` is
+ * absent, no dataset has been generated and no agent has been run, so `§7`
+ * carries no row and neither does this transcription. Filling it is a
+ * **governance** act taken against `§7` first, exactly as
+ * {@link CONSISTENCY_DRAW_SEED} was: the document is the record, and this array
+ * is the second transcription of it.
+ *
+ * **The authority relationship is RATIFIED at spec 1.4.36, register row
+ * `DATA_MODEL.md §22.2` M58**, which `M53` chartered for `§7` alone and left
+ * open for this constant:
+ *
+ * - `PREREGISTRATION.md §7`'s metric-17 table is the **AUTHORITATIVE
+ *   human-readable baseline record**;
+ * - this constant is its **EXECUTABLE TRANSCRIPTION** — not a second,
+ *   independently measured baseline, and not an alternative authority;
+ * - **before `§9` step 0 it is intentionally empty (`[]`)**, which is the frozen
+ *   pre-measurement state and not an omission;
+ * - **after** step 0 measures the five DEV rates, the exact
+ *   `(agent_id, llm_mode, mean_bps, stddev_bps)` rows are transcribed into `§7`
+ *   **and** into this constant;
+ * - both writes happen **after step 0 and BEFORE `§9` step 1's tag**, so the tag
+ *   covers the source that carries the measured baseline and step 8's *"no code
+ *   changes between 6 and 8"* holds over it;
+ * - **no runtime scoring may recompute the baseline** — `§7`'s consumer row:
+ *   *"No baseline is computed at scoring time on any split"*;
+ * - **any divergence between `§7` and this constant is a SEAL /
+ *   REPRODUCIBILITY FAILURE**, on the same footing as `§9` step 5's other seal
+ *   failures. The integer encoding M58 ratifies is what makes that check exact
+ *   and therefore performable;
+ * - **nothing may be guessed, prefilled or populated before step 0**, and **no
+ *   generated JSON or data file** may be introduced as another evidence path —
+ *   a second path to a figure `§7` alone is authoritative for is what `AL8`,
+ *   `DECISION_BRIEF.md §A.31` and `M56` all refuse.
+ *
+ * `frozen.ts` is the home for the same reason this module's header gives: it is
+ * *"the single place those parameters enter this package"*, and
+ * {@link CONSISTENCY_DRAW_SEED} is the standing precedent for a `§7` value that
+ * no frozen rule derives, fixed at a governance gate before any result existed.
+ *
+ * **It is deliberately NOT a `BenchmarkManifest` field.** `§7`: *"It is NOT a
+ * BenchmarkManifest field: `DATA_MODEL.md §18`'s shape stays closed."* M53
+ * lists that reading under **Rejected**, so no manifest carries it and no
+ * digest covers it.
+ *
+ * **Nothing computes a row at scoring time.** `§7`'s consumer row: *"TEST
+ * scoring READS this table. No baseline is computed at scoring time on any
+ * split, and no run contributes to the baseline it is judged against."* An
+ * absent row is therefore metric 17 UNAVAILABLE with its reason, never a
+ * `spike_flag` of `false` — a detector that reports *"clean"* because it has no
+ * baseline is the broken detector `EVALUATION_SPEC.md §4.10` names.
+ */
+export const METRIC_17_BASELINE: readonly Metric17BaselineRow[] = Object.freeze([]);
 
 /**
  * `queue_top_n` (`PREREGISTRATION.md §7`).
@@ -437,6 +613,40 @@ export const LEGACY_MAX_UNRESOLVED_ABS_PAISE = 5_000_000;
  *     authorises is deliberately not in this commit** (`DECISION_BRIEF.md §A.42`,
  *     `§I`).
  *
+ *   - **1.4.36 (M58)** -- metric 17's baseline gains the ENCODING and the RECORD
+ *     RELATIONSHIP `PREREGISTRATION.md §7` left open at M53. `§7` named the fields
+ *     `mean_bps`/`stddev_bps` and stated NO ROUNDING RULE; two readings were
+ *     admissible and they disagree numerically, therefore on
+ *     `abstention_spike_flag`, so the choice is RATIFIED on the
+ *     M27/M35/M45/M49/M50/M55/M56/M57 precedent. **Encoding:** integer basis
+ *     points; the five per-seed rates enter the mean and SAMPLE stddev at FULL
+ *     PRECISION; each statistic is converted to bps and rounded EXACTLY ONCE at the
+ *     end of `§9` step 0 by `round_half_up`, ties away from zero; the two figures
+ *     round INDEPENDENTLY; and the detector reads the ROUNDED pair against the run's
+ *     FULL-PRECISION rate. **No second, unrounded baseline exists.** **Record:**
+ *     `§7` is AUTHORITATIVE and {@link METRIC_17_BASELINE} is its EXECUTABLE
+ *     TRANSCRIPTION -- empty before step 0, written into both after step 0 and
+ *     BEFORE step 1's tag, never recomputed at scoring time, never a
+ *     `BenchmarkManifest` field, and any divergence a SEAL FAILURE. **This is
+ *     metric 17's rule and NOT a claim that half-up is this corpus's only rounding
+ *     mode:** M27's `mode_days` floors, `metrics/calibration.ts`'s bin selection
+ *     floors, and both stand unchanged. **`K_SIGMA` is unchanged at 3 and
+ *     `EVALUATION_SPEC.md §4.10`'s formula is preserved verbatim**, as are M53's
+ *     rate, population, statistic, scope, producer and consumer;
+ *     {@link METRIC_17_BASELINE_SEEDS}, {@link METRIC_17_BASELINE_SPLIT},
+ *     {@link SEEDS_PER_CONFIGURATION}, {@link BPS_DENOMINATOR} and every other
+ *     constant below are unchanged; `metric-list.ts` stays at 28 and keeps its
+ *     numbering; `run-key.ts` is unchanged. Five alternatives are rejected and
+ *     preserved as rejected: full-precision internals with `_bps` as display, a
+ *     generated baseline file, a runtime JSON file read by the scorer, a
+ *     `BenchmarkManifest` field, and a `false` flag or zero baseline where `§7`
+ *     records no row. **`BENCHMARK_VERSION` moves 1.0.12 -> 1.0.13**, that constant
+ *     being `packages/generator`'s, and `GT_VERSION` stays 1.1.0. The residual is
+ *     `PREREGISTRATION.md §10` **V33**. **The implementation this row authorises is
+ *     deliberately not in this commit** (`DECISION_BRIEF.md §A.43`, `§I`), and that
+ *     follow-up MUST replace `metrics/abstention.ts`'s FALSE claim that half-up is
+ *     the corpus's only rounding mode with wording grounded in this row.
+ *
  * **Nothing below moves with it**, and neither does `metric-list.ts`.
  */
-export const SPEC_VERSION = "1.4.35";
+export const SPEC_VERSION = "1.4.36";

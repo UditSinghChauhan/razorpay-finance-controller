@@ -1,6 +1,26 @@
 # EVALUATION_SPEC — ASSAY
 
-**Spec version:** 1.4.35 · **Date:** 2026-09-02
+**Spec version:** 1.4.36 · **Date:** 2026-09-02
+
+**At spec 1.4.36** this document supplies **metric 17's missing baseline encoding** in
+`§4.10` and changes nothing else. Register row `DATA_MODEL.md §22.2` **M58** ratifies
+that `PREREGISTRATION.md §7`'s `mean_bps` / `stddev_bps` are **integer basis points**,
+that the five per-seed rates enter the mean and **sample** standard deviation at **full
+precision**, that each statistic is converted to bps and rounded **exactly once** at the
+end of `§9` **step 0** by **`round_half_up` with ties away from zero**, that the two
+figures are rounded **independently**, and that the detector compares the run's
+**full-precision** rate against the **rounded** pair. **`§4.10`'s formula
+`rate > baseline + k·σ` is preserved verbatim, `k_sigma` stays 3, and the rate's
+numerator, denominator and universe do not move** — what M58 supplies is the encoding
+`§7` named and never stated. **This is metric 17's rule and not a claim that half-up is
+this corpus's only rounding mode:** `§4.6`'s bin selection **floors** and `M27`'s
+`mode_days` **floors**, both unchanged and not reopened. M58 also fixes that `§7`
+remains the **authoritative** baseline record and `packages/eval/src/frozen.ts`'s
+`METRIC_17_BASELINE` its **executable transcription**, empty until step 0 and
+transcribed before `§9` step 1's tag. `§4.1`–`§4.9` and `§4.11`–`§4.13` are unchanged,
+`§4.6`'s M57 semantics stand entire, `§5.1`–`§5.5` are untouched, and `§8`'s list stays
+at **28**. Benchmark moves to **v1.0.13**. See `DECISION_BRIEF.md §A.43` and
+`PREREGISTRATION.md §10` **V33**.
 
 **At spec 1.4.35** this document supplies **metric 7's missing correctness
 semantics** in `§4.6`, and changes nothing else. Register row `DATA_MODEL.md §22.2`
@@ -1216,6 +1236,65 @@ judged against. `PREREGISTRATION.md §10` **V28** declares the residual: the bas
 is built on DEV's `F01`–`F06`, while the flag's expected firing site is `F10` at
 seeds `9100`–`9104` beside `F07`–`F09`, so the comparison crosses a
 family-composition boundary and `n = 5` bounds what a `3σ` bar can resolve.
+
+**The baseline pair's encoding, supplied at spec 1.4.36 `[ASSAY-MODEL]`, register row
+`DATA_MODEL.md §22.2` M58.** `PREREGISTRATION.md §7` named the fields `mean_bps` and
+`stddev_bps` and stated **no rounding rule**; two readings were admissible and they
+disagree numerically, therefore on the flag. **The formula above is unchanged and
+`k_sigma = 3` is unchanged.** The encoding is:
+
+```
+  mean_bps, stddev_bps    INTEGER basis points (DATA_MODEL.md §0 rule 5 — the pair
+                          is a dimensionless ratio that a detector COMPARES, so
+                          rule 5's main clause binds it and its §20 carve-out,
+                          which is enumerated, closed and conditioned on values
+                          "computed at render from the authoritative integer paise
+                          fields", does not reach it)
+
+  inputs                  the five per-seed rates enter the mean and the SAMPLE
+                          standard deviation at FULL PRECISION; they are NOT
+                          rounded first
+
+  when                    each statistic is converted to bps and rounded EXACTLY
+                          ONCE, at the end of PREREGISTRATION.md §9 step 0's
+                          arithmetic
+
+  mode                    round_half_up, ties away from zero
+
+  independence            mean_bps and stddev_bps are rounded INDEPENDENTLY, each
+                          from its own full-precision result; stddev_bps is never
+                          re-derived from mean_bps nor from rounded inputs
+
+  what the detector reads the ROUNDED pair, against the run's own FULL-PRECISION
+                          rate:
+                            abstention_spike_flag =
+                              rate > mean_bps / 10_000
+                                     + k_sigma * stddev_bps / 10_000
+                          NO SECOND, UNROUNDED BASELINE EXISTS ANYWHERE.
+```
+
+**This is metric 17's rule and it is not a claim about the corpus.** Half-up is **not**
+this corpus's only rounding or quantization mode: `§4.6`'s bin selection **floors**,
+`M27`'s `mode_days` **floors**, and remainder distribution **floors**. Those rules are
+unchanged and are not reopened. What M58 takes from `M27` is its **structure** — `M27`
+quantized the recorded, compared term while leaving `lag_days` *"the unfloored real
+quotient"*, and M58 quantizes the recorded baseline pair while leaving the run's rate
+at full precision.
+
+**Where the pair lives.** `PREREGISTRATION.md §7` is the **authoritative
+human-readable** record and `packages/eval/src/frozen.ts`'s `METRIC_17_BASELINE` is its
+**executable transcription** — empty before `§9` step 0, written into **both** after
+step 0 and **before** step 1's tag, never recomputed at scoring time, never a
+`BenchmarkManifest` field, and any divergence between the two a **seal/reproducibility
+failure**. Where `§7` records **no row** for a scored unit's `(agent_id, llm_mode)`,
+the **flag** is published **UNAVAILABLE with its reason** and never `false` — a
+detector reporting *"no spike"* against a baseline it does not have is the broken
+detector this section names, and `§5.5` bars a number that does not exist in a
+committed run artifact. The **rate** is published regardless.
+
+`PREREGISTRATION.md §10` **V33** declares this ruling's own residual: a full-precision
+rate against a quantized bar moves the comparison by up to `2` bps, and a genuinely
+non-zero `σ` below `0.5` bps records as `0`.
 
 ### 4.11 Provider independence
 
