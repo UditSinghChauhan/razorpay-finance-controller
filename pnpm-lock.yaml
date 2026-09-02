@@ -8,6 +8,9 @@ importers:
 
   .:
     devDependencies:
+      '@assay/cli':
+        specifier: workspace:*
+        version: link:apps/cli
       '@eslint/js':
         specifier: 10.0.1
         version: 10.0.1(eslint@10.8.1)

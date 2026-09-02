@@ -6,7 +6,7 @@
   "description": "ASSAY command line — the only package that touches the filesystem; acquires source data and drives the already-built pipeline",
   "license": "UNLICENSED",
   "bin": {
-    "assay": "./src/main.ts"
+    "assay": "./bin/assay.mjs"
   },
   "exports": {
     ".": {
