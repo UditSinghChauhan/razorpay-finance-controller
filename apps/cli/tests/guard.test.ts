@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -120,9 +123,8 @@ describe("SEAL carries AL8's exception and nothing else", () => {
   /**
    * The zone names a **permission**, not a caller. `assay seal` reads ground
    * truth in `GENERATOR_TRUST` — `AL2`'s route, unchanged since `apps/cli`
-   * landed and withdrawn by `AL5` under `--sealed` — and reads the recon report
-   * in `SEAL`. Keeping them apart is what stops a caller reaching ground truth
-   * by declaring itself the seal.
+   * landed — and reads the recon report in `SEAL`. Keeping them apart is what
+   * stops a caller reaching ground truth by declaring itself the seal.
    */
   it("does not unlock ground truth", () => {
     expect(() => assertReadable("bench/dev/ground_truth.jsonl", "SEAL")).toThrow(PathGuardError);
@@ -191,32 +193,74 @@ describe("path normalization — the '**/' half of both globs", () => {
   });
 });
 
-describe("AL5 — the --sealed flag", () => {
+describe("M56 — AL5 is an EMISSION rule, and this guard does not enforce it", () => {
   /**
-   * *"The CLI's `--sealed` flag refuses to print, log or write any ground-truth
-   * field; only aggregate metrics are emitted."*
+   * `DATA_MODEL.md §22.2` **M56** (spec 1.4.34, `DECISION_BRIEF.md §A.41`):
+   * `AL5` — *"The CLI's `--sealed` flag refuses to print, log or write any
+   * ground-truth field; only aggregate metrics are emitted"* — *"governs what
+   * leaves the process, not what enters it"*. Through spec 1.4.33 this file
+   * modelled it as a **read** refusal, taking a `GuardPolicy { sealed }` third
+   * argument and withdrawing `GENERATOR_TRUST`'s `AL2` unlock under it. That
+   * made `PREREGISTRATION.md §9` step 7 — `assay bench --sealed`, the only run
+   * that ever scores TEST — unable to satisfy `EVALUATION_SPEC.md §2`'s
+   * `score(agent output, ground truth, oracle labels)`.
    *
-   * Enforced at the read, because a field that was never read cannot be
-   * printed. Under `--sealed` the `GENERATOR_TRUST` unlock is withdrawn and no
-   * zone may reach the artifact.
+   * The withdrawal `§5.3` wrote is **preserved for the two readers it was
+   * written against** and is carried elsewhere: `assay oracle` and `assay seal`
+   * refuse `--sealed` as a usage error. `commands.test.ts` and
+   * `layout-and-gates.test.ts` hold those.
    */
-  it("withdraws AL2's unlock for every zone, the new one included", () => {
-    const sealed = { sealed: true };
-    for (const zone of ["AGENT", "PROBE_DISPATCH", "GENERATOR_TRUST", "SEAL"] as const) {
-      expect(() => assertReadable("bench/test/ground_truth.jsonl", zone, sealed), zone).toThrow(
+  it("takes the pair and nothing else — there is no sealed parameter left", () => {
+    // A signature assertion rather than a prose one: a re-introduced policy
+    // argument would be a return to the read-withdrawal reading M56 replaced.
+    expect(assertReadable.length).toBe(2);
+  });
+
+  it("A — admits a GENERATOR_TRUST ground-truth read, sealed run or not", () => {
+    // The load-bearing assertion of M56. The scorer reads here at §9 step 7,
+    // through AL2's standing route, and the flag is not a term in the decision.
+    expect(() => assertReadable("bench/test/9100/ground_truth.jsonl", "GENERATOR_TRUST"))
+      .not.toThrow();
+  });
+
+  it("B — leaves every other AL2 restriction exactly where it was", () => {
+    // AL2 is untouched in substance and in wording (§A.41's "unchanged" list):
+    // no agent, engine or oracle reaches the artifact, sealed or not.
+    for (const zone of ["AGENT", "PROBE_DISPATCH", "SEAL"] as const) {
+      expect(() => assertReadable("bench/test/9100/ground_truth.jsonl", zone), zone).toThrow(
         PathGuardError,
       );
     }
   });
 
-  it("leaves both of AL8's routes alone — --sealed is about ground truth", () => {
-    // AL5's withdrawal is scoped to AL2 (guard.ts tests `artifact.rule ===
-    // "AL2"`). §6.2 gives the recon report settlement_id, entity_id and
-    // settled_at and "nothing else", so it holds no ground-truth field for the
-    // flag to keep out of the output.
-    const sealed = { sealed: true };
-    expect(() => assertReadable("bench/dev/recon_report.jsonl", "PROBE_DISPATCH", sealed)).not.toThrow();
-    expect(() => assertReadable("bench/dev/recon_report.jsonl", "SEAL", sealed)).not.toThrow();
+  it("leaves both of AL8's routes alone, as it always did", () => {
+    expect(() => assertReadable("bench/dev/recon_report.jsonl", "PROBE_DISPATCH")).not.toThrow();
+    expect(() => assertReadable("bench/dev/recon_report.jsonl", "SEAL")).not.toThrow();
+    expect(() => assertReadable("bench/dev/recon_report.jsonl", "GENERATOR_TRUST")).toThrow(
+      PathGuardError,
+    );
+  });
+
+  it("K — adds no fifth ReadZone: the union still has exactly the four", () => {
+    // §A.41 rejected a fifth zone for the scorer and preserved the rejection:
+    // "AL2 names its constrained parties by package, so a zone expressing what
+    // AL2's own sentence expresses is ceremony". The permission matrix above is
+    // typed `Record<ReadZone, ...>`, so a fifth arm would already fail the
+    // typecheck; this reads the declaration so the count is asserted directly.
+    const source = readFileSync(
+      join(import.meta.dirname, "..", "src", "fs", "guard.ts"),
+      "utf8",
+    );
+    const declaration = source.slice(
+      source.indexOf("export type ReadZone ="),
+      source.indexOf('| "SEAL";') + '| "SEAL";'.length,
+    );
+    const arms = [...declaration.matchAll(/^\s*\|\s*"([A-Z_]+)"/gm)].map((m) => m[1]);
+    expect(arms).toStrictEqual(["AGENT", "PROBE_DISPATCH", "GENERATOR_TRUST", "SEAL"]);
+    // ...and the policy type the read-withdrawal reading needed is declared
+    // nowhere: the prose above still names it, as the record of what was removed.
+    expect(source).not.toMatch(/export (?:interface|type) GuardPolicy/);
+    expect(source).not.toMatch(/policy: GuardPolicy/);
   });
 });
 

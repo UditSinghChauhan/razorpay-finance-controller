@@ -17,9 +17,7 @@ import { encodeMetrics, type BaseMetrics, type ScoredMetrics } from "../artifact
 import { metricsPath } from "../artifacts/metrics-path.js";
 import { selectAgents, sweptRunnerFor } from "../agents/index.js";
 import {
-  AL5_GROUND_TRUTH_WITHHELD,
   isExercisedSplit,
-  notExercised,
   notExercisedOnSplit,
   overDataset,
   scoreRobustness,
@@ -84,6 +82,22 @@ const GROUND_TRUTH = "ground_truth.jsonl";
  * the artifact records *"not exercised"* in words and no ground truth is opened
  * at all.
  *
+ * **`--sealed` reads the answer key, from spec 1.4.34 (`DATA_MODEL.md §22.2`
+ * M56).** Through spec 1.4.33 this command carried a third branch: under the flag
+ * it opened no ground truth and filed *"not exercised"* even on TEST, because
+ * `fs/guard.ts` withdrew `AL2`'s unlock. `M56` rules `AL5` an **emission** rule —
+ * *"reading is none of print, log or write"* — and `EVALUATION_SPEC.md §2` has
+ * always defined a scored unit as `score(agent output, ground truth, oracle
+ * labels)`, so `§9` step 7's `assay bench --sealed --agents all --seeds all` was
+ * the one run that could satisfy none of it. The branch is gone; the read is the
+ * same read, through the same `artifacts/ground-truth.ts` and the same
+ * `GENERATOR_TRUST` zone, and **no fifth `ReadZone`, second scoring pass or copy
+ * of the artifact was created** — `DECISION_BRIEF.md §A.41` rejects all three and
+ * preserves them as rejected. What `--sealed` still governs is **emission**: this
+ * command prints per-agent counts and writes `ScoredMetrics`, a closed record of
+ * scalars, and no `GroundTruth` field, path or row appears in either
+ * (`PREREGISTRATION.md §10` **V31**).
+ *
  * **What this command still does not do.** The rest of the truth side —
  * `§4.4`'s harm and, through it, metrics 2, 3 and 8 — needs the remainder of
  * `scoringTruth`, and the bootstrap over ≥ 5 seeds needs `§5.2`'s aggregator;
@@ -119,7 +133,7 @@ async function run(context: CommandContext): Promise<void> {
     const observations = loadObservations(join(seedDir, OBSERVATIONS));
     // Once per (split, seed): §4.8's populations are the dataset's and not the
     // agent's, so every agent scored on this seed is measured over the same two.
-    const robustnessSource = sourceFor(split, seedDir, observations, context.config.sealed);
+    const robustnessSource = sourceFor(split, seedDir, observations);
     for (const agent of agents) {
       const input: AgentInput = Object.freeze({
         observations,
@@ -155,24 +169,23 @@ async function run(context: CommandContext): Promise<void> {
 
 /**
  * Where one scored unit's metrics 15 and 16 come from — `bench/scorer.ts`'s
- * union, decided from the split and `AL5`, and nothing else.
+ * union, decided from the split and nothing else.
  *
- * The ground-truth read happens **only** on the split M52 scopes the metrics to
- * and **only** when the guard would admit it, so `train` and `dev` open no
- * answer key at all and `--sealed` opens none anywhere. Where the read does
- * happen it is unguarded by any `try`: a `ground_truth.jsonl` the scorer cannot
- * read or reconcile is a stop condition for a TEST scored unit, not a metric
- * taken over a smaller truth.
+ * The ground-truth read happens **only** on the split M52 scopes the metrics to,
+ * so `train` and `dev` open no answer key at all. `--sealed` is **not** a term in
+ * this decision from spec 1.4.34 (`M56`): `AL5` governs what leaves the process,
+ * not what enters it, and a sealed TEST unit reads the same file an unsealed one
+ * does. Where the read happens it is unguarded by any `try`: a
+ * `ground_truth.jsonl` the scorer cannot read or reconcile is a stop condition
+ * for a TEST scored unit, not a metric taken over a smaller truth.
  */
 function sourceFor(
   split: Split,
   seedDir: string,
   observations: readonly Observation[],
-  sealed: boolean,
 ): RobustnessSource {
   if (!isExercisedSplit(split)) return notExercisedOnSplit(split);
-  if (sealed) return notExercised(AL5_GROUND_TRUTH_WITHHELD);
-  return overDataset(loadGroundTruth(join(seedDir, GROUND_TRUTH), { sealed }), observations);
+  return overDataset(loadGroundTruth(join(seedDir, GROUND_TRUTH)), observations);
 }
 
 /** One agent's base execution, projected onto the metrics it determines. */

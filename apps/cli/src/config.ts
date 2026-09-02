@@ -38,7 +38,18 @@ export interface CliConfig {
   readonly strictReplay: boolean;
   /** `ARCHITECTURE.md §8`'s database path. Recorded; see `commands/run.ts`. */
   readonly dbPath: string;
-  /** `AL5`: refuses to print, log or write any ground-truth field. */
+  /**
+   * `AL5`: *"refuses to print, log or write any ground-truth field; only
+   * aggregate metrics are emitted."*
+   *
+   * An **emission** flag, ruled so at spec 1.4.34 (`DATA_MODEL.md §22.2` M56).
+   * It is read in exactly two places, and neither is a guard: `commands/oracle.ts`
+   * and `commands/seal.ts` refuse it as a usage error, carrying
+   * `PREREGISTRATION.md §5.3`'s withdrawal for the two readers that sentence was
+   * written against. `assay bench` takes it at `§9` step 7 and does **not**
+   * branch on it — the scorer reads ground truth either way and emits aggregates
+   * either way.
+   */
   readonly sealed: boolean;
 }
 
@@ -48,7 +59,7 @@ export const GLOBAL_FLAGS: FlagSpecs = Object.freeze({
   "llm-model": { kind: "string", describe: "Model id recorded on the run (§19 cache_key)." },
   "strict-replay": { kind: "boolean", describe: "A replay cache miss is a hard error (§L.1 r11)." },
   "no-strict-replay": { kind: "boolean", describe: "Explicitly relax §L.1 rule 11. Never for a scored run." },
-  sealed: { kind: "boolean", describe: "AL5: emit only aggregate metrics; refuse ground truth." },
+  sealed: { kind: "boolean", describe: "AL5: emit only aggregate metrics (M56). Refused by oracle and seal." },
   help: { kind: "boolean", describe: "Print usage and exit." },
   version: { kind: "boolean", describe: "Print the spec and benchmark versions and exit." },
 });

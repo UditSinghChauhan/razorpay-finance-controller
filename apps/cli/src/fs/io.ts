@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSy
 import { basename, dirname, join, relative, resolve } from "node:path";
 
 import { CliError, EXIT } from "../errors.js";
-import { assertReadable, type GuardPolicy, type ReadZone } from "./guard.js";
+import { assertReadable, type ReadZone } from "./guard.js";
 
 /**
  * The single filesystem module. `ARCHITECTURE.md §3` gives `apps/cli` *"all
@@ -34,12 +34,19 @@ export class SourceReadError extends CliError {
   }
 }
 
-/** Everything a read needs beyond the path. */
+/**
+ * Everything a read needs beyond the path.
+ *
+ * Two fields, and from spec 1.4.34 (`DATA_MODEL.md §22.2` M56) no third: the
+ * optional `GuardPolicy` this carried through spec 1.4.33 existed only to let
+ * `--sealed` withdraw `AL2`'s `GENERATOR_TRUST` unlock, and `M56` rules `AL5` an
+ * **emission** rule that withdraws no route. A field the guard no longer reads
+ * is removed rather than left to be threaded through every call site.
+ */
 export interface ReadRequest {
   readonly path: string;
   /** Who the bytes are for. `PREREGISTRATION.md §6.2` `AL2`/`AL8`. */
   readonly zone: ReadZone;
-  readonly policy?: GuardPolicy;
 }
 
 /**
@@ -49,7 +56,7 @@ export interface ReadRequest {
  * something that has already happened once the bytes exist in the process.
  */
 export function readText(request: ReadRequest): string {
-  assertReadable(request.path, request.zone, request.policy ?? { sealed: false });
+  assertReadable(request.path, request.zone);
   try {
     return readFileSync(request.path, "utf8");
   } catch (cause) {
@@ -74,7 +81,7 @@ export function readLines(request: ReadRequest): readonly string[] {
 
 /** Whether a path exists. Guarded: existence of a barred artifact is itself a read. */
 export function exists(request: ReadRequest): boolean {
-  assertReadable(request.path, request.zone, request.policy ?? { sealed: false });
+  assertReadable(request.path, request.zone);
   return existsSync(request.path);
 }
 

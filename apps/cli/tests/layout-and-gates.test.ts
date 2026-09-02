@@ -243,17 +243,49 @@ describe("M44 — §7's frozen consistency draw, and its non-authoritative overr
     expect(result.out).toContain("NOT AUTHORITATIVE");
   });
 
-  it("REFUSES an override under --sealed — an official run takes §7's seed", async () => {
+  it("C — REFUSES --sealed outright, as a usage error, writing nothing (M56)", async () => {
+    // Spec 1.4.34, DATA_MODEL.md §22.2 M56. PREREGISTRATION.md §5.3's "AL5
+    // withdraws that route under --sealed" is narrowed to the two readers it was
+    // written against -- this gate and the §9 seal -- and re-grounded on a flag
+    // refusal rather than on fs/guard.ts's read refusal, which DECISION_BRIEF.md
+    // §A.41 records as stricter: it "cannot be reached by a gate call site that
+    // happens to open the file". §9 step 3 invokes this command without the flag.
     const root = tempDir();
     emptyDataset(root, "dev", 2000);
     const result = await run([
-      "oracle", "--split", "dev", "--seeds", "2000", "--bench", root,
-      "--consistency-seed", "99", "--sealed",
+      "oracle", "--split", "dev", "--seeds", "2000", "--bench", root, "--sealed",
     ]);
     expect(result.code).toBe(EXIT.USAGE);
-    expect(result.err).toContain("refused under --sealed");
-    expect(result.err).toContain(String(CONSISTENCY_DRAW_SEED));
+    expect(result.err).toContain("AL5");
+    expect(result.err).toContain("M56");
+    // Refused before any path is formed: no labels, no gate artifact.
     expect(result.sink.files.size).toBe(0);
+  });
+
+  it("refuses --sealed BEFORE reading any other flag, so nothing is opened first", async () => {
+    // A refusal that let the flag reach a truth read and failed afterwards would
+    // be the weaker construction M56 replaced. The invocation below names no
+    // --split and no dataset at all, and is still refused for the flag.
+    const result = await run(["oracle", "--sealed"]);
+    expect(result.code).toBe(EXIT.USAGE);
+    expect(result.err).toContain("AL5");
+    expect(result.sink.files.size).toBe(0);
+  });
+
+  it("keeps §7's frozen seed on a run that carries an override and no --sealed", async () => {
+    // The AL3 half of the old test: an override is admissible on dev, is never
+    // authoritative, and CONSISTENCY_DRAW_SEED remains recorded beside it.
+    const root = tempDir();
+    emptyDataset(root, "dev", 2000);
+    const result = await run([
+      "oracle", "--split", "dev", "--seeds", "2000", "--bench", root, "--consistency-seed", "99",
+    ]);
+    expect(result.code).toBe(EXIT.OK);
+    const gate = JSON.parse(
+      result.sink.files.get(join(join(join(root, "dev"), "2000"), "oracle_gate.json")) ?? "{}",
+    ) as { consistency: { frozen_draw_seed: number; authoritative: boolean } };
+    expect(gate.consistency.frozen_draw_seed).toBe(CONSISTENCY_DRAW_SEED);
+    expect(gate.consistency.authoritative).toBe(false);
   });
 
   it("refuses an override on a split whose gate does not run", async () => {
