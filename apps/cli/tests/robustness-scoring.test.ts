@@ -1194,6 +1194,15 @@ describe("11. M56 — a sealed TEST run reads the answer key and emits aggregate
       // M53's state for metric 17, where PREREGISTRATION.md §7's baseline table
       // records no row for this (agent_id, llm_mode). It names §7, §9 step 0 and
       // §4.10 and carries no figure from this run or from the answer key.
+      //
+      // @STEP-0-TRANSITION — once §7 records a row for (ASSAY, offline) this
+      // unit carries a FLAG, and a flag brings §10 V28's
+      // disclosure with it (scorer.ts: "V28 travels with a flag that exists").
+      // V28_BASELINE_COMPOSITION must then join this closed set. It is a frozen
+      // §10 sentence and not a truth value -- but see truth-scoring.test.ts's
+      // own marker: the same sentence names the F10 FAMILY, which a token scan
+      // there reads as a ground-truth leak. Both are test-side facts; neither
+      // is an emission AL5 bars, because §10 V28 is a published disclosure.
       METRIC_17_BASELINE_NOT_RECORDED,
     ]);
     for (const leaf of stringLeaves(written)) {

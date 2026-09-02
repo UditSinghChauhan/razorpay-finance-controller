@@ -1254,6 +1254,17 @@ describe("the whole command files the truth side into M48's one artifact", () =>
 
     // AL5 is an emission rule: no ground-truth or label row, field or path may
     // appear in the artifact or on stdout.
+    //
+    // @STEP-0-TRANSITION — the "F10" token below is the one that moves. Once
+    // PREREGISTRATION.md §9 step 0 records a baseline for
+    // (ASSAY, offline), this TEST unit carries a flag, and a flag carries §10
+    // V28's disclosure, whose frozen text names "F10 at TEST seeds 9100-9104".
+    // That is a PUBLISHED §10 sentence, not a GroundTruth field reaching the
+    // artifact: V28 is a constant in artifacts/metrics.ts and no dataset value
+    // enters through it. The scan must then exclude the known frozen
+    // disclosures -- V28_BASELINE_COMPOSITION -- before searching for tokens,
+    // rather than dropping "F10" from the token list, which would retire a real
+    // leak check. Nothing else in this case changes.
     const artifact = sealed.sink.files.get(path) ?? "";
     for (const token of [
       "gt_version", "family_id", "true_journal", "true_balances", "degradations",
