@@ -1,8 +1,36 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.34 · **Date:** 2026-09-02
+**Spec version:** 1.4.35 · **Date:** 2026-09-02
 **Reviewer role:** principal architect / skeptical reviewer
+
+**At spec 1.4.35** §A.42 records **one ratification**, taken at a governance gate held
+after spec 1.4.34 and — the condition that makes it legitimate — **before any
+benchmark data existed**: `bench/` absent, `runs/` holding only `.gitkeep`, no dataset
+generated, no agent scored, no metric computed and no seal tag cut. Wiring the
+truth-side metrics exposed that `EVALUATION_SPEC.md §4.6` had frozen metric 7's
+formula, its ten bins, its reliability diagram and its ε-gap scope while naming
+`accuracy(bin)` **without ever defining what makes a committed decision right**. Two
+readings stood on the frozen text and they **disagree numerically** on a decision
+asserting a **subset** of the true members: **set equality** against the true
+allocation, which `M35` already calls *"allocation identity"*, and **edge-level
+agreement**, under which `§4.2`'s `FP` clause alone would decide. **M57** ratifies set
+equality. The population is `RECONCILIATION_SPEC.md §6` step 3's **`DISCRIMINATED`**
+branch — the one accept in which the ε-gap decided the gate — the binned prediction is
+that decision's `Δs`, and **one committed decision is one prediction**. **The `§4.6`
+formula is preserved verbatim**, as are the ten bins, the reliability diagram and
+metric 7's name and number. Six alternatives are **rejected and preserved as
+rejected**: calibrating `evidence_score_bps` itself, including `UNIQUE` decisions with
+an invented score, including `IMMATERIALLY_AMBIGUOUS` decisions, edge-level or
+partial-credit correctness, the edge as the prediction unit, and leaving the metric
+unresolved. `§4.2` is **read and not amended**, and metric **5** remains the
+partial-credit metric. **`BENCHMARK_VERSION` moves 1.0.11 → 1.0.12** on `M39`'s
+precedent — metric 7 moves from an unavailable state to a number — while `GT_VERSION`
+stays 1.1.0, `constraint_set_hash` does not move, `RunKey` and `RunConfig` are
+unchanged, `AL1`–`AL8` are untouched in substance and wording, and the 28-metric list
+stays at 28 with no other formula changed. The residual is **disclosed rather than
+hidden**, at `PREREGISTRATION.md §10` **V32**. **No implementation code is touched.**
+See `PREREGISTRATION.md` amendment 1.4.35.
 
 **At spec 1.4.34** §A.41 records **one ratification**, taken at a governance gate held
 after spec 1.4.33 and — the condition that makes it legitimate — **before any
@@ -3298,6 +3326,187 @@ and 16 *"not exercised"*, and `bench/scorer.ts` still carries the standing-refus
 constant this row supersedes — an implementation follow-up, named in `§I`, and
 **ratified here and built later**, the order `§A.37`, `§A.38` and `§A.40` all used.
 
+### A.42 Spec 1.4.35 / benchmark 1.0.12 — the term that was never defined
+
+**The decision.** One ratification, closing a gap `EVALUATION_SPEC.md §4.6` has
+carried since it was written. Register row `DATA_MODEL.md §22.2` **M57**.
+`SPEC_VERSION` **1.4.34 → 1.4.35**; **`BENCHMARK_VERSION` 1.0.11 → 1.0.12**;
+`GT_VERSION` stays **1.1.0**.
+
+**The condition that makes this legitimate is an ordering, and it holds.** `bench/`
+absent, `runs/` holding only `.gitkeep`, no dataset generated, no agent scored, no
+metric computed, no seal tag cut. It matters here for the same reason it mattered at
+`§A.41`: a correctness predicate is defensible fixed before any figure exists and
+indefensible fixed after, because after, the choice can be made to favour a number
+already seen. `PREREGISTRATION.md §6.2` **AL3** and `§L.4` are satisfied rather than
+merely not engaged.
+
+**The gap.** `§4.6` is complete in every respect but one:
+
+```
+  FROZEN   the formula   ECE = Σ_bins (n_bin/N) × |accuracy(bin) − mean_score(bin)|
+  FROZEN   the bins      "10 equal-width bins"
+  FROZEN   the companion "Plus a reliability diagram in the report"
+  FROZEN   the scope     "calibration is reported for the ε-gap component,
+                          which is the one place a soft score influences the gate"
+
+  ABSENT   accuracy(bin) -- WHAT MAKES ONE COMMITTED DECISION RIGHT
+```
+
+Nothing in the corpus defines it. `EVALUATION_SPEC.md §5.4` item 5 nevertheless
+requires **every** metric on `PREREGISTRATION.md §8`'s list of 28 in the report, and
+`§5.5` bars *"any number that does not exist in a committed run artifact"* — so the
+term could be neither omitted nor invented at scoring time.
+
+**Two readings, and they disagree on a case the benchmark will contain.**
+
+```
+  set equality      the decision is right iff the set of (target_id, entity_id)
+                    edges it asserts EQUALS the true allocation's set for that
+                    target. RECONCILIATION_SPEC.md §6 / M35 already call that set
+                    the solution's "allocation identity".
+
+  edge-level        the decision is right iff every edge it asserts is true.
+                    EVALUATION_SPEC.md §4.2's FP clause alone; a decision that
+                    asserted a SUBSET of the true members has no false positive.
+```
+
+A decision asserting two of three true members is **wrong** under the first and
+**right** under the second. The choice therefore **moves a figure on `§8`'s list**,
+which is the definition of outcome-bearing, and `§A.41` fixed the standard that
+applies: *"Both readings are admissible on the frozen text, so this is marked
+**ratified rather than dressed as derivation**."* The same marking is taken here, on
+the `M35`/`M49`/`M50`/`M55`/`M56` precedent.
+
+**The ruling, and it is the whole of it.**
+
+```
+  POPULATION    committed decisions carrying a non-null score --
+                RECONCILIATION_SPEC.md §6 step 3's DISCRIMINATED branch.
+  PREDICTION    one committed decision = one prediction. N counts gate events.
+  BINNED VALUE  Δs = |evidence_score_bps(best) − evidence_score_bps(second)|,
+                integer bps; DATA_MODEL.md §13's evidence_score_gap_bps.
+  CORRECTNESS   correct(d) iff assert(d) = truth(d), set equality against the
+                FULL true member set for d's own target.
+```
+
+**The unit is derived, not chosen, and this is what selects it.** Every score in the
+corpus is a property of a `Candidate` — `DATA_MODEL.md §11`: *"It orders candidates
+and feeds the ε-margin ambiguity test"* — and a `Candidate` is `(target_id,
+member_obs_ids)`, a whole allocation. **No frozen field carries a per-edge score.**
+Binning an edge would replicate one gate event into as many predictions as the
+allocation has members and weight `n_bin / N` by allocation size, so a settlement
+with forty constituents would outweigh a two-member one twentyfold in a metric about
+a **gate**. `§4.2` warns against exactly this confusion in the other direction —
+*"a settlement with 40 constituents is one record and forty independent claims"* — and
+it chose the edge for a **set-membership** metric. Metric 7's unit is fixed by what
+carries the score.
+
+**Given the allocation unit, set equality is what "right" can mean.** `M35` already
+fixed *"allocation identity — the set of `(target_id, member_obs_id)` pairs the
+solution asserts"* as this corpus's term for the identity of an allocation, and used
+it to make an outcome-bearing tie-break deterministic. The predicate **reuses that
+term and adds no new quantity**: `target_id` and the member entities are
+`DATA_MODEL.md §11` fields, and the truth side is `§1`'s `allocations` and
+`bank_mappings` read through the projection the scorer already holds. Nothing is
+invented, and `GT_VERSION` does not move.
+
+**The population is derived.** `§6` step 3 tests **materiality first**, so a `UNIQUE`
+decision has no second solution and therefore **no `Δs` to bin**; an
+`IMMATERIALLY_AMBIGUOUS` decision was settled by the materiality clause, whose `§6.1`
+rationale is that *"the ledger is identical either way"*, so the score influenced
+nothing and `§4.6`'s *"the one place a soft score influences the gate"* does not
+reach it; an `AMBIGUOUS` decision **abstains**, `chosen_candidate_id` being `null`, so
+there is no committed allocation to be right about and `§4.3`'s metric 4 owns it; and
+`INTRACTABLE` commits nothing. `DISCRIMINATED` is the remainder.
+
+**What was rejected, and is preserved as rejected.**
+
+- **Calibrating `evidence_score_bps` itself instead of `Δs`.** `§4.6`'s stated
+  purpose is that *"an uncalibrated score cannot justify a threshold"*, and the only
+  threshold this corpus applies to a score-derived quantity is **ε**, which
+  `RECONCILIATION_SPEC.md §6` compares against `Δs` and against nothing else. That
+  reading would calibrate a quantity no frozen threshold is applied to and would
+  justify **no threshold at all**, defeating the section's own decision.
+- **Including `UNIQUE` decisions with an invented score.** There is no second
+  solution and therefore no gap; supplying `10_000`, or any other value, is the
+  fabricated number `§5.5` forbids and `M56` refused for the same reason when it
+  rejected emitting `0.0` for an unavailable metric.
+- **Including `IMMATERIALLY_AMBIGUOUS` decisions.** Their gap exists but their gate
+  never consulted it. Mixing two accept rules into one reliability curve would
+  calibrate a threshold against decisions a different threshold made.
+- **Edge-level / partial-credit correctness.** It is `§4.2`'s `FP` clause with its
+  `FN` clause deleted, and `§4.2` pairs them precisely because *"how much does it
+  miss"* is a separate question. Under it metric 7 would calibrate `match_precision`
+  and duplicate metric 5's numerator, while the claim the gate actually makes is that
+  **this allocation explains this target** — what `§6` step 1 accepts, what stage
+  `S5` validates and what `DATA_MODEL.md §17.1` posts.
+- **The edge as the prediction unit.** Rejected on the weighting argument above.
+- **Importing `§4.2`'s abstained/excepted `FN` exclusion.** Its rationale is **cost
+  double-counting** — *"`§4.5` already prices that decision at `C_review` or
+  `C_exception`"* — and metric 7 prices nothing. Importing it would make one
+  decision's correctness a function of the agent's **other** decisions, so two agents
+  asserting an identical allocation against identical truth could be scored
+  differently, which defeats cross-agent comparability.
+- **Leaving the metric unresolved.** `§5.4` item 5 requires every metric on the list
+  of 28. **`M54`'s disposition does not transfer:** metric 10 has **no truth axis**,
+  which no amendment can supply without coupling the generator to the engine; metric
+  7 has one, and what was missing was a sentence in `§4.6`.
+
+None of the seven may be adopted without reopening `M57`.
+
+**The residual is declared rather than argued away.** `§10` **V32**, in two halves.
+Set-equality correctness is **not equivalent** to edge-level correctness, so metric 7
+is not comparable with any externally computed edge-wise figure and metric **5**
+remains where partial credit is reported. And because only score-consulting
+`DISCRIMINATED` decisions enter, metric 7 observes the **accept** side of the very
+threshold it exists to justify: bins below ε cannot be populated by construction, an
+agent whose gate consults no score contributes no prediction at all, and **sparse or
+empty bins are therefore a structural property of the population and never grounds
+for changing this definition**. No population size, frequency or expected value is
+asserted — **no dataset exists**, and a structural statement is the only kind
+available.
+
+**Why the benchmark version moves, and why `M50`'s non-bump does not govern.** The
+bump is taken on **M39**'s precedent — the pre-registered surface changes in what the
+sealed run yields for a figure on `§8`'s list — and not on **M49**'s, no conforming
+agent's postings changing. `M50` held `BENCHMARK_VERSION` at 1.0.8, and that is
+**distinguished rather than overlooked**: it **withdrew** two expectations and changed
+nothing a scored artifact contains, whereas this row decides whether metric 7 is a
+**number** or an unavailable state — which is `§A.41`'s own test, applied to one
+figure instead of nine. Under-bumping is the error `M46` exists to make unrepeatable,
+so `§9` step 1's tag and step 5's literal are carried in the same amendment.
+
+**What does not change.** `§4.6`'s formula, its **ten** equal-width bins and its
+reliability diagram; metric 7's **name and number**; `EVALUATION_SPEC.md §4.2`
+entire; `§4.1`, `§4.3`–`§4.5` and `§4.7`–`§4.13`; `§5.1`'s ε grid, `§5.3`'s sweeps,
+`§5.4`'s **thirteen** obligations and `§5.5`'s forbidden practices; `§8`'s list at
+**28**, none added, removed, renumbered or redefined, and **no other metric's
+formula, universe or threshold**; `M51`'s grids, `M52`'s two populations, `M53`'s
+baseline, `M54`'s disposition, `M55`'s per-case harm and `M56`'s three states, all
+preserved verbatim; `AL1`–`AL8` in substance **and** wording; `§9`'s eight steps in
+number, order, command and flag, **step 0** included; `C1`–`C8` and therefore
+`constraint_set_hash`; `SE1`–`SE5`, `τ`, `ε`, `K_max`, `C_max`, `P_max` and every
+other `§7` threshold; `RunKey` `(agent_id, split, seed, llm_mode)` and `RunConfig`;
+`AgentInput`'s two fields; `DATA_MODEL.md §1`'s `GroundTruth` in every field, type and
+comment, so `GT_VERSION` stays **1.1.0**; `§13`'s `Decision` and
+`AmbiguityCertificate` and `§11`'s `Candidate`; `§18`'s `BenchmarkManifest` **shape**;
+`§6.1`'s split and seed table; `§4.1`'s composition; `V17` and `V22`–`V31`; `§F`'s
+rows and `§H`'s dispositions. **No artifact byte changes and no dataset exists to
+regenerate** — no manifest, run, root hash or `bench-v1.0.12` tag was ever produced.
+
+**What this amendment does not do.** It implements nothing.
+`packages/eval/src/metrics/calibration.ts` is **untouched** and remains correct for
+the predictions it is given; `packages/eval/src/run.ts`,
+`apps/cli/src/bench/scorer.ts`, `apps/cli/src/artifacts/metrics.ts`,
+`apps/cli/src/commands/bench.ts` and `packages/eval/src/metric-list.ts` are all
+untouched; no file outside the three version constants and one test's assertion of a
+version literal changes in any package. `assay bench` still publishes metric 7 as
+`null` beside its standing-refusal constant — an implementation follow-up, named in
+`§I`, and **ratified here and built later**, the order `§A.37`, `§A.38`, `§A.40` and
+`§A.41` all used.
+
+
 ## B. Locked project definition
 
 > **ASSAY is a settlement reconciliation controller for Razorpay-shaped payment
@@ -3378,6 +3587,25 @@ a choice, cut anything else first.
 ---
 
 ## E. Benchmark changes in this revision
+
+**At benchmark 1.0.12 (spec 1.4.35, `§A.42`).** `PREREGISTRATION.md §7` gains **one
+entry and revises none**, and **no metric formula, bin count, universe, threshold or
+number moves** — the list stays at **28**, none added, removed or renumbered. What
+changes is that metric **7** `ece` acquires the correctness semantics
+`EVALUATION_SPEC.md §4.6` never stated: the population is `RECONCILIATION_SPEC.md §6`
+step 3's `DISCRIMINATED` branch, the binned prediction is that decision's `Δs`, one
+committed decision is one prediction, and a decision is correct **iff its asserted
+allocation equals the true allocation for the same target**. It is **unaffected in
+formula and affected in determinacy**, and saying only "unaffected" would be
+misleading — the correctness term had no determinate value before. Metric **5** is
+genuinely unaffected and remains the partial-credit metric, `§4.2` being read and not
+amended. `AL1`–`AL8`, `C1`–`C8` and `constraint_set_hash`, `SE1`–`SE5`, `τ`, `ε`,
+every pre-existing `§7` threshold, `M51`–`M56` entire, `RunKey`, `RunConfig`,
+`DATA_MODEL.md §18`'s manifest shape and `GT_VERSION` 1.1.0 are all unmoved, and
+`§9`'s eight steps keep their number, order, command and flag. The two-part residual
+— non-equivalence with the edge-level reading, and a population confined to the
+accept side of ε — is declared at `PREREGISTRATION.md §10` **V32**. Register row
+**M57**.
 
 **At benchmark 1.0.11 (spec 1.4.34, `§A.41`).** `PREREGISTRATION.md §7` gains **no
 entry and revises none**, and **no metric definition, formula, universe, threshold or
@@ -3645,6 +3873,28 @@ already carries per `obs_id` — so it is read there rather than off `AgentRun.a
 whose key is `DATA_MODEL.md §16`'s Suspense-item key and therefore a different
 population. **This amendment takes none of that:** `robustness.ts` is untouched at
 spec 1.4.33, exactly as `§L.4`'s ratify-first order requires.
+
+**The follow-up spec 1.4.35 leaves (`§A.42`, register row M57).** What **M57** leaves
+is item **(9)**: wiring metric **7**. `packages/eval/src/metrics/calibration.ts` is
+**already correct and is not to be edited** — it takes `ScoredPrediction { score_bps,
+correct }` and owns the binning, and `M57` supplies precisely the input it was always
+missing. The work is at the **call site**: `apps/cli/src/bench/scorer.ts` builds one
+`ScoredPrediction` per `AgentRun.decisions` entry whose `score_bps` is non-`null`,
+with `correct` computed as **set equality** of that decision's asserted
+`(target_id, member_entity_ids)` edges against `packages/eval/src/truth.ts`'s
+`ScoringTruth.edges` filtered to the same `target_id`; `apps/cli/src/artifacts/metrics.ts`
+then publishes `ece` and the `§4.6` reliability diagram in place of the standing
+`METRIC_7_ECE_UNRATIFIED` constant, and publishes the metric **unavailable with its
+reason** — never `0.0` — where the population is empty. Two obligations ride with it.
+An agent must emit `CommittedDecision.score_bps` **non-`null` exactly on
+`RECONCILIATION_SPEC.md §6` step 3's `DISCRIMINATED` branch**, so that the field's
+nullity **is** `M57`'s population test rather than merely correlating with it. And
+`packages/eval/src/metric-list.ts` row 7 already reads `blockedBy: null,
+computedBy: "metrics/calibration.ts"` — a claim that was ahead of the code and that
+this wiring makes true; the row needs no edit, unlike item **(7)**'s metric-10 row.
+**This amendment takes none of that:** `calibration.ts`, `scorer.ts`, `metrics.ts`,
+`run.ts` and `metric-list.ts` are untouched at spec 1.4.35, exactly as `§L.4`'s
+ratify-first order requires.
 
 ---
 

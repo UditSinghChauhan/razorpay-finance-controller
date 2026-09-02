@@ -1,6 +1,17 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.4.34 · **Date:** 2026-09-02
+**Spec version:** 1.4.35 · **Date:** 2026-09-02
+
+**At spec 1.4.35** this document is unchanged apart from the version header. Register
+row `DATA_MODEL.md §22.2` **M57** supplies `EVALUATION_SPEC.md §4.6`'s missing
+correctness semantics for **metric 7 `ece`** — the population is
+`RECONCILIATION_SPEC.md §6` step 3's `DISCRIMINATED` branch, the binned prediction is
+that decision's ε-gap `Δs`, one committed decision is one prediction, and a decision
+is correct **iff its asserted allocation equals ground truth's for the same target**.
+**`§4.6`'s formula, its ten bins and its reliability diagram are unchanged**, metric 7
+keeps its name and number, and `EVALUATION_SPEC.md §8`'s list stays at **28** with no
+other formula, universe or threshold moved. **`§6` is read and NOT amended**: step 3's four outcomes, `materiality`, `Δs`, `τ`, `ε`, `§6.1`'s materiality rationale, `§6.2`'s probe loop and `M35`'s canonical allocation key all stand exactly as written — `M57` reads `§6` to fix metric 7's population and reuses `M35`'s *"allocation identity"* as a comparison rather than as a sort key. Benchmark moves to
+**v1.0.12**. See `DECISION_BRIEF.md §A.42` and `PREREGISTRATION.md §10` **V32**.
 
 **At spec 1.4.34** this document is unchanged apart from the version header. Register
 row `DATA_MODEL.md §22.2` **M56** rules that `PREREGISTRATION.md §6.2` `AL5` is an

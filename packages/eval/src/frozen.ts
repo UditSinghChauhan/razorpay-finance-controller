@@ -401,6 +401,42 @@ export const LEGACY_MAX_UNRESOLVED_ABS_PAISE = 5_000_000;
  *     **The implementation this row authorises is deliberately not in this commit**
  *     (`DECISION_BRIEF.md §A.41`, `§I`).
  *
+ *   - **1.4.35 (M57)** -- metric 7 `ece` gains the correctness semantics
+ *     `EVALUATION_SPEC.md §4.6` never stated. `§4.6` froze the formula, the ten
+ *     equal-width bins, the reliability diagram and the ε-gap scope, and named
+ *     `accuracy(bin)` WITHOUT DEFINING what makes a committed decision right; two
+ *     readings were admissible and they disagree on a decision asserting a SUBSET of
+ *     the true members, so the choice is RATIFIED on the M35/M49/M50/M55/M56
+ *     precedent. **Population:** the scored unit's committed decisions carrying a
+ *     non-null score -- `RECONCILIATION_SPEC.md §6` step 3's DISCRIMINATED branch,
+ *     the one accept in which the ε-gap decided the gate. **Prediction:** one
+ *     committed decision = one prediction, so `N` counts gate events. **Binned
+ *     value:** `Δs`, `DATA_MODEL.md §13`'s `evidence_score_gap_bps`. **Correctness:**
+ *     SET EQUALITY of the decision's asserted `(target_id, entity_id)` edges against
+ *     the true allocation's edges for that same target -- M35's "allocation identity"
+ *     applied as a comparison rather than as a sort key. A strict subset is
+ *     incorrect, a superset is incorrect, and `N = 0` publishes the metric
+ *     UNAVAILABLE with its reason, never `0.0`. **`metrics/calibration.ts` is NOT
+ *     touched and never was the gap:** it takes `ScoredPrediction { score_bps,
+ *     correct }` and owns `CALIBRATION_BINS`, `BPS_DENOMINATOR`, the bin edges and
+ *     the empty-bin rule, all of which this row confirms unchanged -- what was
+ *     missing is the INPUT. `truth.ts`'s `ScoringTruth`/`TrueEdge`, `run.ts`'s
+ *     `CommittedDecision`, `metrics/match.ts` and `EVALUATION_SPEC.md §4.2` entire
+ *     are likewise unchanged, metric 5 remaining the partial-credit metric;
+ *     `metric-list.ts` stays at 28 and keeps its numbering, `run-key.ts` is unchanged
+ *     and `RunKey` stays `(agent_id, split, seed, llm_mode)`, and `EPSILON_BPS`,
+ *     `CALIBRATION_BINS`, `C_REVIEW_PAISE`, `C_EXCEPTION_PAISE`, `K_SIGMA`,
+ *     `TAU_SWEEP_FLOOR_PAISE`, `C_REVIEW_SWEEP_PAISE`, `EPSILON_SWEEP_BPS` and every
+ *     other constant below are unchanged. Six alternatives are rejected and preserved
+ *     as rejected: calibrating `evidence_score_bps` itself, including UNIQUE
+ *     decisions with an invented score, including IMMATERIALLY_AMBIGUOUS decisions,
+ *     edge-level / partial-credit correctness, the edge as the prediction unit, and
+ *     leaving the metric unresolved. **`BENCHMARK_VERSION` moves 1.0.11 -> 1.0.12**,
+ *     that constant being `packages/generator`'s, and `GT_VERSION` stays 1.1.0. The
+ *     residual is `PREREGISTRATION.md §10` **V32**. **The implementation this row
+ *     authorises is deliberately not in this commit** (`DECISION_BRIEF.md §A.42`,
+ *     `§I`).
+ *
  * **Nothing below moves with it**, and neither does `metric-list.ts`.
  */
-export const SPEC_VERSION = "1.4.34";
+export const SPEC_VERSION = "1.4.35";

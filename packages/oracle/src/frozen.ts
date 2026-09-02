@@ -253,5 +253,22 @@ export const BPS_DENOMINATOR = 10_000;
  * gate are unchanged; `C1`-`C8` are untouched so `constraint_set_hash` does not move.
  * **`BENCHMARK_VERSION` moves 1.0.10 -> 1.0.11** and `GT_VERSION` stays 1.1.0; both
  * remain `packages/generator`'s.
+ *
+ * **1.4.34 -> 1.4.35 (M57) -- required nothing of this package, and the reason is that
+ * the metric it settles is truth-side rather than oracle-side.** M57 supplies
+ * `EVALUATION_SPEC.md §4.6`'s missing correctness semantics for metric 7 `ece`: the
+ * population is `RECONCILIATION_SPEC.md §6` step 3's DISCRIMINATED branch, the binned
+ * prediction is that decision's ε-gap `Δs`, one committed decision is one prediction,
+ * and a decision is correct iff its asserted allocation equals ground truth's for the
+ * same target. Nothing there is this package's: `§6` is the ENGINE's gate, `Δs` is the
+ * engine's own quantity, and the correctness side reads `GroundTruth` through the
+ * scorer's projection. **Metric 4 -- the one figure this package's labels decide --
+ * is untouched**, `abstention_precision`/`_recall` scoring against
+ * `oracle_labels.jsonl` on `§5.4`'s ambiguity definition, which does not move; and the
+ * `§5.3` τ sweep still does not re-run the oracle. `SETTLEMENT_WINDOW_DAYS`,
+ * `K_ORACLE`, `C_ORACLE`, `TAU_FLOOR_PAISE` and `TAU_RATE_BPS` are unchanged; `§5.1`'s
+ * completeness gate and `§5.3`'s differential gate are unchanged; `C1`-`C8` are
+ * untouched so `constraint_set_hash` does not move. **`BENCHMARK_VERSION` moves
+ * 1.0.11 -> 1.0.12** and `GT_VERSION` stays 1.1.0; both remain `packages/generator`'s.
  */
-export const SPEC_VERSION = "1.4.34";
+export const SPEC_VERSION = "1.4.35";
