@@ -183,3 +183,29 @@ export { agentDeclaration };
 export { SWEPT_AGENT_IDS, isSweptAgent, type SweptRunner };
 export type { SweepParameters } from "./sweep-runner.js";
 export { a1Agent, a2Agent, a3Agent, assayAgent, b0Agent, b1Agent, b2Agent };
+
+/**
+ * `ASSAY` executed for its **evidence** rather than for its metrics.
+ *
+ * `Agent.run` returns `ARCHITECTURE.md §10`'s `AgentRun`, which is
+ * `EVALUATION_SPEC.md §4`'s scoring projection and carries no chain, no
+ * certificate, no close report and no journal line — `packages/eval`'s `run.ts`
+ * gives the three reasons, and none of them is weakened by what follows.
+ * {@link runAssayComposedFull} is the same composition, returning the same
+ * `AgentRun` plus the state the run already built, and `ARCHITECTURE.md §9`'s
+ * *"thin HTTP over engine + ledger"* is written over that.
+ *
+ * Re-exported here, and from `src/index.ts` in turn, so `apps/api` reaches it
+ * through `@assay/cli`'s published surface rather than by importing
+ * `src/agents/assay.js` directly. The composition stays private; its result
+ * does not.
+ */
+export { ZERO_SOLVE_OUTCOMES, runAssayComposedFull } from "./assay.js";
+export type {
+  AssayComposeOptions,
+  AssayRunResult,
+  ComposedRun,
+  DecisionEvidence,
+  RunEvidence,
+  SolveOutcomeTally,
+} from "./assay.js";

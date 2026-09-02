@@ -4,6 +4,7 @@ import {
   type ConstraintId,
   type Observation,
   type ObservationId,
+  type ObservationKind,
   type UnixSeconds,
 } from "@assay/domain";
 import {
@@ -65,6 +66,7 @@ import {
   type BankSideEvidence,
   type CandidateId,
   type CertificateReason,
+  type CloseAttempt,
   type CloseGateInput,
   type CloseObservationRecord,
   type ComponentId,
@@ -75,6 +77,8 @@ import {
   type EventId,
   type ExceptionClass,
   type JournalLine,
+  type LedgerChain,
+  type LedgerProjection,
   type LedgerStore,
   type LedgerWriteState,
   type ObservationState,
@@ -433,6 +437,23 @@ interface Posted {
   /** `JournalLine.source_entity_id` where the terminal-state rule opened a Suspense item. */
   readonly suspense_key: string | null;
   readonly lines: readonly JournalLine[];
+  /**
+   * The `§16` event this decision was appended as.
+   *
+   * Recorded at the append rather than recomputed later: `post` already holds
+   * the value it stamped, and deriving it a second time would be a second place
+   * the event's identity is decided.
+   */
+  readonly evt_id: EventId;
+  /**
+   * `§6`'s certificate, as it went into the event — `null` on every state but
+   * `ABSTAINED`.
+   *
+   * Carried here because this is the record that survives to the return; the
+   * certificate is otherwise reachable only from inside the chain, which
+   * `AgentRun` does not carry.
+   */
+  readonly certificate: AmbiguityCertificate | null;
 }
 
 interface Built {
@@ -837,11 +858,118 @@ export interface ComposedRun {
   readonly solve_outcomes: SolveOutcomeTally;
 }
 
+// ---------------------------------------------------------------------------
+// The evidence a run produced, for the product surface
+// ---------------------------------------------------------------------------
+
+/**
+ * One posted decision, with the evidence `ARCHITECTURE.md §9`'s
+ * `GET /runs/:id/decisions/:decision_id` calls *"full drill-down: evidence,
+ * constraints, certificate, hash-chain segment"*.
+ *
+ * **Every field is already-computed state, re-keyed and not recomputed.** The
+ * decision, its class, its Suspense key, its journal lines, its certificate and
+ * its event id are all produced by the pipeline above and were, until now,
+ * discarded at the return: `AgentRun` is `EVALUATION_SPEC.md §4`'s scoring
+ * projection and deliberately carries none of them (`packages/eval`'s `run.ts`
+ * gives the three reasons). Nothing here re-derives a stage, re-runs a gate or
+ * re-reads a threshold.
+ */
+export interface DecisionEvidence {
+  readonly decision_id: DecisionId;
+  readonly obs_id: ObservationId;
+  /** `§16`'s "the observation's own" business identifier — the queue's key. */
+  readonly entity_id: string;
+  readonly kind: ObservationKind;
+  readonly state: DecisionState;
+  /** Non-null exactly when `state === "EXCEPTION"` (`DATA_MODEL.md §14`). */
+  readonly exception_class: ExceptionClass | null;
+  /** `JournalLine.source_entity_id` where a Suspense item was opened; `null` otherwise. */
+  readonly suspense_key: string | null;
+  /** `DATA_MODEL.md §14.1`'s `value(observation)`, in paise — `§9`'s rupee ranking. */
+  readonly value_paise: number;
+  readonly journal_lines: readonly JournalLine[];
+  /** `§5`'s component, where this decision belongs to one. */
+  readonly comp_id: ComponentId | null;
+  /**
+   * `§6`'s Ambiguity Certificate — `PROJECT_SPEC.md §10` step 2's whole subject,
+   * carrying `solution_a`, `solution_b`, the shared hard constraints, the
+   * evidence gap in bps, `materiality_paise`, `epsilon_bps`, `tau_paise`, the
+   * probes attempted and the reason. Non-null exactly on an `ABSTAINED`
+   * decision, target and member alike.
+   */
+  readonly certificate: AmbiguityCertificate | null;
+  /** The `§16` event this decision was appended as — the chain-segment key. */
+  readonly evt_id: EventId;
+}
+
+/**
+ * Everything one run produced beyond `EVALUATION_SPEC.md §4`'s metrics.
+ *
+ * **This is a view over state the run already built, not a second run.** The
+ * chain is the one `postValidatedDecision` appended to, the close attempt is the
+ * one `attemptClose` returned, and the projection is the one the close gate was
+ * run against. `ARCHITECTURE.md §9` gives `apps/api` a *"thin HTTP over engine +
+ * ledger"* and every endpoint on its table reads from exactly these five values:
+ *
+ * ```
+ *   GET /runs/:id/close              close, projection
+ *   GET /runs/:id/exceptions         decisions        (ranked by value_paise)
+ *   GET /runs/:id/decisions/:id      decisions        (certificate, lines, evt_id)
+ *   GET /runs/:id/ledger/verify      chain            (verifyChain re-runs G4)
+ * ```
+ *
+ * `run_id` and `genesis_hash` are deliberately absent: {@link LedgerChain}
+ * carries both, and a second copy is a second thing to keep in step.
+ */
+export interface RunEvidence {
+  /** Layer A — the append-only hash chain, with its genesis, events and root hash. */
+  readonly chain: LedgerChain;
+  /**
+   * One entry per posted decision, in **chain order**.
+   *
+   * The order is `posted`'s, which is the order the events were appended, so
+   * `decisions[i]` and the chain's posting events line up without a join. A
+   * `REFERENCE` observation produces no `Decision` at all (`§13`) and appears
+   * here never — it holds a terminal state for `G1` and reaches the chain never.
+   */
+  readonly decisions: readonly DecisionEvidence[];
+  /**
+   * `§6`'s certificates, one per abstained **component**, sorted by `comp_id`.
+   *
+   * De-duplicated relative to {@link DecisionEvidence.certificate}: one
+   * certificate covers an abstained target and every member of its component,
+   * so the per-decision field repeats it and this list does not. Sorted rather
+   * than left in map order because `DATA_MODEL.md §16` bars a result that
+   * depends on *"iteration order over an unordered collection"*.
+   */
+  readonly certificates: readonly AmbiguityCertificate[];
+  /** `§10.4`'s close attempt: the five gates, `§10.2`'s outcome and the report. */
+  readonly close: CloseAttempt;
+  /** Layer B — balances re-projected from the event log, never cached. */
+  readonly projection: LedgerProjection;
+}
+
+/**
+ * One composed execution, with the evidence it produced.
+ *
+ * **A widening of {@link ComposedRun}, not a replacement.** `SweptRunner` still
+ * returns the narrower shape and `bench/sweep.ts` still reads `run` and
+ * `solve_outcomes` alone, which is the correct dependency: a sweep measures, and
+ * measurement has no business reading a hash chain. Extending rather than
+ * widening `ComposedRun` in place is what keeps that true — and what keeps the
+ * sweep's own test stubs from having to fabricate a chain, a close attempt and a
+ * projection they never look at.
+ */
+export interface AssayRunResult extends ComposedRun {
+  readonly evidence: RunEvidence;
+}
+
 /** `ARCHITECTURE.md §10`'s interface, composed. */
 async function runAssayComposed(
   input: AgentInput,
   options: AssayComposeOptions,
-): Promise<ComposedRun> {
+): Promise<AssayRunResult> {
   const { observations } = input;
   const config: RunConfig =
     options.llmModeOverride === undefined
@@ -1047,10 +1175,11 @@ async function runAssayComposed(
       );
     }
 
+    const evtId = eventIdFor(obs.obs_id);
     const write = postValidatedDecision(
       writeState,
       result.validation.decision,
-      { evt_id: eventIdFor(obs.obs_id), ts: obs.ingested_at, actor },
+      { evt_id: evtId, ts: obs.ingested_at, actor },
       store,
     );
     writeState = write.state;
@@ -1062,6 +1191,11 @@ async function runAssayComposed(
       decision_id: decisionIdFor(obs.obs_id),
       suspense_key: result.suspense_key,
       lines: result.lines,
+      evt_id: evtId,
+      // `result` is the classification that actually reached S5 and the chain —
+      // the exception fallback above included — so this is the certificate the
+      // event carries and never the one that was proposed and refused.
+      certificate: result.classification.certificate,
     };
     posted.push(record);
     return record;
@@ -1367,6 +1501,36 @@ async function runAssayComposed(
     solveOutcomes[outcome.solve.outcome] += 1;
   }
 
+  // --- the evidence, re-keyed from what the run already built ---------------
+  // No stage is re-run, no gate re-evaluated and no threshold re-read: every
+  // value below is already in hand, and the only work is a projection onto the
+  // shape `ARCHITECTURE.md §9`'s endpoints read. `posted` is in chain order, so
+  // the list lines up with the chain's posting events without a join.
+  const decisionEvidence: DecisionEvidence[] = posted.map((record) => ({
+    decision_id: record.decision_id,
+    obs_id: record.obs.obs_id,
+    entity_id: entityIdOf(record.obs),
+    kind: record.obs.kind,
+    state: record.state,
+    exception_class: record.exception_class,
+    suspense_key: record.suspense_key,
+    value_paise: valueOf(record.obs),
+    journal_lines: record.lines,
+    // A target's component is on its `S4` outcome; a member's is the map `S3`
+    // already built. An observation in neither — an unpostable kind reaching §9
+    // outside a component — carries null rather than an invented id.
+    comp_id:
+      outcomes.get(record.obs.obs_id)?.comp_id ??
+      componentIdByMember.get(record.obs.obs_id) ??
+      null,
+    certificate: record.certificate,
+    evt_id: record.evt_id,
+  }));
+
+  const certificates = [...certificateByComponent.values()].sort((a, b) =>
+    compare(a.comp_id, b.comp_id),
+  );
+
   return {
     run: {
       agent_id: options.agentId,
@@ -1383,6 +1547,13 @@ async function runAssayComposed(
       close,
     },
     solve_outcomes: Object.freeze(solveOutcomes),
+    evidence: {
+      chain: writeState.chain,
+      decisions: Object.freeze(decisionEvidence),
+      certificates: Object.freeze(certificates),
+      close: attempt,
+      projection,
+    },
   };
 }
 
@@ -1658,17 +1829,25 @@ export async function runAssayAblation(
 }
 
 /**
- * The same composition, keeping the `§6` tally — M51's sweep entry point.
+ * The same composition, keeping the `§6` tally and the run's evidence.
  *
- * `apps/cli`-internal, like {@link runAssayAblation} and
- * {@link AssayComposeOptions} themselves. Only `bench/sweep.ts` calls it, and it
- * exists so that a swept execution can report `count(AMBIGUOUS)` and
- * `count(IMMATERIALLY_AMBIGUOUS)` without `AgentRun` gaining a field.
+ * **Two callers, one execution.** It began as M51's sweep entry point, so that a
+ * swept execution could report `count(AMBIGUOUS)` and
+ * `count(IMMATERIALLY_AMBIGUOUS)` without `AgentRun` gaining a field; it is now
+ * also the entry point `ARCHITECTURE.md §9`'s API reads, for the same reason
+ * one step further — the chain, the certificates, the close attempt and the
+ * projection are all built by the run above and none of them fits `AgentRun`
+ * either. `packages/eval` is untouched by both: {@link AssayRunResult} is
+ * `apps/cli`'s own shape, and the `Agent` interface still returns an `AgentRun`.
+ *
+ * `bench/sweep.ts` sees the narrower {@link ComposedRun} through `SweptRunner`
+ * and reads no evidence, which is the dependency direction `EVALUATION_SPEC.md`
+ * requires: the thing being measured may not hand the scorer a hash chain.
  */
 export function runAssayComposedFull(
   input: AgentInput,
   options: AssayComposeOptions,
-): Promise<ComposedRun> {
+): Promise<AssayRunResult> {
   return runAssayComposed(input, options);
 }
 
