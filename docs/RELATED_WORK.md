@@ -1,6 +1,23 @@
 # RELATED_WORK — ASSAY
 
-**Spec version:** 1.4.35 · **Date:** 2026-09-02
+**Spec version:** 1.4.36 · **Date:** 2026-09-02
+
+**At spec 1.4.36** this document is unchanged apart from the version header. Register
+row `DATA_MODEL.md §22.2` **M58** ratifies **two** choices `PREREGISTRATION.md §7`'s
+metric-17 entry left open: the baseline pair `mean_bps` / `stddev_bps` is **integer
+basis points**, rounded `round_half_up` (ties away from zero) **exactly once** at the
+end of `§9` **step 0** from full-precision statistics, the two figures rounded
+**independently**, with the detector comparing the run's **full-precision** rate
+against the **rounded** pair; and `§7` remains the **authoritative** baseline record
+while `packages/eval/src/frozen.ts`'s `METRIC_17_BASELINE` is its **executable
+transcription**, empty until step 0, transcribed before `§9` step 1's tag, and never
+recomputed at scoring time. **`EVALUATION_SPEC.md §4.10`'s formula is preserved
+verbatim and `k_sigma` stays 3**; this is metric 17's rule and **not** a claim that
+half-up is the corpus's only rounding mode, `M27`'s `mode_days` floor standing
+unchanged. `EVALUATION_SPEC.md §8`'s list stays at **28**, `GT_VERSION` stays
+**1.1.0**, `constraint_set_hash` does not move, and `§9`'s eight steps keep their
+number, order, command and flag. Benchmark moves to **v1.0.13**. See
+`DECISION_BRIEF.md §A.43` and `PREREGISTRATION.md §10` **V33**.
 
 **At spec 1.4.35** this document is unchanged apart from the version header. Register
 row `DATA_MODEL.md §22.2` **M57** supplies `EVALUATION_SPEC.md §4.6`'s missing

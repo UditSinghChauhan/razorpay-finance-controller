@@ -270,5 +270,26 @@ export const BPS_DENOMINATOR = 10_000;
  * completeness gate and `§5.3`'s differential gate are unchanged; `C1`-`C8` are
  * untouched so `constraint_set_hash` does not move. **`BENCHMARK_VERSION` moves
  * 1.0.11 -> 1.0.12** and `GT_VERSION` stays 1.1.0; both remain `packages/generator`'s.
+ *
+ * **1.4.35 -> 1.4.36 (M58) -- required nothing of this package, and the reason is that
+ * the figure it settles is an AGENT-OUTPUT measurement rather than an oracle label.**
+ * M58 ratifies metric 17's baseline encoding -- `mean_bps`/`stddev_bps` as integer
+ * basis points, full-precision inputs, `round_half_up` with ties away from zero applied
+ * ONCE at the end of `PREREGISTRATION.md §9` step 0, the two figures rounded
+ * INDEPENDENTLY, and the detector reading the ROUNDED pair against a FULL-PRECISION
+ * rate -- and the record relationship, `§7` being authoritative and
+ * `packages/eval/src/frozen.ts`'s `METRIC_17_BASELINE` its executable transcription.
+ * Nothing there is this package's: `abstention_rate_by_value` is computed from agent
+ * output over the `recon_line` universe and consults NO oracle label, and `§9` step 0
+ * is a NON-SCORED pass this package takes no part in. **Metric 4 -- the one figure this
+ * package's labels decide -- is untouched**, `abstention_precision`/`_recall` scoring
+ * against `oracle_labels.jsonl` on `§5.4`'s ambiguity definition, which does not move.
+ * `TAU_RATE_BPS` and `TAU_FLOOR_PAISE` are the other basis-point quantities here and
+ * M58 does NOT reach them: its rounding rule is scoped to metric 17's baseline pair
+ * alone and is expressly not a corpus-wide rounding claim. `SETTLEMENT_WINDOW_DAYS`,
+ * `K_ORACLE`, `C_ORACLE`, `TAU_FLOOR_PAISE` and `TAU_RATE_BPS` are unchanged; `§5.1`'s
+ * completeness gate and `§5.3`'s differential gate are unchanged; `C1`-`C8` are
+ * untouched so `constraint_set_hash` does not move. **`BENCHMARK_VERSION` moves
+ * 1.0.12 -> 1.0.13** and `GT_VERSION` stays 1.1.0; both remain `packages/generator`'s.
  */
-export const SPEC_VERSION = "1.4.35";
+export const SPEC_VERSION = "1.4.36";
