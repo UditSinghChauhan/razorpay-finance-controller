@@ -804,5 +804,30 @@ export const GT_VERSION = "1.1.0";
  * `constraint_set_hash` is `packages/domain`'s and is unmodified. **No dataset exists
  * to regenerate**, and the implementation M58 authorises is deliberately not in this
  * commit (`DECISION_BRIEF.md §A.43`, `§I`).
+ *
+ * **1.4.36 -> 1.4.37 (M59) -- required NOTHING of this package, and pointedly not
+ * `BENCHMARK_VERSION`, which STAYS 1.0.13.** `§9` step 0 has been taken and its
+ * measured metric-17 baseline -- `(0, 0)` for all five `offline` Tier-0 keys -- is
+ * transcribed into `PREREGISTRATION.md §7` and `packages/eval/src/frozen.ts`. **The
+ * measurement is an AGENT-OUTPUT quantity taken by `apps/cli` over this package's
+ * DEV datasets, and it changes no rule this package owns.** `SPLIT_TABLE` is the
+ * reason the result is what it is -- DEV is `F01`-`F06`, `DROP_SETTLEMENT_ID` is
+ * `F08`'s and `F08` is TEST-ONLY, so `§10` **V17**'s fully-`AN1`-anchored DEV
+ * population enumerates no candidate and no agent abstains -- and `SPLIT_TABLE`,
+ * `OPERATOR_DECLARING_FAMILY`, `FAMILY_MECHANICS`, `SEED_BLOCKS`, `blockOf`, `AL7`'s
+ * successor rule, `§4.1`'s composition, every rate, magnitude and
+ * `target_record_count` and every emitted byte are **preserved verbatim**: widening
+ * the DEV population to make the baseline non-degenerate is one of the alternatives
+ * M59 REJECTS, barred by `§6.1`'s forbidden list and by `V28`. No `GroundTruth`
+ * field is added, retyped or read differently, so `GT_VERSION` stays **1.1.0**;
+ * `constraint_set_hash` is `packages/domain`'s and is unmodified; `§8`'s list stays
+ * at 28 with metric 17 keeping its name, number and formula and `k_sigma` staying
+ * 3. **`BENCHMARK_VERSION` does not move** because no rule determining what the
+ * sealed run yields changes -- M39's test is not met, no reading of a frozen text
+ * is selected that would alter the run's output relative to the frozen
+ * implementation, and M49's postings test is not met either. **The existing
+ * `bench/dev` datasets are NOT regenerated and MUST NOT be**: they are `§9` step
+ * 0's evidence, they embed no benchmark version, and re-deriving them would destroy
+ * the provenance this row exists to record.
  */
-export const SPEC_VERSION = "1.4.36";
+export const SPEC_VERSION = "1.4.37";

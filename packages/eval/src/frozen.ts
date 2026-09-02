@@ -343,8 +343,35 @@ export interface Metric17BaselineRow {
  * absent row is therefore metric 17 UNAVAILABLE with its reason, never a
  * `spike_flag` of `false` — a detector that reports *"clean"* because it has no
  * baseline is the broken detector `EVALUATION_SPEC.md §4.10` names.
+ *
+ * **TRANSCRIBED at spec 1.4.37, register row `DATA_MODEL.md §22.2` M59.** `§9`
+ * step 0 has been taken and the five rows below are its measured result,
+ * transcribed **unchanged** from the pass's own table and from
+ * `PREREGISTRATION.md §7`. Nothing here is computed, re-derived, rounded a
+ * second time or adjusted: `§7` is the authoritative record and this constant
+ * is its transcription, so the two must agree exactly and any divergence is a
+ * seal failure. The measured pair is `(0, 0)` for every key, which M59 ratifies
+ * as a **valid baseline and not an absence** — `metric17BaselineFor` returns
+ * these rows, the flag is computed rather than reported UNAVAILABLE, and
+ * `§4.10`'s bar for them evaluates to `0 / 10_000 + 3 · 0 / 10_000`, i.e.
+ * `rate > 0`. `PREREGISTRATION.md §10` **V34** carries the residual: on such a
+ * bar the published flag identifies the presence of any positive abstained
+ * `recon_line` value rather than an excursion above a non-degenerate reference.
+ *
+ * **The seven keys `§7` records no pair for are NOT here**, and their absence is
+ * the frozen semantics rather than a gap: `B2-LLM-DIRECT` under both modes and
+ * the five `replay` keys are deferred by `DECISION_BRIEF.md §F` **F2**, `§7`
+ * records their reasons, and this constant transcribes **pairs** and has no
+ * field for a reason. Each reads `metric17BaselineFor(...) === null`, which is
+ * `§7`'s UNAVAILABLE.
  */
-export const METRIC_17_BASELINE: readonly Metric17BaselineRow[] = Object.freeze([]);
+export const METRIC_17_BASELINE: readonly Metric17BaselineRow[] = Object.freeze([
+  Object.freeze({ agent_id: "ASSAY", llm_mode: "offline", mean_bps: 0, stddev_bps: 0 }),
+  Object.freeze({ agent_id: "B0-IDONLY", llm_mode: "offline", mean_bps: 0, stddev_bps: 0 }),
+  Object.freeze({ agent_id: "A1-NOVALIDATE", llm_mode: "offline", mean_bps: 0, stddev_bps: 0 }),
+  Object.freeze({ agent_id: "A2-NOABSTAIN", llm_mode: "offline", mean_bps: 0, stddev_bps: 0 }),
+  Object.freeze({ agent_id: "A3-NOLLM", llm_mode: "offline", mean_bps: 0, stddev_bps: 0 }),
+]);
 
 /**
  * `queue_top_n` (`PREREGISTRATION.md §7`).
@@ -647,6 +674,45 @@ export const LEGACY_MAX_UNRESOLVED_ABS_PAISE = 5_000_000;
  *     follow-up MUST replace `metrics/abstention.ts`'s FALSE claim that half-up is
  *     the corpus's only rounding mode with wording grounded in this row.
  *
+ *   - **1.4.37 (M59)** -- `§9` step 0 has been TAKEN and its measured result is
+ *     TRANSCRIBED. The pass returned `mean_bps = stddev_bps = 0` for all five
+ *     `offline` Tier-0 keys, and {@link METRIC_17_BASELINE} now carries exactly
+ *     those five rows, unchanged. **The result is ENTAILED by structure this
+ *     register already carries** and is not a newly discovered property:
+ *     `PREREGISTRATION.md §10` **V17** records that every DEV settlement is fully
+ *     `AN1`-anchored because `F08`'s `DROP_SETTLEMENT_ID` is TEST-ONLY, so no DEV
+ *     target enumerates a candidate; **V28** records that `§6.1` makes `F07`-`F10`
+ *     test-only. A population enumerating no candidate presents no AMBIGUOUS or
+ *     INTRACTABLE target, so no `recon_line` reaches ABSTAINED and `§4.10`'s
+ *     numerator is zero on every seed for every agent. **RATIFIED:** a measured
+ *     `(0, 0)` pair IS a baseline -- {@link metric17BaselineFor} returns it, the
+ *     flag is COMPUTED, and `§5.5`'s unavailable-with-reason is NOT engaged, that
+ *     convention governing a key `§7` records NO PAIR for. **Detector consequence,
+ *     arithmetic and not a redefinition:** on `(0, 0)` the unchanged expression
+ *     evaluates to `rate > 0 + 3 · 0`, so a run carrying no abstained
+ *     `recon_line` value yields `false` and one carrying any positive such value
+ *     yields `true`. **V33 is NOT edited and its `A2-NOABSTAIN` instance is not
+ *     withdrawn**; this row records a SECOND instance, a zero σ arising from a
+ *     population presenting nothing to abstain over rather than from an agent
+ *     that cannot abstain, and additionally a zero MEAN, which V33's "the bar
+ *     collapses to `mean_bps`" does not describe. **Unchanged:** `§4.10`'s formula
+ *     verbatim, {@link K_SIGMA} at 3, M53's rate, numerator, denominator,
+ *     five-seed population, sample statistic, `(agent_id, llm_mode)` scope,
+ *     producer and consumer, M58's encoding/rounding/transcription rules,
+ *     `metric-list.ts` at 28, `run-key.ts`, and every constant below. Four
+ *     alternatives are rejected and preserved as rejected: reporting the flag
+ *     UNAVAILABLE for a measured `(0, 0)` key, re-running step 0, widening the DEV
+ *     population, and altering the detector, threshold or formula -- the last two
+ *     barred by `§6.2` `AL3`, `DECISION_BRIEF.md §L.4` and `§6.1`'s forbidden
+ *     list. **`BENCHMARK_VERSION` does NOT move, staying 1.0.13**, and
+ *     `GT_VERSION` stays 1.1.0: no rule changes, so the sealed run's yield is
+ *     what the already-frozen procedure produces, and M49's postings test is not
+ *     met either. **This row is taken AFTER a measured figure exists** and does
+ *     NOT claim to be fixed before one; its legitimacy is that the figure came
+ *     from the frozen procedure, that nothing here tunes or revises it, that no
+ *     scored TEST result has been observed, and that no threshold or benchmark
+ *     parameter moves. The residual is `PREREGISTRATION.md §10` **V34**.
+ *
  * **Nothing below moves with it**, and neither does `metric-list.ts`.
  */
-export const SPEC_VERSION = "1.4.36";
+export const SPEC_VERSION = "1.4.37";

@@ -20,7 +20,7 @@ import {
   isExercisedSplit,
   M54_METRIC_10_NOT_COMPUTABLE,
   METRIC_7_ECE_EMPTY_POPULATION,
-  METRIC_17_BASELINE_NOT_RECORDED,
+  V28_BASELINE_COMPOSITION,
   loadGroundTruth,
   memorySink,
   metric7EceState,
@@ -1191,23 +1191,25 @@ describe("11. M56 — a sealed TEST run reads the answer key and emits aggregate
       // for metric 7 — both published rather than fabricated.
       M54_METRIC_10_NOT_COMPUTABLE,
       METRIC_7_ECE_EMPTY_POPULATION,
-      // M53's state for metric 17, where PREREGISTRATION.md §7's baseline table
-      // records no row for this (agent_id, llm_mode). It names §7, §9 step 0 and
-      // §4.10 and carries no figure from this run or from the answer key.
-      //
-      // @STEP-0-TRANSITION — once §7 records a row for (ASSAY, offline) this
-      // unit carries a FLAG, and a flag brings §10 V28's
-      // disclosure with it (scorer.ts: "V28 travels with a flag that exists").
-      // V28_BASELINE_COMPOSITION must then join this closed set. It is a frozen
-      // §10 sentence and not a truth value -- but see truth-scoring.test.ts's
-      // own marker: the same sentence names the F10 FAMILY, which a token scan
-      // there reads as a ground-truth leak. Both are test-side facts; neither
-      // is an emission AL5 bars, because §10 V28 is a published disclosure.
-      METRIC_17_BASELINE_NOT_RECORDED,
+      // @STEP-0-TRANSITION — APPLIED at spec 1.4.37 (M59). §7 now records a row
+      // for (ASSAY, offline), so this unit carries a FLAG, and a flag brings §10
+      // V28's disclosure with it (scorer.ts: "V28 travels with a flag that
+      // exists"). V28_BASELINE_COMPOSITION therefore joins this closed set and
+      // METRIC_17_BASELINE_NOT_RECORDED leaves it — the state being null for a
+      // recorded key, and an allowlist entry that can no longer appear is one
+      // this scan would stop catching a regression through. It is a frozen §10
+      // sentence and not a truth value -- but see truth-scoring.test.ts's own
+      // marker: the same sentence names the F10 FAMILY, which a token scan there
+      // reads as a ground-truth leak. Both are test-side facts; neither is an
+      // emission AL5 bars, because §10 V28 is a published disclosure.
+      V28_BASELINE_COMPOSITION,
     ]);
     for (const leaf of stringLeaves(written)) {
       expect(allowed.has(leaf), `metrics.json carries an unexpected string: ${leaf}`).toBe(true);
     }
+    // Asserted rather than merely permitted: the disclosure is actually there,
+    // which is what makes its presence in the closed set a fact and not a hole.
+    expect(stringLeaves(written)).toContain(V28_BASELINE_COMPOSITION);
   });
 
   it("G — the artifact does not move when the answer key's unprojected fields do", async () => {

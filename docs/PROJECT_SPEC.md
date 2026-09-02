@@ -2,8 +2,27 @@
 
 **Track:** 04 — AI Finance Controller
 **Status:** Specification. Frozen scope for implementation.
-**Spec version:** 1.4.36
+**Spec version:** 1.4.37
 **Date:** 2026-09-02
+
+**At spec 1.4.37** this document is unchanged apart from the version header, and **one
+`§7` success criterion is read rather than amended**. Register row `DATA_MODEL.md
+§22.2` **M59** records that `PREREGISTRATION.md §9` **step 0 has been taken**,
+returning `mean_bps = stddev_bps = 0` for all five `offline` Tier-0 keys, and
+transcribes those rows **unchanged** into `PREREGISTRATION.md §7` and into
+`packages/eval/src/frozen.ts`'s `METRIC_17_BASELINE`. It ratifies that a measured
+`(0, 0)` pair **is** a baseline, so the **flag is computed** rather than reported
+UNAVAILABLE, and records the arithmetic consequence — on `(0, 0)` the unchanged
+expression evaluates to `rate > 0 + 3 · 0`, so the flag identifies **the presence of
+any positive abstained `recon_line` value**. **S10** — every claimed number traceable
+to a committed run artifact — is the criterion the ruling serves, and here it is
+discharged rather than merely served: the baseline is now a **measured** number whose
+trace runs from `§9` step 0's transcript through `§7` to the source constant, with any
+divergence between the last two a **seal failure**. **No success criterion moves, none
+is added and none is withdrawn**; `S1`–`S12` are untouched, as are `§9`'s dataset bound
+and `§10`'s demo script. **Benchmark stays v1.0.13.** This is the **first amendment in
+this corpus taken after a measured figure exists** and it does not claim otherwise. See
+`DECISION_BRIEF.md §A.44` and `PREREGISTRATION.md §10` **V34**.
 
 **At spec 1.4.36** this document is unchanged apart from the version header, and **one
 `§7` success criterion is read rather than amended**. Register row `DATA_MODEL.md

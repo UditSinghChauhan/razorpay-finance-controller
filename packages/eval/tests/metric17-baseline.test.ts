@@ -269,21 +269,40 @@ describe("3. §7's statistic is the mean and the SAMPLE stddev, recorded in inte
 // ---------------------------------------------------------------------------
 
 describe("4. §7's baseline table is read, never computed", () => {
-  // @STEP-0-TRANSITION — asserts §7's PRE-step-0 state. Becomes: the five
-  // measured offline rows, in §9 step 0's emitted order.
-  it("is EMPTY until §9 step 0 has run, which is §7's own word for it", () => {
-    expect(METRIC_17_BASELINE).toEqual([]);
+  // @STEP-0-TRANSITION — APPLIED at spec 1.4.37 (M59). §9 step 0 has been
+  // taken, so this case asserts the five measured offline rows in the pass's
+  // own emitted order rather than §7's pre-step-0 empty state.
+  it("carries §9 step 0's five measured rows, in the pass's emitted order", () => {
+    expect(METRIC_17_BASELINE).toEqual([
+      { agent_id: "ASSAY", llm_mode: "offline", mean_bps: 0, stddev_bps: 0 },
+      { agent_id: "B0-IDONLY", llm_mode: "offline", mean_bps: 0, stddev_bps: 0 },
+      { agent_id: "A1-NOVALIDATE", llm_mode: "offline", mean_bps: 0, stddev_bps: 0 },
+      { agent_id: "A2-NOABSTAIN", llm_mode: "offline", mean_bps: 0, stddev_bps: 0 },
+      { agent_id: "A3-NOLLM", llm_mode: "offline", mean_bps: 0, stddev_bps: 0 },
+    ]);
     expect(Object.isFrozen(METRIC_17_BASELINE)).toBe(true);
   });
 
-  // @STEP-0-TRANSITION — the first two keys become the measured rows; the two
-  // `replay` keys STAY null while §F F2 stands, which is
-  // the frozen semantics for the absent column and not a state to be repaired.
-  it("answers null for a (agent_id, llm_mode) §7 records no row for", () => {
-    expect(metric17BaselineFor("ASSAY", "offline")).toBeNull();
+  // @STEP-0-TRANSITION — APPLIED at spec 1.4.37 (M59). The two `offline` keys
+  // are now measured rows and must NOT read as absent; the two `replay` keys
+  // STAY null while §F F2 stands, which is the frozen semantics for the absent
+  // column and not a state to be repaired.
+  it("answers the measured row for a recorded key and null only for an absent one", () => {
+    // M59: a measured (0, 0) pair IS a baseline. §5.5's unavailable-with-reason
+    // governs a key §7 records NO PAIR for, never a key whose pair is zero.
+    expect(metric17BaselineFor("ASSAY", "offline")).toEqual({
+      agent_id: "ASSAY",
+      llm_mode: "offline",
+      mean_bps: 0,
+      stddev_bps: 0,
+    });
+    expect(metric17BaselineFor("A2-NOABSTAIN", "offline")).not.toBeNull();
+    expect(metric17BaselineFor("A2-NOABSTAIN", "offline")?.mean_bps).toBe(0);
+    // §F F2's deferred column is genuinely absent and still reads UNAVAILABLE.
     expect(metric17BaselineFor("ASSAY", "replay")).toBeNull();
-    expect(metric17BaselineFor("A2-NOABSTAIN", "offline")).toBeNull();
     expect(metric17BaselineFor("B0-IDONLY", "replay")).toBeNull();
+    expect(metric17BaselineFor("B2-LLM-DIRECT", "offline")).toBeNull();
+    expect(metric17BaselineFor("B2-LLM-DIRECT", "replay")).toBeNull();
   });
 
   it("keys per (agent_id, llm_mode) — never pooled, and never keyed by seed", () => {
@@ -627,20 +646,60 @@ describe("8. M58 — the rounded pair is the ONLY baseline representation", () =
     expect(Object.keys(row).sort()).toEqual(["agent_id", "llm_mode", "mean_bps", "stddev_bps"]);
   });
 
-  // @STEP-0-TRANSITION — the whole case is the pre-step-0 state. Becomes the
-  // populated-transcription assertion: five rows, offline
-  // only, every figure an integer bps, and the replay keys still null.
-  it("keeps METRIC_17_BASELINE empty and unfilled at this pre-step-0 checkpoint", () => {
-    // M58: "intentionally empty ([]) before step 0", "nothing may be guessed,
-    // prefilled or populated before step 0". §9 step 0 has not been taken.
-    expect(METRIC_17_BASELINE).toEqual([]);
-    expect(METRIC_17_BASELINE).toHaveLength(0);
+  // @STEP-0-TRANSITION — APPLIED at spec 1.4.37 (M59). The whole case was the
+  // pre-step-0 state and is now the populated-transcription assertion: five
+  // rows, offline only, every figure an integer bps, and the replay keys still
+  // null.
+  it("holds §9 step 0's transcription — five offline rows, integer bps, replay absent", () => {
+    // M58: "intentionally empty ([]) before step 0"; M59: step 0 has been taken
+    // and the exact measured rows are transcribed, nothing guessed or prefilled.
+    expect(METRIC_17_BASELINE).toHaveLength(5);
     expect(Object.isFrozen(METRIC_17_BASELINE)).toBe(true);
-    for (const agent of ["ASSAY", "A1-NOVALIDATE", "A2-NOABSTAIN", "B0-IDONLY"] as const) {
-      for (const mode of ["offline", "replay"] as const) {
-        expect(metric17BaselineFor(agent, mode)).toBeNull();
-      }
+    for (const row of METRIC_17_BASELINE) {
+      expect(row.llm_mode).toBe("offline");
+      expect(Number.isInteger(row.mean_bps)).toBe(true);
+      expect(Number.isInteger(row.stddev_bps)).toBe(true);
+      expect(Object.keys(row).sort()).toEqual([
+        "agent_id",
+        "llm_mode",
+        "mean_bps",
+        "stddev_bps",
+      ]);
     }
+    // Exactly the five §9 step 0 runs, each once — no replay row, no B2 row.
+    expect(METRIC_17_BASELINE.map((r) => r.agent_id)).toEqual([
+      "ASSAY",
+      "B0-IDONLY",
+      "A1-NOVALIDATE",
+      "A2-NOABSTAIN",
+      "A3-NOLLM",
+    ]);
+    for (const agent of ["ASSAY", "A1-NOVALIDATE", "A2-NOABSTAIN", "B0-IDONLY"] as const) {
+      expect(metric17BaselineFor(agent, "offline")).not.toBeNull();
+      expect(metric17BaselineFor(agent, "replay")).toBeNull();
+    }
+  });
+
+  // The other half of M59's ratification: a measured (0, 0) row drives the
+  // UNCHANGED detector, and the bar it makes is `rate > 0`.
+  it("M59 — a measured (0, 0) row is a baseline and makes the bar rate > 0", () => {
+    const row = metric17BaselineFor("ASSAY", "offline");
+    expect(row).not.toBeNull();
+    const bar =
+      (row?.mean_bps ?? NaN) / BPS_DENOMINATOR +
+      K_SIGMA * ((row?.stddev_bps ?? NaN) / BPS_DENOMINATOR);
+    expect(bar).toBe(0);
+    // The flag is COMPUTED, never null — §5.5's UNAVAILABLE is not engaged.
+    const quiet = metric17(runWith([["RECONCILED", 1_000_000]]), row);
+    expect(quiet.abstention_spike_flag).toBe(false);
+    expect(quiet.baseline_mean_bps).toBe(0);
+    expect(quiet.baseline_stddev_bps).toBe(0);
+    expect(quiet.k_sigma).toBe(3);
+    // Any positive abstained recon_line value fires; the comparison is strict.
+    const oneP = metric17(runWith([["ABSTAINED", 1], ["RECONCILED", 999_999]]), row);
+    expect(oneP.abstention_spike_flag).toBe(true);
+    // An ABSENT key still reads UNAVAILABLE rather than false.
+    expect(metric17(runWith([["ABSTAINED", 1]]), null).abstention_spike_flag).toBeNull();
   });
 });
 

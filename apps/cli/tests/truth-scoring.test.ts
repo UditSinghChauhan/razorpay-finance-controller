@@ -22,6 +22,7 @@ import {
   METRIC_7_ECE_EMPTY_POPULATION,
   NO_RISK_AXIS,
   TRUTH_SCORED_SPLITS,
+  V28_BASELINE_COMPOSITION,
   balanceHarmOf,
   dispatch,
   isTruthScoredSplit,
@@ -1255,17 +1256,25 @@ describe("the whole command files the truth side into M48's one artifact", () =>
     // AL5 is an emission rule: no ground-truth or label row, field or path may
     // appear in the artifact or on stdout.
     //
-    // @STEP-0-TRANSITION — the "F10" token below is the one that moves. Once
-    // PREREGISTRATION.md §9 step 0 records a baseline for
-    // (ASSAY, offline), this TEST unit carries a flag, and a flag carries §10
+    // @STEP-0-TRANSITION — APPLIED at spec 1.4.37 (M59). The "F10" token is the
+    // one that moved. PREREGISTRATION.md §9 step 0 now records a baseline for
+    // (ASSAY, offline), so this TEST unit carries a flag, and a flag carries §10
     // V28's disclosure, whose frozen text names "F10 at TEST seeds 9100-9104".
     // That is a PUBLISHED §10 sentence, not a GroundTruth field reaching the
     // artifact: V28 is a constant in artifacts/metrics.ts and no dataset value
-    // enters through it. The scan must then exclude the known frozen
-    // disclosures -- V28_BASELINE_COMPOSITION -- before searching for tokens,
+    // enters through it. The scan therefore EXCLUDES the known frozen
+    // disclosure -- V28_BASELINE_COMPOSITION -- before searching for tokens,
     // rather than dropping "F10" from the token list, which would retire a real
-    // leak check. Nothing else in this case changes.
-    const artifact = sealed.sink.files.get(path) ?? "";
+    // leak check: "F10" arriving from anywhere else still fails. Nothing else in
+    // this case changes.
+    const withoutDisclosure = (text: string): string =>
+      text.split(V28_BASELINE_COMPOSITION).join("");
+    const artifact = withoutDisclosure(sealed.sink.files.get(path) ?? "");
+    const streams = withoutDisclosure(`${sealed.out}\n${sealed.err}`);
+    // The exclusion is narrow: the disclosure was actually present, and removing
+    // it is what this scan is permitted to do — not widening the token list.
+    expect(V28_BASELINE_COMPOSITION).toContain("F10");
+    expect(sealed.sink.files.get(path) ?? "").toContain("F10");
     for (const token of [
       "gt_version", "family_id", "true_journal", "true_balances", "degradations",
       "allocations", "source_entity_id", "dr_paise", "cr_paise",
@@ -1273,7 +1282,7 @@ describe("the whole command files the truth side into M48's one artifact", () =>
       "1.1.0", "F10", "ground_truth.jsonl", "oracle_labels.jsonl",
     ]) {
       expect(artifact, `artifact carries ${token}`).not.toContain(token);
-      expect(`${sealed.out}\n${sealed.err}`, `stdout carries ${token}`).not.toContain(token);
+      expect(streams, `stdout carries ${token}`).not.toContain(token);
     }
     // Exactly one artifact per scored unit; no label file is rewritten.
     expect([...sealed.sink.files.keys()]).toStrictEqual([path]);
