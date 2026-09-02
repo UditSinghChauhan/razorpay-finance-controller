@@ -1,0 +1,33 @@
+{
+  "benchmark_version": "1.0.13",
+  "created_at": 1788370216,
+  "generator_commit": "2e93efedd44663c19d95caf0e7b74b9a86e2914d",
+  "spec_commit": "2e93efedd44663c19d95caf0e7b74b9a86e2914d",
+  "families": [
+    "F01",
+    "F02",
+    "F03",
+    "F04",
+    "F05",
+    "F06"
+  ],
+  "seeds": [
+    9004
+  ],
+  "record_counts": {
+    "F01": 2621,
+    "F02": 2621,
+    "F03": 2621,
+    "F04": 2624,
+    "F05": 2618,
+    "F06": 2621
+  },
+  "observations_sha256": "23d6ff28361c49b9b39ffd0550a71d26bd9a779e082ecde70a3bbac8b6ac5e90",
+  "ground_truth_sha256": "58f066a03e8ad773671389d8819c6c5b9872f7f1f22f91e96ca30145b65cf29d",
+  "oracle_labels_sha256": "1b518fea9be6986e0ba0390787c5ac02847024a6ee0f06b04978985944a87a14",
+  "recon_report_sha256": "d3a3828ae62d286e1b263a76ec43c91c6633eba287619935f0f9411301d5e648",
+  "constraint_set_hash": "f0c93b5f6a5ffd583c6619a8eaf4d44099718fdf39b28bf61588a887a02f0c1b",
+  "sealed_at": 1788370209,
+  "seal_signature": "bench-v1.0.13",
+  "burns": []
+}

@@ -1,0 +1,66 @@
+{
+  "spec_version": "1.4.37",
+  "split": "test",
+  "seed": 9001,
+  "passed": true,
+  "completeness": {
+    "passed": true,
+    "targets_total": 186,
+    "targets_in_scope": 183,
+    "scoped_out_inexpressible": 3,
+    "scoped_out_budget_exhausted": 0,
+    "failure_count": 0,
+    "by_family": [
+      {
+        "family": "F01",
+        "targets_total": 31,
+        "targets_in_scope": 31,
+        "scoped_out_inexpressible": 0,
+        "scoped_out_budget_exhausted": 0,
+        "failures": 0
+      },
+      {
+        "family": "F02",
+        "targets_total": 31,
+        "targets_in_scope": 31,
+        "scoped_out_inexpressible": 0,
+        "scoped_out_budget_exhausted": 0,
+        "failures": 0
+      },
+      {
+        "family": "F03",
+        "targets_total": 31,
+        "targets_in_scope": 31,
+        "scoped_out_inexpressible": 0,
+        "scoped_out_budget_exhausted": 0,
+        "failures": 0
+      },
+      {
+        "family": "F04",
+        "targets_total": 31,
+        "targets_in_scope": 31,
+        "scoped_out_inexpressible": 0,
+        "scoped_out_budget_exhausted": 0,
+        "failures": 0
+      },
+      {
+        "family": "F05",
+        "targets_total": 31,
+        "targets_in_scope": 28,
+        "scoped_out_inexpressible": 3,
+        "scoped_out_budget_exhausted": 0,
+        "failures": 0
+      },
+      {
+        "family": "F06",
+        "targets_total": 31,
+        "targets_in_scope": 31,
+        "scoped_out_inexpressible": 0,
+        "scoped_out_budget_exhausted": 0,
+        "failures": 0
+      }
+    ],
+    "excluded_by": []
+  },
+  "consistency": null
+}
