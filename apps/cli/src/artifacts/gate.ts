@@ -163,7 +163,26 @@ function asObject(value: unknown, what: string): Record<string, unknown> {
 }
 
 /**
- * `GroundTruth.allocations`, joined onto the oracle's `obs_id` space.
+ * `GroundTruth.allocations`, joined onto the oracle's target and member id spaces.
+ *
+ * **The two halves of this join sit in DIFFERENT id spaces, and the asymmetry is
+ * the frozen contract rather than an accident of this function.**
+ * `DATA_MODEL.md §11` declares `Candidate.target_id: string` — *"what is being
+ * explained (settlement / bank line)"* — beside `member_obs_ids:
+ * ObservationId[]`, and types only the second as an observation id.
+ * `RECONCILIATION_SPEC.md §6`'s allocation identity is a set of `(target_id,
+ * member_obs_id)` pairs on that same asymmetry, and `DATA_MODEL.md §17.1.1`
+ * attributes a target's Suspense postings to `setl_…`/`bnk_…`.
+ * `packages/oracle` emits exactly that: `enumerate.ts` keys every
+ * `OracleTargetResult` by `TargetContribution.id`, which `universe.ts` reads
+ * from `Settlement.id`, while `OracleSolution.member_obs_ids` carries `obs_id`s.
+ *
+ * So the **target** is keyed by its settlement **entity** id and each **member**
+ * by the `obs_id` of the observation carrying it. `completenessGate` looks the
+ * target up by that key alone, so a truth side keyed instead on the settlement
+ * observation's own `obs_id` shares **no** member with the oracle's key set and
+ * reports every target `TARGET_NOT_ENUMERATED` — a total failure carrying an
+ * empty `excluded_by`, while no constraint has excluded anything.
  *
  * One `TrueAllocation` per settlement named in ground truth. `expressible` is
  * `§5.3`'s: every member of the true allocation has a member-eligible
@@ -180,9 +199,13 @@ export function trueAllocations(
   truth: readonly TruthRow[],
   observations: readonly Observation[],
 ): readonly TrueAllocation[] {
-  const targetObsId = new Map<string, string>();
+  // Presence is recorded and the id is NOT rewritten. §4.1 emits one settlement
+  // observation per settlement, so a missing one is the dataset defect the throw
+  // below names; that observation's own obs_id identifies the settlement ROW and
+  // is not the target key, which is the settlement entity id ground truth names.
+  const settlementObserved = new Set<string>();
   for (const observation of observations) {
-    if (observation.kind === "settlement") targetObsId.set(observation.payload.id, observation.obs_id);
+    if (observation.kind === "settlement") settlementObserved.add(observation.payload.id);
   }
 
   const memberObsId = new Map<string, string>();
@@ -203,8 +226,7 @@ export function trueAllocations(
     }
 
     for (const [settlementId, entityIds] of bySettlement) {
-      const targetId = targetObsId.get(settlementId);
-      if (targetId === undefined) {
+      if (!settlementObserved.has(settlementId)) {
         throw new Error(
           `oracle gate: ground truth names settlement ${settlementId}, which has no settlement ` +
             `observation in the dataset. PREREGISTRATION.md §4.1 emits one observation per ` +
@@ -214,7 +236,7 @@ export function trueAllocations(
       const memberIds = entityIds.map((entityId) => memberObsId.get(entityId));
       out.push(
         Object.freeze({
-          target_id: targetId,
+          target_id: settlementId,
           member_obs_ids: Object.freeze(
             memberIds.filter((obsId): obsId is string => obsId !== undefined),
           ),

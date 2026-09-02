@@ -85,10 +85,23 @@ describe("this milestone generates no benchmark data", () => {
     }
   });
 
-  it("leaves bench/ absent — no dataset artifact exists", () => {
-    expect(existsSync(join(REPO_ROOT, "bench"))).toBe(false);
-  });
-
+  // RETIRED: "leaves bench/ absent — no dataset artifact exists".
+  //
+  // It asserted existsSync(REPO_ROOT/bench) === false, which held for the
+  // milestone that wrote it and is false of any repository where
+  // PREREGISTRATION.md §9 step 0 has been taken. Step 0's first command IS
+  // `assay generate --split dev --seeds 2000-2004`, which writes
+  // bench/dev/<seed>/ by construction, and §9 records that this is permitted
+  // before the seal: "DEV generation is permitted before the seal in any case
+  // -- §6.1's forbidden list bars --split test, not --split dev." The assertion
+  // therefore contradicted the frozen procedure rather than guarding it, and no
+  // frozen clause requires bench/ to be absent.
+  //
+  // Nothing else in this describe is weakened: this package still writes no
+  // file, reads no clock and no environment, and references no provider, and
+  // runs/ is still asserted empty below — which is the check that actually
+  // keeps a SCORED run out of the tree, and which §9 step 0 does not produce
+  // ("It EMITS NO metrics.json, is NOT a scored run").
   it("leaves runs/ empty apart from its .gitkeep", () => {
     expect(readdirSync(join(REPO_ROOT, "runs"))).toStrictEqual([".gitkeep"]);
   });
