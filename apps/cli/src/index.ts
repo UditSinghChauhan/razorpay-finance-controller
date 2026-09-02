@@ -39,7 +39,6 @@ export {
   RESTRICTED_ARTIFACTS,
   assertReadable,
   isRestricted,
-  type GuardPolicy,
   type ReadZone,
 } from "./fs/guard.js";
 export {
@@ -66,7 +65,6 @@ export {
   type ScoredMetrics,
 } from "./artifacts/metrics.js";
 export {
-  AL5_GROUND_TRUTH_WITHHELD,
   EMPTY_INJECTED_POPULATION,
   EXERCISED_SPLIT,
   isExercisedSplit,

@@ -35,9 +35,24 @@ import type { Command, CommandContext } from "./types.js";
  * **Ground truth is read in zone `GENERATOR_TRUST`.** `AL2` bars the engine and
  * the oracle from the artifact; the seal is neither, and `ARCHITECTURE.md §10`
  * places this work *"inside the generator's trust zone, offline, before any
- * agent exists"*. Under `--sealed` the guard withdraws that unlock, so
- * `assay seal --sealed` is refused by `AL5` rather than silently hashing a file
- * the flag exists to keep out of the output.
+ * agent exists"*. `§9` steps 4 and 5 run this command **unsealed** and the path
+ * stays unsealed: the file is hashed here, and `ground_truth_sha256` is the only
+ * thing that leaves.
+ *
+ * **`assay seal --sealed` is refused as a usage error, from spec 1.4.34
+ * (`DATA_MODEL.md §22.2` M56).** Through spec 1.4.33 the refusal came from
+ * `fs/guard.ts`, which withdrew `AL2`'s unlock under the flag. `M56` rules `AL5`
+ * an **emission** rule — *"reading is none of print, log or write"* — so that
+ * read refusal is gone, and `PREREGISTRATION.md §5.3`'s withdrawal is narrowed to
+ * the two readers it was written against, this command and the `§5.3`
+ * completeness gate. For both it is now carried by a **flag refusal**, which
+ * `DECISION_BRIEF.md §A.41` records as stricter: it *"cannot be reached by a gate
+ * call site that happens to open the file"*. The refusal happens before any flag
+ * is read and before any digest is computed, on this command's own standing rule
+ * that a seal which computed five digests and then refused would leave a reader
+ * wondering which half to trust. **Nothing else about the seal moves**: the
+ * digest format, the five hashes, `§9` step 5's checks and `DATA_MODEL.md §18`'s
+ * manifest shape are untouched.
  *
  * **The recon report is read in zone `SEAL`, and that is a different zone on
  * purpose.** `§9` step 4 hashes `recon_report.jsonl` and step 5 makes its
@@ -50,7 +65,8 @@ import type { Command, CommandContext } from "./types.js";
  * the `§5.3` completeness gate as well, and `§5.3` / `§10` V22 require the gate
  * never to hold the report. `AL5` does not withdraw this unlock — it is scoped
  * to ground-truth fields, and `§6.2` gives the report `settlement_id`,
- * `entity_id` and `settled_at` and *"nothing else"*.
+ * `entity_id` and `settled_at` and *"nothing else"* — and from spec 1.4.34
+ * (M56) `AL5` withdraws no read route from anyone at all.
  *
  * **One manifest per `(split, seed)`, ratified at spec 1.4.27 (`DATA_MODEL.md
  * §22.2` M42).** `seeds` was already the singleton `familiesFor(seed)` implies
@@ -97,6 +113,28 @@ export class SealGateFailure extends CliError {
   }
 }
 
+/**
+ * `§5.3`'s withdrawal for the seal, carried as a flag refusal — spec 1.4.34, `M56`.
+ *
+ * A **usage** error rather than a guard trip: nothing was read, so the failure is
+ * a malformed command line and `EXIT.USAGE` is what tells a harness that from a
+ * breach `AL7` would burn a seed for. `§9` steps 4 and 5 invoke this command
+ * without the flag, so the official procedure is unchanged.
+ */
+function refuseSealed(context: CommandContext): void {
+  if (!context.config.sealed) return;
+  throw new UsageError(
+    `assay seal takes no --sealed. PREREGISTRATION.md §5.3 withdraws ground truth from the ` +
+      `§9 seal under that flag, and from spec 1.4.34 (DATA_MODEL.md §22.2 M56) the withdrawal ` +
+      `is carried by this refusal rather than by fs/guard.ts: AL5 is an EMISSION rule — "the ` +
+      `CLI's --sealed flag refuses to print, log or write any ground-truth field" — so a read ` +
+      `refusal would have made §9 step 7's scored sweep inexecutable, while a flag refusal ` +
+      `cannot be reached by a call site that happens to open the file (DECISION_BRIEF.md ` +
+      `§A.41). §9 steps 4 and 5 invoke this command without the flag; the seal still hashes ` +
+      `ground_truth.jsonl and emits only its digest.`,
+  );
+}
+
 function readUnixSeconds(raw: string, flag: string): number {
   const value = Number(raw);
   if (!Number.isSafeInteger(value) || value <= 0) {
@@ -106,6 +144,9 @@ function readUnixSeconds(raw: string, flag: string): number {
 }
 
 async function run(context: CommandContext): Promise<void> {
+  // Before any flag is read, any path is formed or any digest is computed.
+  refuseSealed(context);
+
   const seedRaw = requireFlag(context.args, "seed");
   const seed = Number(seedRaw);
   if (!Number.isInteger(seed) || seed <= 0) {
@@ -127,14 +168,12 @@ async function run(context: CommandContext): Promise<void> {
   // Null is untouched -- `§9` step 5 admits an unsealed manifest and says so.
   if (signature !== null) checkSealTag(signature, "seal-signature");
 
-  const policy = { sealed: context.config.sealed };
-
   // Before anything is hashed: a seal that computed five digests and then
   // refused would leave a reader wondering which half to trust.
   const gatePath = requireFlag(context.args, "oracle-gate");
   let gate: unknown;
   try {
-    gate = JSON.parse(readText({ path: gatePath, zone: "GENERATOR_TRUST", policy }));
+    gate = JSON.parse(readText({ path: gatePath, zone: "GENERATOR_TRUST" }));
   } catch (cause) {
     throw new SealGateFailure(
       `cannot read the §5.3 gate artifact at ${JSON.stringify(gatePath)}: ` +
@@ -158,18 +197,12 @@ async function run(context: CommandContext): Promise<void> {
     spec_commit: requireFlag(context.args, "spec-commit"),
     families: familiesFor(seed),
     seeds: [seed],
-    observations_sha256: sha256Text(
-      readText({ path: observationsPath, zone: "AGENT", policy }),
-    ),
+    observations_sha256: sha256Text(readText({ path: observationsPath, zone: "AGENT" })),
     ground_truth_sha256: sha256Text(
-      readText({ path: groundTruthPath, zone: "GENERATOR_TRUST", policy }),
+      readText({ path: groundTruthPath, zone: "GENERATOR_TRUST" }),
     ),
-    oracle_labels_sha256: sha256Text(
-      readText({ path: oracleLabelsPath, zone: "AGENT", policy }),
-    ),
-    recon_report_sha256: sha256Text(
-      readText({ path: reconReportPath, zone: "SEAL", policy }),
-    ),
+    oracle_labels_sha256: sha256Text(readText({ path: oracleLabelsPath, zone: "AGENT" })),
+    recon_report_sha256: sha256Text(readText({ path: reconReportPath, zone: "SEAL" })),
     constraint_set_hash: sha256Text(canonicalConstraintSet()),
     sealed_at: sealedAtFlag === null ? null : readUnixSeconds(sealedAtFlag, "sealed-at"),
     seal_signature: signature,

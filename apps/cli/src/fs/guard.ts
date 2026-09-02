@@ -37,7 +37,10 @@ import { CliError, EXIT } from "../errors.js";
  * ```
  *   ground_truth*.jsonl   the completeness gate, which ARCHITECTURE.md §10 runs
  *                         "inside the generator's trust zone, offline, before
- *                         any agent exists" — and the seal, in that same zone
+ *                         any agent exists"; the seal, in that same zone; and,
+ *                         from spec 1.4.34 (M56), the scorer, which
+ *                         EVALUATION_SPEC.md §2 has always defined as consuming
+ *                         ground truth and which §9 step 7 runs under --sealed
  *   recon_report*.jsonl   the §6.2 probe, and AL8 says "ONLY through the probe
  *                         executor, under P_max"; and, from spec 1.4.24 (M38),
  *                         the offline seal, which §9 step 4 requires to hash it
@@ -52,17 +55,43 @@ import { CliError, EXIT } from "../errors.js";
  */
 
 /**
- * `AL5`: *"The CLI's `--sealed` flag refuses to print, log or write any
- * ground-truth field; only aggregate metrics are emitted."*
+ * **`AL5` is not enforced in this file, and from spec 1.4.34 it never was one of
+ * this file's rules.**
  *
- * Modelled as a property of the guard rather than of the printer, because a
- * field cannot be printed if it was never read. Under `sealed`, the
- * `GENERATOR_TRUST` unlock for ground truth is withdrawn and **no** zone may
- * read it.
+ * `AL5`: *"The CLI's `--sealed` flag refuses to print, log or write any
+ * ground-truth field; only aggregate metrics are emitted."* Through spec 1.4.33
+ * the guard modelled that as a **read** refusal — a `GuardPolicy { sealed }`
+ * threaded to every call site, withdrawing `GENERATOR_TRUST`'s `AL2` unlock —
+ * on the reasoning that a field cannot be printed if it was never read.
+ *
+ * `DATA_MODEL.md §22.2` **M56** (spec 1.4.34, `DECISION_BRIEF.md §A.41`) rules
+ * that `AL5` is an **EMISSION** rule: *"reading is none of print, log or
+ * write"*. `EVALUATION_SPEC.md §2` defines a scored unit as `score(agent output,
+ * ground truth, oracle labels)` and `PREREGISTRATION.md §9` step 7 —
+ * `assay bench --sealed` — is the only run that ever scores TEST, so the read
+ * withdrawal made this procedure's own step inexecutable. The withdrawal was
+ * written against the **two** readers `GENERATOR_TRUST` held when it landed at
+ * spec 1.4.27 (`M43`) — the `§5.3` completeness gate and the `§9` seal, **neither
+ * of which `§9` ever runs sealed** — and a third reader, the scorer, arrived at
+ * spec 1.4.33.
+ *
+ * **Where the withdrawal lives now, and why it is stricter.** `commands/oracle.ts`
+ * and `commands/seal.ts` refuse `--sealed` outright as a **usage** error. A flag
+ * refusal cannot be reached by a gate call site that happens to open the file,
+ * which is the property `DECISION_BRIEF.md §A.31` demanded when it rejected
+ * resting a guarantee *"on the fact that no gate call site happens to use it
+ * today"*.
+ *
+ * **What did not change.** `AL1`, `AL2`, `AL3`, `AL4`, `AL6`, `AL7` and `AL8` are
+ * untouched in substance and in wording, and the table below is unchanged: no
+ * agent, engine or oracle may read ground truth, sealed or not, and **no fifth
+ * `ReadZone` was added** — `§A.41` rejected one and preserved the rejection,
+ * because `AL2` already names its constrained parties by package. The scorer
+ * reads in `GENERATOR_TRUST`, `AL2`'s standing route.
+ *
+ * `PREREGISTRATION.md §10` **V31** discloses the residual: the guarantee now
+ * rests on an emission boundary rather than on a read refusal.
  */
-export interface GuardPolicy {
-  readonly sealed: boolean;
-}
 
 /**
  * Who the bytes are being read for.
@@ -91,9 +120,12 @@ export type ReadZone =
   | "PROBE_DISPATCH"
   /**
    * `ARCHITECTURE.md §10`'s *"generator's trust zone, offline, before any agent
-   * exists"* — the completeness gate and the seal's artifact hashing. Ground
-   * truth is unlocked unless `--sealed`; the recon report is not, and spec
-   * 1.4.24 kept it that way on purpose — see `SEAL` below.
+   * exists"* — the completeness gate, the seal's artifact hashing and, from spec
+   * 1.4.34 (`M56`), the scorer. Ground truth is unlocked, unconditionally: `AL5`
+   * is an emission rule and withdraws no route (see above), so `§9` step 7's
+   * `assay bench --sealed` reads the answer key here and emits aggregates only.
+   * The recon report is **not** unlocked, and spec 1.4.24 kept it that way on
+   * purpose — see `SEAL` below.
    */
   | "GENERATOR_TRUST"
   /**
@@ -109,10 +141,11 @@ export type ReadZone =
    * carries no `constituent_entity_id` into any decision."*
    *
    * **Ground truth is not unlocked here.** The seal reads it in
-   * `GENERATOR_TRUST`, the route `AL2` has permitted since `apps/cli` landed,
-   * and `AL5` withdraws that route under `--sealed`. This zone carries `AL8`'s
-   * new permission and only that one, so a caller cannot reach ground truth by
-   * declaring itself the seal.
+   * `GENERATOR_TRUST`, the route `AL2` has permitted since `apps/cli` landed.
+   * This zone carries `AL8`'s new permission and only that one, so a caller
+   * cannot reach ground truth by declaring itself the seal. `assay seal` never
+   * runs sealed at all: from spec 1.4.34 (`M56`) it refuses `--sealed` as a
+   * usage error, which is where `AL5`'s withdrawal for that reader now lives.
    */
   | "SEAL";
 
@@ -221,28 +254,19 @@ function zonesOf(zones: readonly ReadZone[]): string {
  * value rather than only throwing would let a caller ignore the answer, so this
  * returns `void` and the refusal is the throw.
  *
+ * The decision is a function of `(path, zone)` and of nothing else. It took a
+ * third argument through spec 1.4.33 — `GuardPolicy { sealed }` — and `M56`
+ * removed it rather than leaving an ignored parameter behind: `AL5` governs
+ * emission, so a flag about what leaves the process has no bearing on which
+ * zone may open which artifact.
+ *
  * @throws PathGuardError when `AL2` or `AL8` bars the pair.
  */
-export function assertReadable(
-  path: string,
-  zone: ReadZone,
-  policy: GuardPolicy = { sealed: false },
-): void {
+export function assertReadable(path: string, zone: ReadZone): void {
   const segment = segmentOf(path);
 
   for (const artifact of RESTRICTED_ARTIFACTS) {
     if (!artifact.match.test(segment)) continue;
-
-    if (policy.sealed && artifact.rule === "AL2") {
-      throw new PathGuardError(
-        "AL5",
-        zone,
-        path,
-        "--sealed refuses to print, log or write any ground-truth field; a " +
-          "field that was never read cannot be printed. Only aggregate metrics " +
-          "are emitted under this flag.",
-      );
-    }
 
     if (artifact.unlockedFor.includes(zone)) return;
 

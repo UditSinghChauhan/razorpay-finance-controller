@@ -1,6 +1,5 @@
 import { ObservationSchema, type Observation } from "@assay/domain";
 
-import type { GuardPolicy } from "../fs/guard.js";
 import { decodeJsonl } from "./jsonl.js";
 
 /**
@@ -24,14 +23,6 @@ import { decodeJsonl } from "./jsonl.js";
  */
 
 /** Read an `observations.jsonl` artifact into `packages/domain`'s `Observation`. */
-export function loadObservations(
-  path: string,
-  policy?: GuardPolicy,
-): readonly Observation[] {
-  return decodeJsonl(
-    policy === undefined
-      ? { path, zone: "AGENT" }
-      : { path, zone: "AGENT", policy },
-    ObservationSchema,
-  );
+export function loadObservations(path: string): readonly Observation[] {
+  return decodeJsonl({ path, zone: "AGENT" }, ObservationSchema);
 }

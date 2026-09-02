@@ -42,6 +42,27 @@ import { V30_NON_ADDITIVITY, type RobustnessMetrics } from "../artifacts/metrics
  * *"not exercised on DEV"* elsewhere. {@link scoreRobustness} therefore takes a
  * {@link RobustnessSource} that either carries a dataset or names the reason
  * there is none, and never computes a rate from an absent one.
+ *
+ * **`--sealed` is not one of those reasons, from spec 1.4.34 (`DATA_MODEL.md
+ * §22.2` M56).** Through spec 1.4.33 this module also exported
+ * `AL5_GROUND_TRUTH_WITHHELD`, the state a sealed run filed because `fs/guard.ts`
+ * withdrew `AL2`'s ground-truth unlock under the flag. `M56` rules `AL5` an
+ * **emission** rule — *"reading is none of print, log or write"* — so the scorer
+ * reads the answer key on `§9` step 7's sealed sweep, which
+ * `EVALUATION_SPEC.md §2` has always defined as `score(agent output, ground
+ * truth, oracle labels)`. The reason and its branch are **gone**, not made
+ * conditional: `DECISION_BRIEF.md §A.41` rejects a second scoring pass and
+ * rejects a `0.0` standing in for an unread population, so there is exactly one
+ * path through this function and {@link EMPTY_INJECTED_POPULATION} stays what it
+ * always was — a statement about the **dataset**, distinct from the withheld
+ * state it now outlives.
+ *
+ * **What this module still never does is emit.** `AL5`'s guarantee is now an
+ * emission boundary (`PREREGISTRATION.md §10` **V31**), and this is the last
+ * place a `GroundTruth` exists: it enters {@link scoreRobustness} inside a
+ * {@link RobustnessSource}, is converted by `packages/eval`'s projections before
+ * any metric module sees it, and what leaves is `RobustnessMetrics` — booleans,
+ * counts, rates and two fixed strings. Nothing here prints, logs or writes.
  */
 
 /** The one `PREREGISTRATION.md §6.1` split M52 scopes metrics 15 and 16 to. */
@@ -53,23 +74,18 @@ export function isExercisedSplit(split: Split): boolean {
 }
 
 /**
- * `AL5`'s standing refusal, as the artifact records it.
+ * M52's own disposition where the injected set came back empty.
  *
- * `PREREGISTRATION.md §9` step 7 runs the scored sweep `assay bench --sealed`,
- * and `AL5` withdraws `GENERATOR_TRUST`'s ground-truth unlock under that flag —
- * *"a field that was never read cannot be printed"*. The two together mean a
- * **sealed** run reads no answer key, so metrics 15 and 16 have no populations
- * to be taken over. That is recorded in the artifact in words rather than
- * resolved here: reading ground truth under `--sealed` would be a change to
- * `fs/guard.ts`'s own table, and reporting a `0.0` would be the number `§5.5`
- * forbids.
+ * **The one remaining reason a TEST unit reports no rate, and it is a
+ * measurement.** Through spec 1.4.33 there was a second — `AL5_GROUND_TRUTH_WITHHELD`,
+ * a standing refusal filed whenever `§9` step 7's `--sealed` was present, so a
+ * sealed TEST unit and a TEST seed carrying no `F10` record were both *"not
+ * exercised"* for reasons a reader had to tell apart from prose. `M56` removed
+ * the first (see the note above): the populations are now read on every TEST
+ * unit, and this constant states the only thing that can still empty them —
+ * that **this dataset** holds no injecting degradation. The counts behind it are
+ * real, `report` is non-`null`, and the rates are `null` rather than `0`.
  */
-export const AL5_GROUND_TRUTH_WITHHELD =
-  "not exercised: PREREGISTRATION.md §6.2 AL5 withdraws the GENERATOR_TRUST unlock for " +
-  "ground_truth*.jsonl under --sealed, so M52's injected and control populations were never " +
-  "read. Metrics 15 and 16 are undefined here rather than zero.";
-
-/** M52's own disposition where the injected set came back empty. */
 export const EMPTY_INJECTED_POPULATION =
   "not exercised: M52's injected population is empty on this (split, seed) dataset — no " +
   "INJECT_NOTES or CONFLICT_REFERENCE degradation record names an observation in it. " +

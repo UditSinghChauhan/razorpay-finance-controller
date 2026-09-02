@@ -719,7 +719,12 @@ interface Outcome {
   readonly sink: MemorySink;
 }
 
-async function bench(root: string, seed: number, agents: string): Promise<Outcome> {
+async function bench(
+  root: string,
+  seed: number,
+  agents: string,
+  extra: readonly string[] = [],
+): Promise<Outcome> {
   const out = recorder();
   const err = recorder();
   const sink = memorySink();
@@ -727,6 +732,7 @@ async function bench(root: string, seed: number, agents: string): Promise<Outcom
     argv: [
       "bench", "--split", EXERCISED_SPLIT, "--seeds", String(seed), "--agents", agents,
       "--run-id", "m55", "--bench", root, "--llm", "offline",
+      ...extra,
     ],
     env: {},
     out: out.write,
@@ -937,5 +943,304 @@ describe("10. apps/cli holds no second population, covered-set or harm projectio
     const bench = sources.find((s) => s.rel === "commands/bench.ts");
     expect(bench?.body).toMatch(/scoreRobustness\(run, robustnessSource\)/);
     expect(bench?.body).not.toMatch(/injected|control_cases|by_kind/);
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// 11 — M56: AL5 is an EMISSION rule (spec 1.4.34, DATA_MODEL.md §22.2)
+// ---------------------------------------------------------------------------
+
+/**
+ * `PREREGISTRATION.md §9` step 7's own command, and what it may emit.
+ *
+ * ```
+ *   assay bench --sealed --agents all --seeds all
+ * ```
+ *
+ * **M56's three states, as tests.** `DECISION_BRIEF.md §A.41`:
+ *
+ * ```
+ *   A  AGENT EXECUTION under --sealed   UNCHANGED -- guard.test.ts holds AL2
+ *   B  TRUTH/EVALUATION COMPUTATION     the scorer MAY read ground_truth.jsonl
+ *   C  THE EMITTED SCORED ARTIFACT      AGGREGATES ONLY, no GroundTruth field
+ * ```
+ *
+ * State **C** is the whole of what `--sealed` still means, and it is asserted
+ * **structurally** rather than by a substring sweep alone: the artifact's own
+ * key set is checked against `DATA_MODEL.md §1`'s `GroundTruth` field names, its
+ * string leaves are checked against the closed set of strings a scored unit is
+ * allowed to carry, and two runs whose answer keys differ in every field the
+ * scorer does not project are required to produce **byte-identical** bytes.
+ *
+ * **No benchmark data is produced.** As above: hand-written observations and a
+ * hand-written answer key in a temporary directory, a memory sink, and no
+ * `bench/` or `runs/` path is touched.
+ */
+
+/** `DATA_MODEL.md §1`'s `GroundTruth`, field for field. None may be emitted. */
+const GROUND_TRUTH_FIELDS: readonly string[] = [
+  "gt_version",
+  "family_id",
+  "allocations",
+  "bank_mappings",
+  "ledger_mappings",
+  "true_journal",
+  "true_balances",
+  "degradations",
+  // The record fields the scorer's decoder dereferences, named so a projection
+  // that carried one through would be caught by name and not only by value.
+  "settlement_id",
+  "entity_id",
+  "entity_type",
+  "gross_paise",
+  "fee_paise",
+  "tax_paise",
+  "net_paise",
+  "bank_line_id",
+  "settlement_ids",
+  "ledger_entry_id",
+  "source_entity_id",
+  "dr_paise",
+  "cr_paise",
+  "target_id",
+  "op",
+];
+
+function keysOf(value: unknown, into: Set<string> = new Set()): Set<string> {
+  if (Array.isArray(value)) {
+    for (const item of value) keysOf(item, into);
+  } else if (typeof value === "object" && value !== null) {
+    for (const [key, item] of Object.entries(value)) {
+      into.add(key);
+      keysOf(item, into);
+    }
+  }
+  return into;
+}
+
+function stringLeaves(value: unknown, into: Set<string> = new Set()): Set<string> {
+  if (typeof value === "string") into.add(value);
+  else if (Array.isArray(value)) for (const item of value) stringLeaves(item, into);
+  else if (typeof value === "object" && value !== null) {
+    for (const item of Object.values(value)) stringLeaves(item, into);
+  }
+  return into;
+}
+
+describe("11. M56 — a sealed TEST run reads the answer key and emits aggregates only", () => {
+  it("E — loads ground_truth.jsonl on a TEST scored unit under --sealed", async () => {
+    // The load-bearing assertion. Through spec 1.4.33 this invocation filed
+    // AL5_GROUND_TRUTH_WITHHELD and computed nothing; EVALUATION_SPEC.md §2 has
+    // always defined a scored unit as score(agent output, ground truth, oracle
+    // labels), and §9 step 7 is the only run that ever scores TEST.
+    const root = tempDir();
+    writeDataset(root, 9100, INJECTED);
+    const result = await bench(root, 9100, "A3-NOLLM", ["--sealed"]);
+    expect(result.err, result.err).toBe("");
+    expect(result.code).toBe(0);
+
+    const written = readMetrics(result, "A3-NOLLM", 9100);
+    expect(written.base.robustness.exercised).toBe(true);
+    expect(written.base.robustness.not_exercised).toBeNull();
+    expect(written.base.robustness.report?.injected_cases).toBe(2);
+    expect(written.base.robustness.report?.control_cases).toBe(1);
+  });
+
+  it("produces the SAME artifact sealed and unsealed — the flag is not a metric input", async () => {
+    // M56 rejects a second scoring pass and an unsealed step 7b: there is one
+    // path through the scorer, so the flag can change nothing it computes.
+    const root = tempDir();
+    writeDataset(root, 9100, INJECTED);
+    const sealed = await bench(root, 9100, "ASSAY", ["--sealed"]);
+    const open = await bench(root, 9100, "ASSAY");
+    const path = ["runs", "m55", EXERCISED_SPLIT, "9100", "ASSAY", "offline", "metrics.json"]
+      .join("/");
+    expect(sealed.sink.files.get(path)).toBe(open.sink.files.get(path));
+  });
+
+  it("G — emits no GroundTruth field name anywhere in the artifact", async () => {
+    const root = tempDir();
+    writeDataset(root, 9100, INJECTED);
+    const result = await bench(root, 9100, "A3-NOLLM", ["--sealed"]);
+    const written = readMetrics(result, "A3-NOLLM", 9100);
+
+    const emitted = keysOf(written);
+    for (const field of GROUND_TRUTH_FIELDS) {
+      expect(emitted.has(field), `metrics.json carries a GroundTruth field: ${field}`).toBe(false);
+    }
+    // ...and the top level is still M51's three keys and nothing more.
+    expect(Object.keys(written).sort()).toStrictEqual(["base", "key", "sweeps"]);
+  });
+
+  it("G — every string the artifact carries is one a scored unit is allowed to carry", async () => {
+    // The complement of the key check: a truth value could reach the artifact
+    // under an innocuous key. A scored unit's strings are a CLOSED set -- M48's
+    // RunKey components, M51's parameter names, and the two fixed dispositions --
+    // so anything else is a leak whatever it is called.
+    const root = tempDir();
+    writeDataset(root, 9100, INJECTED);
+    const result = await bench(root, 9100, "ASSAY", ["--sealed"]);
+    const written = readMetrics(result, "ASSAY", 9100);
+
+    const allowed = new Set<string>([
+      "ASSAY", EXERCISED_SPLIT, "offline",
+      "epsilon_bps", "tau_floor_paise",
+      V30_NON_ADDITIVITY, EMPTY_INJECTED_POPULATION,
+    ]);
+    for (const leaf of stringLeaves(written)) {
+      expect(allowed.has(leaf), `metrics.json carries an unexpected string: ${leaf}`).toBe(true);
+    }
+  });
+
+  it("G — the artifact does not move when the answer key's unprojected fields do", async () => {
+    // Two datasets whose observations, degradations and true journal agree and
+    // whose every OTHER GroundTruth field differs. A byte-identical artifact is
+    // proof that gt_version, family_id and true_balances reach nothing emitted.
+    const a = tempDir();
+    const b = tempDir();
+    writeDataset(a, 9100, INJECTED);
+    mkdirSync(join(join(b, EXERCISED_SPLIT), "9100"), { recursive: true });
+    writeFileSync(
+      join(join(join(b, EXERCISED_SPLIT), "9100"), "observations.jsonl"),
+      `${DATASET.map((o) => JSON.stringify(o)).join("\n")}\n`,
+      "utf8",
+    );
+    writeFileSync(
+      join(join(join(b, EXERCISED_SPLIT), "9100"), "ground_truth.jsonl"),
+      `${JSON.stringify({
+        ...truthRecord({ degradations: INJECTED }),
+        seed: 9100,
+        gt_version: "9.9.9-SENTINEL",
+        family_id: "F01",
+        true_balances: { "1200_BANK": 123_456 },
+      })}\n`,
+      "utf8",
+    );
+
+    const path = ["runs", "m55", EXERCISED_SPLIT, "9100", "A3-NOLLM", "offline", "metrics.json"]
+      .join("/");
+    const fromA = await bench(a, 9100, "A3-NOLLM", ["--sealed"]);
+    const fromB = await bench(b, 9100, "A3-NOLLM", ["--sealed"]);
+    expect(fromB.err, fromB.err).toBe("");
+    expect(fromA.sink.files.get(path)).toBe(fromB.sink.files.get(path));
+    expect(fromB.sink.files.get(path) ?? "").not.toContain("SENTINEL");
+  });
+
+  it("G — logs no GroundTruth row, field or path to stdout or stderr", async () => {
+    const root = tempDir();
+    writeDataset(root, 9100, INJECTED);
+    // Every agent §9 step 7 can run offline; B2-LLM-DIRECT is F2-deferred and
+    // reports its blocker on stderr, which is a fact about the baseline and not
+    // about emission.
+    const result = await bench(root, 9100, "ASSAY,B0-IDONLY,A1-NOVALIDATE,A2-NOABSTAIN,A3-NOLLM", [
+      "--sealed",
+    ]);
+    expect(result.err, result.err).toBe("");
+
+    const printed = `${result.out}\n${result.err}`;
+    for (const token of [
+      "ground_truth", "gt_version", "true_journal", "true_balances", "degradations",
+      "F10", "1.1.0", "1200_BANK", "1100_GATEWAY_RECEIVABLE",
+      ...INJECTED.map((d) => d.op),
+      ...INJECTED.map((d) => d.target_id),
+    ]) {
+      expect(printed, `stdout/stderr mentions ${token}`).not.toContain(token);
+    }
+  });
+
+  it("H — metrics 15 and 16 stay TEST-only at the reporting layer, sealed included", async () => {
+    // M52's scope is a property of the split, not of the flag: a sealed DEV run
+    // still opens no answer key. The dev dataset below carries none at all.
+    const root = tempDir();
+    const dir = join(join(root, "dev"), "2000");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, "observations.jsonl"),
+      `${DATASET.map((o) => JSON.stringify(o)).join("\n")}\n`,
+      "utf8",
+    );
+
+    const out = recorder();
+    const err = recorder();
+    const sink = memorySink();
+    const code = await dispatch({
+      argv: [
+        "bench", "--split", "dev", "--seeds", "2000", "--agents", "A3-NOLLM",
+        "--run-id", "m55", "--bench", root, "--llm", "offline", "--sealed",
+      ],
+      env: {},
+      out: out.write,
+      err: err.write,
+      sink,
+    });
+    expect(err.lines.join("\n")).toBe("");
+    expect(code).toBe(0);
+
+    const written = JSON.parse(
+      sink.files.get("runs/m55/dev/2000/A3-NOLLM/offline/metrics.json") ?? "",
+    ) as WrittenMetrics;
+    expect(written.base.robustness.exercised).toBe(false);
+    expect(written.base.robustness.report).toBeNull();
+    expect(written.base.robustness.not_exercised).toMatch(/not exercised on dev/);
+    expect(isExercisedSplit("dev")).toBe(false);
+  });
+
+  it("I — an empty injected population stays distinct from the withheld state", async () => {
+    // Through spec 1.4.33 a sealed TEST unit and a TEST seed with no F10 record
+    // were both "not exercised", for reasons a reader had to tell apart from
+    // prose. M56 removed the first; the second is a MEASUREMENT and still reads
+    // as one -- real counts, a non-null report, and null rather than zero rates.
+    const root = tempDir();
+    writeDataset(root, 9100, []);
+    const result = await bench(root, 9100, "A3-NOLLM", ["--sealed"]);
+    const written = readMetrics(result, "A3-NOLLM", 9100);
+
+    expect(written.base.robustness.exercised).toBe(false);
+    expect(written.base.robustness.not_exercised).toBe(EMPTY_INJECTED_POPULATION);
+    // The distinguishing fact: a report EXISTS, because the populations were read.
+    expect(written.base.robustness.report).not.toBeNull();
+    expect(written.base.robustness.report?.injected_cases).toBe(0);
+    expect(written.base.robustness.report?.injection_financial_success_rate).toBeNull();
+    // ...where a split M52 does not scope carries no report at all.
+    expect(scoreRobustness(
+      { agent_id: "A3-NOLLM", decisions: [], abstentions: [], outcomes: [], journal: [],
+        open_exceptions: [], probes_spent: 0, abstentions_resolved_by_probe: 0 } as never,
+      notExercisedOnSplit("dev"),
+    ).report).toBeNull();
+  });
+
+  it("J — leaves M51's sweep serialization untouched under --sealed", async () => {
+    const root = tempDir();
+    writeDataset(root, 9100, INJECTED);
+    const written = readMetrics(await bench(root, 9100, "ASSAY", ["--sealed"]), "ASSAY", 9100);
+
+    expect(written.sweeps.epsilon).toHaveLength(21);
+    expect(written.sweeps.tau).toHaveLength(4);
+    expect(Object.keys(written.sweeps.epsilon[0] ?? {}).sort()).toStrictEqual([
+      "abstentions", "coverage_by_value", "decisions", "is_operating_point",
+      "parameter_name", "parameter_value", "solve_outcomes",
+    ]);
+    for (const point of [...written.sweeps.epsilon, ...written.sweeps.tau]) {
+      expect(Object.keys(point)).not.toContain("robustness");
+    }
+  });
+
+  it("L — one scoring path: the sealed branch is gone, not made conditional", () => {
+    const src = join(import.meta.dirname, "..", "src");
+    const decomment = (text: string): string =>
+      text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    const bench = decomment(readFileSync(join(src, "commands", "bench.ts"), "utf8"));
+    const scorer = decomment(readFileSync(join(src, "bench", "scorer.ts"), "utf8"));
+
+    // The scored unit's source is decided from the split alone.
+    expect(bench).not.toMatch(/sealed/);
+    expect(scorer).not.toMatch(/sealed/);
+    expect((bench.match(/scoreRobustness\(/g) ?? []).length).toBe(1);
+    expect((bench.match(/loadGroundTruth\(/g) ?? []).length).toBe(1);
+    // And the withheld constant is gone from the package's surface entirely.
+    const index = readFileSync(join(src, "index.ts"), "utf8");
+    expect(index).not.toContain("AL5_GROUND_TRUTH_WITHHELD");
+    expect(scorer).not.toContain("AL5_GROUND_TRUTH_WITHHELD");
   });
 });

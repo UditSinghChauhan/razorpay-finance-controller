@@ -4,7 +4,6 @@ import { kindOf, type ValidatedProbeCall } from "@assay/probe";
 
 import { decodeJsonl } from "../artifacts/jsonl.js";
 import { CliError, EXIT } from "../errors.js";
-import type { GuardPolicy } from "../fs/guard.js";
 
 /**
  * The `RECONCILIATION_SPEC.md §6.2` probe **dispatch** — `apps/cli`'s one job in
@@ -119,7 +118,6 @@ const rowDecoder = {
 export interface ProbeDispatchOptions {
   /** `bench/<split>/<family>/recon_report.jsonl`. */
   readonly reconReportPath: string;
-  readonly policy?: GuardPolicy;
 }
 
 /**
@@ -145,12 +143,7 @@ export function dispatchProbe(
   if (!isDispatchable(kind)) throw new ProbeSourceUnavailableError(kind);
   if (call.probe !== "fetch_settlement_recon") throw new ProbeSourceUnavailableError(kind);
 
-  const rows = decodeJsonl(
-    options.policy === undefined
-      ? { path: options.reconReportPath, zone: "PROBE_DISPATCH" }
-      : { path: options.reconReportPath, zone: "PROBE_DISPATCH", policy: options.policy },
-    rowDecoder,
-  );
+  const rows = decodeJsonl({ path: options.reconReportPath, zone: "PROBE_DISPATCH" }, rowDecoder);
 
   // §6.2: "the lines carrying that settlement_id". Row order is a serialization
   // property (M38) and SE5 is a set measure, so the order they are collected in

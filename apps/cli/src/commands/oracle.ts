@@ -46,12 +46,22 @@ import type { Command, CommandContext } from "./types.js";
  * **Access.** Observations are read in zone `AGENT`, so the guard refuses
  * `recon_report*.jsonl` and `ground_truth*.jsonl` on that path. Ground truth is
  * read in `GENERATOR_TRUST`, the route `AL2` has permitted since `apps/cli`
- * landed, and `AL5` withdraws it under `--sealed` — so neither gate runs sealed,
- * and `§9` step 3 correctly carries no such flag. **The recon report reaches
- * neither gate**: `AL8` says its seal-scoped permission *"does not extend to the
- * `§5.3` completeness gate, which stays observations-only"*, and `§10` V22 rests
- * on that. **The consistency gate never receives ground truth** — it is handed
- * observations and pairs, and nothing else.
+ * landed. **The recon report reaches neither gate**: `AL8` says its seal-scoped
+ * permission *"does not extend to the `§5.3` completeness gate, which stays
+ * observations-only"*, and `§10` V22 rests on that. **The consistency gate never
+ * receives ground truth** — it is handed observations and pairs, and nothing
+ * else.
+ *
+ * **`--sealed` is refused outright, from spec 1.4.34 (`DATA_MODEL.md §22.2`
+ * M56).** `§5.3` said *"`AL5` withdraws that route under `--sealed`"*, and
+ * `fs/guard.ts` enforced it as a **read** refusal. `M56` rules `AL5` an
+ * **emission** rule — *"reading is none of print, log or write"* — so the read
+ * refusal is gone; the withdrawal `§5.3` wrote survives for this command, and is
+ * re-grounded on a **flag refusal**, which `DECISION_BRIEF.md §A.41` records as
+ * *stricter*: *"it cannot be reached by a gate call site that happens to open the
+ * file"*. `§9` step 3 carries no such flag, so nothing in the official procedure
+ * changes — an invocation that carries one was never `§9`'s and is now a usage
+ * error rather than a run that opens the answer key and fails afterwards.
  *
  * **On `test` the output is aggregate only.** `AL4` bars inspection of TEST
  * outputs before the sealed run and `AL7` burns the seed on a breach, so
@@ -66,8 +76,9 @@ import type { Command, CommandContext } from "./types.js";
  * command line. `AL3` binds them.
  *
  * **The override survives, and it is non-authoritative.** `--consistency-seed`
- * now overrides the frozen seed **for local exploration only**: it is refused
- * under `--sealed` and refused on the test split, it marks the artifact
+ * now overrides the frozen seed **for local exploration only**: it is refused on
+ * the test split — and this command admits no `--sealed` at all — it marks the
+ * artifact
  * `authoritative: false`, and `oracle_gate.json` records both the seed used and
  * the frozen seed it departed from. `AL4` lets a developer inspect DEV *"without
  * limit"*, so exploring other draws is legitimate; what `AL3` forbids is choosing
@@ -86,6 +97,27 @@ export class GateFailedError extends CliError {
     super(message, EXIT.FAILURE);
     this.name = "GateFailedError";
   }
+}
+
+/**
+ * `§5.3`'s withdrawal, carried as a flag refusal — spec 1.4.34, `M56`.
+ *
+ * `§9` runs this command at step 3 and carries no `--sealed`. The refusal is a
+ * **usage** error rather than a guard trip because nothing was read: the
+ * invocation is malformed, and `EXIT.USAGE` is what a harness reads to tell a
+ * bad command line from a breach `AL7` would burn a seed for.
+ */
+function refuseSealed(context: CommandContext): void {
+  if (!context.config.sealed) return;
+  throw new UsageError(
+    `assay oracle takes no --sealed. PREREGISTRATION.md §5.3 withdraws ground truth from ` +
+      `this gate under that flag, and from spec 1.4.34 (DATA_MODEL.md §22.2 M56) the ` +
+      `withdrawal is carried by this refusal rather than by fs/guard.ts: AL5 is an EMISSION ` +
+      `rule — "the CLI's --sealed flag refuses to print, log or write any ground-truth field" ` +
+      `— so a read refusal would have made §9 step 7's scored sweep inexecutable, while a ` +
+      `flag refusal cannot be reached by a gate call site that happens to open the file ` +
+      `(DECISION_BRIEF.md §A.41). §9 step 3 invokes this command without the flag.`,
+  );
 }
 
 function readSplit(raw: string): Split {
@@ -120,6 +152,11 @@ function runsConsistencyGate(split: Split): boolean {
 }
 
 async function run(context: CommandContext): Promise<void> {
+  // Before any flag is read and before any path is formed: M56 re-grounds §5.3's
+  // withdrawal on this refusal, and a refusal that let the flag reach a truth
+  // read and failed afterwards would be the weaker construction it replaces.
+  refuseSealed(context);
+
   const split = readSplit(requireFlag(context.args, "split"));
   // `--seeds all` (§9 step 7's spelling) expands over §6.1's declared seeds for
   // this split, read from the frozen table's one reader.
@@ -131,17 +168,10 @@ async function run(context: CommandContext): Promise<void> {
   for (const seed of seeds) checkSeed(seed, split);
 
   // AL3 binds §7's draw from spec 1.4.28 (M44). An override is non-authoritative
-  // and may never reach a sealed or official run: --sealed is the flag §9 step 7
-  // uses for a scored run, and the test split has no consistency gate at all.
-  if (drawSeedRaw !== null && context.config.sealed) {
-    throw new UsageError(
-      `--consistency-seed is refused under --sealed. PREREGISTRATION.md §7 freezes the §5.3 ` +
-        `draw at CONSISTENCY_DRAW_SEED = ${String(CONSISTENCY_DRAW_SEED)} and AL3 binds it ` +
-        `(spec 1.4.28, register row M44); the override exists for local exploration only and ` +
-        `is non-authoritative. §L.4 forbids changing a §7 parameter on the basis of an ` +
-        `observed result.`,
-    );
-  }
+  // and may never reach an official run. The `--sealed` half of that guard is
+  // subsumed by `refuseSealed` above -- this command admits no such invocation at
+  // all from spec 1.4.34 (M56) -- and the split half stands: the test split has
+  // no consistency gate for an override to move.
   if (drawSeedRaw !== null && !runsConsistencyGate(split)) {
     throw new UsageError(
       `--consistency-seed is meaningless on the ${split} split: PREREGISTRATION.md §5.3 draws ` +
@@ -156,12 +186,11 @@ async function run(context: CommandContext): Promise<void> {
   const drawSeed = override ?? CONSISTENCY_DRAW_SEED;
   const authoritative = override === null;
 
-  const policy = { sealed: context.config.sealed };
   const failures: string[] = [];
 
   for (const seed of seeds) {
     const seedDir = join(join(benchRoot, split), String(seed));
-    const observations = loadObservations(join(seedDir, OBSERVATIONS), policy);
+    const observations = loadObservations(join(seedDir, OBSERVATIONS));
 
     // Everything below the read is packages/oracle's. `oracleContext` builds
     // C2's referent set — including DATA_MODEL.md §22.2 M22's "the recon_line
@@ -172,10 +201,10 @@ async function run(context: CommandContext): Promise<void> {
     const oracleRun = labelAll(observations, oracleContext(observations));
     context.sink.write(join(seedDir, ORACLE_LABELS), encodeJsonl(oracleRun.labels));
 
-    // AL2's route, and the only one. AL5 withdraws it under --sealed, which is
-    // why §9 step 3 carries no such flag.
+    // AL2's route, and the only one. This command never runs sealed -- M56 makes
+    // `--sealed` a usage error here -- which is why §9 step 3 carries no such flag.
     const truth = decodeJsonl(
-      { path: join(seedDir, GROUND_TRUTH), zone: "GENERATOR_TRUST", policy },
+      { path: join(seedDir, GROUND_TRUTH), zone: "GENERATOR_TRUST" },
       { parse: readTruthRow },
     );
     const completeness = completenessGate(
@@ -273,8 +302,8 @@ export const oracleCommand: Command = {
     "consistency-seed": {
       kind: "string",
       describe:
-        "EXPLORATORY override of §7's frozen §5.3 draw seed. Local use only; refused " +
-        "under --sealed, and the gate artifact is marked non-authoritative.",
+        "EXPLORATORY override of §7's frozen §5.3 draw seed. Local use only; the gate " +
+        "artifact is marked non-authoritative.",
     },
   },
   run,

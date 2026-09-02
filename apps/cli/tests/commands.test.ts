@@ -476,11 +476,37 @@ describe("assay seal", () => {
     );
   });
 
-  it("is refused under --sealed, because AL5 keeps ground truth out of the process", async () => {
+  it("D — refuses --sealed as a USAGE error, and writes nothing (M56)", async () => {
+    // Spec 1.4.34, DATA_MODEL.md §22.2 M56. Through spec 1.4.33 this was a
+    // GUARD trip: fs/guard.ts withdrew AL2's GENERATOR_TRUST unlock under the
+    // flag, so the seal failed when it reached the ground-truth read. M56 rules
+    // AL5 an EMISSION rule -- "reading is none of print, log or write" -- and
+    // re-grounds §5.3's withdrawal for this reader on a flag refusal, which
+    // DECISION_BRIEF.md §A.41 records as stricter: "it cannot be reached by a
+    // gate call site that happens to open the file".
     const { argv } = dataset();
     const result = await run([...argv, "--sealed"]);
-    expect(result.code).toBe(EXIT.GUARD);
+    expect(result.code).toBe(EXIT.USAGE);
     expect(result.err).toContain("AL5");
+    expect(result.err).toContain("M56");
+    // The flag never reaches a read: no digest is computed and no manifest is
+    // written, which is this command's own standing rule about partial seals.
+    expect(result.sink.files.size).toBe(0);
+  });
+
+  it("still hashes ground_truth.jsonl on the unsealed path §9 steps 4-5 use", async () => {
+    // M56 changes nothing about the seal's own procedure: the artifact is read
+    // in GENERATOR_TRUST and only its digest leaves.
+    const { dir, argv } = dataset();
+    const result = await run(argv);
+    expect(result.code).toBe(EXIT.OK);
+    const manifest = JSON.parse(
+      result.sink.files.get(join(dir, MANIFEST)) ?? "{}",
+    ) as Record<string, unknown>;
+    const expected = createHash("sha256")
+      .update(readFileSync(join(dir, "ground_truth.jsonl")))
+      .digest("hex");
+    expect(manifest["ground_truth_sha256"]).toBe(expected);
   });
 
   it("hashes the recon report over its raw bytes, as sha256sum would", async () => {

@@ -2,7 +2,6 @@ import { isAccountCode } from "@assay/domain";
 import type { GroundTruth } from "@assay/generator";
 
 import { CliError, EXIT } from "../errors.js";
-import type { GuardPolicy } from "../fs/guard.js";
 import { decodeJsonl } from "./jsonl.js";
 
 /**
@@ -16,11 +15,30 @@ import { decodeJsonl } from "./jsonl.js";
  * happens here — no population is projected, no covered set is derived and no
  * metric is computed.
  *
- * **The zone is `GENERATOR_TRUST`, which is `AL2`'s only route.** `fs/guard.ts`
- * unlocks `**\/ground_truth*.jsonl` for that zone alone, and `AL5` withdraws it
- * under `--sealed`; `commands/oracle.ts` and `commands/seal.ts` already read the
- * artifact there. A fifth `ReadZone` for the scorer would be a change to the
- * guard's own table, which is a specification question rather than a wiring one.
+ * **The zone is `GENERATOR_TRUST`, which is `AL2`'s only route, and the read is
+ * unconditional.** `fs/guard.ts` unlocks `**\/ground_truth*.jsonl` for that zone
+ * alone; `commands/oracle.ts` and `commands/seal.ts` read the artifact there too.
+ * From spec 1.4.34 (`DATA_MODEL.md §22.2` **M56**, `DECISION_BRIEF.md §A.41`)
+ * `--sealed` does **not** withdraw it: `AL5` is an **emission** rule — *"reading
+ * is none of print, log or write"* — so `PREREGISTRATION.md §9` step 7's
+ * `assay bench --sealed` opens this artifact through this same function, and
+ * `EVALUATION_SPEC.md §2`'s `score(agent output, ground truth, oracle labels)`
+ * becomes executable on the one run that ever scores TEST. **No fifth `ReadZone`
+ * was added**: `§A.41` rejected one and preserved the rejection, because `AL2`
+ * names its constrained parties by package and the scorer is not among them.
+ *
+ * **What M56 does not widen.** `AL2` is untouched in substance and in wording:
+ * zone `AGENT` is still refused, so no agent, engine or oracle reaches the
+ * artifact, sealed or not. The withdrawal `§5.3` wrote survives for the two
+ * readers it was written against — `assay oracle` and `assay seal` refuse
+ * `--sealed` as a usage error, which is stricter than a read refusal reached
+ * only if a call site happens to open the file.
+ *
+ * **This module is a read and a decode, and it is the boundary M56 leans on.**
+ * The record it returns is handed to `bench/scorer.ts` and to nothing else; no
+ * `GroundTruth`, no path and no row reaches `AgentInput`, an emitted artifact or
+ * a printed line. `PREREGISTRATION.md §10` **V31** states the residual: `AL5`'s
+ * guarantee now rests on that emission boundary rather than on the guard.
  *
  * **The decode is a check, not an `S0` transform.** `RECONCILIATION_SPEC.md §2`'s
  * five steps are over *source data*; ground truth is the generator's own output,
@@ -212,12 +230,16 @@ export function datasetGroundTruth(
   });
 }
 
-/** Read one `(split, seed)` dataset's ground truth, through `AL2`'s one zone. */
-export function loadGroundTruth(path: string, policy?: GuardPolicy): GroundTruth {
+/**
+ * Read one `(split, seed)` dataset's ground truth, through `AL2`'s one zone.
+ *
+ * No policy argument: `M56` removed `GuardPolicy` rather than leaving the caller
+ * a flag the guard ignores. What a caller may do with the record is an emission
+ * question, and it is answered where the emission happens.
+ */
+export function loadGroundTruth(path: string): GroundTruth {
   const records = decodeJsonl(
-    policy === undefined
-      ? { path, zone: "GENERATOR_TRUST" }
-      : { path, zone: "GENERATOR_TRUST", policy },
+    { path, zone: "GENERATOR_TRUST" },
     { parse: readGroundTruthRecord },
   );
   return datasetGroundTruth(records, path);

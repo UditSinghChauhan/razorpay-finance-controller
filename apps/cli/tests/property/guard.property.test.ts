@@ -104,20 +104,25 @@ describe("AL2/AL8 hold over every path shape", () => {
     );
   });
 
-  it("--sealed removes AL2's zone and neither of AL8's", () => {
-    // AL5 is scoped to AL2 in `guard.ts`: the recon report holds no
-    // ground-truth field, so the flag has nothing to keep out of the output.
+  it("M56 — the decision is a function of (path, zone) and of nothing else", () => {
+    // Through spec 1.4.33 a third argument, `GuardPolicy { sealed }`, removed
+    // AL2's one zone. `DATA_MODEL.md §22.2` M56 rules AL5 an EMISSION rule --
+    // "reading is none of print, log or write" -- so the parameter is gone and
+    // the matrix below is the whole of the guard's answer, on every path shape.
+    expect(assertReadable.length).toBe(2);
     fc.assert(
       fc.property(prefix, suffix, (dir, tail) => {
-        const sealed = { sealed: true };
         const gt = `${dir}ground_truth${tail}.jsonl`;
         const rr = `${dir}recon_report${tail}.jsonl`;
 
-        for (const zone of ZONES) {
-          expect(() => assertReadable(gt, zone, sealed)).toThrow(PathGuardError);
+        // AL2's standing route, which the scorer takes at §9 step 7's sealed run.
+        expect(() => assertReadable(gt, "GENERATOR_TRUST")).not.toThrow();
+        // ...and AL2 is otherwise untouched in substance and in wording.
+        for (const zone of ZONES.filter((z) => z !== "GENERATOR_TRUST")) {
+          expect(() => assertReadable(gt, zone)).toThrow(PathGuardError);
         }
-        expect(() => assertReadable(rr, "PROBE_DISPATCH", sealed)).not.toThrow();
-        expect(() => assertReadable(rr, "SEAL", sealed)).not.toThrow();
+        expect(() => assertReadable(rr, "PROBE_DISPATCH")).not.toThrow();
+        expect(() => assertReadable(rr, "SEAL")).not.toThrow();
       }),
       { numRuns: 2000 },
     );
