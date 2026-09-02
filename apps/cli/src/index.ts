@@ -166,6 +166,24 @@ export { COMMANDS, T0_11_COMMANDS, findCommand, flagsFor, type Command, type Com
 export {
   ALL_AGENTS, TIER0_AGENTS, agentById, isAgentId, readAgentId, selectAgents,
 } from "./agents/index.js";
+/**
+ * The product surface — `ARCHITECTURE.md §9`'s `apps/api` reads exactly this.
+ *
+ * `agentById("ASSAY").run(...)` returns `EVALUATION_SPEC.md §4`'s scoring
+ * projection and nothing else; `runAssayComposedFull` returns that same run
+ * beside the evidence it produced — the Layer A chain, `§6`'s Ambiguity
+ * Certificates, `§10.4`'s close attempt, the Layer B projection, and one
+ * {@link DecisionEvidence} per posted decision carrying its class, its Suspense
+ * key, its journal lines and its event id.
+ *
+ * Nothing here re-runs a stage or re-reads a threshold: it is the state the
+ * composition already built, published instead of discarded.
+ */
+export {
+  ZERO_SOLVE_OUTCOMES, runAssayComposedFull,
+  type AssayComposeOptions, type AssayRunResult, type ComposedRun,
+  type DecisionEvidence, type RunEvidence, type SolveOutcomeTally,
+} from "./agents/index.js";
 export { AgentUnavailableError } from "./errors.js";
 export { SEAL_TAG, checkSealTag } from "./seal-tag.js";
 export { usage, versionLine } from "./usage.js";
