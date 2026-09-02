@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { CONVENTIONS, UNRATIFIED, UNRATIFIED_COUNT } from "../src/conventions.js";
-import { HELD_OUT_FAMILIES, IMPLEMENTED_FAMILIES } from "../src/frozen.js";
+import { BENCHMARK_VERSION, HELD_OUT_FAMILIES, IMPLEMENTED_FAMILIES } from "../src/frozen.js";
 import { generateFamily } from "../src/generate.js";
 import { DECLARED_SEEDS } from "../src/seeds.js";
 import { TEST_SEEDS } from "./fixtures.js";
@@ -99,11 +99,40 @@ describe("this milestone generates no benchmark data", () => {
   //
   // Nothing else in this describe is weakened: this package still writes no
   // file, reads no clock and no environment, and references no provider, and
-  // runs/ is still asserted empty below — which is the check that actually
-  // keeps a SCORED run out of the tree, and which §9 step 0 does not produce
-  // ("It EMITS NO metrics.json, is NOT a scored run").
-  it("leaves runs/ empty apart from its .gitkeep", () => {
-    expect(readdirSync(join(REPO_ROOT, "runs"))).toStrictEqual([".gitkeep"]);
+  // runs/ is still asserted to carry no unaccounted run output below — which is
+  // the check that actually keeps a SCRATCH scored run out of the tree, and
+  // which §9 step 0 does not produce ("It EMITS NO metrics.json, is NOT a
+  // scored run").
+
+  // AMENDED, on the same ground as the retirement above: "leaves runs/ empty
+  // apart from its .gitkeep".
+  //
+  // It asserted readdirSync(REPO_ROOT/runs) === [".gitkeep"], which held for
+  // the milestone that wrote it and is false of any repository where
+  // PREREGISTRATION.md §9 step 7 has been taken. Step 7 IS `assay bench
+  // --sealed --agents … --seeds …`, and EVALUATION_SPEC.md §7 places its
+  // artifacts at runs/<run_id>/<split>/<seed>/<agent>/<llm_mode>/metrics.json
+  // and requires them COMMITTED — §5.5 forbids "any number in the demo that
+  // does not exist in a committed run artifact", and .gitignore records the
+  // same at spec 1.4.29 (M48). The bare assertion therefore contradicted the
+  // frozen procedure rather than guarding it, exactly as the bench/ assertion
+  // did, and no frozen clause requires runs/ to hold only .gitkeep once the
+  // sealed run has been recorded.
+  //
+  // WHAT THE CHECK IS FOR IS UNCHANGED, and is what it still enforces: this
+  // package generates no benchmark data, so no run output may appear that the
+  // sealed lifecycle does not account for. A directory left behind by a test,
+  // a scratch sweep or a second unrecorded run still fails. The sealed run's
+  // directory is DERIVED from BENCHMARK_VERSION rather than transcribed, on
+  // M46's lesson — §9's own literals drifted from that constant once already —
+  // so a version bump moves this allowance with it rather than silently
+  // admitting a stale directory.
+  it("adds no run output beyond the committed sealed run", () => {
+    const sealedRun = `seal-v${BENCHMARK_VERSION}`;
+    const unaccounted = readdirSync(join(REPO_ROOT, "runs")).filter(
+      (entry) => entry !== ".gitkeep" && entry !== sealedRun,
+    );
+    expect(unaccounted).toStrictEqual([]);
   });
 
   it("involves no model: nothing in this package references a provider", () => {
