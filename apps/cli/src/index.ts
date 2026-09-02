@@ -55,6 +55,28 @@ export {
 export { sha256Text } from "./fs/digest.js";
 export { decodeJsonl, encodeJsonl, RecordRejectedError, type Decoder } from "./artifacts/jsonl.js";
 export { loadObservations } from "./artifacts/observations.js";
+export {
+  datasetGroundTruth, loadGroundTruth, readGroundTruthRecord,
+} from "./artifacts/ground-truth.js";
+export {
+  V30_NON_ADDITIVITY,
+  encodeMetrics,
+  type BaseMetrics,
+  type RobustnessMetrics,
+  type ScoredMetrics,
+} from "./artifacts/metrics.js";
+export {
+  AL5_GROUND_TRUTH_WITHHELD,
+  EMPTY_INJECTED_POPULATION,
+  EXERCISED_SPLIT,
+  isExercisedSplit,
+  notExercised,
+  notExercisedOnSplit,
+  overDataset,
+  scoreRobustness,
+  type RobustnessDataset,
+  type RobustnessSource,
+} from "./bench/scorer.js";
 export { loadLedgerEvents } from "./artifacts/ledger-events.js";
 export { loadReplayCache, ReplayCacheError } from "./artifacts/replay-cache.js";
 export {

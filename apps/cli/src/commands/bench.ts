@@ -1,3 +1,4 @@
+import type { Observation } from "@assay/domain";
 import {
   SCORED_LLM_MODES,
   coverage,
@@ -10,14 +11,28 @@ import {
 import { SEED_BLOCKS, blockOf, type Split } from "@assay/generator";
 
 import { requireFlag, requireSeeds, stringFlag } from "../args.js";
+import { loadGroundTruth } from "../artifacts/ground-truth.js";
 import { loadObservations } from "../artifacts/observations.js";
 import { encodeMetrics, type BaseMetrics, type ScoredMetrics } from "../artifacts/metrics.js";
 import { metricsPath } from "../artifacts/metrics-path.js";
 import { selectAgents, sweptRunnerFor } from "../agents/index.js";
+import {
+  AL5_GROUND_TRUTH_WITHHELD,
+  isExercisedSplit,
+  notExercised,
+  notExercisedOnSplit,
+  overDataset,
+  scoreRobustness,
+  type RobustnessSource,
+} from "../bench/scorer.js";
 import { NO_SWEEPS, runSweeps, type AgentSweeps } from "../bench/sweep.js";
 import { CliError, EXIT, UsageError } from "../errors.js";
 import { join } from "../fs/io.js";
 import type { Command, CommandContext } from "./types.js";
+
+/** `DATA_MODEL.md §22.2` M42's two per-`(split, seed)` dataset artifacts. */
+const OBSERVATIONS = "observations.jsonl";
+const GROUND_TRUTH = "ground_truth.jsonl";
 
 /**
  * `assay bench` — the scored benchmark sweep.
@@ -58,14 +73,24 @@ import type { Command, CommandContext } from "./types.js";
  * execution and no curve, which is F2's standing disposition applied rather than
  * a new branch.
  *
- * **What this command does not yet do.** `ScoredMetrics.base` carries the
- * metrics a scored unit's own `AgentRun` determines. The truth-side half —
- * `§4.4`'s harm and, through it, metrics 2, 3 and 8 — needs `scoringTruth` over
- * `ground_truth.jsonl` and the bootstrap over ≥ 5 seeds needs `§5.2`'s
- * aggregator; both are successor tasks. Nothing is stubbed or defaulted to a
- * zero: an uncomputed metric is **absent** from the artifact, because `§5.5`
- * bars *"any number that does not exist in a committed run artifact"* and a zero
- * standing in for an uncomputed figure is precisely such a number.
+ * **The truth side starts here, with `§4.8`.** Spec 1.4.33's M52 + M55 fixed
+ * metrics 15 and 16 entirely inside `packages/eval`, and this command supplies
+ * the two artifacts they read: the seed's `observations.jsonl`, already loaded
+ * for the agent, and its `ground_truth.jsonl`, read in zone `GENERATOR_TRUST` —
+ * `AL2`'s one route, which binds the engine and the oracle rather than the
+ * scorer. `bench/scorer.ts` is the single seam that gathers them and makes the
+ * one `robustness()` call; nothing about `§4.8`'s semantics is decided in this
+ * file. **M52 scopes both metrics to the TEST split**, so on `train` and `dev`
+ * the artifact records *"not exercised"* in words and no ground truth is opened
+ * at all.
+ *
+ * **What this command still does not do.** The rest of the truth side —
+ * `§4.4`'s harm and, through it, metrics 2, 3 and 8 — needs the remainder of
+ * `scoringTruth`, and the bootstrap over ≥ 5 seeds needs `§5.2`'s aggregator;
+ * both are successor tasks. Nothing is stubbed or defaulted to a zero: an
+ * uncomputed metric is **absent** from the artifact, because `§5.5` bars *"any
+ * number that does not exist in a committed run artifact"* and a zero standing
+ * in for an uncomputed figure is precisely such a number.
  */
 async function run(context: CommandContext): Promise<void> {
   const split = readSplit(requireFlag(context.args, "split"));
@@ -91,7 +116,10 @@ async function run(context: CommandContext): Promise<void> {
   let written = 0;
   for (const seed of seeds) {
     const seedDir = join(join(benchRoot, split), String(seed));
-    const observations = loadObservations(join(seedDir, "observations.jsonl"));
+    const observations = loadObservations(join(seedDir, OBSERVATIONS));
+    // Once per (split, seed): §4.8's populations are the dataset's and not the
+    // agent's, so every agent scored on this seed is measured over the same two.
+    const robustnessSource = sourceFor(split, seedDir, observations, context.config.sealed);
     for (const agent of agents) {
       const input: AgentInput = Object.freeze({
         observations,
@@ -100,7 +128,7 @@ async function run(context: CommandContext): Promise<void> {
 
       // The base execution: no sweep parameter, so `packages/engine` resolves
       // §7's frozen ε and τ and this is byte-identical to a pre-M51 run.
-      const base = await execute(agent, input);
+      const base = await execute(agent, input, robustnessSource);
       const key = runKey(agent.id, input.config);
 
       // §5.1's two curve agents, and only under offline (F2, above).
@@ -125,8 +153,34 @@ async function run(context: CommandContext): Promise<void> {
   context.out(`artifacts           ${join("runs", runId)}`);
 }
 
+/**
+ * Where one scored unit's metrics 15 and 16 come from — `bench/scorer.ts`'s
+ * union, decided from the split and `AL5`, and nothing else.
+ *
+ * The ground-truth read happens **only** on the split M52 scopes the metrics to
+ * and **only** when the guard would admit it, so `train` and `dev` open no
+ * answer key at all and `--sealed` opens none anywhere. Where the read does
+ * happen it is unguarded by any `try`: a `ground_truth.jsonl` the scorer cannot
+ * read or reconcile is a stop condition for a TEST scored unit, not a metric
+ * taken over a smaller truth.
+ */
+function sourceFor(
+  split: Split,
+  seedDir: string,
+  observations: readonly Observation[],
+  sealed: boolean,
+): RobustnessSource {
+  if (!isExercisedSplit(split)) return notExercisedOnSplit(split);
+  if (sealed) return notExercised(AL5_GROUND_TRUTH_WITHHELD);
+  return overDataset(loadGroundTruth(join(seedDir, GROUND_TRUTH), { sealed }), observations);
+}
+
 /** One agent's base execution, projected onto the metrics it determines. */
-async function execute(agent: Agent, input: AgentInput): Promise<BaseMetrics> {
+async function execute(
+  agent: Agent,
+  input: AgentInput,
+  robustnessSource: RobustnessSource,
+): Promise<BaseMetrics> {
   const run = await agent.run(input);
   if (run.agent_id !== agent.id) {
     throw new CliError(
@@ -148,6 +202,9 @@ async function execute(agent: Agent, input: AgentInput): Promise<BaseMetrics> {
     open_exceptions: run.open_exceptions.length,
     probes_spent: run.probes_spent,
     abstentions_resolved_by_probe: run.abstentions_resolved_by_probe,
+    // §4.8, through the one seam. No population, covered set or per-case harm
+    // is derived in this file.
+    robustness: scoreRobustness(run, robustnessSource),
   });
 }
 
