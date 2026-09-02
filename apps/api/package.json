@@ -1,0 +1,24 @@
+{
+  "name": "@assay/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "ASSAY internal HTTP — thin HTTP over engine + ledger, consumed only by apps/web, local bind only",
+  "license": "UNLICENSED",
+  "bin": {
+    "assay-api": "./bin/assay-api.mjs"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@assay/cli": "workspace:*",
+    "@assay/domain": "workspace:*",
+    "@assay/ledger": "workspace:*",
+    "@hono/node-server": "2.1.1",
+    "hono": "4.10.7"
+  }
+}
