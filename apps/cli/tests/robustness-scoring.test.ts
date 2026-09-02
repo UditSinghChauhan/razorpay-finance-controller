@@ -13,12 +13,17 @@ import {
   dispatch,
   encodeMetrics,
   isExercisedSplit,
+  M54_METRIC_10_NOT_COMPUTABLE,
+  METRIC_7_ECE_UNRATIFIED,
   loadGroundTruth,
   memorySink,
   notExercisedOnSplit,
   overDataset,
   readGroundTruthRecord,
+  scoreRiskCoverage,
   scoreRobustness,
+  scoreTruth,
+  truthNotScoredOnSplit,
   type BaseMetrics,
   type MemorySink,
   type RobustnessMetrics,
@@ -521,6 +526,14 @@ function baseWith(robustness: RobustnessMetrics): BaseMetrics {
     probes_spent: 0,
     abstentions_resolved_by_probe: 0,
     robustness,
+    // The rest of the truth side is `truth-scoring.test.ts`'s subject; these
+    // cases assert that §4.8's two metrics survive into the artifact unchanged
+    // beside it, so the source here is the "not scored" state.
+    truth: scoreTruth(agentRun(), truthNotScoredOnSplit("train")),
+    ece: null,
+    ece_state: METRIC_7_ECE_UNRATIFIED,
+    exception_class_confusion: null,
+    exception_class_confusion_state: M54_METRIC_10_NOT_COMPUTABLE,
   });
 }
 
@@ -552,6 +565,7 @@ describe("5/6. V27's composition and V30's disclosure survive into the artifact"
     key: { agent_id: "ASSAY", split: EXERCISED_SPLIT, seed: 9100, llm_mode: "offline" },
     base: baseWith(metrics),
     sweeps: { epsilon: [], tau: [] },
+    risk_coverage: scoreRiskCoverage([], { coverage_by_value: 1, balance_harm_paise: null }),
   })) as { base: { robustness: RobustnessMetrics } };
 
   it("V27 — both kind mixes reach the artifact beside the difference", () => {
@@ -697,8 +711,9 @@ function writeDataset(
   root: string,
   seed: number,
   degradations: readonly DegradationSpec[],
+  split: string = EXERCISED_SPLIT,
 ): void {
-  const dir = join(join(root, EXERCISED_SPLIT), String(seed));
+  const dir = join(join(root, split), String(seed));
   mkdirSync(dir, { recursive: true });
   writeFileSync(
     join(dir, "observations.jsonl"),
@@ -710,6 +725,31 @@ function writeDataset(
     `${JSON.stringify({ ...truthRecord({ degradations }), seed })}\n`,
     "utf8",
   );
+  // §9 step 3's artifact, which step 7's scored run reads and never regenerates.
+  // EVALUATION_SPEC.md §2 makes it the third argument to `score(agent output,
+  // ground truth, oracle labels)`; without it a TEST scored unit fails closed.
+  writeFileSync(join(dir, "oracle_labels.jsonl"), oracleLabels(), "utf8");
+}
+
+/**
+ * The two targets in {@link DATASET}, labelled — hand-written, never generated.
+ *
+ * `UNAMBIGUOUS` on both, so `|truly_ambiguous| = 0`: these cases are about
+ * `§4.8`, and a non-empty ambiguous set would move metric 8's reference policy
+ * without telling them anything. `truth-scoring.test.ts` varies it.
+ */
+function oracleLabels(): string {
+  const rows = [
+    { target_id: SETL(60), target_kind: "settlement" },
+    { target_id: BNK(61), target_kind: "bank_line" },
+  ].map((row) => ({
+    ...row,
+    label: "UNAMBIGUOUS",
+    solution_count: 1,
+    max_materiality_paise: 0,
+    tau_paise: 10_000,
+  }));
+  return `${rows.map((r) => JSON.stringify(r)).join("\n")}\n`;
 }
 
 interface Outcome {
@@ -793,11 +833,20 @@ describe("8/9. the whole command writes M48's one artifact, unchanged apart from
     const a = readMetrics(await bench(withF10, 9100, "A3-NOLLM"), "A3-NOLLM", 9100);
     const b = readMetrics(await bench(withoutF10, 9100, "A3-NOLLM"), "A3-NOLLM", 9100);
 
-    const { robustness: injectedSide, ...agentSideA } = a.base;
-    const { robustness: cleanSide, ...agentSideB } = b.base;
-    expect(agentSideA).toStrictEqual(agentSideB);
+    // `truth` is excluded alongside `robustness`: §4.2's edges and §4.4's
+    // journal are read from the answer key too, so the two datasets' truth-side
+    // figures are not required to agree. What must not move is the agent side.
+    const injectedSide = a.base.robustness;
+    const cleanSide = b.base.robustness;
+    const agentSide = (base: BaseMetrics): Record<string, unknown> => ({
+      ...base,
+      robustness: undefined,
+      truth: undefined,
+    });
+    expect(agentSide(a.base)).toStrictEqual(agentSide(b.base));
     // The eleven pre-M55 fields, in the order the command has always written
-    // them, plus exactly one more.
+    // them, then §4.8's, then the rest of the truth side, then metric 10's
+    // published state. Nothing is renamed and nothing is reordered.
     expect(Object.keys(a.base)).toStrictEqual([
       "coverage_by_value",
       "coverage_by_count",
@@ -811,6 +860,11 @@ describe("8/9. the whole command writes M48's one artifact, unchanged apart from
       "probes_spent",
       "abstentions_resolved_by_probe",
       "robustness",
+      "truth",
+      "ece",
+      "ece_state",
+      "exception_class_confusion",
+      "exception_class_confusion_state",
     ]);
     expect(injectedSide.exercised).toBe(true);
     expect(cleanSide.exercised).toBe(false);
@@ -825,6 +879,14 @@ describe("8/9. the whole command writes M48's one artifact, unchanged apart from
     expect(written.sweeps.epsilon).toHaveLength(21);
     expect(written.sweeps.tau).toHaveLength(4);
     expect(Object.keys(written.sweeps.epsilon[0] ?? {}).sort()).toStrictEqual([
+      // §5.3's output column for this sweep is "(coverage_by_value,
+      // balance_harm) per point", so the y-axis is the sweep's own output and
+      // not a fifth key dimension. M51's identity -- the two `parameter_*`
+      // fields -- is unchanged, and the τ point's shape below is untouched.
+      "abstentions", "balance_harm_paise", "coverage_by_value", "decisions",
+      "is_operating_point", "parameter_name", "parameter_value", "solve_outcomes",
+    ]);
+    expect(Object.keys(written.sweeps.tau[0] ?? {}).sort()).toStrictEqual([
       "abstentions", "coverage_by_value", "decisions", "is_operating_point",
       "parameter_name", "parameter_value", "solve_outcomes",
     ]);
@@ -833,21 +895,22 @@ describe("8/9. the whole command writes M48's one artifact, unchanged apart from
     for (const point of [...written.sweeps.epsilon, ...written.sweeps.tau]) {
       expect(Object.keys(point)).not.toContain("robustness");
     }
-    // And the artifact still holds exactly M51's three top-level keys.
-    expect(Object.keys(written).sort()).toStrictEqual(["base", "key", "sweeps"]);
+    // And the artifact still holds M51's key + base + sweeps, with metric 3's
+    // integration of the ε curve beside them — one schema, no fifth dimension.
+    expect(Object.keys(written).sort()).toStrictEqual([
+      "base", "key", "risk_coverage", "sweeps",
+    ]);
   });
 
-  it("reports a non-TEST split as not exercised and opens no answer key", async () => {
-    // The dev dataset below carries NO ground_truth.jsonl at all. The command
-    // must still succeed: on a split M52 does not scope, nothing is read.
+  it("reports DEV as not exercised even though the answer key IS open there", async () => {
+    // The load-bearing separation. EVALUATION_SPEC.md §2's scoring loop runs over
+    // {dev, test} and §7 benches dev alone, so the dev dataset below DOES carry a
+    // ground_truth.jsonl and it IS read -- and M52's scope is a property of the
+    // POPULATION, not of the read: F10 lives at TEST seeds 9100-9104, so metrics
+    // 15 and 16 must still report "not exercised on dev" in M52's own words
+    // rather than a rate over an empty population that reads as a computed zero.
     const root = tempDir();
-    const dir = join(join(root, "dev"), "2000");
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(
-      join(dir, "observations.jsonl"),
-      `${DATASET.map((o) => JSON.stringify(o)).join("\n")}\n`,
-      "utf8",
-    );
+    writeDataset(root, 2000, INJECTED, "dev");
 
     const out = recorder();
     const err = recorder();
@@ -868,8 +931,14 @@ describe("8/9. the whole command writes M48's one artifact, unchanged apart from
     const text = sink.files.get("runs/m55/dev/2000/A3-NOLLM/offline/metrics.json") ?? "";
     const written = JSON.parse(text) as WrittenMetrics;
     expect(written.base.robustness.exercised).toBe(false);
+    // `report` is null, not a real count of zero: on a split M52 does not scope
+    // there is no injected set to count, which stays distinguishable from a TEST
+    // seed carrying no F10 record.
     expect(written.base.robustness.report).toBeNull();
     expect(written.base.robustness.not_exercised).toMatch(/not exercised on dev/);
+    // And the truth side WAS taken over that same answer key.
+    expect(written.base.truth.scored).toBe(true);
+    expect(typeof written.base.truth.report?.net_cost.net_cost_paise).toBe("number");
   });
 });
 
@@ -1069,8 +1138,12 @@ describe("11. M56 — a sealed TEST run reads the answer key and emits aggregate
     for (const field of GROUND_TRUTH_FIELDS) {
       expect(emitted.has(field), `metrics.json carries a GroundTruth field: ${field}`).toBe(false);
     }
-    // ...and the top level is still M51's three keys and nothing more.
-    expect(Object.keys(written).sort()).toStrictEqual(["base", "key", "sweeps"]);
+    // ...and the top level is still M51's key + base + sweeps, with metric 3's
+    // integration of the ε curve beside them. No fifth key dimension, no second
+    // schema, no ground-truth container.
+    expect(Object.keys(written).sort()).toStrictEqual([
+      "base", "key", "risk_coverage", "sweeps",
+    ]);
   });
 
   it("G — every string the artifact carries is one a scored unit is allowed to carry", async () => {
@@ -1087,6 +1160,10 @@ describe("11. M56 — a sealed TEST run reads the answer key and emits aggregate
       "ASSAY", EXERCISED_SPLIT, "offline",
       "epsilon_bps", "tau_floor_paise",
       V30_NON_ADDITIVITY, EMPTY_INJECTED_POPULATION,
+      // M54's ratified state for metric 10, and metric 7's unratified-predicate
+      // state — both published rather than fabricated.
+      M54_METRIC_10_NOT_COMPUTABLE,
+      METRIC_7_ECE_UNRATIFIED,
     ]);
     for (const leaf of stringLeaves(written)) {
       expect(allowed.has(leaf), `metrics.json carries an unexpected string: ${leaf}`).toBe(true);
@@ -1115,6 +1192,11 @@ describe("11. M56 — a sealed TEST run reads the answer key and emits aggregate
         family_id: "F01",
         true_balances: { "1200_BANK": 123_456 },
       })}\n`,
+      "utf8",
+    );
+    writeFileSync(
+      join(join(join(b, EXERCISED_SPLIT), "9100"), "oracle_labels.jsonl"),
+      oracleLabels(),
       "utf8",
     );
 
@@ -1150,16 +1232,12 @@ describe("11. M56 — a sealed TEST run reads the answer key and emits aggregate
   });
 
   it("H — metrics 15 and 16 stay TEST-only at the reporting layer, sealed included", async () => {
-    // M52's scope is a property of the split, not of the flag: a sealed DEV run
-    // still opens no answer key. The dev dataset below carries none at all.
+    // M52's scope is a property of the POPULATION, not of the flag and not of
+    // the read: a sealed DEV run opens the answer key -- §2's loop runs over
+    // {dev, test} -- and metrics 15 and 16 are still "not exercised on dev",
+    // because F10 exists at TEST seeds 9100-9104 and nowhere else.
     const root = tempDir();
-    const dir = join(join(root, "dev"), "2000");
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(
-      join(dir, "observations.jsonl"),
-      `${DATASET.map((o) => JSON.stringify(o)).join("\n")}\n`,
-      "utf8",
-    );
+    writeDataset(root, 2000, INJECTED, "dev");
 
     const out = recorder();
     const err = recorder();
@@ -1218,6 +1296,10 @@ describe("11. M56 — a sealed TEST run reads the answer key and emits aggregate
     expect(written.sweeps.epsilon).toHaveLength(21);
     expect(written.sweeps.tau).toHaveLength(4);
     expect(Object.keys(written.sweeps.epsilon[0] ?? {}).sort()).toStrictEqual([
+      "abstentions", "balance_harm_paise", "coverage_by_value", "decisions",
+      "is_operating_point", "parameter_name", "parameter_value", "solve_outcomes",
+    ]);
+    expect(Object.keys(written.sweeps.tau[0] ?? {}).sort()).toStrictEqual([
       "abstentions", "coverage_by_value", "decisions", "is_operating_point",
       "parameter_name", "parameter_value", "solve_outcomes",
     ]);

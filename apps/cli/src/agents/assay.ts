@@ -15,7 +15,6 @@ import {
   generateCandidates,
   isMember,
   modalLagDays,
-  observationValue,
   solve,
   validate,
   type AnchorLink,
@@ -86,6 +85,8 @@ import {
   type UnresolvedItemRecord,
 } from "@assay/ledger";
 import type { Paise } from "@assay/money";
+
+import { valueOf } from "../values.js";
 
 import { resolveConfig } from "../config.js";
 import { AgentUnavailableError } from "../errors.js";
@@ -279,33 +280,11 @@ type BankLineObs = Extract<Observation, { kind: "bank_line" }>;
 // value(observation) — DATA_MODEL.md §14.1's table
 // ---------------------------------------------------------------------------
 
-/**
- * `§14.1`'s *"rupee figure an unresolved item carries"*, over all nine kinds.
- *
- * The two member-eligible rows are **not** restated: `observationValue` is
- * `packages/engine`'s, and `§14.1`'s adjustment row — *"`M`, the non-zero one of
- * `debit`/`credit`; **not** `amount`"* — is the row a second reading would get
- * wrong. The rest are the field selections `§14.1` tabulates, and the reference
- * kinds *"have no value under this definition"* and carry `0`.
- */
-function valueOf(o: Observation): number {
-  if (isMember(o)) return observationValue(o);
-  switch (o.kind) {
-    case "bank_line":
-      return o.payload.amount;
-    case "settlement":
-      return o.payload.amount;
-    case "ledger_entry":
-      return o.payload.gross_paise;
-    case "refund":
-      return o.payload.amount;
-    case "dispute":
-      return o.payload.amount;
-    default:
-      // payment, order — §10.1's reference kinds.
-      return 0;
-  }
-}
+// `valueOf` — §14.1's nine-kind table — is `../values.js`'s.
+// It was transcribed here and in `b0.ts`, and `bench/scorer.ts` needs the same
+// table to build the value maps `metrics/harm.ts` and `metrics/abstention.ts`
+// take as parameters; a third copy is a third place §14.1 can drift. The move
+// is the one `entityIdOf` already made at M55, for the same reason.
 
 // `entityIdOf` — the business identifier `§16` calls "the observation's own" —
 // is `@assay/domain`'s from spec 1.4.33 (register row DATA_MODEL.md §22.2 M55).

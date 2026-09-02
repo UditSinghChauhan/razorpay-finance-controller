@@ -121,6 +121,25 @@ export type AmbiguityLabel =
   | "NO_SOLUTION"
   | "INTRACTABLE";
 
+/**
+ * {@link AmbiguityLabel}'s five values, as data.
+ *
+ * The vocabulary is closed and `oracle_labels.jsonl` carries one of them per
+ * row, so a reader of that artifact must be able to check a decoded value
+ * against the list rather than transcribe it. A second spelling in a caller is
+ * how a label the oracle never emits reaches a metric as a silently smaller
+ * population — `metrics/abstention.ts` selects `TRULY_AMBIGUOUS` out of this
+ * set, so anything unrecognised shrinks metric 4's denominator instead of
+ * failing.
+ */
+export const AMBIGUITY_LABELS: readonly AmbiguityLabel[] = Object.freeze([
+  "UNAMBIGUOUS",
+  "IMMATERIALLY_AMBIGUOUS",
+  "TRULY_AMBIGUOUS",
+  "NO_SOLUTION",
+  "INTRACTABLE",
+]);
+
 /** The oracle's product for one target — one row of `oracle_labels.jsonl`. */
 export interface OracleLabel {
   readonly target_id: string;

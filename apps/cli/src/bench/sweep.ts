@@ -5,6 +5,7 @@ import {
   coverage,
   type AgentId,
   type AgentInput,
+  type AgentRun,
 } from "@assay/eval";
 
 import type { SweepParameters, SweptRunner } from "../agents/sweep-runner.js";
@@ -129,17 +130,56 @@ export interface SweepPoint {
   readonly decisions: number;
 }
 
+/**
+ * One ε point — a {@link SweepPoint} plus `§5.1`'s **y-axis**.
+ *
+ * `§5.3`'s procedure table gives this sweep's output as *"`(coverage_by_value,
+ * balance_harm)` per point → metric 3 `aurc_inr`"*, and `§5.1` names the same two
+ * as the figure's axes. The x has always been here; {@link balance_harm_paise} is
+ * the y, and it is the **only** truth-dependent quantity either sweep reports.
+ *
+ * **It is not added to the τ points, and that is `§5.3`'s own scoping.** The τ
+ * row's output column reads *"`coverage_by_value`, `count(AMBIGUOUS)`,
+ * `count(IMMATERIALLY_AMBIGUOUS)` per point → metric 26 `tau_sensitivity`"* —
+ * three quantities, *"that statement, and only that statement"*, and all three
+ * engine-side. A harm figure on a τ point would be a fourth output of a frozen
+ * sweep. {@link SweepPoint} therefore keeps exactly the fields it had, and the ε
+ * curve extends it.
+ */
+export interface EpsilonSweepPoint extends SweepPoint {
+  /**
+   * Metric 6(a) at this ε, in paise — `§5.1`'s risk axis.
+   *
+   * `null` where the scored unit was given no answer key, so `§4.4`'s harm has no
+   * value at any point on the curve. Never `0` in that case: `metrics/harm.ts`'s
+   * zero is the *best* score, and `EVALUATION_SPEC.md §5.5` bars a number that
+   * does not exist in a committed run artifact.
+   */
+  readonly balance_harm_paise: number | null;
+}
+
 /** One agent's swept curves inside one scored unit. */
 export interface AgentSweeps {
-  readonly epsilon: readonly SweepPoint[];
+  readonly epsilon: readonly EpsilonSweepPoint[];
   readonly tau: readonly SweepPoint[];
 }
 
 /** An agent that `§5.1` draws as a single point contributes no curve. */
 export const NO_SWEEPS: AgentSweeps = Object.freeze({
-  epsilon: Object.freeze([]),
-  tau: Object.freeze([]),
+  epsilon: Object.freeze([] as readonly EpsilonSweepPoint[]),
+  tau: Object.freeze([] as readonly SweepPoint[]),
 });
+
+/**
+ * `§5.1`'s risk axis, as this module receives it.
+ *
+ * A callback rather than a `GroundTruth`: `§4.4`'s harm is `packages/eval`'s and
+ * the read is `artifacts/ground-truth.ts`'s, so this module — which holds the
+ * grids and the walk — never sees an answer key, never opens a path and never
+ * decides what harm means. `commands/bench.ts` closes over `bench/scorer.ts`'s
+ * {@link balanceHarmOf} and passes the result of one `harm()` call per point.
+ */
+export type RiskAxis = (run: AgentRun) => number | null;
 
 // ---------------------------------------------------------------------------
 // Execution
@@ -160,7 +200,8 @@ async function evaluatePoint(
   parameter_value: number,
   sweep: SweepParameters,
   operating: number,
-): Promise<SweepPoint> {
+  riskAxis: RiskAxis,
+): Promise<EpsilonSweepPoint> {
   let composed;
   try {
     composed = await runner(input, sweep);
@@ -185,6 +226,9 @@ async function evaluatePoint(
     parameter_value,
     is_operating_point: parameter_value === operating,
     coverage_by_value: coverage(run).coverage_by_value.ratio,
+    // §5.1's y. One `harm()` call per point, through the caller's closure; this
+    // module reads no journal and differences no account.
+    balance_harm_paise: riskAxis(run),
     solve_outcomes: composed.solve_outcomes,
     abstentions: run.abstentions.length,
     decisions: run.decisions.length,
@@ -204,14 +248,15 @@ export async function runEpsilonSweep(
   runner: SweptRunner,
   input: AgentInput,
   agentId: AgentId,
-): Promise<readonly SweepPoint[]> {
+  riskAxis: RiskAxis,
+): Promise<readonly EpsilonSweepPoint[]> {
   assertGridIsFrozen();
-  const points: SweepPoint[] = [];
+  const points: EpsilonSweepPoint[] = [];
   for (const epsilonBps of EPSILON_GRID_BPS) {
     points.push(
       await evaluatePoint(
         runner, input, agentId, "epsilon_bps", epsilonBps,
-        { epsilonBps }, EPSILON_OPERATING_POINT_BPS,
+        { epsilonBps }, EPSILON_OPERATING_POINT_BPS, riskAxis,
       ),
     );
   }
@@ -238,9 +283,14 @@ export async function runTauSweep(
   const points: SweepPoint[] = [];
   for (const tauFloorPaise of TAU_FLOOR_GRID_PAISE) {
     points.push(
-      await evaluatePoint(
-        runner, input, agentId, "tau_floor_paise", tauFloorPaise,
-        { tauFloorPaise }, -1,
+      // No risk axis: §5.3 fixes this sweep's three outputs and harm is not one
+      // of them. The `null` never reaches an artifact -- `stripRiskAxis` returns
+      // the τ point to exactly the fields SweepPoint declares.
+      stripRiskAxis(
+        await evaluatePoint(
+          runner, input, agentId, "tau_floor_paise", tauFloorPaise,
+          { tauFloorPaise }, -1, () => null,
+        ),
       ),
     );
   }
@@ -248,14 +298,28 @@ export async function runTauSweep(
   return Object.freeze(points);
 }
 
+/** A τ point, with `§5.1`'s y-axis removed rather than carried as a `null`. */
+function stripRiskAxis(point: EpsilonSweepPoint): SweepPoint {
+  return Object.freeze({
+    parameter_name: point.parameter_name,
+    parameter_value: point.parameter_value,
+    is_operating_point: point.is_operating_point,
+    coverage_by_value: point.coverage_by_value,
+    solve_outcomes: point.solve_outcomes,
+    abstentions: point.abstentions,
+    decisions: point.decisions,
+  });
+}
+
 /** Both curves for one `§5.1` curve agent. */
 export async function runSweeps(
   runner: SweptRunner,
   input: AgentInput,
   agentId: AgentId,
+  riskAxis: RiskAxis,
 ): Promise<AgentSweeps> {
   return Object.freeze({
-    epsilon: await runEpsilonSweep(runner, input, agentId),
+    epsilon: await runEpsilonSweep(runner, input, agentId, riskAxis),
     tau: await runTauSweep(runner, input, agentId),
   });
 }

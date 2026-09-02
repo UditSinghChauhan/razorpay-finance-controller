@@ -7,7 +7,6 @@ import {
 } from "@assay/domain";
 import {
   isMember,
-  observationValue,
   validate,
   type Member,
   type ValidationResult,
@@ -55,6 +54,8 @@ import {
   type UnresolvedItemRecord,
 } from "@assay/ledger";
 import type { Paise } from "@assay/money";
+
+import { valueOf } from "../values.js";
 
 /**
  * `B0-IDONLY` — exact join on `settlement_id` and normalized UTR.
@@ -155,25 +156,9 @@ const compare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 type SettlementObs = Extract<Observation, { kind: "settlement" }>;
 type BankLineObs = Extract<Observation, { kind: "bank_line" }>;
 
-/** `DATA_MODEL.md §14.1`'s `value(observation)`, over all nine kinds. */
-function valueOf(o: Observation): number {
-  if (isMember(o)) return observationValue(o);
-  switch (o.kind) {
-    case "bank_line":
-      return o.payload.amount;
-    case "settlement":
-      return o.payload.amount;
-    case "ledger_entry":
-      return o.payload.gross_paise;
-    case "refund":
-      return o.payload.amount;
-    case "dispute":
-      return o.payload.amount;
-    default:
-      // payment, order — §10.1's reference kinds.
-      return 0;
-  }
-}
+// `valueOf` — §14.1's `value(observation)` over all nine kinds — is
+// `../values.js`'s; see the note in `assay.ts`. Both agents and
+// the scorer read one definition of the table.
 
 // `entityIdOf` is `@assay/domain`'s from spec 1.4.33 — see the note in
 // `assay.ts`. Both agents read one definition of §16's business identifier.
