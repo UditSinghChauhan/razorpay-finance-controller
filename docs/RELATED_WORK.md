@@ -1,6 +1,17 @@
 # RELATED_WORK — ASSAY
 
-**Spec version:** 1.4.33 · **Date:** 2026-09-02
+**Spec version:** 1.4.34 · **Date:** 2026-09-02
+
+**At spec 1.4.34** this document is unchanged apart from the version header. Register
+row `DATA_MODEL.md §22.2` **M56** rules that `PREREGISTRATION.md §6.2` `AL5` is an
+**emission** rule, so the scorer reads ground truth at `§9` step 7 under `--sealed`.
+**No positioning claim depends on it, and one is made checkable by it:** `§4`'s
+selective-prediction citation rests on metric 3's risk–coverage curve and `AURC`, whose
+axes read `EVALUATION_SPEC.md §4.4(a)`'s `balance_harm_inr` — a figure the official
+sealed run could not have produced under the reading `M56` replaces. No prior-art
+comparison, differentiator or claim moves, and `§1.4`'s statement — that ASSAY consumes
+the Razorpay recon report as authoritative input and claims no gap in it — is untouched.
+See `DECISION_BRIEF.md §A.41`.
 
 **At spec 1.4.33** this document is unchanged apart from the version header. Register
 row `DATA_MODEL.md §22.2` **M55** supplies metric 15's per-case `balance_harm`. **No

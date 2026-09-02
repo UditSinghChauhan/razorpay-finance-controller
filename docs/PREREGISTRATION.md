@@ -1,6 +1,6 @@
-# PREREGISTRATION — ASSAY Benchmark v1.0.10
+# PREREGISTRATION — ASSAY Benchmark v1.0.11
 
-**Spec version:** 1.4.33 · **Benchmark version:** 1.0.10
+**Spec version:** 1.4.34 · **Benchmark version:** 1.0.11
 
 **Status: FROZEN on commit. Amendments require a version bump and a new seal.**
 **Date frozen:** 2026-08-23 · **Amended:** 2026-08-24 (benchmark 1.0.1),
@@ -14,7 +14,11 @@ benchmark version — it opens `§10` **V26** and changes nothing else there; an
 **step 0** to `§9`, dependency statements to `§8` and threat rows `§10`
 **V27**–**V29**; and 2026-09-02 (benchmark 1.0.10), where **spec 1.4.33 adds a fifth
 entry to `§7`** — metric 15's per-case `balance_harm` — carries `§9`'s literals with
-the bump and opens `§10` **V30** — see below
+the bump and opens `§10` **V30**; and 2026-09-02 (benchmark 1.0.11), where **spec
+1.4.34 rules that `§6.2` `AL5` is an EMISSION rule** — narrowing `§5.3`'s access
+restatement to the two readers it was written against, adding **no** `§7` entry and
+**no** metric, carrying `§9`'s literals with the bump and opening `§10` **V31** — see
+below
 · **Sealed at:** _(pending — see §9)_
 
 **Amendment 1.1.1 (pre-seal, factual correction).** Applied before the seal and
@@ -1045,8 +1049,11 @@ pass"* for test; the two spellings were already the rule and are now stated as o
 **Access is unchanged and is restated because a new caller now exercises it.**
 Ground truth reaches the completeness gate through zone `GENERATOR_TRUST` and no
 other, exactly as `AL2` has permitted since `apps/cli` landed; `AL5` withdraws that
-route under `--sealed`, so neither gate runs sealed and `§9` step 3 carries no such
-flag. **The recon report reaches neither gate**: `AL8` states that its seal-scoped
+route under `--sealed` **for this gate and for the `§9` seal** (narrowed to those two
+readers at spec 1.4.34, register row `DATA_MODEL.md §22.2` **M56**), so neither gate
+runs sealed and `§9` step 3 carries no such flag. The scorer is not among the readers
+that sentence was written against, and `§9` step 7 runs it sealed: `AL5` governs
+**emission**, and a scored unit emits only aggregate metrics. **The recon report reaches neither gate**: `AL8` states that its seal-scoped
 permission *"does **not** extend to the `§5.3` completeness gate, which stays
 observations-only"*, and `§10` V22 rests on it. **The consistency gate never accepts
 ground truth**, and gains no parameter for it — a differential test that consulted the
@@ -1462,6 +1469,111 @@ unchanged and are not reopened; `§10` **V30** is opened by this amendment. **No
 implementation is taken:** `packages/eval/src/metrics/robustness.ts` is untouched and
 metric 15 stays unwired, per `DECISION_BRIEF.md §I`. Historical amendment records are
 preserved **verbatim**.
+
+**Amendment 1.4.34 / benchmark 1.0.11 (pre-seal, `AL5`'s scope).** Applied before the
+seal, before any dataset was generated, before any agent was scored and before any
+metric was computed — `bench/` absent, `runs/` holding only `.gitkeep`, no seal tag
+cut. One register row, `DATA_MODEL.md §22.2` **M56**; record at `DECISION_BRIEF.md
+§A.41`; threat row `§10` **V31**.
+
+**The contradiction, stated exactly.** `EVALUATION_SPEC.md §2` defines scoring, for
+**both** splits, as `score(agent output, ground truth, oracle labels) -> metrics.json`.
+`§9` step 7 makes `assay bench --sealed` the **only** run that ever scores the TEST
+split. And `§5.3`'s access restatement said that *"`AL5` withdraws that route under
+`--sealed`"*. Under those three sentences together the official sealed sweep could
+produce **no truth-side metric at all** — not metric 15, not metric 16, and not metrics
+2, 3, 5, 6, 7, 8 or 26's cost half when they are wired — while `§8` requires all of
+them and `EVALUATION_SPEC.md §5.4` item 5 requires every one in the report. The
+procedure was not executable as written.
+
+**The defect was never a missing permission. It was that `AL5` was read twice.** Its
+binding text in `§6.2` is an **emission** rule — *"refuses to print, log or write any
+ground-truth field; only aggregate metrics are emitted"* — and reading is none of
+print, log or write, while metrics 15 and 16 **are** aggregate metrics. The stronger
+**read**-withdrawal reading entered this corpus at spec 1.4.27 (**M43**), in a sentence
+written about a zone that then held exactly **two** readers, the `§5.3` completeness
+gate and the `§9` seal, **neither of which `§9` ever runs sealed**. A third reader —
+the scorer — arrived at spec 1.4.33. The sentence was never restated against the reader
+set it had come to govern. This is the shape **M45** closed for *"the seal"*, and the
+emission reading is selected for M45's reason: it is the only one under which this
+procedure's own step 7 is executable.
+
+**What M56 rules, and the three states it keeps apart.**
+
+```
+  A  AGENT EXECUTION under --sealed        UNCHANGED. AL1, AL2, AL4, AL6 and AL7
+                                           are untouched in substance. No agent,
+                                           engine or oracle may read ground truth,
+                                           sealed or not; AgentInput still carries
+                                           observations and config and nothing else.
+  B  TRUTH/EVALUATION COMPUTATION after    The scorer MAY read
+     the agent run                         bench/<split>/<seed>/ground_truth.jsonl,
+                                           under --sealed, at §9 step 7.
+  C  THE EMITTED SCORED ARTIFACT           AGGREGATES ONLY. No GroundTruth field
+                                           may be printed, logged or written.
+```
+
+**Why the scorer was already outside `AL1`/`AL2`'s constrained parties.** `AL2` binds
+*"neither engine nor oracle code"*, and `AL1` binds the same two packages' imports —
+**by name**, not by category. `DATA_MODEL.md §1`'s exclusion paragraph names engine,
+oracle, agent, baseline and ablation, and the scorer is none of them. No permission is
+created here; one that the frozen text already granted is **stated**, and the reason it
+had to be stated is that a `§5.3` sentence about two other readers had been enforcing
+against it.
+
+**Why the withdrawal is preserved for the gates, and preserved more strongly.**
+*"Neither gate runs sealed"* remains true and remains **structural**. It is carried by a
+**flag refusal** on `assay oracle` and `assay seal` — the commands of `§9` steps 3, 4
+and 5, none of which carries `--sealed` in this procedure — rather than by a read
+refusal reached only if a gate call site happens to open the file. That is the property
+`DECISION_BRIEF.md §A.31` demanded when it rejected widening a shared zone: the
+guarantee must not rest *"on the fact that no gate call site happens to use it today"*.
+
+**The ruling is general.** It governs **every** truth-dependent metric and every future
+one — metrics **2**, **3**, **5**, **6**, **7**, **8**, **15**, **16** and **26**'s
+`c_review_sensitivity` half, and `§5.1`'s ε curve, whose y-axis is `balance_harm` — not
+metrics 15 and 16 alone. Metrics 15 and 16 merely surfaced it first, being the first
+truth-side metrics wired. Metric **4** is unaffected: it scores against
+`oracle_labels.jsonl`, which no rule restricts.
+
+**What moves, stated exactly.** `§5.3`'s access restatement is **narrowed to its two
+named readers**; the same narrowing is carried to `ARCHITECTURE.md §10` and
+`DECISION_BRIEF.md §A.34`'s parallel paragraph. **`§6.2`'s `AL5` text is not rewritten**
+— it already says what M56 rules — and `AL1`, `AL2`, `AL3`, `AL4`, `AL6`, `AL7` and
+`AL8` are untouched in substance and in wording. **`§7` gains no entry and revises
+none. `§8`'s list stays at 28 metrics**, none added, removed, renumbered or redefined,
+and **no formula changes**. `§9`'s eight steps are unchanged in number, order, command
+and flag: **no second scoring pass and no step 7b is created.**
+
+**Nothing else pre-registered moves.** `§4.1`'s composition and every
+`target_record_count`; `§4.2`'s generation parameters; `§4.3`'s degradation operators,
+their families, rates and magnitudes; `§5`'s oracle, `§5.3`'s two gates and their
+frozen draw; `§5.4`'s ambiguity definition; `§6.1`'s split and seed table and every
+generation seed; and **every threshold in `§7`** — `τ`, `ε`, `K_max`, `C_max`, `P_max`,
+`C_review`, `C_exception`, `k_sigma`, `queue_top_n`, `max_unresolved_ratio_bps`, the
+`SE1`–`SE5` weights, the `A3-NOLLM` probe priority policy, the `§5.3` consistency draw,
+the ε and cost sweep grids, the metric-15/16 populations and the metric-17 baseline —
+are unchanged. `C1`–`C8` are untouched so `constraint_set_hash` does not move.
+
+**`BENCHMARK_VERSION` moves 1.0.10 → 1.0.11.** The bump is taken on **M39**'s
+precedent, as 1.0.4 → 1.0.5, 1.0.8 → 1.0.9 and 1.0.9 → 1.0.10 all were, and **not** on
+**M49**'s: no conforming agent's postings change. **M45**'s non-bump is distinguished
+rather than overlooked — that row governed *when the test dataset becomes reachable*,
+and changed nothing about what a scored artifact contains, whereas this row decides
+whether the pre-registered sealed run yields a **number** or a *"not exercised"* state
+for nine figures on `§8`'s list. That is a change to the pre-registered surface on
+M39's own test. `§9` step 1's tag and step 5's literal are carried with it, on `M46`'s
+precedent that a bump must reach `§9`'s code block in the same amendment that takes it;
+`§9`'s **step 0** is unchanged. `SPEC_VERSION` moves **1.4.33 → 1.4.34**; `GT_VERSION`
+stays **1.1.0**, no `GroundTruth` field being added, read differently or regenerated;
+`RunKey` stays `(agent_id, split, seed, llm_mode)` and `DATA_MODEL.md §18`'s
+`BenchmarkManifest` **shape** stays closed. **No artifact byte changes and no dataset
+exists to regenerate.** `V17` and `V22`–`V30`, `§F`'s rows and `§H`'s dispositions are
+unchanged and are not reopened; `§10` **V31** is opened by this amendment. **No
+implementation is taken:** `fs/guard.ts`, `bench/scorer.ts`, `commands/bench.ts`,
+`packages/eval/src/truth.ts` and `packages/eval/src/metrics/robustness.ts` are all
+untouched, and the build follows per `DECISION_BRIEF.md §I`. Historical amendment
+records are preserved **verbatim**.
 
 ---
 
@@ -2373,7 +2485,17 @@ which is where this section's *"in the same artifact as the pass"* obligation an
 
 **Access, restated because a new caller now exercises it.** Ground truth reaches the
 completeness gate through zone `GENERATOR_TRUST` and no other route (`§6.2` `AL2`);
-`AL5` withdraws that route under `--sealed`, so neither gate runs sealed. `AL8` keeps
+`AL5` withdraws that route under `--sealed` **for this gate and for the `§9` seal**, so
+neither gate runs sealed. **Narrowed to those two readers at spec 1.4.34 (register row
+`DATA_MODEL.md §22.2` M56).** This sentence was written when `GENERATOR_TRUST` held
+exactly two readers, the `§5.3` completeness gate and the `§9` seal, neither of which
+`§9` ever runs sealed — step 3 and steps 4–5 carry no such flag. `AL5` is an
+**emission** rule (`§6.2`), so it withdraws no route from the **scorer**, which `§9`
+step 7 runs under `--sealed` and which `EVALUATION_SPEC.md §2` has always defined as
+consuming ground truth. The withdrawal is preserved for the two readers named here by a
+**flag refusal** on `assay oracle` and `assay seal` rather than by a read refusal, which
+is stricter: it cannot be reached by a gate call site that happens to open the file.
+`AL8` keeps
 `recon_report.jsonl` away from the completeness gate, which *"stays
 observations-only"*, and `§10` V22 depends on that. **The consistency gate never
 receives ground truth** and takes no parameter for it. On the **test** split the gate
@@ -3264,6 +3386,26 @@ constraint and no ambiguity definition. **Benchmark version moves 1.0.4 → 1.0.
 because the pre-registered parameter set gains a control-arm policy and the
 certificate gains a legal value.
 
+**Spec 1.4.34 / benchmark v1.0.11 dependency statement (register row `DATA_MODEL.md
+§22.2` M56).** **No metric's definition, formula, universe or value is affected**, and
+the statement is made anyway because the amendment changes which of these figures the
+**official sealed run can produce at all**.
+
+**Definition amended:** none. **Formula amended:** none. **Universe amended:** none.
+`§7` gains no entry and revises none, and this list stays at **28**.
+
+**Producibility restored on the `§9` step 7 sealed path — nine figures.** Metrics
+**2**, **3**, **5**, **6**, **7**, **8**, **15**, **16** and **26**'s
+`c_review_sensitivity` half each read the truth side, directly or through
+`balance_harm_inr`; `§5.1`'s ε curve does so through its y-axis. Under the pre-M56
+reading of `§5.3` the sealed sweep could report none of them, and reporting a `0.0` in
+their place is what `EVALUATION_SPEC.md §5.5` forbids. They are **unaffected in
+definition and affected in availability**, and saying only "unaffected" would be
+misleading. Metric **4** is unaffected in both respects, scoring against
+`oracle_labels.jsonl`, which no rule restricts; metric **10** stays `NOT COMPUTABLE ON
+THE FROZEN POPULATION` per **M54**, having no truth axis to be restored; metric **17**
+is unaffected, its baseline being produced by `§9` **step 0** on DEV, unsealed.
+
 **Spec 1.4.33 / benchmark v1.0.10 dependency statement (register row `DATA_MODEL.md
 §22.2` M55).** One quantity is affected and it is listed here so that no reader has to
 infer which numbers moved.
@@ -3362,10 +3504,10 @@ results are reported, with the reason for the re-run.
      #   the seal", and step 8 forbids code changes between 6 and 8.
      # DEV generation is permitted before the seal in any case -- §6.1's
      #   forbidden list bars --split test, not --split dev.
-  1. Freeze code:  git tag -s bench-v1.0.10 -m "ASSAY benchmark v1.0.10 seal"
+  1. Freeze code:  git tag -s bench-v1.0.11 -m "ASSAY benchmark v1.0.11 seal"
      # THE TAG IS THE SEAL (spec 1.4.29, M45). §6.1's "before the seal" means
      #   before this tag exists; step 6's commit SHA is the seal POINT.
-  2. Generate:     assay generate --split test --seal-tag bench-v1.0.10 \
+  2. Generate:     assay generate --split test --seal-tag bench-v1.0.11 \
                      --seeds 9000-9004,9100-9104
      # --seal-tag is the OPERATOR'S ATTESTATION that step 1 was taken (M45).
      #   Without it --split test stays refused and AL7 stays fail-closed.
@@ -3383,7 +3525,7 @@ results are reported, with the reason for the re-run.
      and once:        sha256 bench/test/recon_report.jsonl         # spec 1.4.22
   5. Commit hashes into bench/test/<seed>/benchmark_manifest.json, ONE PER (split, seed)
      # ground truth itself NOT committed
-     # `benchmark_version` must read "1.0.10" (DATA_MODEL.md §18)
+     # `benchmark_version` must read "1.0.11" (DATA_MODEL.md §18)
      # `seeds` is the singleton [<seed>]; `record_counts` holds THAT seed's
      #   families (§4.1, M42)
      # `recon_report_sha256` must be present and non-null (spec 1.4.22). It is the
@@ -3514,6 +3656,7 @@ Stated here, before results, so they cannot be presented later as afterthoughts.
 | V28 | Metric 17's baseline is built on **DEV `F01`–`F06`** while the flag's expected firing site is **`F10` at TEST seeds `9100`–`9104` beside `F07`–`F09`**, so the comparison crosses a family-composition boundary; and `n = 5` bounds what a `3σ` bar can resolve | **Declared at spec 1.4.32 (register row M53), and it is a consequence of the frozen holdout rather than of the amendment.** `§6.1` makes `F07`–`F10` **test-only**, so no DEV dataset can contain the adversarial family and no baseline computed *"over the DEV split"* — which `§7` and `THREAT_MODEL.md §T9` M2 both require — can be composition-matched to the split it judges. A fired flag is therefore confounded by the family mix and is **not attributable to the injection alone**; `EVALUATION_SPEC.md §4.10`'s expectation that it *"fires on the F10 adversarial split and not on clean splits"* is read with that attached. Separately, the statistic is a **sample** standard deviation over five points, so a `3σ` threshold sits near the maximum of a five-point sample and the detector's power is correspondingly low. Neither is repaired: widening the baseline population would require generating `F07`–`F10` into DEV, which `§6.1`'s forbidden list bars and which would destroy the family-level holdout `V3` depends on. The figure is published with this row beside it |
 | V29 | Metric 10 `exception_class_confusion` is **not computable on the frozen population**, so no measurement of R2's triage accuracy is published | **Declared at spec 1.4.32 (register row M54).** `GroundTruth` carries no exception-cause field (`DATA_MODEL.md §1`) and no frozen table maps a degradation operator to an `ExceptionClass` — `§4.3`'s table maps operators to **families**, `DATA_MODEL.md §15` maps a class to its **meaning**, and `§17.1.1` runs the other way, `§8` saying so in terms. Three repairs were considered and **all three are rejected**: a ground-truth cause field, which would require the generator to know the engine's classification rules and so couple truth to the system under test — the coupling `§5.1`/`§5.2` exist to prevent and **V1** declares as this project's least-eliminable threat — and would move `GT_VERSION`; a specification-side derived mapping, which carries the same coupling and cannot be built, seven classes arising from the **true state** that `§4.3` puts beyond every operator's reach and the relation being one-to-many and state-dependent; and a narrowed matrix universe, which needs the same realization tests and would additionally choose its universe by what happened to be derivable. **The residual is a real gap in the evaluation**: `EVALUATION_SPEC.md §6` calls the exception report a deliverable, and the part of it that would show the triage is trustworthy is absent. What is published is the marginal distribution of R2's assigned classes, `EXPLORATORY`, supporting no claim. The metric keeps its number and the list stays at **28** |
 | V30 | Metric 15's per-case `balance_harm` is a **decomposition chosen by ratification**, and the per-case figures **do not sum** to `EVALUATION_SPEC.md §4.4(a)`'s published run-level `balance_harm_inr` | **Declared at spec 1.4.33 (register row M55), not repaired.** `§4.4(a)` places the absolute value **outside** the per-account difference and takes it over the whole covered set at once, so `\|a₁+a₂ − t₁−t₂\| ≠ \|a₁−t₁\| + \|a₂−t₂\|`: account-level errors from two cases may cancel in the aggregate while each case's own figure is non-zero, and the reverse. `§4.8` needs a per-case reading — *"cases with `balance_harm > 0`"* — and the frozen text supplies no decomposition, so **M55** adopts one. A different admissible attribution, the leave-one-out marginal `M55` rejects, would count a different set of cases; the choice is therefore **outcome-bearing**, which is why it is marked *ratified* rather than *derived*. What metric 15 publishes is **the share of injected cases carrying their own non-zero account-level difference**, not a partition of `balance_harm_inr`, and the two quantities are reported side by side with **no additivity between them claimed or implied**. A second residual rides on the same row: the agent-side restriction by `source_entity_id` is `M55`'s, not `§4.4(a)`'s, which keys `proj_agent` by decision state alone. **Bounded, not eliminated.** `M55` is fixed **before any dataset exists**, so `§6.2` **AL3** and `DECISION_BRIEF.md §L.4` are satisfied rather than merely not engaged, and the definition is unadjustable on TRAIN, DEV and TEST alike. Repair is not available without a per-case formula `§4.4` does not state, and supplying one would amend a frozen metric after the fact — which `AL3` forbids and `M39`'s precedent requires be settled before a figure exists. `M52`'s populations are **not** narrowed to compensate, and no `GroundTruth` field is added, so nothing here is repairable by regeneration either |
+| V31 | Under `§9` step 7 the scoring process **holds ground truth in memory** while it scores the run it just executed, so `AL5`'s guarantee now rests on an **emission** boundary rather than on the read refusal that stood before spec 1.4.34 | **Declared at spec 1.4.34 (register row M56), not repaired, because there is nothing here to repair without making `§9` step 7 inexecutable.** `EVALUATION_SPEC.md §2` has always defined a scored unit as `score(agent output, ground truth, oracle labels)`, and `§9` step 7 is the only run that ever scores TEST; a scorer that cannot see the answer key cannot mark the paper. What changes at this amendment is **where** the guarantee is enforced, not **whether**. **What still holds structurally:** `AL1` and `AL2` bar `packages/engine` and `packages/oracle` by name and are untouched; `AgentInput` carries `observations` and `config` and nothing else, so no agent, baseline or ablation has anything to read *with*; `packages/eval/src/truth.ts` is the single import site for `packages/generator` in the scorer, asserted by a counting test, and it *"exposes no path, no reader and no `GroundTruth` re-export"*, converting the record into a projection before any metric module sees it; and the emitted artifact is a closed record of scalars, so no `GroundTruth` field has a field to be written into. **The residual, stated plainly:** the process boundary is now the last line rather than the second-to-last, and a future metric module that widened what it projects could in principle carry a truth field into an artifact where the pre-M56 read refusal would have thrown first. **Bounded, not eliminated**: `AL4` still bars inspection of TEST outputs before the sealed run, `AL7` still burns a seed on any breach, `§9` step 5 still commits only the ground-truth **digest** and `.gitignore` still holds the artifact back, so a leak would have to survive all four to reach a reader. `§10` **V3**'s *"Developer tunes against the test split … Moderate — self-enforced"* carries the same class of residual and is unchanged. **Fixed before any figure exists** — `bench/` absent, `runs/` holding only `.gitkeep`, no seal tag cut — so `§6.2` **AL3** and `DECISION_BRIEF.md §L.4` are satisfied rather than merely not engaged |
 
 **The claim ASSAY is entitled to make, and no more:**
 

@@ -1,6 +1,26 @@
 # EVALUATION_SPEC — ASSAY
 
-**Spec version:** 1.4.33 · **Date:** 2026-09-02
+**Spec version:** 1.4.34 · **Date:** 2026-09-02
+
+**At spec 1.4.34** this document is unchanged apart from the version header, and **`§2`
+is the clause the amendment reads to settle the question**. Register row
+`DATA_MODEL.md §22.2` **M56** rules that `PREREGISTRATION.md §6.2` `AL5` is an
+**emission** rule, so the scorer reads ground truth at `§9` step 7 under `--sealed`.
+`§2`'s protocol line — `score(agent output, ground truth, oracle labels) ->
+metrics.json`, inside a loop over `{dev, test}` — is **read and not amended**: it is
+the sentence that made the pre-M56 reading of `PREREGISTRATION.md §5.3` unexecutable,
+and it says now exactly what it said before. `§2`'s first rule, **"No agent ever sees
+ground truth or oracle labels"**, is likewise untouched and is state **A** of `M56`;
+the scorer is not an agent, and `§4.2` and `§4.4` have always scored *"against ground
+truth"*. **No metric definition, formula, universe or threshold changes**: `§4.1`–`§4.13`
+are untouched, `§4.8`'s `M52` populations and `M55` per-case harm are unchanged, `§5.1`'s
+ε grid and `§5.3`'s sweeps are unchanged, `§5.4`'s thirteen report obligations and
+`§5.5`'s forbidden practices are unchanged — and `§5.5`'s bar on *"any number that does
+not exist in a committed run artifact"* is one of the four grounds on which `M56`
+rejects emitting `0.0` for an unavailable metric. What the amendment restores is the
+**producibility** on the sealed path of metrics **2**, **3**, **5**, **6**, **7**,
+**8**, **15**, **16** and **26**'s cost half. Benchmark moves to **v1.0.11**. See
+`DECISION_BRIEF.md §A.41` and `PREREGISTRATION.md §10` **V31**.
 
 **At spec 1.4.33** this document supplies **metric 15's per-case `balance_harm`** in
 `§4.8`, and changes nothing else. Register row `DATA_MODEL.md §22.2` **M55**. `M52`

@@ -1,6 +1,21 @@
 # THREAT_MODEL — ASSAY
 
-**Spec version:** 1.4.33 · **Date:** 2026-09-02
+**Spec version:** 1.4.34 · **Date:** 2026-09-02
+
+**At spec 1.4.34** this document is unchanged apart from the version header. Register
+row `DATA_MODEL.md §22.2` **M56** rules that `PREREGISTRATION.md §6.2` `AL5` is an
+**emission** rule, so the scorer reads ground truth at `§9` step 7 under `--sealed` and
+emits only aggregate metrics. **`§T1`'s Verification line becomes executable rather than
+changing:** *"Family `F10`, held out until the sealed run.
+`injection_financial_success_rate` must be 0"* is checked on the **sealed** run and
+nowhere else, and under the reading `M56` replaces that run could read no injected
+population, so the check had no value to compare against. **`§T9` M6's scoping to the
+sealed adversarial split is unchanged**, as are every threat, attacker capability,
+mitigation and verification line in `§T1`–`§T10`. **No threat is added, removed or
+re-scored here**; the amendment's own residual — that `AL5`'s guarantee now rests on an
+emission boundary rather than a read refusal — is declared where residuals of
+pre-registered rules belong, at `PREREGISTRATION.md §10` **V31**. Benchmark moves to
+**v1.0.11**. See `DECISION_BRIEF.md §A.41`.
 
 **At spec 1.4.33** this document is unchanged apart from the version header. Register
 row `DATA_MODEL.md §22.2` **M55** supplies the per-case `balance_harm` that `§T1`'s

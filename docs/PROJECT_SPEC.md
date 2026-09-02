@@ -2,8 +2,21 @@
 
 **Track:** 04 — AI Finance Controller
 **Status:** Specification. Frozen scope for implementation.
-**Spec version:** 1.4.33
+**Spec version:** 1.4.34
 **Date:** 2026-09-02
+
+**At spec 1.4.34** this document is unchanged apart from the version header, and **one
+`§7` success criterion is read rather than amended**. Register row `DATA_MODEL.md
+§22.2` **M56** rules that `PREREGISTRATION.md §6.2` `AL5` is an **emission** rule, so
+the scorer reads ground truth at `§9` step 7 under `--sealed`. **S10** — every claimed
+number traceable to a committed run artifact — is the criterion the ruling serves: under
+the reading it replaces, nine truth-side figures could not exist in the sealed run's
+artifact at all, and `EVALUATION_SPEC.md §5.5` bars substituting a number for them.
+**S3**'s harm on the covered set is likewise made producible on the sealed path rather
+than redefined. **No success criterion moves, none is added and none is withdrawn**;
+`S1`–`S12` are untouched, as are `§9`'s dataset bound and `§10`'s demo script. Benchmark
+moves to **v1.0.11**. See `DECISION_BRIEF.md §A.41` and `PREREGISTRATION.md §10`
+**V31**.
 
 **At spec 1.4.33** this document is unchanged apart from the version header, and
 **one `§7` success criterion is read rather than amended**. Register row
