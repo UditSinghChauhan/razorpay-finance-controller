@@ -1,0 +1,683 @@
+{
+  "key": {
+    "agent_id": "ASSAY",
+    "split": "test",
+    "seed": 9003,
+    "llm_mode": "offline"
+  },
+  "base": {
+    "coverage_by_value": 0.9878602598728032,
+    "coverage_by_count": 0.5177794832437964,
+    "coverage_by_value_bank": 0.29653202013265445,
+    "coverage_by_value_ledger": 0,
+    "coverage_by_value_all_observations": 0.5702436764805463,
+    "batch_value_paise": 5789608613,
+    "abstentions": 0,
+    "decisions": 237,
+    "open_exceptions": 3770,
+    "probes_spent": 0,
+    "abstentions_resolved_by_probe": 0,
+    "robustness": {
+      "exercised": false,
+      "not_exercised": "not exercised: M52's injected population is empty on this (split, seed) dataset — no INJECT_NOTES or CONFLICT_REFERENCE degradation record names an observation in it. EVALUATION_SPEC.md §4.8's two metrics are undefined rather than zero.",
+      "report": {
+        "exercised": false,
+        "injected_cases": 0,
+        "control_cases": 0,
+        "injected_cases_with_harm": 0,
+        "injection_financial_success_rate": null,
+        "abstained_injected": 0,
+        "abstained_control": 0,
+        "abstention_rate_injected": null,
+        "abstention_rate_control": null,
+        "forced_abstention_rate": null,
+        "injected_by_kind": {
+          "recon_line": 0,
+          "bank_line": 0,
+          "ledger_entry": 0,
+          "payment": 0,
+          "order": 0,
+          "refund": 0,
+          "settlement": 0,
+          "adjustment": 0,
+          "dispute": 0
+        },
+        "control_by_kind": {
+          "recon_line": 0,
+          "bank_line": 0,
+          "ledger_entry": 0,
+          "payment": 0,
+          "order": 0,
+          "refund": 0,
+          "settlement": 0,
+          "adjustment": 0,
+          "dispute": 0
+        }
+      },
+      "non_additivity_disclosure": "PREREGISTRATION.md §10 V30: injected_cases_with_harm counts injected cases whose M55 case_balance_harm is positive. case_balance_harm is a ratified decomposition and NOT a partition of EVALUATION_SPEC.md §4.4's balance_harm_inr: §4.4(a) places the absolute value outside the per-account difference and takes it over the whole covered set at once, so |a1+a2 - t1-t2| != |a1-t1| + |a2-t2| and the per-case figures do not sum to the run-level metric. No additivity between them is claimed or implied."
+    },
+    "abstention_spike": {
+      "abstention_rate_by_value": 0,
+      "abstained_recon_line_value_paise": 0,
+      "batch_value_paise": 5789608613,
+      "baseline_mean_bps": 0,
+      "baseline_stddev_bps": 0,
+      "k_sigma": 3,
+      "abstention_spike_flag": false,
+      "state": null,
+      "v28_disclosure": "PREREGISTRATION.md §10 V28: metric 17's baseline is built on DEV's F01-F06 while the flag's expected firing site is F10 at TEST seeds 9100-9104 beside F07-F09, so the comparison crosses a family-composition boundary and a fired flag is not attributable to the injection alone. n = 5 and the statistic is a SAMPLE standard deviation, so a 3σ bar sits near the maximum of a five-point sample and the detector's power is correspondingly low. Neither is repaired: widening the population would require generating F07-F10 into DEV, which §6.1's forbidden list bars."
+    },
+    "truth": {
+      "scored": true,
+      "not_scored": null,
+      "report": {
+        "match": {
+          "true_positives": 3654,
+          "false_positives": 0,
+          "false_negatives": 186,
+          "match_precision": 1,
+          "match_recall": 0.9515625,
+          "match_f1": 0.9751801441152922,
+          "excluded_unresolved": 61
+        },
+        "harm": {
+          "balance_harm_paise": 7803112096,
+          "misdirected_value_paise": 0,
+          "by_account": {
+            "1100_GATEWAY_RECEIVABLE": 3901556048,
+            "1200_BANK": 3702942644,
+            "1300_GST_INPUT_CREDIT": 15451511,
+            "2200_REFUND_LIABILITY": 97320330,
+            "4000_REVENUE": 0,
+            "5100_PG_FEE_EXPENSE": 85841563,
+            "9000_SUSPENSE_UNRECONCILED": 0
+          },
+          "covered_entities": 3654
+        },
+        "net_cost": {
+          "balance_harm_paise": 7803112096,
+          "abstention_count": 0,
+          "abstention_cost_paise": 0,
+          "open_exception_count": 3770,
+          "exception_cost_paise": 188500000,
+          "net_cost_paise": 7991612096,
+          "net_cost_paise_excluding_e13": 7813712096,
+          "e13_count": 3558
+        },
+        "abstention": {
+          "abstained": 0,
+          "truly_ambiguous": 0,
+          "correctly_abstained": 0,
+          "abstention_precision": 0,
+          "abstention_recall": 0,
+          "over_abstention_cost_paise": 0,
+          "silent_guess_value_paise": 0,
+          "probes_spent": 0,
+          "abstentions_resolved_by_probe": 0
+        },
+        "truly_ambiguous": 0,
+        "oracle_policy_net_cost_paise": 177900000,
+        "gap_to_oracle_paise": 7813712096,
+        "calibration": null
+      }
+    },
+    "ece": null,
+    "ece_state": "UNAVAILABLE: EVALUATION_SPEC.md §4.6's population is empty for this scored unit. DATA_MODEL.md §22.2 M57 fixes metric 7's population as the committed decisions carrying a non-null score — RECONCILIATION_SPEC.md §6 step 3's DISCRIMINATED branch, the one accept in which the ε-gap decided the gate — and this run committed none, so N = 0. No ECE is reported rather than the 0.0 an empty population would otherwise produce: §5.5 bars a number that does not exist in a committed run artifact, and M57 requires the metric be published UNAVAILABLE with its reason. PREREGISTRATION.md §10 V32 records that an empty population is a structural property of M57's population and never grounds for redefining it.",
+    "exception_class_confusion": null,
+    "exception_class_confusion_state": "NOT COMPUTABLE ON THE FROZEN POPULATION (DATA_MODEL.md §22.2 M54, PREREGISTRATION.md §10 V29): GroundTruth carries no exception-cause field and no frozen table maps a degradation operator to an ExceptionClass, so metric 10's matrix has no truth axis. The metric keeps its number and its place on §8's list of 28; the marginal distribution of R2's assigned classes is EXPLORATORY and supports no claim about triage accuracy."
+  },
+  "sweeps": {
+    "epsilon": [
+      {
+        "parameter_name": "epsilon_bps",
+        "parameter_value": 0,
+        "is_operating_point": false,
+        "coverage_by_value": 0.9878602598728032,
+        "balance_harm_paise": 7803112096,
+        "solve_outcomes": {
+          "UNIQUE": 138,
+          "IMMATERIALLY_AMBIGUOUS": 0,
+          "DISCRIMINATED": 0,
+          "AMBIGUOUS": 0,
+          "INTRACTABLE": 0
+        },
+        "abstentions": 0,
+        "decisions": 237
+      },
+      {
+        "parameter_name": "epsilon_bps",
+        "parameter_value": 500,
+        "is_operating_point": false,
+        "coverage_by_value": 0.9878602598728032,
+        "balance_harm_paise": 7803112096,
+        "solve_outcomes": {
+          "UNIQUE": 138,
+          "IMMATERIALLY_AMBIGUOUS": 0,
+          "DISCRIMINATED": 0,
+          "AMBIGUOUS": 0,
+          "INTRACTABLE": 0
+        },
+        "abstentions": 0,
+        "decisions": 237
+      },
+      {
+        "parameter_name": "epsilon_bps",
+        "parameter_value": 1000,
+        "is_operating_point": false,
+        "coverage_by_value": 0.9878602598728032,
+        "balance_harm_paise": 7803112096,
+        "solve_outcomes": {
+          "UNIQUE": 138,
+          "IMMATERIALLY_AMBIGUOUS": 0,
+          "DISCRIMINATED": 0,
+          "AMBIGUOUS": 0,
+          "INTRACTABLE": 0
+        },
+        "abstentions": 0,
+        "decisions": 237
+      },
+      {
+        "parameter_name": "epsilon_bps",
+        "parameter_value": 1500,
+        "is_operating_point": true,
+        "coverage_by_value": 0.9878602598728032,
+        "balance_harm_paise": 7803112096,
+        "solve_outcomes": {
+          "UNIQUE": 138,
+          "IMMATERIALLY_AMBIGUOUS": 0,
+          "DISCRIMINATED": 0,
+          "AMBIGUOUS": 0,
+          "INTRACTABLE": 0
+        },
+        "abstentions": 0,
+        "decisions": 237
+      },
+      {
+        "parameter_name": "epsilon_bps",
+        "parameter_value": 2000,
+        "is_operating_point": false,
+        "coverage_by_value": 0.9878602598728032,
+        "balance_harm_paise": 7803112096,
+        "solve_outcomes": {
+          "UNIQUE": 138,
+          "IMMATERIALLY_AMBIGUOUS": 0,
+          "DISCRIMINATED": 0,
+          "AMBIGUOUS": 0,
+          "INTRACTABLE": 0
+        },
+        "abstentions": 0,
+        "decisions": 237
+      },
+      {
+        "parameter_name": "epsilon_bps",
+        "parameter_value": 2500,
+        "is_operating_point": false,
+        "coverage_by_value": 0.9878602598728032,
+        "balance_harm_paise": 7803112096,
+        "solve_outcomes": {
+          "UNIQUE": 138,
+          "IMMATERIALLY_AMBIGUOUS": 0,
+          "DISCRIMINATED": 0,
+          "AMBIGUOUS": 0,
+          "INTRACTABLE": 0
+        },
+        "abstentions": 0,
+        "decisions": 237
+      },
+      {
+        "parameter_name": "epsilon_bps",
+        "parameter_value": 3000,
+        "is_operating_point": false,
+        "coverage_by_value": 0.9878602598728032,
+        "balance_harm_paise": 7803112096,
+        "solve_outcomes": {
+          "UNIQUE": 138,
+          "IMMATERIALLY_AMBIGUOUS": 0,
+          "DISCRIMINATED": 0,
+          "AMBIGUOUS": 0,
+          "INTRACTABLE": 0
+        },
+        "abstentions": 0,
+        "decisions": 237
+      },
+      {
+        "parameter_name": "epsilon_bps",
+        "parameter_value": 3500,
+        "is_operating_point": false,
+        "coverage_by_value": 0.9878602598728032,
+        "balance_harm_paise": 7803112096,
+        "solve_outcomes": {
+          "UNIQUE": 138,
+          "IMMATERIALLY_AMBIGUOUS": 0,
+          "DISCRIMINATED": 0,
+          "AMBIGUOUS": 0,
+          "INTRACTABLE": 0
+        },
+        "abstentions": 0,
+        "decisions": 237
+      },
+      {
+        "parameter_name": "epsilon_bps",
+        "parameter_value": 4000,
+        "is_operating_point": false,
+        "coverage_by_value": 0.9878602598728032,
+        "balance_harm_paise": 7803112096,
+        "solve_outcomes": {
+          "UNIQUE": 138,
+          "IMMATERIALLY_AMBIGUOUS": 0,
+          "DISCRIMINATED": 0,
+          "AMBIGUOUS": 0,
+          "INTRACTABLE": 0
+        },
+        "abstentions": 0,
+        "decisions": 237
+      },
+      {
+        "parameter_name": "epsilon_bps",
+        "parameter_value": 4500,
+        "is_operating_point": false,
+        "coverage_by_value": 0.9878602598728032,
+        "balance_harm_paise": 7803112096,
+        "solve_outcomes": {
+          "UNIQUE": 138,
+          "IMMATERIALLY_AMBIGUOUS": 0,
+          "DISCRIMINATED": 0,
+          "AMBIGUOUS": 0,
+          "INTRACTABLE": 0
+        },
+        "abstentions": 0,
+        "decisions": 237
+      },
+      {
+        "parameter_name": "epsilon_bps",
+        "parameter_value": 5000,
+        "is_operating_point": false,
+        "coverage_by_value": 0.9878602598728032,
+        "balance_harm_paise": 7803112096,
+        "solve_outcomes": {
+          "UNIQUE": 138,
+          "IMMATERIALLY_AMBIGUOUS": 0,
+          "DISCRIMINATED": 0,
+          "AMBIGUOUS": 0,
+          "INTRACTABLE": 0
+        },
+        "abstentions": 0,
+        "decisions": 237
+      },
+      {
+        "parameter_name": "epsilon_bps",
+        "parameter_value": 5500,
+        "is_operating_point": false,
+        "coverage_by_value": 0.9878602598728032,
+        "balance_harm_paise": 7803112096,
+        "solve_outcomes": {
+          "UNIQUE": 138,
+          "IMMATERIALLY_AMBIGUOUS": 0,
+          "DISCRIMINATED": 0,
+          "AMBIGUOUS": 0,
+          "INTRACTABLE": 0
+        },
+        "abstentions": 0,
+        "decisions": 237
+      },
+      {
+        "parameter_name": "epsilon_bps",
+        "parameter_value": 6000,
+        "is_operating_point": false,
+        "coverage_by_value": 0.9878602598728032,
+        "balance_harm_paise": 7803112096,
+        "solve_outcomes": {
+          "UNIQUE": 138,
+          "IMMATERIALLY_AMBIGUOUS": 0,
+          "DISCRIMINATED": 0,
+          "AMBIGUOUS": 0,
+          "INTRACTABLE": 0
+        },
+        "abstentions": 0,
+        "decisions": 237
+      },
+      {
+        "parameter_name": "epsilon_bps",
+        "parameter_value": 6500,
+        "is_operating_point": false,
+        "coverage_by_value": 0.9878602598728032,
+        "balance_harm_paise": 7803112096,
+        "solve_outcomes": {
+          "UNIQUE": 138,
+          "IMMATERIALLY_AMBIGUOUS": 0,
+          "DISCRIMINATED": 0,
+          "AMBIGUOUS": 0,
+          "INTRACTABLE": 0
+        },
+        "abstentions": 0,
+        "decisions": 237
+      },
+      {
+        "parameter_name": "epsilon_bps",
+        "parameter_value": 7000,
+        "is_operating_point": false,
+        "coverage_by_value": 0.9878602598728032,
+        "balance_harm_paise": 7803112096,
+        "solve_outcomes": {
+          "UNIQUE": 138,
+          "IMMATERIALLY_AMBIGUOUS": 0,
+          "DISCRIMINATED": 0,
+          "AMBIGUOUS": 0,
+          "INTRACTABLE": 0
+        },
+        "abstentions": 0,
+        "decisions": 237
+      },
+      {
+        "parameter_name": "epsilon_bps",
+        "parameter_value": 7500,
+        "is_operating_point": false,
+        "coverage_by_value": 0.9878602598728032,
+        "balance_harm_paise": 7803112096,
+        "solve_outcomes": {
+          "UNIQUE": 138,
+          "IMMATERIALLY_AMBIGUOUS": 0,
+          "DISCRIMINATED": 0,
+          "AMBIGUOUS": 0,
+          "INTRACTABLE": 0
+        },
+        "abstentions": 0,
+        "decisions": 237
+      },
+      {
+        "parameter_name": "epsilon_bps",
+        "parameter_value": 8000,
+        "is_operating_point": false,
+        "coverage_by_value": 0.9878602598728032,
+        "balance_harm_paise": 7803112096,
+        "solve_outcomes": {
+          "UNIQUE": 138,
+          "IMMATERIALLY_AMBIGUOUS": 0,
+          "DISCRIMINATED": 0,
+          "AMBIGUOUS": 0,
+          "INTRACTABLE": 0
+        },
+        "abstentions": 0,
+        "decisions": 237
+      },
+      {
+        "parameter_name": "epsilon_bps",
+        "parameter_value": 8500,
+        "is_operating_point": false,
+        "coverage_by_value": 0.9878602598728032,
+        "balance_harm_paise": 7803112096,
+        "solve_outcomes": {
+          "UNIQUE": 138,
+          "IMMATERIALLY_AMBIGUOUS": 0,
+          "DISCRIMINATED": 0,
+          "AMBIGUOUS": 0,
+          "INTRACTABLE": 0
+        },
+        "abstentions": 0,
+        "decisions": 237
+      },
+      {
+        "parameter_name": "epsilon_bps",
+        "parameter_value": 9000,
+        "is_operating_point": false,
+        "coverage_by_value": 0.9878602598728032,
+        "balance_harm_paise": 7803112096,
+        "solve_outcomes": {
+          "UNIQUE": 138,
+          "IMMATERIALLY_AMBIGUOUS": 0,
+          "DISCRIMINATED": 0,
+          "AMBIGUOUS": 0,
+          "INTRACTABLE": 0
+        },
+        "abstentions": 0,
+        "decisions": 237
+      },
+      {
+        "parameter_name": "epsilon_bps",
+        "parameter_value": 9500,
+        "is_operating_point": false,
+        "coverage_by_value": 0.9878602598728032,
+        "balance_harm_paise": 7803112096,
+        "solve_outcomes": {
+          "UNIQUE": 138,
+          "IMMATERIALLY_AMBIGUOUS": 0,
+          "DISCRIMINATED": 0,
+          "AMBIGUOUS": 0,
+          "INTRACTABLE": 0
+        },
+        "abstentions": 0,
+        "decisions": 237
+      },
+      {
+        "parameter_name": "epsilon_bps",
+        "parameter_value": 10000,
+        "is_operating_point": false,
+        "coverage_by_value": 0.9878602598728032,
+        "balance_harm_paise": 7803112096,
+        "solve_outcomes": {
+          "UNIQUE": 138,
+          "IMMATERIALLY_AMBIGUOUS": 0,
+          "DISCRIMINATED": 0,
+          "AMBIGUOUS": 0,
+          "INTRACTABLE": 0
+        },
+        "abstentions": 0,
+        "decisions": 237
+      }
+    ],
+    "tau": [
+      {
+        "parameter_name": "tau_floor_paise",
+        "parameter_value": 1000,
+        "is_operating_point": false,
+        "coverage_by_value": 0.9878602598728032,
+        "solve_outcomes": {
+          "UNIQUE": 138,
+          "IMMATERIALLY_AMBIGUOUS": 0,
+          "DISCRIMINATED": 0,
+          "AMBIGUOUS": 0,
+          "INTRACTABLE": 0
+        },
+        "abstentions": 0,
+        "decisions": 237
+      },
+      {
+        "parameter_name": "tau_floor_paise",
+        "parameter_value": 10000,
+        "is_operating_point": false,
+        "coverage_by_value": 0.9878602598728032,
+        "solve_outcomes": {
+          "UNIQUE": 138,
+          "IMMATERIALLY_AMBIGUOUS": 0,
+          "DISCRIMINATED": 0,
+          "AMBIGUOUS": 0,
+          "INTRACTABLE": 0
+        },
+        "abstentions": 0,
+        "decisions": 237
+      },
+      {
+        "parameter_name": "tau_floor_paise",
+        "parameter_value": 100000,
+        "is_operating_point": false,
+        "coverage_by_value": 0.9878602598728032,
+        "solve_outcomes": {
+          "UNIQUE": 138,
+          "IMMATERIALLY_AMBIGUOUS": 0,
+          "DISCRIMINATED": 0,
+          "AMBIGUOUS": 0,
+          "INTRACTABLE": 0
+        },
+        "abstentions": 0,
+        "decisions": 237
+      },
+      {
+        "parameter_name": "tau_floor_paise",
+        "parameter_value": 1000000,
+        "is_operating_point": false,
+        "coverage_by_value": 0.9878602598728032,
+        "solve_outcomes": {
+          "UNIQUE": 138,
+          "IMMATERIALLY_AMBIGUOUS": 0,
+          "DISCRIMINATED": 0,
+          "AMBIGUOUS": 0,
+          "INTRACTABLE": 0
+        },
+        "abstentions": 0,
+        "decisions": 237
+      }
+    ],
+    "cost": {
+      "scored": true,
+      "not_scored": null,
+      "report": {
+        "points": [
+          {
+            "parameter_name": "c_review_and_c_exception_paise",
+            "parameter_value": 10000,
+            "c_review_paise": 10000,
+            "c_exception_paise": 10000,
+            "is_operating_point": false,
+            "net_cost_paise": 7840812096,
+            "net_cost_paise_excluding_e13": 7805232096
+          },
+          {
+            "parameter_name": "c_review_and_c_exception_paise",
+            "parameter_value": 25000,
+            "c_review_paise": 25000,
+            "c_exception_paise": 25000,
+            "is_operating_point": false,
+            "net_cost_paise": 7897362096,
+            "net_cost_paise_excluding_e13": 7808412096
+          },
+          {
+            "parameter_name": "c_review_and_c_exception_paise",
+            "parameter_value": 100000,
+            "c_review_paise": 100000,
+            "c_exception_paise": 100000,
+            "is_operating_point": false,
+            "net_cost_paise": 8180112096,
+            "net_cost_paise_excluding_e13": 7824312096
+          }
+        ],
+        "covers_declared_range": true
+      }
+    }
+  },
+  "risk_coverage": {
+    "scored": true,
+    "not_scored": null,
+    "report": {
+      "aurc_paise": 0,
+      "curve": [
+        {
+          "epsilon_bps": 0,
+          "coverage_by_value": 0.9878602598728032,
+          "balance_harm_paise": 7803112096
+        },
+        {
+          "epsilon_bps": 500,
+          "coverage_by_value": 0.9878602598728032,
+          "balance_harm_paise": 7803112096
+        },
+        {
+          "epsilon_bps": 1000,
+          "coverage_by_value": 0.9878602598728032,
+          "balance_harm_paise": 7803112096
+        },
+        {
+          "epsilon_bps": 1500,
+          "coverage_by_value": 0.9878602598728032,
+          "balance_harm_paise": 7803112096
+        },
+        {
+          "epsilon_bps": 2000,
+          "coverage_by_value": 0.9878602598728032,
+          "balance_harm_paise": 7803112096
+        },
+        {
+          "epsilon_bps": 2500,
+          "coverage_by_value": 0.9878602598728032,
+          "balance_harm_paise": 7803112096
+        },
+        {
+          "epsilon_bps": 3000,
+          "coverage_by_value": 0.9878602598728032,
+          "balance_harm_paise": 7803112096
+        },
+        {
+          "epsilon_bps": 3500,
+          "coverage_by_value": 0.9878602598728032,
+          "balance_harm_paise": 7803112096
+        },
+        {
+          "epsilon_bps": 4000,
+          "coverage_by_value": 0.9878602598728032,
+          "balance_harm_paise": 7803112096
+        },
+        {
+          "epsilon_bps": 4500,
+          "coverage_by_value": 0.9878602598728032,
+          "balance_harm_paise": 7803112096
+        },
+        {
+          "epsilon_bps": 5000,
+          "coverage_by_value": 0.9878602598728032,
+          "balance_harm_paise": 7803112096
+        },
+        {
+          "epsilon_bps": 5500,
+          "coverage_by_value": 0.9878602598728032,
+          "balance_harm_paise": 7803112096
+        },
+        {
+          "epsilon_bps": 6000,
+          "coverage_by_value": 0.9878602598728032,
+          "balance_harm_paise": 7803112096
+        },
+        {
+          "epsilon_bps": 6500,
+          "coverage_by_value": 0.9878602598728032,
+          "balance_harm_paise": 7803112096
+        },
+        {
+          "epsilon_bps": 7000,
+          "coverage_by_value": 0.9878602598728032,
+          "balance_harm_paise": 7803112096
+        },
+        {
+          "epsilon_bps": 7500,
+          "coverage_by_value": 0.9878602598728032,
+          "balance_harm_paise": 7803112096
+        },
+        {
+          "epsilon_bps": 8000,
+          "coverage_by_value": 0.9878602598728032,
+          "balance_harm_paise": 7803112096
+        },
+        {
+          "epsilon_bps": 8500,
+          "coverage_by_value": 0.9878602598728032,
+          "balance_harm_paise": 7803112096
+        },
+        {
+          "epsilon_bps": 9000,
+          "coverage_by_value": 0.9878602598728032,
+          "balance_harm_paise": 7803112096
+        },
+        {
+          "epsilon_bps": 9500,
+          "coverage_by_value": 0.9878602598728032,
+          "balance_harm_paise": 7803112096
+        },
+        {
+          "epsilon_bps": 10000,
+          "coverage_by_value": 0.9878602598728032,
+          "balance_harm_paise": 7803112096
+        }
+      ],
+      "spans_declared_sweep": true,
+      "is_single_point": false
+    }
+  }
+}
