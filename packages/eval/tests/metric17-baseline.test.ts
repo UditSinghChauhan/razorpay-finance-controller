@@ -2,11 +2,13 @@ import { SEED_BLOCKS } from "@assay/generator";
 import { describe, expect, it } from "vitest";
 
 import {
+  AGENT_IDS,
   BPS_DENOMINATOR,
   K_SIGMA,
   METRIC_17_BASELINE,
   METRIC_17_BASELINE_SEEDS,
   METRIC_17_BASELINE_SPLIT,
+  SCORED_LLM_MODES,
   SEEDS_PER_CONFIGURATION,
   abstentionRateByValue,
   abstentionSpikeFlag,
@@ -267,11 +269,16 @@ describe("3. §7's statistic is the mean and the SAMPLE stddev, recorded in inte
 // ---------------------------------------------------------------------------
 
 describe("4. §7's baseline table is read, never computed", () => {
+  // @STEP-0-TRANSITION — asserts §7's PRE-step-0 state. Becomes: the five
+  // measured offline rows, in §9 step 0's emitted order.
   it("is EMPTY until §9 step 0 has run, which is §7's own word for it", () => {
     expect(METRIC_17_BASELINE).toEqual([]);
     expect(Object.isFrozen(METRIC_17_BASELINE)).toBe(true);
   });
 
+  // @STEP-0-TRANSITION — the first two keys become the measured rows; the two
+  // `replay` keys STAY null while §F F2 stands, which is
+  // the frozen semantics for the absent column and not a state to be repaired.
   it("answers null for a (agent_id, llm_mode) §7 records no row for", () => {
     expect(metric17BaselineFor("ASSAY", "offline")).toBeNull();
     expect(metric17BaselineFor("ASSAY", "replay")).toBeNull();
@@ -289,6 +296,54 @@ describe("4. §7's baseline table is read, never computed", () => {
       "mean_bps",
       "stddev_bps",
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 4b. What §7's table must satisfy in EVERY state — before and after step 0
+// ---------------------------------------------------------------------------
+
+/**
+ * The invariants that hold whether or not `§9` step 0 has been taken.
+ *
+ * The three marked cases above assert the table's **current** contents and must
+ * be rewritten when the measured rows are transcribed. These
+ * assert its **shape**, hold vacuously while it is empty, and are the ones that
+ * will check the transcription itself — so the transcription commit adds no new
+ * structural test and this suite never has an unguarded moment.
+ */
+describe("4b. §7's table is well-formed in every state, empty or populated", () => {
+  it("is frozen, and every row carries §7's four fields and no fifth", () => {
+    expect(Object.isFrozen(METRIC_17_BASELINE)).toBe(true);
+    for (const row of METRIC_17_BASELINE) {
+      expect(Object.keys(row).sort()).toEqual(["agent_id", "llm_mode", "mean_bps", "stddev_bps"]);
+    }
+  });
+
+  it("names only §3 agents and only EVALUATION_SPEC.md §2's scored llm_modes", () => {
+    for (const row of METRIC_17_BASELINE) {
+      expect(AGENT_IDS).toContain(row.agent_id);
+      expect(SCORED_LLM_MODES).toContain(row.llm_mode);
+    }
+  });
+
+  it("carries integer basis points in 0..10_000 on both figures (M58)", () => {
+    for (const row of METRIC_17_BASELINE) {
+      for (const figure of [row.mean_bps, row.stddev_bps]) {
+        expect(Number.isInteger(figure)).toBe(true);
+        expect(figure).toBeGreaterThanOrEqual(0);
+        expect(figure).toBeLessThanOrEqual(BPS_DENOMINATOR);
+      }
+    }
+  });
+
+  it("holds at most one row per (agent_id, llm_mode) — §7's key is the pair", () => {
+    const keys = METRIC_17_BASELINE.map((row) => `${row.agent_id}|${row.llm_mode}`);
+    expect(new Set(keys).size).toBe(keys.length);
+    // The reader agrees: a duplicated key throws rather than choosing a row.
+    for (const row of METRIC_17_BASELINE) {
+      expect(metric17BaselineFor(row.agent_id, row.llm_mode)).toEqual(row);
+    }
   });
 });
 
@@ -572,6 +627,9 @@ describe("8. M58 — the rounded pair is the ONLY baseline representation", () =
     expect(Object.keys(row).sort()).toEqual(["agent_id", "llm_mode", "mean_bps", "stddev_bps"]);
   });
 
+  // @STEP-0-TRANSITION — the whole case is the pre-step-0 state. Becomes the
+  // populated-transcription assertion: five rows, offline
+  // only, every figure an integer bps, and the replay keys still null.
   it("keeps METRIC_17_BASELINE empty and unfilled at this pre-step-0 checkpoint", () => {
     // M58: "intentionally empty ([]) before step 0", "nothing may be guessed,
     // prefilled or populated before step 0". §9 step 0 has not been taken.

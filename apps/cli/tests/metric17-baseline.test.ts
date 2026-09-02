@@ -15,7 +15,9 @@ import {
   METRIC_17_BASELINE_SPLIT,
   TAU_SWEEP_FLOOR_PAISE,
   abstentionRateByValue,
+  agentDeclaration,
   runKey,
+  tier0Agents,
   type Agent,
   type AgentInput,
   type AgentRun,
@@ -24,10 +26,16 @@ import {
 import { afterAll, describe, expect, it } from "vitest";
 
 import {
+  BASELINE_AGENT_IDS,
   BASELINE_CONSUMING_SPLIT,
+  BASELINE_DEFERRED_AGENT,
+  BASELINE_DEFERRED_BY_F2_AGENT,
+  BASELINE_DEFERRED_BY_F2_REPLAY,
   BASELINE_NOT_SCORED,
+  BASELINE_NOT_TAKEN_THIS_INVOCATION,
   BASELINE_SEEDS,
   BASELINE_SPLIT,
+  BASELINE_TABLE_HEADER,
   BASELINE_TRANSCRIPTION,
   COMMANDS,
   EPSILON_GRID_BPS,
@@ -41,6 +49,7 @@ import {
   V30_NON_ADDITIVITY,
   T0_11_COMMANDS,
   V28_BASELINE_COMPOSITION,
+  baselineDeferrals,
   baselineTableLines,
   consumesBaseline,
   dispatch,
@@ -164,6 +173,21 @@ async function run(argv: readonly string[]): Promise<Outcome> {
   const code = await dispatch({ argv, env: {}, out: out.write, err: err.write, sink });
   return { code, out: out.lines.join("\n"), err: err.lines.join("\n"), sink };
 }
+
+/**
+ * `baselineArgv` with one of its own flags replaced rather than repeated — the
+ * parser takes each flag at most once, so a refusal case must substitute.
+ */
+const baselineWith = (over: { agents?: string; llm?: string }): readonly string[] => [
+  "bench",
+  "--baseline",
+  "--agents",
+  over.agents ?? "B0-IDONLY",
+  "--bench",
+  ROOT,
+  "--llm",
+  over.llm ?? "offline",
+];
 
 const baselineArgv = (extra: readonly string[] = []): readonly string[] => [
   "bench",
@@ -414,6 +438,8 @@ describe("6. the baseline is a total function of its inputs", () => {
 // ---------------------------------------------------------------------------
 
 describe("7. §7 is the record, and it is empty before step 0 is transcribed into it", () => {
+  // @STEP-0-TRANSITION — §7's pre-step-0 state.
+  // Becomes: the five measured offline rows §9 step 0 transcribed.
   it("holds no row, which is §7's own state today", () => {
     expect(METRIC_17_BASELINE).toEqual([]);
   });
@@ -495,6 +521,11 @@ describe("8. TEST scoring reads §7's frozen baseline", () => {
 });
 
 describe("9/10. an unrecorded baseline fails closed, and nothing is recomputed", () => {
+  // @STEP-0-TRANSITION — (ASSAY, offline) gains a row, so
+  // this key stops being unrecorded. The fail-closed BEHAVIOUR must keep a
+  // subject: re-point the case at a key §7 still records none for — (ASSAY,
+  // replay), which §F F2 defers — so "UNAVAILABLE rather than false" is still
+  // asserted against a real absence and not deleted with the empty table.
   it("publishes metric 17 UNAVAILABLE on TEST rather than a flag of false", () => {
     const metrics = scoreAbstentionSpike(spikeRun(), "test", "ASSAY", "offline");
     expect(metrics.abstention_spike_flag).toBeNull();
@@ -510,6 +541,9 @@ describe("9/10. an unrecorded baseline fails closed, and nothing is recomputed",
     expect(metrics.abstention_rate_by_value).toBe(0.4);
   });
 
+  // @STEP-0-TRANSITION — only the trailing `toEqual([])`
+  // goes; the before/after comparison is the actual subject and gets STRONGER
+  // once the table is populated.
   it("does not mutate §7's table while scoring", () => {
     const before = JSON.stringify(METRIC_17_BASELINE);
     scoreAbstentionSpike(spikeRun(), "test", "ASSAY", "offline");
@@ -518,6 +552,10 @@ describe("9/10. an unrecorded baseline fails closed, and nothing is recomputed",
     expect(METRIC_17_BASELINE).toEqual([]);
   });
 
+  // @STEP-0-TRANSITION — with a row recorded, `loud` gains
+  // a fired flag and `quiet` does not, so the invariant to assert becomes the
+  // real one: both read the SAME recorded pair, and the pair does not move with
+  // the run's rate. Re-point at (ASSAY, replay) for the null-flag half.
   it("derives no baseline from the run it judges — the scorer has no such seam", () => {
     // Two runs whose rates differ by an order of magnitude reach the SAME state,
     // because nothing about the run can produce a baseline.
@@ -533,6 +571,9 @@ describe("9/10. an unrecorded baseline fails closed, and nothing is recomputed",
     expect(loud.abstention_spike_flag).toBeNull();
   });
 
+  // @STEP-0-TRANSITION — becomes the pair of cases §10 V28
+  // actually requires: no disclosure where there is no flag (a key §7 records
+  // none for), and the disclosure ATTACHED where a flag exists.
   it("carries no V28 disclosure where there is no flag to qualify", () => {
     expect(scoreAbstentionSpike(spikeRun(), "test", "ASSAY", "offline").v28_disclosure).toBeNull();
     expect(V28_BASELINE_COMPOSITION).toMatch(/V28/);
@@ -760,6 +801,10 @@ describe("17. M58 — the transcription path is printed, and this pass writes ne
     expect(result.sink.files.size).toBe(0);
   });
 
+  // @STEP-0-TRANSITION — the subject is that the PASS
+  // writes nothing, which survives population; what changes is the empty-table
+  // assertion standing in for it. Becomes: the constant is byte-identical
+  // before and after the pass runs.
   it("leaves METRIC_17_BASELINE empty — nothing is guessed or prefilled by the pass", async () => {
     await run(baselineArgv());
     expect(METRIC_17_BASELINE).toEqual([]);
@@ -803,6 +848,9 @@ describe("18. M58 — TEST scoring READS the transcription and recomputes nothin
     }
   });
 
+  // @STEP-0-TRANSITION — becomes the positive form: a TEST
+  // unit reads the TRANSCRIBED pair, echoes it unchanged in integer bps, and
+  // recomputes nothing. The UNAVAILABLE half moves to a key F2 still defers.
   it("reads the transcription for a TEST unit and finds §7's frozen empty table", () => {
     // The transcription is empty at this pre-step-0 checkpoint, so the honest
     // answer is UNAVAILABLE with its reason — never a recomputed pair.
@@ -839,5 +887,294 @@ describe("19. M58 changed no threshold, no command and no metric count", () => {
     expect([...BASELINE_SEEDS]).toEqual([2_000, 2_001, 2_002, 2_003, 2_004]);
     expect(BASELINE_SPLIT).toBe("dev");
     expect(BASELINE_CONSUMING_SPLIT).toBe("test");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 20. F2 — step 0 enumerates the five agents it can run, and refuses `all`
+// ---------------------------------------------------------------------------
+
+describe("20. F2 — §9 step 0's agent set is the five runnable Tier-0 agents", () => {
+  it("is exactly ASSAY, B0-IDONLY, A1-NOVALIDATE, A2-NOABSTAIN, A3-NOLLM", () => {
+    expect([...BASELINE_AGENT_IDS]).toEqual([
+      "ASSAY",
+      "B0-IDONLY",
+      "A1-NOVALIDATE",
+      "A2-NOABSTAIN",
+      "A3-NOLLM",
+    ]);
+  });
+
+  it("is EVALUATION_SPEC.md §2's Tier-0 loop minus the one agent §F F2 defers", () => {
+    // Derived, not restated: §3.1 records B1-GREEDY's exclusion as data
+    // (inTier0: false) and §C T0-10 defers B2-LLM-DIRECT to F2. A hand-written
+    // list would be a third place those two facts are decided.
+    expect([...BASELINE_AGENT_IDS]).toEqual(
+      tier0Agents()
+        .map((d) => d.id)
+        .filter((id) => id !== BASELINE_DEFERRED_AGENT),
+    );
+    expect(BASELINE_DEFERRED_AGENT).toBe("B2-LLM-DIRECT");
+    expect(BASELINE_AGENT_IDS).not.toContain("B2-LLM-DIRECT");
+    expect(BASELINE_AGENT_IDS).not.toContain("B1-GREEDY");
+    expect(BASELINE_AGENT_IDS).toHaveLength(5);
+  });
+
+  it("refuses --agents all, naming the five so the next command is the right one", async () => {
+    const result = await run(baselineWith({ agents: "all" }));
+    expect(result.code).not.toBe(0);
+    expect(result.err).toMatch(/--baseline does not take --agents all/);
+    expect(result.err).toMatch(/B2-LLM-DIRECT/);
+    expect(result.err).toMatch(/§C T0-10/);
+    expect(result.err).toContain(BASELINE_AGENT_IDS.join(","));
+  });
+
+  it("refuses B2-LLM-DIRECT named explicitly rather than silently dropping it", async () => {
+    const result = await run(baselineWith({ agents: "B2-LLM-DIRECT" }));
+    expect(result.code).not.toBe(0);
+    expect(result.err).toMatch(/--baseline cannot run B2-LLM-DIRECT/);
+    expect(result.err).toMatch(/refused rather than silently narrowed/);
+  });
+
+  it("refuses B1-GREEDY, which §2's loop carries only \"if built\"", async () => {
+    const result = await run(baselineWith({ agents: "B1-GREEDY" }));
+    expect(result.code).not.toBe(0);
+    expect(result.err).toMatch(/--baseline cannot run B1-GREEDY/);
+  });
+
+  it("changes neither B2's implementation nor its declaration", () => {
+    // F2 is APPLIED here, not reopened: B2 stays a declared Tier-0 baseline that
+    // raises, and nothing above turns it into a runnable agent.
+    expect(tier0Agents().map((d) => d.id)).toContain("B2-LLM-DIRECT");
+    expect(agentDeclaration("B2-LLM-DIRECT").inTier0).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 21. F3 — offline-only at this checkpoint, with the absent column recorded
+// ---------------------------------------------------------------------------
+
+describe("21. F3 — the replay column is deferred, never fabricated", () => {
+  it("refuses --llm replay while no recorded cache exists, before any agent runs", async () => {
+    const result = await run(baselineWith({ llm: "replay" }));
+    expect(result.code).not.toBe(0);
+    expect(result.err).toMatch(/--baseline --llm replay is refused/);
+    expect(result.err).toMatch(/DECISION_BRIEF\.md §F F2/);
+    expect(result.err).toMatch(/reads UNAVAILABLE for the absent rows/);
+    // Refused BEFORE the pass: no table, no partial transcript, nothing written.
+    expect(result.out).not.toContain(BASELINE_TABLE_HEADER);
+    expect(result.sink.files.size).toBe(0);
+  });
+
+  it("names every key carrying no pair, with which of the three reasons applies", () => {
+    const rows: readonly BaselineRow[] = [
+      { agent_id: "ASSAY", llm_mode: "offline", mean_bps: 12, stddev_bps: 3, samples: [] },
+    ];
+    const deferrals = baselineDeferrals(rows, false);
+    const keys = deferrals.map((d) => `${d.agent_id}|${d.llm_mode}`);
+    // The whole key space §7 calls complete, minus the one row measured above.
+    expect(keys).toHaveLength(tier0Agents().length * 2 - 1);
+    expect(keys).not.toContain("ASSAY|offline");
+    // B2 under BOTH modes: §C T0-10 defers the agent, not one of its columns.
+    for (const deferral of deferrals.filter((d) => d.agent_id === "B2-LLM-DIRECT")) {
+      expect(deferral.reason).toBe(BASELINE_DEFERRED_BY_F2_AGENT);
+    }
+    // Every other replay key: F2's absent cache.
+    for (const deferral of deferrals.filter(
+      (d) => d.llm_mode === "replay" && d.agent_id !== "B2-LLM-DIRECT",
+    )) {
+      expect(deferral.reason).toBe(BASELINE_DEFERRED_BY_F2_REPLAY);
+    }
+    // An offline key this invocation simply did not cover is NOT deferred.
+    const notTaken = deferrals.filter(
+      (d) => d.llm_mode === "offline" && d.agent_id !== "B2-LLM-DIRECT",
+    );
+    expect(notTaken.length).toBeGreaterThan(0);
+    for (const deferral of notTaken) {
+      expect(deferral.reason).toBe(BASELINE_NOT_TAKEN_THIS_INVOCATION);
+    }
+  });
+
+  it("stops calling the replay column deferred once a cache is recorded", () => {
+    // F2's condition is a parameter, so resolving F2 moves the reason and not
+    // this code. Nothing here invents a cache; it asserts the seam exists.
+    const deferrals = baselineDeferrals([], true);
+    const assayReplay = deferrals.find((d) => d.agent_id === "ASSAY" && d.llm_mode === "replay");
+    expect(assayReplay?.reason).toBe(BASELINE_NOT_TAKEN_THIS_INVOCATION);
+  });
+
+  it("invents no cache, no row and no figure for the absent column", async () => {
+    // Stated against the constant BEFORE and AFTER, rather than against its
+    // emptiness, so this case survives the transcription unchanged: what it
+    // asserts is that the PASS fabricates nothing, not that §7 holds nothing.
+    const before = JSON.stringify(METRIC_17_BASELINE);
+    const result = await run(baselineArgv());
+    expect(result.code).toBe(0);
+    // The absences are named in words and carry no pair anywhere near them.
+    expect(result.out).toContain(BASELINE_DEFERRED_BY_F2_REPLAY);
+    expect(BASELINE_DEFERRED_BY_F2_REPLAY).toMatch(/NOTHING is fabricated in their place/);
+    expect(result.sink.files.size).toBe(0);
+    expect(JSON.stringify(METRIC_17_BASELINE)).toBe(before);
+  });
+
+  it("says in the transcription that absences go into §7 alone, never the constant", async () => {
+    const result = await run(baselineArgv());
+    expect(result.out).toContain(BASELINE_TRANSCRIPTION);
+    expect(BASELINE_TRANSCRIPTION).toMatch(/TRANSCRIBE THE ABSENCES TOO, INTO §7 ALONE/);
+    expect(BASELINE_TRANSCRIPTION).toMatch(/NOT written into METRIC_17_BASELINE/);
+    expect(BASELINE_TRANSCRIPTION).toMatch(/never a pair of zeros/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 22. F6 — one deterministic §7 row layout, in M58's field order
+// ---------------------------------------------------------------------------
+
+describe("22. F6 — §7's rows render in one deterministic layout", () => {
+  const rows: readonly BaselineRow[] = [
+    { agent_id: "ASSAY", llm_mode: "offline", mean_bps: 1_234, stddev_bps: 7, samples: [] },
+    { agent_id: "A1-NOVALIDATE", llm_mode: "offline", mean_bps: 0, stddev_bps: 10_000, samples: [] },
+  ];
+
+  it("heads the table with M58's four fields, in M58's order", () => {
+    const lines = baselineTableLines(rows);
+    expect(lines).toContain(BASELINE_TABLE_HEADER);
+    // The order is §7's own: (agent_id, llm_mode) -> (mean_bps, stddev_bps).
+    expect(BASELINE_TABLE_HEADER.trim().split(/\s+/)).toEqual([
+      "agent_id",
+      "llm_mode",
+      "mean_bps",
+      "stddev_bps",
+    ]);
+  });
+
+  it("renders each row in that order and nothing else's", () => {
+    const lines = baselineTableLines(rows);
+    const start = lines.indexOf(BASELINE_TABLE_HEADER) + 1;
+    const body = lines.slice(start, lines.indexOf("", start));
+    expect(body.map((line) => line.trim().split(/\s+/))).toEqual([
+      ["ASSAY", "offline", "1234", "7"],
+      ["A1-NOVALIDATE", "offline", "0", "10000"],
+    ]);
+  });
+
+  it("uses FIXED column widths, so one row's figure never moves another's line", () => {
+    const wide = baselineTableLines(rows);
+    const narrow = baselineTableLines([rows[0] as BaselineRow]);
+    const lineFor = (lines: readonly string[]): string =>
+      lines[lines.indexOf(BASELINE_TABLE_HEADER) + 1] ?? "";
+    expect(lineFor(wide)).toBe(lineFor(narrow));
+    // Every column starts at the same offset in the header and in the rows.
+    for (const line of [BASELINE_TABLE_HEADER, lineFor(wide)]) {
+      expect(line).toHaveLength(BASELINE_TABLE_HEADER.length);
+    }
+  });
+
+  it("renders the same bytes twice, and puts the samples below the table", () => {
+    const withSamples = baselineTableLines([
+      {
+        agent_id: "ASSAY",
+        llm_mode: "offline",
+        mean_bps: 12,
+        stddev_bps: 3,
+        samples: [{ seed: 2_000, rate: 0.1, numerator_paise: 1, denominator_paise: 10 }],
+      },
+    ]);
+    expect(withSamples).toEqual(
+      baselineTableLines([
+        {
+          agent_id: "ASSAY",
+          llm_mode: "offline",
+          mean_bps: 12,
+          stddev_bps: 3,
+          samples: [{ seed: 2_000, rate: 0.1, numerator_paise: 1, denominator_paise: 10 }],
+        },
+      ]),
+    );
+    // The block a reviewer diffs against §7 is contiguous: the header, the rows,
+    // then a blank line before anything else.
+    const start = withSamples.indexOf(BASELINE_TABLE_HEADER);
+    expect(withSamples[start + 2]).toBe("");
+    expect(withSamples.join("\n")).toMatch(/seed 2000\s+1 \/ 10 paise/);
+  });
+
+  it("emits no unrounded baseline anywhere in the rendered table", async () => {
+    const result = await run(baselineArgv());
+    expect(result.code).toBe(0);
+    // Every figure on a table row is an integer; a decimal point on one would be
+    // the second, unrounded baseline M58 says exists nowhere.
+    const lines = result.out.split("\n");
+    const start = lines.indexOf(BASELINE_TABLE_HEADER);
+    expect(start).toBeGreaterThan(-1);
+    for (const line of lines.slice(start + 1)) {
+      if (line === "") break;
+      const [, , meanBps, stddevBps] = line.trim().split(/\s+/);
+      expect(Number.isInteger(Number(meanBps))).toBe(true);
+      expect(Number.isInteger(Number(stddevBps))).toBe(true);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 23. F5 — the step-0 transition is marked, and is the whole of what changes
+// ---------------------------------------------------------------------------
+
+describe("23. F5 — every assertion that changes when §7 is transcribed is marked", () => {
+  // Assembled rather than written out, so this file's own inventory does not
+  // count as one of the sites it inventories.
+  const MARK = ["@STEP-0", "TRANSITION"].join("-");
+  const REPO = join(import.meta.dirname, "..", "..", "..");
+
+  /**
+   * The complete inventory, established empirically: `METRIC_17_BASELINE` was
+   * populated with five plausible offline rows, the whole suite was run, and
+   * every case that failed is marked below. It is **13 cases in 4 files**, and
+   * nothing else in 2,700-odd tests moves — which is what makes the measured
+   * transcription one controlled commit rather than an open-ended repair.
+   *
+   * Two of the four files are not about metric 17 at all, and that is the
+   * finding worth carrying: a recorded baseline gives a TEST unit a **flag**,
+   * a flag carries `§10` **V28**'s disclosure, and V28's frozen sentence names
+   * the `F10` family — which one leak scan reads as a ground-truth token and one
+   * closed-string set does not admit. Both are test-side consequences of a
+   * published `§10` disclosure, and both are noted at their own markers.
+   */
+  const SITES: readonly (readonly [string, number])[] = [
+    ["apps/cli/tests/metric17-baseline.test.ts", 8],
+    ["apps/cli/tests/robustness-scoring.test.ts", 1],
+    ["apps/cli/tests/truth-scoring.test.ts", 1],
+    ["packages/eval/tests/metric17-baseline.test.ts", 3],
+  ];
+
+  it("marks exactly the thirteen cases the measured transcription will break", () => {
+    for (const [file, expected] of SITES) {
+      const text = readFileSync(join(REPO, file), "utf8");
+      const found = text.split(MARK).length - 1;
+      expect(found, `${file} carries ${String(found)} ${MARK} markers`).toBe(expected);
+    }
+    expect(SITES.reduce((total, [, n]) => total + n, 0)).toBe(13);
+  });
+
+  // @STEP-0-TRANSITION — the control itself, and deliberately the last marker
+  // to fall: it asserts the empty state directly so that a transcription taken
+  // without touching this suite cannot come out green. Becomes the populated
+  // assertion — five offline rows, one per agent in BASELINE_AGENT_IDS.
+  it("leaves the pre-step-0 assertions ASSERTING, so the transition cannot pass silently", () => {
+    // The markers are documentation; these are the control. §7 is empty, so a
+    // transcription taken without updating the marked cases FAILS the suite —
+    // which is what makes the transcription one deliberate commit rather than a
+    // constant edit that quietly re-greens.
+    expect(METRIC_17_BASELINE).toEqual([]);
+    expect(METRIC_17_BASELINE).toHaveLength(0);
+  });
+
+  it("keeps §7's own rules true of whatever is transcribed — offline-only, five agents", () => {
+    // Holds vacuously today and is the check on the populated table tomorrow:
+    // §9 step 0 is offline-only at this checkpoint (F3) over the five runnable
+    // agents (F2), so no other key may appear in the transcription.
+    for (const row of METRIC_17_BASELINE) {
+      expect(BASELINE_AGENT_IDS).toContain(row.agent_id);
+      expect(row.llm_mode).toBe("offline");
+    }
   });
 });

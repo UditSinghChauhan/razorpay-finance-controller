@@ -10,7 +10,7 @@ import {
 } from "@assay/eval";
 import { SEED_BLOCKS, blockOf, type Split } from "@assay/generator";
 
-import { boolFlag, requireFlag, requireSeeds, stringFlag } from "../args.js";
+import { ALL, boolFlag, requireFlag, requireSeeds, stringFlag } from "../args.js";
 import { loadGroundTruth } from "../artifacts/ground-truth.js";
 import { loadObservations } from "../artifacts/observations.js";
 import { loadOracleLabels } from "../artifacts/oracle-labels.js";
@@ -26,10 +26,13 @@ import {
 import { metricsPath } from "../artifacts/metrics-path.js";
 import { selectAgents, sweptRunnerFor } from "../agents/index.js";
 import {
+  BASELINE_AGENT_IDS,
+  BASELINE_DEFERRED_AGENT,
   BASELINE_NOT_SCORED,
   BASELINE_SEEDS,
   BASELINE_SPLIT,
   BASELINE_TRANSCRIPTION,
+  baselineDeferrals,
   baselineTableLines,
   runBaselinePass,
 } from "../bench/baseline.js";
@@ -51,7 +54,8 @@ import {
 } from "../bench/scorer.js";
 import { NO_SWEEPS, runSweeps, type AgentSweeps } from "../bench/sweep.js";
 import { CliError, EXIT, UsageError } from "../errors.js";
-import { join } from "../fs/io.js";
+import { isDirectory, join } from "../fs/io.js";
+import { DEFAULT_REPLAY_CACHE_DIR } from "../providers.js";
 import type { Command, CommandContext } from "./types.js";
 
 /** `DATA_MODEL.md §22.2` M42's two per-`(split, seed)` dataset artifacts. */
@@ -318,6 +322,27 @@ async function run(context: CommandContext): Promise<void> {
  * and `packages/eval/src/frozen.ts` transcribes `§7` as it does every other `§7`
  * parameter. A machine-readable baseline file would be a second, uncommitted
  * evidence path for a figure `§7` alone is authoritative for.
+ *
+ * **The agent set and the `llm_mode` are both F2's disposition applied, and both
+ * are checked before the first agent runs.** `§9` step 0's *"it runs every
+ * agent"* is qualified by `§9`'s own next sentence, which defers
+ * `B2-LLM-DIRECT` and the `replay` column to `DECISION_BRIEF.md §F` **F2** and
+ * records *"metric 17 reads UNAVAILABLE for the absent rows"*. So
+ * {@link selectBaselineAgents} refuses `--agents all` — the Tier-0 selector
+ * includes the one agent that raises — and takes {@link BASELINE_AGENT_IDS}, the
+ * five step 0 can run; and `--llm replay` is refused for as long as no recorded
+ * cache exists. Both refusals happen **before** `runBaselinePass`, because step
+ * 0 must produce `§7`'s table or none of it: a pass that raised at seed 2000
+ * would leave rows for some agents and no `§7` state for the difference.
+ *
+ * **What the absent keys get is a written reason, not a figure.**
+ * {@link baselineDeferrals} enumerates every `(agent_id, llm_mode)` key `§7`
+ * calls a complete table over that this pass produced no pair for, and the
+ * emitted block names which of F2's two deferrals — or the plain
+ * *"not taken by this invocation"* — applies to each. Nothing is fabricated for
+ * them: no cache is invented, no row is guessed, and none of them is transcribed
+ * into `METRIC_17_BASELINE`, which carries pairs and reaches the scorer as
+ * `null` — `§7`'s UNAVAILABLE — for everything it does not carry.
  */
 async function baselinePass(context: CommandContext): Promise<void> {
   const requested = stringFlag(context.args, "split");
@@ -345,9 +370,30 @@ async function baselinePass(context: CommandContext): Promise<void> {
     );
   }
 
-  const agents = selectAgents(stringFlag(context.args, "agents") ?? "all");
+  const agents = selectBaselineAgents(stringFlag(context.args, "agents"));
   const llmMode = readLlmMode(context.config.llmProvider);
   const benchRoot = stringFlag(context.args, "bench") ?? "bench";
+
+  // DECISION_BRIEF.md §F F2, in its operational form: EVALUATION_SPEC.md §2
+  // populates the replay cache from "one recorded --llm=<live provider>
+  // --record pass", which F2 leaves untaken, so at this checkpoint there is no
+  // cache to replay. The check is HERE rather than left to the provider so that
+  // step 0 fails BEFORE the first agent runs: a pass that raised on seed 2000
+  // would leave the operator holding no table and a partial transcript, and §7
+  // has no state for a half-measured table. Nothing is fabricated in the absent
+  // column's place -- no cache is invented and no row is guessed.
+  const replayRecorded = isDirectory(DEFAULT_REPLAY_CACHE_DIR);
+  if (llmMode === "replay" && !replayRecorded) {
+    throw new UsageError(
+      `--baseline --llm replay is refused: no recorded replay cache exists at ` +
+        `${JSON.stringify(DEFAULT_REPLAY_CACHE_DIR)}. DECISION_BRIEF.md §F F2 leaves the one ` +
+        `recorded --llm=<live provider> --record pass untaken, and PREREGISTRATION.md §9 step 0 ` +
+        `applies that disposition rather than reopening it: "the replay rows are deferred ` +
+        `exactly as F2 already defers B2-LLM-DIRECT and metric 3's replay column, and metric 17 ` +
+        `reads UNAVAILABLE for the absent rows". Take step 0 under --llm offline; §7 records the ` +
+        `absent replay keys with this reason, and no cache, row or pair is invented for them.`,
+    );
+  }
 
   const rows = await runBaselinePass({
     agents,
@@ -362,7 +408,9 @@ async function baselinePass(context: CommandContext): Promise<void> {
 
   context.out(BASELINE_NOT_SCORED);
   context.out("");
-  for (const line of baselineTableLines(rows)) context.out(line);
+  for (const line of baselineTableLines(rows, baselineDeferrals(rows, replayRecorded))) {
+    context.out(line);
+  }
   context.out("");
   // M58's transcription path, printed where the rows are: §7 first as the
   // authoritative record, then frozen.ts as its executable transcription, both
@@ -373,6 +421,65 @@ async function baselinePass(context: CommandContext): Promise<void> {
   context.out(`seeds               ${BASELINE_SEEDS.join(", ")}  (n = ${String(BASELINE_SEEDS.length)})`);
   context.out(`llm_mode            ${llmMode}`);
   context.out(`artifacts           none — §9 step 0 writes nothing`);
+}
+
+/**
+ * `§9` **step 0**'s agent selection — `§9`'s *"it runs every agent"* with
+ * `DECISION_BRIEF.md §F` **F2**'s semantics applied.
+ *
+ * **`--agents all` is refused here and only here.** `selectAgents("all")` is
+ * `EVALUATION_SPEC.md §2`'s Tier-0 set, which contains `B2-LLM-DIRECT`, whose
+ * `run` raises `AgentUnavailableError` because `§C` T0-10 makes it *"conditional
+ * on F2"*. `§9` step 7's scored run may legitimately spell `--agents all`; step 0
+ * may not, because step 0 must produce `§7`'s table **or nothing**, and a pass
+ * that raised partway would leave rows for some agents, an exception for another
+ * and no state in `§7` for the difference. The refusal names the five so the
+ * operator's next command is the one to run.
+ *
+ * **The default is the same five and not `all`.** `§9` step 0's population is
+ * fixed before the measurement — that is the whole of why `DECISION_BRIEF.md
+ * §L.4` is not engaged by this entry (M53) — and the agent set is part of that
+ * population. Defaulting to a selector that resolves to a **different** set than
+ * the one step 0 can take would make the pass's coverage depend on which agents
+ * happened to be runnable on the day.
+ *
+ * **A deferred agent named explicitly is refused rather than skipped.** Silently
+ * dropping `B2-LLM-DIRECT` from an explicit list would answer a request for six
+ * rows with five and let a reader believe `§7`'s table is complete. `B1-GREEDY`
+ * is refused by the same check and for `§3.1`'s own reason: it is outside Tier-0
+ * and `§2`'s loop reads *"(+ B1 if built)"*.
+ *
+ * F2 is **applied, not reopened**: nothing here changes `b2.ts`, T0-10 or F2's
+ * disposition, and the deferral is recorded into `§7` by
+ * {@link baselineDeferrals} rather than passed over in silence.
+ */
+function selectBaselineAgents(requested: string | null): readonly Agent[] {
+  const enumerated = BASELINE_AGENT_IDS.join(",");
+  if (requested !== null && requested.trim() === ALL) {
+    throw new UsageError(
+      `--baseline does not take --agents ${ALL}. PREREGISTRATION.md §9 step 7's "all" is ` +
+        `EVALUATION_SPEC.md §2's Tier-0 set, which includes ${BASELINE_DEFERRED_AGENT} — ` +
+        `DECISION_BRIEF.md §C T0-10 makes that baseline "conditional on F2 — it needs a live ` +
+        `credential to populate its replay cache" and §F F2 is Unresolved, so it raises rather ` +
+        `than producing a rate. §9 step 0 must produce §7's whole table or none of it. ` +
+        `Enumerate the five agents step 0 can run:\n\n  --agents ${enumerated}\n`,
+    );
+  }
+
+  const agents = selectAgents(requested ?? enumerated);
+  const runnable = new Set<string>(BASELINE_AGENT_IDS);
+  for (const agent of agents) {
+    if (runnable.has(agent.id)) continue;
+    throw new UsageError(
+      `--baseline cannot run ${agent.id}. PREREGISTRATION.md §9 step 0 runs the agents ` +
+        `EVALUATION_SPEC.md §2's Tier-0 loop carries that are not deferred by ` +
+        `DECISION_BRIEF.md §F F2, which is these five: ${enumerated}. The request is refused ` +
+        `rather than silently narrowed, because a table short of a row the operator asked for ` +
+        `would read as a complete §7 table. §7 records the deferred key with its reason and ` +
+        `metric 17 reads UNAVAILABLE for it.`,
+    );
+  }
+  return agents;
 }
 
 /**
@@ -542,7 +649,10 @@ export const benchCommand: Command = {
     bench: { kind: "string", describe: "Dataset root. Default: bench." },
     baseline: {
       kind: "boolean",
-      describe: "PREREGISTRATION.md §9 step 0: the non-scored pre-seal DEV baseline pass (M53).",
+      describe:
+        "PREREGISTRATION.md §9 step 0: the non-scored pre-seal DEV baseline pass (M53). " +
+        "Takes no --seeds, --seed or --run-id; --split must be dev; --agents must enumerate " +
+        "the agents §F F2 leaves runnable and may not be \"all\".",
     },
   },
   run,
