@@ -16,8 +16,8 @@ import { loadObservations } from "../artifacts/observations.js";
 import { loadOracleLabels } from "../artifacts/oracle-labels.js";
 import {
   M54_METRIC_10_NOT_COMPUTABLE,
-  METRIC_7_ECE_UNRATIFIED,
   encodeMetrics,
+  metric7EceState,
   type BaseMetrics,
   type ScoredMetrics,
 } from "../artifacts/metrics.js";
@@ -304,6 +304,10 @@ async function execute(
     );
   }
   const c = coverage(run);
+  // §4.2, §4.3, §4.4, §4.5, §4.6 and §4.13, through one seam and one truth read.
+  // Metric 7's headline is READ OFF the report that carries §4.6's reliability
+  // diagram rather than computed a second time here (M57).
+  const truth = scoreTruth(run, truthSource);
   return Object.freeze({
     coverage_by_value: c.coverage_by_value.ratio,
     coverage_by_count: c.coverage_by_count.ratio,
@@ -319,13 +323,15 @@ async function execute(
     // §4.8, through the one seam. No population, covered set or per-case harm
     // is derived in this file.
     robustness: scoreRobustness(run, robustnessSource),
-    // §4.2, §4.3, §4.4, §4.5 and §4.13, through the other. Every formula is
-    // `packages/eval`'s; this file supplies the two artifacts and the run.
-    truth: scoreTruth(run, truthSource),
-    // Two metrics on §8's list that keep their number and publish their state
+    // §4.2, §4.3, §4.4, §4.5, §4.6 and §4.13, through the other. Every formula
+    // is `packages/eval`'s; this file supplies the two artifacts and the run.
+    truth,
+    // Metric 7 (§4.6, M57) — the figure its own report produced, or null with
+    // the reason there is none. Never a 0.0 (§5.5, M57).
+    ece: truth.report?.calibration?.ece ?? null,
+    ece_state: metric7EceState(truth),
+    // A metric on §8's list that keeps its number and publishes its state
     // rather than a fabricated figure (§5.4 item 5, §5.5).
-    ece: null,
-    ece_state: METRIC_7_ECE_UNRATIFIED,
     exception_class_confusion: null,
     exception_class_confusion_state: M54_METRIC_10_NOT_COMPUTABLE,
   });

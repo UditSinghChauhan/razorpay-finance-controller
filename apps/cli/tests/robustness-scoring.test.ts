@@ -14,9 +14,10 @@ import {
   encodeMetrics,
   isExercisedSplit,
   M54_METRIC_10_NOT_COMPUTABLE,
-  METRIC_7_ECE_UNRATIFIED,
+  METRIC_7_ECE_EMPTY_POPULATION,
   loadGroundTruth,
   memorySink,
+  metric7EceState,
   notExercisedOnSplit,
   overDataset,
   readGroundTruthRecord,
@@ -512,6 +513,9 @@ describe("4. a Reference-kind injected observation stays in metric 15's denomina
 // ---------------------------------------------------------------------------
 
 /** A `BaseMetrics` whose eleven agent-side figures are arbitrary but fixed. */
+/** The "not scored" truth side these cases hold fixed, read once. */
+const truthOfFixture = scoreTruth(agentRun(), truthNotScoredOnSplit("train"));
+
 function baseWith(robustness: RobustnessMetrics): BaseMetrics {
   return Object.freeze({
     coverage_by_value: 1,
@@ -529,9 +533,9 @@ function baseWith(robustness: RobustnessMetrics): BaseMetrics {
     // The rest of the truth side is `truth-scoring.test.ts`'s subject; these
     // cases assert that §4.8's two metrics survive into the artifact unchanged
     // beside it, so the source here is the "not scored" state.
-    truth: scoreTruth(agentRun(), truthNotScoredOnSplit("train")),
+    truth: truthOfFixture,
     ece: null,
-    ece_state: METRIC_7_ECE_UNRATIFIED,
+    ece_state: metric7EceState(truthOfFixture),
     exception_class_confusion: null,
     exception_class_confusion_state: M54_METRIC_10_NOT_COMPUTABLE,
   });
@@ -1160,10 +1164,10 @@ describe("11. M56 — a sealed TEST run reads the answer key and emits aggregate
       "ASSAY", EXERCISED_SPLIT, "offline",
       "epsilon_bps", "tau_floor_paise",
       V30_NON_ADDITIVITY, EMPTY_INJECTED_POPULATION,
-      // M54's ratified state for metric 10, and metric 7's unratified-predicate
-      // state — both published rather than fabricated.
+      // M54's ratified state for metric 10, and M57's empty-population state
+      // for metric 7 — both published rather than fabricated.
       M54_METRIC_10_NOT_COMPUTABLE,
-      METRIC_7_ECE_UNRATIFIED,
+      METRIC_7_ECE_EMPTY_POPULATION,
     ]);
     for (const leaf of stringLeaves(written)) {
       expect(allowed.has(leaf), `metrics.json carries an unexpected string: ${leaf}`).toBe(true);

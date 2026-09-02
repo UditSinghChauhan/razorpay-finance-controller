@@ -530,6 +530,44 @@ describe("I/J. a swept threshold reaches stage S4 and moves §6's outcome", () =
     }
   });
 
+  it("M57 — score_bps is carried on DISCRIMINATED and on NOTHING else", async () => {
+    // `run.ts` makes this a contract from spec 1.4.35: metric 7's population is
+    // "the committed decisions carrying a non-null score -- §6 step 3's
+    // DISCRIMINATED branch", so the field's NULLITY is that population test.
+    // `delta_s_bps` is also non-null on IMMATERIALLY_AMBIGUOUS -- §6 computes the
+    // gap and then decides on MATERIALITY, never consulting it -- so passing it
+    // through unfiltered would put a decision the gap did not decide into the
+    // calibration set. This fixture reaches three of §6's outcomes on one target.
+    if (assay === undefined) throw new Error("ASSAY is not registered");
+    const scoresOf = async (sweep: Parameters<typeof assay>[1]) => {
+      const composed = await assay(input, sweep);
+      return {
+        outcomes: composed.solve_outcomes,
+        scores: composed.run.decisions.map((d) => d.score_bps),
+      };
+    };
+
+    // ε = 0 -> DISCRIMINATED: the gap decided the accept, so it is carried.
+    const discriminated = await scoresOf({ epsilonBps: EPSILON_GRID_BPS[0] ?? 0 });
+    expect(discriminated.outcomes.DISCRIMINATED).toBe(1);
+    const carried = discriminated.scores.filter((s) => s !== null);
+    expect(carried).toHaveLength(1);
+    expect(typeof carried[0]).toBe("number");
+
+    // A raised τ floor -> IMMATERIALLY_AMBIGUOUS: the target still commits, but
+    // the gap was never consulted, so NO score reaches the population.
+    const immaterial = await scoresOf({ tauFloorPaise: TAU_FLOOR_GRID_PAISE[2] ?? 0 });
+    expect(immaterial.outcomes.IMMATERIALLY_AMBIGUOUS).toBe(1);
+    expect(immaterial.outcomes.DISCRIMINATED).toBe(0);
+    expect(immaterial.scores.some((s) => s !== null)).toBe(false);
+
+    // At the frozen thresholds the target is AMBIGUOUS and abstains, so it
+    // commits no decision at all and there is nothing to score.
+    const frozen = await scoresOf({});
+    expect(frozen.outcomes.AMBIGUOUS).toBe(1);
+    expect(frozen.scores.some((s) => s !== null)).toBe(false);
+  });
+
   it("omitting both parameters is the ordinary frozen execution", async () => {
     if (assay === undefined) throw new Error("ASSAY is not registered");
     const bare = await assay(input, {});

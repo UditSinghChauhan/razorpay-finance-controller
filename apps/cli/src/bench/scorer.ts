@@ -6,6 +6,7 @@ import {
   gapToOracle,
   harm,
   matchMetrics,
+  metric7Calibration,
   netCost,
   oraclePolicyNetCost,
   riskCoverage,
@@ -370,14 +371,29 @@ export function balanceHarmOf(run: AgentRun, source: TruthSource): number | null
  *   netCost(run, balance_harm_paise)                     metric 2   metrics/cost.ts
  *   abstentionMetrics(run, labels, valueByEntityId(obs)) metric 4   metrics/abstention.ts
  *   gapToOracle(net_cost, oraclePolicyNetCost(...))      metric 8   metrics/cost.ts
+ *   metric7Calibration(run, truth)      metric 7   metrics/calibration-population.ts
  * ```
  *
- * **Metric 7 is deliberately absent from that list and from the report.** `§4.6`
- * states no correctness source for `accuracy(bin)`, the choice between the two
- * admissible readings moves the figure, and `DECISION_BRIEF.md §A.41` requires
- * such a choice to be ratified rather than made by an implementation. The
- * artifact publishes {@link METRIC_7_ECE_UNRATIFIED} beside a `null`;
- * `packages/eval`'s `calibration()` is unchanged and simply unwired.
+ * **Metric 7 joined that list at spec 1.4.35, and this function still implements
+ * none of it.** Through spec 1.4.34 `§4.6` stated no correctness source for
+ * `accuracy(bin)`, the choice between two admissible readings moved the figure,
+ * and `DECISION_BRIEF.md §A.41` required such a choice to be **ratified rather
+ * than made by an implementation** — so the artifact published a standing refusal
+ * beside a `null`. `DATA_MODEL.md §22.2` **M57** takes that ratification, and
+ * `metrics/calibration-population.ts` holds every part of it: the `DISCRIMINATED`
+ * population, the `Δs` prediction, the one-decision-one-prediction unit and the
+ * set-equality predicate. **No population is filtered here, no truth edge is
+ * re-keyed and no allocation is compared** — this module passes the run and the
+ * same `ScoringTruth` the other five metrics already read, and receives a
+ * `CalibrationReport` or `null`.
+ *
+ * **`null` is `M57`'s `N = 0` and is never a zero.** `calibration([])` answers
+ * `0`, the best possible `ECE`; `§5.5` bars that number and `M57` requires the
+ * metric be published **unavailable with its reason**. The decision to withhold
+ * lives in `calibration-population.ts`; the reason a reader sees is
+ * `artifacts/metrics.ts`'s. `metrics/calibration.ts` itself is **unchanged** —
+ * `M57` confirms its bins, its edges and its empty-bin rule rather than moving
+ * them, and what it was always missing was the input.
  *
  * **Metric 6 is computed once and metric 2 is handed the result.** `netCost`'s own
  * signature asks for it that way — *"passed in rather than recomputed so that the
@@ -435,6 +451,9 @@ export function scoreTruth(run: AgentRun, source: TruthSource): TruthMetrics {
       truly_ambiguous: trulyAmbiguous,
       oracle_policy_net_cost_paise: oraclePolicy,
       gap_to_oracle_paise: gapToOracle(netCostReport.net_cost_paise, oraclePolicy),
+      // Metric 7 (M57), over the SAME `truth` projection every metric above
+      // reads. `null` where §6 step 3's DISCRIMINATED branch committed nothing.
+      calibration: metric7Calibration(run, truth),
     }),
   });
 }

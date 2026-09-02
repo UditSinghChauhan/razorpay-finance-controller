@@ -17,7 +17,7 @@ import {
   EPSILON_OPERATING_POINT_BPS,
   EXERCISED_SPLIT,
   M54_METRIC_10_NOT_COMPUTABLE,
-  METRIC_7_ECE_UNRATIFIED,
+  METRIC_7_ECE_EMPTY_POPULATION,
   NO_RISK_AXIS,
   TRUTH_SCORED_SPLITS,
   balanceHarmOf,
@@ -394,16 +394,21 @@ describe("1. a TEST scored unit computes metrics 2, 4, 5, 6, 7 and 8 through the
     expect(report.abstention.abstentions_resolved_by_probe).toBe(0);
   });
 
-  it("metric 7 — NOT computed: §4.6 states no correctness source for accuracy(bin)", () => {
-    // The seam produces no ECE and no reliability diagram. §4.6 fixes the
-    // formula, the ten equal-width bins and the score they bin, and states
-    // nothing about what makes a committed decision RIGHT. Set equality against
-    // the true allocation (RECONCILIATION_SPEC.md §6 / M35) and edge-level
-    // agreement (§4.2) are both admissible and disagree on a decision that
-    // asserted a subset of the true members, so the choice moves a §8 figure --
-    // and §A.41 requires such a choice to be ratified, not implemented.
-    expect(Object.keys(report)).not.toContain("calibration");
-    expect(Object.keys(report)).not.toContain("ece");
+  it("metric 7 — §4.6's ECE and its reliability diagram, over M57's population", () => {
+    // M57 (spec 1.4.35) ratifies what §4.6 never stated. RUN commits two
+    // decisions and only SETL(60) carries a score, so N = 1: the BNK(61)
+    // decision is outside the population because its gate consulted no gap and
+    // no score is invented for it. The one prediction asserts exactly TRUTH's
+    // member set for SETL(60), so accuracy(bin 9) = 1 against a mean score of
+    // 0.9 and ECE = |1 - 0.9| = 0.1.
+    expect(report.calibration).not.toBeNull();
+    expect(report.calibration?.n).toBe(1);
+    expect(report.calibration?.ece).toBeCloseTo(0.1, 10);
+    // §4.6's reliability diagram rides beside the figure, ten bins of 1000 bps.
+    expect(report.calibration?.bins).toHaveLength(10);
+    expect(report.calibration?.bins[9]?.count).toBe(1);
+    expect(report.calibration?.bins[9]?.accuracy).toBe(1);
+    expect(report.calibration?.bins[9]?.mean_score).toBeCloseTo(0.9, 10);
   });
 
   it("metric 8 — §4.13's difference of two net costs, sign unconstrained", () => {
@@ -654,15 +659,18 @@ describe("4. metrics 1-28 appear exactly once, with no duplicate or renamed metr
     // curve rather than to one execution.
     expect(typeof report.gap_to_oracle_paise).toBe("number");
     expect(FROZEN_METRICS.find((m) => m.number === 3)?.name).toBe("aurc_inr");
-    // Metric 7 keeps its number and its place on the list of 28 and is produced
-    // by no field of the report: it is published as unavailable, in metric 10's
-    // existing shape, and `metric-list.ts` is NOT amended -- `calibration()` is
-    // still the module §8 names, and it is still correct for inputs it is given.
+    // Metric 7 keeps its number and its place on the list of 28, and from M57 it
+    // has one home like the four above: `calibration`, which carries §4.6's
+    // reliability diagram beside its own headline. `metric-list.ts` is NOT
+    // amended -- `calibration()` is still the module §8 names for the
+    // arithmetic, and calibration-population.ts supplies only the input §4.6
+    // never defined.
     expect(FROZEN_METRICS.find((m) => m.number === 7)?.name).toBe("ece");
     expect(FROZEN_METRICS.find((m) => m.number === 7)?.computedBy).toBe(
       "metrics/calibration.ts",
     );
-    expect(Object.keys(report)).not.toContain("calibration");
+    expect(Object.keys(report)).toContain("calibration");
+    expect(FROZEN_METRICS).toHaveLength(28);
   });
 });
 
@@ -985,6 +993,55 @@ describe("the whole command files the truth side into M48's one artifact", () =>
     expect(written.risk_coverage.report?.curve).toHaveLength(21);
   });
 
+  it("M57 — metric 7 is produced through the production path on DEV and TEST", async () => {
+    // §2's scoring loop runs over {dev, test} and metric 7 rides the same seam
+    // as metrics 2, 4, 5, 6 and 8: one truth read, one ScoringTruth, no second
+    // reader. Whether a figure exists is M57's population's business, so this
+    // asserts the WIRING on both splits rather than a number the fixture would
+    // have to manufacture.
+    for (const [split, seed, agent] of [
+      ["dev", 2000, "A3-NOLLM"],
+      [EXERCISED_SPLIT, 9100, "ASSAY"],
+    ] as const) {
+      const root = tempDir();
+      writeDataset(root, split, seed);
+      const written = readMetrics(await bench(root, split, seed, agent), split, seed, agent);
+
+      // The report carries §4.6's field on both splits, and its value is either
+      // a CalibrationReport with ten bins or M57's N = 0.
+      expect(written.base.truth.scored).toBe(true);
+      expect(Object.keys(written.base.truth.report ?? {})).toContain("calibration");
+      const calibrationReport = written.base.truth.report?.calibration ?? null;
+      if (calibrationReport !== null) {
+        expect(calibrationReport.bins).toHaveLength(10);
+        expect(calibrationReport.n).toBeGreaterThan(0);
+      }
+
+      // The headline is READ OFF that report, never computed a second time, so
+      // the scalar and the diagram beside it can never disagree.
+      expect(written.base.ece).toBe(calibrationReport?.ece ?? null);
+
+      // ece and ece_state are exclusive: a reader never sees a figure and a
+      // refusal together, and never sees neither.
+      expect(written.base.ece === null).toBe(written.base.ece_state !== null);
+      // And an unavailable metric is NEVER the 0.0 §5.5 forbids (M57, M56).
+      if (written.base.ece === null) expect(written.base.ece).not.toBe(0);
+    }
+  });
+
+  it("M57 — an unscored unit says metric 7 needs the truth side, and reports no 0.0", async () => {
+    // TRAIN is outside §2's loop, so no answer key is opened and metric 7 has no
+    // population to be empty OR full. The two reasons stay distinguishable.
+    const root = tempDir();
+    writeDataset(root, "train", 1000);
+    const written = readMetrics(await bench(root, "train", 1000, "A3-NOLLM"), "train", 1000, "A3-NOLLM");
+    expect(written.base.truth.scored).toBe(false);
+    expect(written.base.ece).toBeNull();
+    expect(written.base.ece).not.toBe(0);
+    expect(written.base.ece_state).toContain("needs EVALUATION_SPEC.md §4.6's truth side");
+    expect(written.base.ece_state).not.toBe(METRIC_7_ECE_EMPTY_POPULATION);
+  });
+
   it("DEV-1/2 — metrics 2, 4, 5, 6 and 8 compute from the DEV answer key and labels", async () => {
     // EVALUATION_SPEC.md §2 loops `for split in {dev, test}` around the score()
     // line, and §7's reproduction recipe -- "a third party ... must be able to
@@ -1117,23 +1174,21 @@ describe("the whole command files the truth side into M48's one artifact", () =>
     expect(b.sink.files.size).toBe(0);
   });
 
-  it("8 — metric 7 is published as unavailable, never silently computed", async () => {
+  it("8 — metric 7 reports N = 0 as a state, never as a 0.0 (M57)", async () => {
     const root = tempDir();
     writeDataset(root, EXERCISED_SPLIT, 9100);
     const written = readMetrics(
       await bench(root, EXERCISED_SPLIT, 9100, "A3-NOLLM"), EXERCISED_SPLIT, 9100, "A3-NOLLM",
     );
-    // The existing metric-10 representation, reused rather than reinvented.
-    expect(written.base.ece).toBeNull();
-    expect(written.base.ece_state).toBe(METRIC_7_ECE_UNRATIFIED);
-    expect(written.base.ece_state).toContain("no correctness source for accuracy(bin)");
-    // No ECE, no reliability diagram and no correctness predicate anywhere in
-    // the artifact -- a conventional definition is NOT substituted.
-    const artifact = JSON.stringify(written);
-    expect(artifact).not.toContain("reliability");
-    expect(artifact).not.toContain("mean_score");
+    // This fixture's targets solve UNIQUE, so §6 step 3's DISCRIMINATED branch
+    // commits nothing and M57's population is empty. The metric is UNAVAILABLE
+    // with its reason -- the state metric 10 uses, reused rather than reinvented.
     expect(written.base.truth.report).not.toBeNull();
-    expect(Object.keys(written.base.truth.report ?? {})).not.toContain("calibration");
+    expect(written.base.truth.report?.calibration).toBeNull();
+    expect(written.base.ece).toBeNull();
+    expect(written.base.ece).not.toBe(0);
+    expect(written.base.ece_state).toBe(METRIC_7_ECE_EMPTY_POPULATION);
+    expect(written.base.ece_state).toContain("N = 0");
   });
 
   it("12 — the agent-side metrics do not move when the answer key does", async () => {
