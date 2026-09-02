@@ -38,6 +38,7 @@ export {
   isBankLineId,
   isLedgerEntryId,
   isObservationId,
+  isSourceEntityId,
   hasRazorpayPrefix,
   hasAssayPrefix,
 } from "./ids.js";

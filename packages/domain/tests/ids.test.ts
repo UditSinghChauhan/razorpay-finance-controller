@@ -13,6 +13,7 @@ import {
   isPaymentId,
   isRefundId,
   isSettlementId,
+  isSourceEntityId,
 } from "@assay/domain";
 
 /** Exactly 14 alphanumerics, the suffix DATA_MODEL.md §0 rule 3 declares. */
@@ -138,5 +139,51 @@ describe("prefix registry", () => {
     expect(Object.isFrozen(ID_PREFIXES)).toBe(true);
     expect(Object.isFrozen(ID_PREFIXES.razorpay)).toBe(true);
     expect(Object.isFrozen(ID_PREFIXES.assay)).toBe(true);
+  });
+});
+
+/**
+ * `§16`'s journal join key, as a grammar.
+ *
+ * `JournalLine.source_entity_id` and `§1`'s `true_journal.source_entity_id` are
+ * both typed `pay_… | rfnd_… | adj_… | setl_… | bnk_…`. **Five prefixes of the
+ * eight**, and the omissions carry the argument `§17.1.1`'s last row makes and
+ * `DATA_MODEL.md §22.2` M55 relies on for metric 15's structural zero.
+ */
+describe("§16 — the source_entity_id grammar", () => {
+  it("admits exactly the five prefixes §16 and §1 name", () => {
+    expect(isSourceEntityId(`pay_${S14}`)).toBe(true);
+    expect(isSourceEntityId(`rfnd_${S14}`)).toBe(true);
+    expect(isSourceEntityId(`adj_${S14}`)).toBe(true);
+    expect(isSourceEntityId(`setl_${S14}`)).toBe(true);
+    expect(isSourceEntityId("bnk_0000000000001")).toBe(true);
+  });
+
+  it("refuses order_, which §10.1 makes a reference kind that posts nothing", () => {
+    expect(isSourceEntityId(`order_${S14}`)).toBe(false);
+    expect(isOrderId(`order_${S14}`)).toBe(true);
+  });
+
+  it("refuses mle_ and disp_, the two §17.1.1 reasons out by name", () => {
+    // §17.1.1: the grammar "admits no mle_... or disp_..., so truth posts no
+    // line attributable to either kind" -- though §10.1 makes both reconcilable.
+    expect(isSourceEntityId("mle_0000000000001")).toBe(false);
+    expect(isLedgerEntryId("mle_0000000000001")).toBe(true);
+    expect(isSourceEntityId(`disp_${S14}`)).toBe(false);
+    expect(isDisputeId(`disp_${S14}`)).toBe(true);
+  });
+
+  it("refuses an ASSAY-internal handle", () => {
+    // §16: "a business identifier drawn from the observation set, never an
+    // ASSAY-internal handle."
+    expect(isSourceEntityId("obs_0000000000001")).toBe(false);
+    expect(isObservationId("obs_0000000000001")).toBe(true);
+  });
+
+  it("refuses a malformed suffix under an admitted prefix", () => {
+    expect(isSourceEntityId("pay_")).toBe(false);
+    expect(isSourceEntityId("pay_short")).toBe(false);
+    expect(isSourceEntityId("bnk_")).toBe(false);
+    expect(isSourceEntityId("")).toBe(false);
   });
 });

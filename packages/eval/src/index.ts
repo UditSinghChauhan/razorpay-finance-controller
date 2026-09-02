@@ -208,7 +208,10 @@ export {
 } from "./metrics/cost.js";
 
 export {
+  type ForcedAbstentionResult,
+  type InjectionResult,
   type RobustnessReport,
+  caseBalanceHarm,
   forcedAbstentionRate,
   injectionFinancialSuccessRate,
   robustness,

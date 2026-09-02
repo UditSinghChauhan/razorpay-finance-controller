@@ -231,3 +231,48 @@ export function isReconcilableKind(kind: ObservationKind): boolean {
 export function isReferenceKind(kind: ObservationKind): boolean {
   return (REFERENCE_KINDS as readonly ObservationKind[]).includes(kind);
 }
+
+/**
+ * The observation's **own business identifier** — `§16`'s *"the identifier of the
+ * observation whose obligation the posting records"*.
+ *
+ * `§16` requires `JournalLine.source_entity_id` to be *"a business identifier
+ * drawn from the observation set, never an ASSAY-internal handle"*, and `§12`
+ * (register row `§22.2` **M28**) fixes the relation between that identifier and
+ * the observation: *"the corresponding observation is the one whose
+ * `payload.entity_id` equals that `entity_id`"*, one-to-one on a conforming
+ * dataset because `PREREGISTRATION.md §4.3`'s only duplication operator,
+ * `DUPLICATE_ROW`, is scoped to `bank_line`.
+ *
+ * The field carrying it differs by kind because the payload types do — a recon
+ * row names its economic entity `entity_id`, a bank line names itself
+ * `bank_line_id`, and the Razorpay entities name themselves `id`. **This is a
+ * read of the schema table above, not a mapping invented here**, which is why it
+ * lives beside `§10.1`'s classification rather than in a caller.
+ *
+ * **It is deliberately total and deliberately not narrowed.** A reference kind
+ * still has an identifier (`pay_…`, `order_…`); whether that identifier may
+ * appear on a journal line is `§16`'s separate question, answered by
+ * {@link isSourceEntityId}. Collapsing the two here would hide from a caller
+ * that a `payment` observation carries a well-formed `pay_…` and still posts
+ * nothing (`§10.1`, `EVALUATION_SPEC.md §4.4`).
+ *
+ * Declared here at spec 1.4.33 as the single definition of a rule that three
+ * modules had transcribed independently (`DATA_MODEL.md §22.2` **M55**'s
+ * implementation); `apps/cli`'s agents and `packages/eval`'s scorer now read it
+ * from one place, so the two journals cannot come to disagree about what keys
+ * them.
+ */
+export function entityIdOf(observation: Observation): string {
+  switch (observation.kind) {
+    case "recon_line":
+    case "adjustment":
+      return observation.payload.entity_id;
+    case "bank_line":
+      return observation.payload.bank_line_id;
+    case "ledger_entry":
+      return observation.payload.ledger_entry_id;
+    default:
+      return observation.payload.id;
+  }
+}
