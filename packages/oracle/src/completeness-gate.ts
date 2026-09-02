@@ -34,12 +34,29 @@ import type { OracleTargetResult } from "./enumerate.js";
  * One target's true allocation, as the caller derives it from `GroundTruth`.
  *
  * `member_obs_ids` rather than `entity_id`s: `GroundTruth.allocations` keys on
- * `pay_… | rfnd_… | adj_…` while the oracle enumerates `obs_id`s, so the caller
- * performs the join. It is 1:1 on recon rows — every generated dataset carries
- * one recon row per entity — and doing it caller-side keeps this module free of
- * any assumption about how ground truth is shaped.
+ * `pay_… | rfnd_… | adj_…` while an `OracleSolution` carries `obs_id`s, so
+ * the caller performs the join. It is 1:1 on recon rows — every generated
+ * dataset carries one recon row per entity — and doing it caller-side keeps this
+ * module free of any assumption about how ground truth is shaped.
+ *
+ * **The join is on the members and NOT on the target.** `target_id` below stays
+ * in the entity-id space; only `member_obs_ids` is translated.
  */
 export interface TrueAllocation {
+  /**
+   * The target's **entity** id — `setl_…` for a settlement — and never the
+   * `obs_id` of the observation carrying it.
+   *
+   * This is the key {@link completenessGate} looks the oracle's result up by, so
+   * it must be the space {@link OracleTargetResult.target_id} is emitted in:
+   * `enumerate.ts` keys results by `TargetContribution.id`, which is
+   * `Settlement.id` / `BankStatementLine.bank_line_id`. `DATA_MODEL.md §11`
+   * fixes the same asymmetry in the frozen `Candidate`, typing `target_id` as a
+   * plain `string` — *"what is being explained (settlement / bank line)"* —
+   * beside `member_obs_ids: ObservationId[]`. A caller that supplies an `obs_id`
+   * here intersects the oracle's key set nowhere and every target is reported
+   * `TARGET_NOT_ENUMERATED` with an empty `excluded_by`.
+   */
   readonly target_id: string;
   readonly member_obs_ids: readonly string[];
   /**
