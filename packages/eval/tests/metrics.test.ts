@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import type { Observation } from "@assay/domain";
@@ -5,6 +8,7 @@ import type { Observation } from "@assay/domain";
 import {
   C_EXCEPTION_PAISE,
   C_REVIEW_PAISE,
+  C_REVIEW_SWEEP_PAISE,
   FROZEN_METRICS,
   QUEUE_TOP_N,
   REQUIRED_EXPLORATORY,
@@ -13,7 +17,11 @@ import {
   attributableToUntrustedTextRate,
   batchValuePaise,
   blockedMetrics,
+  COST_SWEEP_PARAMETER_NAME,
+  COST_SWEEP_POINTS,
   cReviewSweep,
+  costSensitivity,
+  sweptCosts,
   calibration,
   caseBalanceHarm,
   closeGateFailures,
@@ -996,7 +1004,7 @@ describe("§5.3 metric 26 — the mandatory sensitivity sweeps", () => {
   it("sweeps C_review over §5.3's three declared points", () => {
     const run = agentRun({ abstentions: [abstention(SETL(1), 1), abstention(SETL(2), 1)] });
     const sweep = cReviewSweep((costs) => netCost(run, 0, costs).net_cost_paise);
-    expect(sweep.parameter_name).toBe("C_review");
+    expect(sweep.parameter_name).toBe(COST_SWEEP_PARAMETER_NAME);
     expect(sweep.covers_declared_range).toBe(true);
     expect(sweep.points.map((p) => p.parameter)).toEqual([10_000, 25_000, 100_000]);
     expect(sweep.points.map((p) => p.value)).toEqual([20_000, 50_000, 200_000]);
@@ -1032,5 +1040,159 @@ describe("§5.3 metric 26 — the mandatory sensitivity sweeps", () => {
     const b = cReviewSweep((c) => c.c_review_paise * 2);
     expect(orderingIsStable(a, b)).toBe(true);
     expect(orderingIsStable(a, a)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §5.3's cost row — metric 26's c_review_sensitivity half (M51)
+// ---------------------------------------------------------------------------
+
+describe("§5.3 metric 26 — c_review_sensitivity moves BOTH cost parameters (M51)", () => {
+  /** Two abstentions, two open exceptions, one of them the E13 constant. */
+  const unit = agentRun({
+    abstentions: [abstention(SETL(1), 1), abstention(SETL(2), 1)],
+    open_exceptions: [
+      openException(PAY(1), "E04_SETTLEMENT_NOT_IN_BANK", 1),
+      openException(PAY(2), "E13_LEDGER_ONLY", 1, false),
+    ],
+  });
+  const HARM = 7_777;
+
+  it("1 — sweeps exactly PREREGISTRATION §7's three points, in the declared order", () => {
+    const sweep = costSensitivity(unit, HARM);
+    expect(sweep.points.map((p) => p.parameter_value)).toStrictEqual([10_000, 25_000, 100_000]);
+    expect(sweep.covers_declared_range).toBe(true);
+    expect(sweep.points).toHaveLength(3);
+    // ₹100 / ₹250 / ₹1,000, and the grid is `frozen.ts`'s, not a second list.
+    expect(sweep.points.map((p) => p.parameter_value)).toStrictEqual([...C_REVIEW_SWEEP_PAISE]);
+  });
+
+  it("2 — C_exception takes THE SAME THREE POINTS, with no scale factor", () => {
+    // §7: "C_exception THE SAME THREE POINTS, moved together with C_review".
+    // M51 rejects "a scale factor applied to the frozen values", so the two are
+    // equal at every point rather than related by any ratio.
+    for (const point of costSensitivity(unit, HARM).points) {
+      expect(point.c_exception_paise).toBe(point.c_review_paise);
+      expect(point.c_review_paise).toBe(point.parameter_value);
+    }
+    expect(COST_SWEEP_POINTS.map((c) => [c.c_review_paise, c.c_exception_paise])).toStrictEqual([
+      [10_000, 10_000], [25_000, 25_000], [100_000, 100_000],
+    ]);
+    expect(sweptCosts(4_242)).toStrictEqual({ c_review_paise: 4_242, c_exception_paise: 4_242 });
+  });
+
+  it("2 — the frozen C_exception of ₹500 is deliberately NOT among the points", () => {
+    // §7: "C_exception's frozen Rs 500 is deliberately NOT among the three
+    // points" — the cost row is §5.3's stability verdict, not a curve that must
+    // locate the reported run.
+    expect(C_EXCEPTION_PAISE).toBe(50_000);
+    expect(costSensitivity(unit, HARM).points.map((p) => p.c_exception_paise))
+      .not.toContain(C_EXCEPTION_PAISE);
+  });
+
+  it("7 — NO point is the operating point, ₹250 included", () => {
+    // C_review = ₹250 is on the grid but pairs with C_exception = ₹250, not the
+    // frozen ₹500, so no swept point reproduces §5.2's reported figure.
+    const points = costSensitivity(unit, HARM).points;
+    expect(points.every((p) => p.is_operating_point === false)).toBe(true);
+    expect(points.find((p) => p.parameter_value === C_REVIEW_PAISE)?.is_operating_point)
+      .toBe(false);
+  });
+
+  it("4 — §5.3's output is net_cost_inr, over §4.5's own formula", () => {
+    // 2 abstentions x c + 2 open exceptions x c + §4.4(a)'s harm, which does
+    // not move with the cost pair.
+    const sweep = costSensitivity(unit, HARM);
+    expect(sweep.points.map((p) => p.net_cost_paise)).toStrictEqual([
+      HARM + 4 * 10_000, HARM + 4 * 25_000, HARM + 4 * 100_000,
+    ]);
+    // And it IS netCost's figure, not a re-derivation from counts.
+    for (const point of sweep.points) {
+      expect(point.net_cost_paise).toBe(
+        netCost(unit, HARM, sweptCosts(point.parameter_value)).net_cost_paise,
+      );
+    }
+  });
+
+  it("4 — §4.5's E13 companion rides beside each point and scales with C_exception", () => {
+    // §4.5: "metric 26's cost sweep scales this term with C_exception, so the
+    // two move together and the sweep is read accordingly." One E13 exception
+    // here, so the companion drops exactly one C_exception per point.
+    const sweep = costSensitivity(unit, HARM);
+    for (const point of sweep.points) {
+      expect(point.net_cost_paise - point.net_cost_paise_excluding_e13)
+        .toBe(point.c_exception_paise);
+    }
+  });
+
+  it("3 — the operating-point figure is metric 2's and is NOT one of the points", () => {
+    // §5.2 reports net_cost_inr at C_review = ₹250 AND C_exception = ₹500.
+    const operating = netCost(unit, HARM).net_cost_paise;
+    expect(operating).toBe(HARM + 2 * C_REVIEW_PAISE + 2 * C_EXCEPTION_PAISE);
+    expect(costSensitivity(unit, HARM).points.map((p) => p.net_cost_paise))
+      .not.toContain(operating);
+  });
+
+  it("5 — the same run and the same harm give byte-identical points", () => {
+    expect(JSON.stringify(costSensitivity(unit, HARM)))
+      .toBe(JSON.stringify(costSensitivity(agentRun({
+        abstentions: [abstention(SETL(1), 1), abstention(SETL(2), 1)],
+        open_exceptions: [
+          openException(PAY(1), "E04_SETTLEMENT_NOT_IN_BANK", 1),
+          openException(PAY(2), "E13_LEDGER_ONLY", 1, false),
+        ],
+      }), HARM)));
+  });
+
+  it("4 — every point carries M51's (parameter_name, parameter_value) and nothing else", () => {
+    for (const point of costSensitivity(unit, HARM).points) {
+      expect(point.parameter_name).toBe(COST_SWEEP_PARAMETER_NAME);
+      expect(Object.keys(point)).toStrictEqual([
+        "parameter_name", "parameter_value", "c_review_paise", "c_exception_paise",
+        "is_operating_point", "net_cost_paise", "net_cost_paise_excluding_e13",
+      ]);
+      // Paise integers, never a locale-formatted rupee string (§0 rule 5).
+      expect(Number.isInteger(point.net_cost_paise)).toBe(true);
+      expect(Number.isInteger(point.net_cost_paise_excluding_e13)).toBe(true);
+    }
+  });
+
+  it("10 — an empty run sweeps to §4.4(a)'s harm alone, not to a fabricated cost", () => {
+    // A unit that abstained on nothing and opened no exception has §4.5's two
+    // count terms at zero at EVERY point, so the row is the harm figure it was
+    // handed. Nothing is invented and nothing is dropped.
+    const empty = costSensitivity(agentRun(), 0);
+    expect(empty.points.map((p) => p.net_cost_paise)).toStrictEqual([0, 0, 0]);
+    expect(empty.points).toHaveLength(3);
+  });
+
+  it("marks a point set that is not §5.3's as not covering the declared range", () => {
+    expect(costSensitivity(unit, HARM, [25_000]).covers_declared_range).toBe(false);
+    expect(costSensitivity(unit, HARM, [25_000]).points).toHaveLength(1);
+  });
+
+  it("6/7 — computes from the run alone: no oracle label, no RunKey, no second unit", () => {
+    // §5.3: the cost row's owner is the scorer and its re-runs are "nothing".
+    // The signature is the proof — there is no labels argument to pass and no
+    // key to form — and the source names neither.
+    const src = readFileSync(
+      join(import.meta.dirname, "..", "src", "metrics", "sensitivity.ts"), "utf8",
+    );
+    const body = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    for (const forbidden of ["OracleLabel", "labelAll", "trulyAmbiguous", "runKey", "RunKey"]) {
+      expect(body, forbidden).not.toContain(forbidden);
+    }
+    // One cost formula, reached by call: §4.5 is netCost's and is not restated.
+    expect(body).toContain("netCost(run, balanceHarmPaise, costs)");
+    expect(body).not.toMatch(/abstentions\.length|open_exceptions\.length/);
+  });
+
+  it("8 — tau_sensitivity is untouched by the cost row", () => {
+    const sweep = tauSweep((floor) => floor);
+    expect(sweep.parameter_name).toBe("tau_floor_paise");
+    expect(sweep.points.map((p) => p.parameter)).toStrictEqual([
+      1_000, 10_000, 100_000, 1_000_000,
+    ]);
+    expect(sweep.covers_declared_range).toBe(true);
   });
 });

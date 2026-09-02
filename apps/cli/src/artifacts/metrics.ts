@@ -1,6 +1,7 @@
 import type {
   AbstentionReport,
   CalibrationReport,
+  CostSensitivity,
   HarmReport,
   MatchReport,
   NetCostReport,
@@ -278,9 +279,12 @@ export interface RiskCoverageMetrics {
  *   20, 21, 22     LLM telemetry and wall-clock instrumentation of a run
  *   23             two committed run artifacts to compare root hashes across
  *   24, and CIs    §5.2's bootstrap over >= 5 seeds — an aggregate, not a unit
- *   26 c_review    M51's post-hoc cost sweep; §4.4(a)'s figure it needs is in
- *                  `truth.report.harm.balance_harm_paise` and `net_cost`
  * ```
+ *
+ * Metric **26**'s `c_review_sensitivity` half left this list at spec 1.4.35's
+ * implementation: it is not a figure at the frozen thresholds and so is not a
+ * `base` field — it is a **sweep**, and it sits beside `tau_sensitivity` in
+ * {@link ScoredSweeps.cost}, on M51's own terms.
  */
 export interface BaseMetrics {
   /** Metric 1. */
@@ -340,6 +344,47 @@ export interface BaseMetrics {
   readonly exception_class_confusion_state: string;
 }
 
+/**
+ * Metric 26's `c_review_sensitivity` half for one scored unit, or the reason
+ * `§5.3`'s cost row was not re-scored.
+ *
+ * **The same three-field shape {@link RiskCoverageMetrics} has, for the same
+ * reason.** Both are derived from a sweep and both need `§4.4(a)`'s harm, so both
+ * can be genuinely unavailable on a unit that was given no answer key — and `§5.5`
+ * bars *"any number that does not exist in a committed run artifact"*. `net_cost`
+ * at ₹100 with the harm term silently dropped would be exactly such a number, so
+ * an unscored unit carries the reason in words and no points at all.
+ */
+export interface CostSensitivityMetrics {
+  readonly scored: boolean;
+  readonly not_scored: string | null;
+  /** `null` where {@link scored} is `false`; never a sweep over a zero harm. */
+  readonly report: CostSensitivity | null;
+}
+
+/**
+ * The sweeps one scored unit carries — M51's `(parameter_name, parameter_value)`
+ * rows, all of them, inside the one `metrics.json`.
+ *
+ * **Metric 26's two halves sit side by side and neither is the other.**
+ * `tau_sensitivity` is {@link AgentSweeps.tau}: `apps/cli` `bench`'s, four τ
+ * **floors**, each an agent **re-execution**, reporting `coverage_by_value` and
+ * `§5.3`'s two counts. `c_review_sensitivity` is {@link cost}: the
+ * `packages/eval` **scorer**'s, three cost points, re-executing **nothing**,
+ * reporting `net_cost_inr`. `§5.3`'s procedure table gives them different owners,
+ * different re-runs and different outputs, and conflating them would publish one
+ * sweep's semantics under the other's name.
+ *
+ * **This adds no key dimension and no path segment.** M51: a sweep point is *"an
+ * evaluation inside one scored unit, never a fifth key dimension"*.
+ * {@link ScoredMetrics.key} is still `(agent_id, split, seed, llm_mode)` and is
+ * still written once.
+ */
+export interface ScoredSweeps extends AgentSweeps {
+  /** Metric 26's `c_review_sensitivity` — `§5.3`'s cost row (M51). */
+  readonly cost: CostSensitivityMetrics;
+}
+
 /** One scored unit's artifact. */
 export interface ScoredMetrics {
   /** M48's `(agent_id, split, seed, llm_mode)`, written once. */
@@ -355,10 +400,13 @@ export interface ScoredMetrics {
    */
   readonly base: BaseMetrics;
   /**
-   * `§5.1`'s and `§5.3`'s curves, empty for an agent `§5.1` draws as a single
-   * point (`B0`, `A2`, `A3`).
+   * `§5.1`'s and `§5.3`'s nested sweeps — M51's three point sets in one place.
+   *
+   * The two executed curves are empty for an agent `§5.1` draws as a single
+   * point (`B0`, `A2`, `A3`); the cost sweep is **not**, because it re-executes
+   * nothing and every agent has a `net_cost_inr` to re-score.
    */
-  readonly sweeps: AgentSweeps;
+  readonly sweeps: ScoredSweeps;
   /**
    * Metric 3 — `aurc_inr`, integrated over {@link sweeps}'s ε points.
    *

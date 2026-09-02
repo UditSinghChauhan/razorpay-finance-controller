@@ -3,7 +3,12 @@ import { tmpdir } from "node:os";
 import { join, relative, sep } from "node:path";
 
 import { ObservationSchema, type Observation, type ObservationId } from "@assay/domain";
-import type { AgentRun, RobustnessReport, RunConfig } from "@assay/eval";
+import {
+  COST_SWEEP_PARAMETER_NAME,
+  type AgentRun,
+  type RobustnessReport,
+  type RunConfig,
+} from "@assay/eval";
 import { afterAll, describe, expect, it } from "vitest";
 
 import {
@@ -21,6 +26,7 @@ import {
   notExercisedOnSplit,
   overDataset,
   readGroundTruthRecord,
+  scoreCostSensitivity,
   scoreRiskCoverage,
   scoreRobustness,
   scoreTruth,
@@ -568,7 +574,14 @@ describe("5/6. V27's composition and V30's disclosure survive into the artifact"
   const encoded = JSON.parse(encodeMetrics({
     key: { agent_id: "ASSAY", split: EXERCISED_SPLIT, seed: 9100, llm_mode: "offline" },
     base: baseWith(metrics),
-    sweeps: { epsilon: [], tau: [] },
+    // §5.3's cost row rides in `sweeps` beside the two curves. This fixture
+    // scores §4.8 alone, so its truth side is not scored and metric 26's cost
+    // half reports the reason rather than a net cost with no harm term.
+    sweeps: {
+      epsilon: [],
+      tau: [],
+      cost: scoreCostSensitivity(run, scoreTruth(run, truthNotScoredOnSplit("train"))),
+    },
     risk_coverage: scoreRiskCoverage([], { coverage_by_value: 1, balance_harm_paise: null }),
   })) as { base: { robustness: RobustnessMetrics } };
 
@@ -1162,7 +1175,9 @@ describe("11. M56 — a sealed TEST run reads the answer key and emits aggregate
 
     const allowed = new Set<string>([
       "ASSAY", EXERCISED_SPLIT, "offline",
-      "epsilon_bps", "tau_floor_paise",
+      // M51's three parameter names: the two `apps/cli` executes and §5.3's
+      // cost row, which the scorer re-scores post-hoc.
+      "epsilon_bps", "tau_floor_paise", COST_SWEEP_PARAMETER_NAME,
       V30_NON_ADDITIVITY, EMPTY_INJECTED_POPULATION,
       // M54's ratified state for metric 10, and M57's empty-population state
       // for metric 7 — both published rather than fabricated.

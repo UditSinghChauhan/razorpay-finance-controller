@@ -19,7 +19,9 @@ import {
   encodeMetrics,
   metric7EceState,
   type BaseMetrics,
+  type CostSensitivityMetrics,
   type ScoredMetrics,
+  type ScoredSweeps,
 } from "../artifacts/metrics.js";
 import { metricsPath } from "../artifacts/metrics-path.js";
 import { selectAgents, sweptRunnerFor } from "../agents/index.js";
@@ -30,6 +32,7 @@ import {
   notExercisedOnSplit,
   overDataset,
   overTruth,
+  scoreCostSensitivity,
   scoreRiskCoverage,
   scoreRobustness,
   scoreTruth,
@@ -75,6 +78,9 @@ const ORACLE_LABELS = "oracle_labels.jsonl";
  *   τ sweep   the same two agents, §5.3's four floors in §5.3's order
  *             the Ambiguity Oracle is NOT consulted and its labels are NOT
  *             regenerated -- all three reported quantities are engine-side
+ *   cost      EVERY agent, §5.3's three points with C_review and C_exception
+ *             moved together. Post-hoc: nothing is re-executed, the same
+ *             AgentRun and the same §4.4(a) harm are re-scored (M51)
  * ```
  *
  * **`--llm=replay` is deferred to `DECISION_BRIEF.md §F` F2 and this command
@@ -143,12 +149,21 @@ const ORACLE_LABELS = "oracle_labels.jsonl";
  * scalars, and no `GroundTruth` field, path or row appears in either
  * (`PREREGISTRATION.md §10` **V31**).
  *
+ * **`§5.3`'s cost row is here too, and it is the one sweep that re-executes
+ * nothing.** M51's procedure table gives its owner as the `packages/eval` scorer
+ * and its re-runs as *"**nothing** — post-hoc over one unit's artifacts"*, against
+ * ε and τ which read their thresholds inside stage `S4` and so re-execute the
+ * agent. `bench/scorer.ts`'s `scoreCostSensitivity` re-scores the **same**
+ * `AgentRun` at `C_review` **and `C_exception`** = ₹100 / ₹250 / ₹1,000 — moved
+ * together, `§7`'s ₹500 deliberately off the grid — over the `§4.4(a)` harm metric
+ * 2 already used. Every agent gets it, including the ones `§5.1` draws as a single
+ * point: what those agents lack is a **curve**, not a `net_cost_inr`. No `RunKey`
+ * is formed, no oracle label is read and no second scored unit is written.
+ *
  * **What this command still does not do.** `§5.2`'s aggregation over ≥ 5 seeds —
  * the bootstrap that turns these per-unit figures into `mean ± 95% CI` — is a
- * successor step and reads these artifacts; `§5.3`'s `C_review`/`C_exception`
- * sweep is *"post-hoc over one unit's artifacts"* by M51's own table and
- * re-executes nothing, and the `§4.4(a)` figure it needs is already on the
- * artifact. Nothing is stubbed or defaulted to a zero: an uncomputed metric is
+ * successor step and reads these artifacts. Nothing is stubbed or defaulted to a
+ * zero: an uncomputed metric is
  * **absent or `null` with its reason**, because `§5.5` bars *"any number that
  * does not exist in a committed run artifact"* and a zero standing in for an
  * uncomputed figure is precisely such a number.
@@ -195,16 +210,24 @@ async function run(context: CommandContext): Promise<void> {
       });
 
       // The base execution: no sweep parameter, so `packages/engine` resolves
-      // §7's frozen ε and τ and this is byte-identical to a pre-M51 run.
-      const base = await execute(agent, input, robustnessSource, truthSource);
+      // §7's frozen ε and τ and this is byte-identical to a pre-M51 run. It also
+      // carries §5.3's cost row, which re-executes nothing and is post-hoc over
+      // exactly this run and this unit's already-measured §4.4(a) harm.
+      const { base, cost } = await execute(agent, input, robustnessSource, truthSource);
       const key = runKey(agent.id, input.config);
 
       // §5.1's two curve agents, and only under offline (F2, above).
       const runner = sweptRunnerFor(agent.id);
-      const sweeps: AgentSweeps =
+      const executed: AgentSweeps =
         runner === undefined || llmMode !== "offline"
           ? NO_SWEEPS
           : await runSweeps(runner, input, agent.id, (run) => balanceHarmOf(run, truthSource));
+
+      // M51's three point sets in one place, in a fixed order. The cost row is
+      // NOT gated on `runner`: ε and τ re-execute the agent and so are §5.1's
+      // two curve agents' alone, while the cost row re-executes nothing and
+      // every agent has a net_cost_inr to re-score.
+      const sweeps: ScoredSweeps = Object.freeze({ ...executed, cost });
 
       // Metric 3, over §5.1's curve. A single-point agent -- and a curve agent
       // under --llm=replay, where F2 leaves no curve to run -- contributes its
@@ -288,13 +311,23 @@ function sourcesFor(
   };
 }
 
-/** One agent's base execution, projected onto the metrics it determines. */
+/**
+ * One agent's base execution, projected onto the metrics it determines — and
+ * `§5.3`'s cost row over that same execution.
+ *
+ * **The cost sweep travels with the base execution because it is a re-scoring of
+ * it.** M51 gives it *"nothing"* to re-run and this is the one place that holds
+ * both the `AgentRun` and the `TruthMetrics` it re-scores, so a second call site
+ * would either re-run the agent or re-read the answer key to obtain what is
+ * already here. It is returned beside `base` rather than filed inside it because
+ * it is a **sweep**, not a figure at the frozen thresholds.
+ */
 async function execute(
   agent: Agent,
   input: AgentInput,
   robustnessSource: RobustnessSource,
   truthSource: TruthSource,
-): Promise<BaseMetrics> {
+): Promise<{ readonly base: BaseMetrics; readonly cost: CostSensitivityMetrics }> {
   const run = await agent.run(input);
   if (run.agent_id !== agent.id) {
     throw new CliError(
@@ -308,7 +341,10 @@ async function execute(
   // Metric 7's headline is READ OFF the report that carries §4.6's reliability
   // diagram rather than computed a second time here (M57).
   const truth = scoreTruth(run, truthSource);
-  return Object.freeze({
+  // §5.3's cost row, post-hoc over the run just scored and the harm figure
+  // metric 2 already used. No agent is re-executed and no oracle label is read.
+  const cost = scoreCostSensitivity(run, truth);
+  const base: BaseMetrics = Object.freeze({
     coverage_by_value: c.coverage_by_value.ratio,
     coverage_by_count: c.coverage_by_count.ratio,
     coverage_by_value_bank: c.coverage_by_value_bank.ratio,
@@ -335,6 +371,7 @@ async function execute(
     exception_class_confusion: null,
     exception_class_confusion_state: M54_METRIC_10_NOT_COMPUTABLE,
   });
+  return Object.freeze({ base, cost });
 }
 
 /** `PREREGISTRATION.md §6.1`'s splits, read rather than assumed. */

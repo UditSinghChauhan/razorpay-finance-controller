@@ -224,10 +224,16 @@ export {
 } from "./metrics/components.js";
 
 export {
+  type CostSensitivity,
+  type CostSensitivityPoint,
   type Sweep,
   type SweepPoint,
+  COST_SWEEP_PARAMETER_NAME,
+  COST_SWEEP_POINTS,
   cReviewSweep,
+  costSensitivity,
   orderingIsStable,
+  sweptCosts,
   tauSweep,
 } from "./metrics/sensitivity.js";
 
