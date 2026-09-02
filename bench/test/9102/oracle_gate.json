@@ -1,0 +1,50 @@
+{
+  "spec_version": "1.4.37",
+  "split": "test",
+  "seed": 9102,
+  "passed": true,
+  "completeness": {
+    "passed": true,
+    "targets_total": 124,
+    "targets_in_scope": 124,
+    "scoped_out_inexpressible": 0,
+    "scoped_out_budget_exhausted": 0,
+    "failure_count": 0,
+    "by_family": [
+      {
+        "family": "F07",
+        "targets_total": 31,
+        "targets_in_scope": 31,
+        "scoped_out_inexpressible": 0,
+        "scoped_out_budget_exhausted": 0,
+        "failures": 0
+      },
+      {
+        "family": "F08",
+        "targets_total": 31,
+        "targets_in_scope": 31,
+        "scoped_out_inexpressible": 0,
+        "scoped_out_budget_exhausted": 0,
+        "failures": 0
+      },
+      {
+        "family": "F09",
+        "targets_total": 31,
+        "targets_in_scope": 31,
+        "scoped_out_inexpressible": 0,
+        "scoped_out_budget_exhausted": 0,
+        "failures": 0
+      },
+      {
+        "family": "F10",
+        "targets_total": 31,
+        "targets_in_scope": 31,
+        "scoped_out_inexpressible": 0,
+        "scoped_out_budget_exhausted": 0,
+        "failures": 0
+      }
+    ],
+    "excluded_by": []
+  },
+  "consistency": null
+}

@@ -1,0 +1,29 @@
+{
+  "benchmark_version": "1.0.13",
+  "created_at": 1788370218,
+  "generator_commit": "2e93efedd44663c19d95caf0e7b74b9a86e2914d",
+  "spec_commit": "2e93efedd44663c19d95caf0e7b74b9a86e2914d",
+  "families": [
+    "F07",
+    "F08",
+    "F09",
+    "F10"
+  ],
+  "seeds": [
+    9102
+  ],
+  "record_counts": {
+    "F07": 2623,
+    "F08": 2621,
+    "F09": 2621,
+    "F10": 2621
+  },
+  "observations_sha256": "472b5bdc1f52fdcc83cb451ca98ef814c6d71cacd2faf7dce78e06f169725c85",
+  "ground_truth_sha256": "e0bded713ed8c5efd7d3f7f7313be9ac5de65a5fc51e2da66343e2621b7ae5b7",
+  "oracle_labels_sha256": "946c2dc0ccb790b74aafcce5f168b9e4cb003c5a112839b57976e95d47c5085b",
+  "recon_report_sha256": "d3a3828ae62d286e1b263a76ec43c91c6633eba287619935f0f9411301d5e648",
+  "constraint_set_hash": "f0c93b5f6a5ffd583c6619a8eaf4d44099718fdf39b28bf61588a887a02f0c1b",
+  "sealed_at": 1788370209,
+  "seal_signature": "bench-v1.0.13",
+  "burns": []
+}
