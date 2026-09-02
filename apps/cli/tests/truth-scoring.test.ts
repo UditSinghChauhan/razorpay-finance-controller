@@ -1480,7 +1480,11 @@ describe("metric 26's c_review_sensitivity half rides in the same metrics.json",
     // frozen thresholds, so it is not a `base` field.
     expect(Object.keys(written.base as unknown as Record<string, unknown>).sort())
       .toStrictEqual([
-        "abstentions", "abstentions_resolved_by_probe", "batch_value_paise",
+        // `abstention_spike` is metric 17 (§4.10, M53) — the run's own rate, and
+        // §7's baseline READ on TEST. It is a figure at the frozen thresholds,
+        // so unlike the cost row it IS a `base` field.
+        "abstention_spike", "abstentions", "abstentions_resolved_by_probe",
+        "batch_value_paise",
         "coverage_by_count", "coverage_by_value", "coverage_by_value_all_observations",
         "coverage_by_value_bank", "coverage_by_value_ledger", "decisions", "ece",
         "ece_state", "exception_class_confusion", "exception_class_confusion_state",

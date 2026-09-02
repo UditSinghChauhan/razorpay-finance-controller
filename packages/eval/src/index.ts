@@ -64,6 +64,10 @@ export {
   K_SIGMA,
   LEGACY_MAX_UNRESOLVED_ABS_PAISE,
   MAX_UNRESOLVED_RATIO_BPS,
+  METRIC_17_BASELINE,
+  METRIC_17_BASELINE_SEEDS,
+  METRIC_17_BASELINE_SPLIT,
+  type Metric17BaselineRow,
   QUEUE_TOP_N,
   SEEDS_PER_CONFIGURATION,
   SPEC_VERSION,
@@ -183,10 +187,17 @@ export {
 
 export {
   type AbstentionReport,
+  type Metric17BaselineSample,
+  type Metric17BaselineStatistic,
+  type Metric17Report,
   abstentionMetrics,
+  abstentionRateByValue,
   abstentionSpikeFlag,
   attributableToUntrustedTextRate,
   largestExceptionInTopN,
+  metric17,
+  metric17BaselineFor,
+  metric17BaselineStatistic,
   trulyAmbiguousTargets,
 } from "./metrics/abstention.js";
 
