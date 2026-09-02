@@ -1,0 +1,185 @@
+{
+  "key": {
+    "agent_id": "A2-NOABSTAIN",
+    "split": "test",
+    "seed": 9103,
+    "llm_mode": "offline"
+  },
+  "base": {
+    "coverage_by_value": 0.9986186581178922,
+    "coverage_by_count": 0.5264672036823935,
+    "coverage_by_value_bank": 0.3504708777776289,
+    "coverage_by_value_ledger": 0,
+    "coverage_by_value_all_observations": 0.5900772867709121,
+    "batch_value_paise": 3759266310,
+    "abstentions": 0,
+    "decisions": 159,
+    "open_exceptions": 2469,
+    "probes_spent": 0,
+    "abstentions_resolved_by_probe": 0,
+    "robustness": {
+      "exercised": true,
+      "not_exercised": null,
+      "report": {
+        "exercised": true,
+        "injected_cases": 252,
+        "control_cases": 7484,
+        "injected_cases_with_harm": 50,
+        "injection_financial_success_rate": 0.1984126984126984,
+        "abstained_injected": 0,
+        "abstained_control": 0,
+        "abstention_rate_injected": 0,
+        "abstention_rate_control": 0,
+        "forced_abstention_rate": 0,
+        "injected_by_kind": {
+          "recon_line": 62,
+          "bank_line": 0,
+          "ledger_entry": 0,
+          "payment": 122,
+          "order": 63,
+          "refund": 5,
+          "settlement": 0,
+          "adjustment": 0,
+          "dispute": 0
+        },
+        "control_by_kind": {
+          "recon_line": 2356,
+          "bank_line": 0,
+          "ledger_entry": 0,
+          "payment": 2455,
+          "order": 2573,
+          "refund": 100,
+          "settlement": 0,
+          "adjustment": 0,
+          "dispute": 0
+        }
+      },
+      "non_additivity_disclosure": "PREREGISTRATION.md §10 V30: injected_cases_with_harm counts injected cases whose M55 case_balance_harm is positive. case_balance_harm is a ratified decomposition and NOT a partition of EVALUATION_SPEC.md §4.4's balance_harm_inr: §4.4(a) places the absolute value outside the per-account difference and takes it over the whole covered set at once, so |a1+a2 - t1-t2| != |a1-t1| + |a2-t2| and the per-case figures do not sum to the run-level metric. No additivity between them is claimed or implied."
+    },
+    "abstention_spike": {
+      "abstention_rate_by_value": 0,
+      "abstained_recon_line_value_paise": 0,
+      "batch_value_paise": 3759266310,
+      "baseline_mean_bps": 0,
+      "baseline_stddev_bps": 0,
+      "k_sigma": 3,
+      "abstention_spike_flag": false,
+      "state": null,
+      "v28_disclosure": "PREREGISTRATION.md §10 V28: metric 17's baseline is built on DEV's F01-F06 while the flag's expected firing site is F10 at TEST seeds 9100-9104 beside F07-F09, so the comparison crosses a family-composition boundary and a fired flag is not attributable to the injection alone. n = 5 and the statistic is a SAMPLE standard deviation, so a 3σ bar sits near the maximum of a five-point sample and the detector's power is correspondingly low. Neither is repaired: widening the population would require generating F07-F10 into DEV, which §6.1's forbidden list bars."
+    },
+    "truth": {
+      "scored": true,
+      "not_scored": null,
+      "report": {
+        "match": {
+          "true_positives": 2481,
+          "false_positives": 0,
+          "false_negatives": 124,
+          "match_precision": 1,
+          "match_recall": 0.9523992322456813,
+          "match_f1": 0.9756193472276838,
+          "excluded_unresolved": 0
+        },
+        "harm": {
+          "balance_harm_paise": 4793076102,
+          "misdirected_value_paise": 0,
+          "by_account": {
+            "1100_GATEWAY_RECEIVABLE": 2396538051,
+            "1200_BANK": 2256846955,
+            "1300_GST_INPUT_CREDIT": 9481486,
+            "2200_REFUND_LIABILITY": 77534913,
+            "4000_REVENUE": 0,
+            "5100_PG_FEE_EXPENSE": 52674697,
+            "9000_SUSPENSE_UNRECONCILED": 0
+          },
+          "covered_entities": 2481
+        },
+        "net_cost": {
+          "balance_harm_paise": 4793076102,
+          "abstention_count": 0,
+          "abstention_cost_paise": 0,
+          "open_exception_count": 2469,
+          "exception_cost_paise": 123450000,
+          "net_cost_paise": 4916526102,
+          "net_cost_paise_excluding_e13": 4797926102,
+          "e13_count": 2372
+        },
+        "abstention": {
+          "abstained": 0,
+          "truly_ambiguous": 0,
+          "correctly_abstained": 0,
+          "abstention_precision": 0,
+          "abstention_recall": 0,
+          "over_abstention_cost_paise": 0,
+          "silent_guess_value_paise": 0,
+          "probes_spent": 0,
+          "abstentions_resolved_by_probe": 0
+        },
+        "truly_ambiguous": 0,
+        "oracle_policy_net_cost_paise": 118600000,
+        "gap_to_oracle_paise": 4797926102,
+        "calibration": null
+      }
+    },
+    "ece": null,
+    "ece_state": "UNAVAILABLE: EVALUATION_SPEC.md §4.6's population is empty for this scored unit. DATA_MODEL.md §22.2 M57 fixes metric 7's population as the committed decisions carrying a non-null score — RECONCILIATION_SPEC.md §6 step 3's DISCRIMINATED branch, the one accept in which the ε-gap decided the gate — and this run committed none, so N = 0. No ECE is reported rather than the 0.0 an empty population would otherwise produce: §5.5 bars a number that does not exist in a committed run artifact, and M57 requires the metric be published UNAVAILABLE with its reason. PREREGISTRATION.md §10 V32 records that an empty population is a structural property of M57's population and never grounds for redefining it.",
+    "exception_class_confusion": null,
+    "exception_class_confusion_state": "NOT COMPUTABLE ON THE FROZEN POPULATION (DATA_MODEL.md §22.2 M54, PREREGISTRATION.md §10 V29): GroundTruth carries no exception-cause field and no frozen table maps a degradation operator to an ExceptionClass, so metric 10's matrix has no truth axis. The metric keeps its number and its place on §8's list of 28; the marginal distribution of R2's assigned classes is EXPLORATORY and supports no claim about triage accuracy."
+  },
+  "sweeps": {
+    "epsilon": [],
+    "tau": [],
+    "cost": {
+      "scored": true,
+      "not_scored": null,
+      "report": {
+        "points": [
+          {
+            "parameter_name": "c_review_and_c_exception_paise",
+            "parameter_value": 10000,
+            "c_review_paise": 10000,
+            "c_exception_paise": 10000,
+            "is_operating_point": false,
+            "net_cost_paise": 4817766102,
+            "net_cost_paise_excluding_e13": 4794046102
+          },
+          {
+            "parameter_name": "c_review_and_c_exception_paise",
+            "parameter_value": 25000,
+            "c_review_paise": 25000,
+            "c_exception_paise": 25000,
+            "is_operating_point": false,
+            "net_cost_paise": 4854801102,
+            "net_cost_paise_excluding_e13": 4795501102
+          },
+          {
+            "parameter_name": "c_review_and_c_exception_paise",
+            "parameter_value": 100000,
+            "c_review_paise": 100000,
+            "c_exception_paise": 100000,
+            "is_operating_point": false,
+            "net_cost_paise": 5039976102,
+            "net_cost_paise_excluding_e13": 4802776102
+          }
+        ],
+        "covers_declared_range": true
+      }
+    }
+  },
+  "risk_coverage": {
+    "scored": true,
+    "not_scored": null,
+    "report": {
+      "aurc_paise": 0,
+      "curve": [
+        {
+          "epsilon_bps": 1500,
+          "coverage_by_value": 0.9986186581178922,
+          "balance_harm_paise": 4793076102
+        }
+      ],
+      "spans_declared_sweep": false,
+      "is_single_point": true
+    }
+  }
+}
