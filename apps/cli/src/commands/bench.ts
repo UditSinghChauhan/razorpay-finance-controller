@@ -10,7 +10,7 @@ import {
 } from "@assay/eval";
 import { SEED_BLOCKS, blockOf, type Split } from "@assay/generator";
 
-import { requireFlag, requireSeeds, stringFlag } from "../args.js";
+import { boolFlag, requireFlag, requireSeeds, stringFlag } from "../args.js";
 import { loadGroundTruth } from "../artifacts/ground-truth.js";
 import { loadObservations } from "../artifacts/observations.js";
 import { loadOracleLabels } from "../artifacts/oracle-labels.js";
@@ -26,6 +26,14 @@ import {
 import { metricsPath } from "../artifacts/metrics-path.js";
 import { selectAgents, sweptRunnerFor } from "../agents/index.js";
 import {
+  BASELINE_NOT_SCORED,
+  BASELINE_SEEDS,
+  BASELINE_SPLIT,
+  BASELINE_TRANSCRIPTION,
+  baselineTableLines,
+  runBaselinePass,
+} from "../bench/baseline.js";
+import {
   balanceHarmOf,
   isExercisedSplit,
   isTruthScoredSplit,
@@ -33,6 +41,7 @@ import {
   overDataset,
   overTruth,
   scoreCostSensitivity,
+  scoreAbstentionSpike,
   scoreRiskCoverage,
   scoreRobustness,
   scoreTruth,
@@ -169,6 +178,10 @@ const ORACLE_LABELS = "oracle_labels.jsonl";
  * uncomputed figure is precisely such a number.
  */
 async function run(context: CommandContext): Promise<void> {
+  // §9 step 0 is taken BEFORE anything a scored run needs: no --run-id, no
+  // artifact path, no RunKey. The branch is first so none of them is required.
+  if (boolFlag(context.args, "baseline")) return baselinePass(context);
+
   const split = readSplit(requireFlag(context.args, "split"));
   // `--seeds all` (§9 step 7's spelling) expands over §6.1's declared seeds for
   // this split, read from the frozen table's one reader -- oracle.ts's own line.
@@ -255,6 +268,111 @@ async function run(context: CommandContext): Promise<void> {
   context.out(`scored units        ${String(written)}`);
   context.out(`llm_mode            ${llmMode}`);
   context.out(`artifacts           ${join("runs", runId)}`);
+}
+
+/**
+ * `PREREGISTRATION.md §9` **step 0** — the non-scored pre-seal DEV baseline pass
+ * (spec 1.4.32, register row `DATA_MODEL.md §22.2` **M53**; **M58** at spec
+ * 1.4.36 clarifies this placement rather than amending it).
+ *
+ * **It is a mode of this command and not a ninth command, and M58 says so in
+ * terms.** `DECISION_BRIEF.md §C` T0-11 enumerates the CLI's commands and
+ * `tests/commands.test.ts` pins the registry against that literal list; a ninth
+ * entry would amend a governance document to add an implementation seam. `§9`
+ * writes step 0 as *"`<non-scored DEV baseline pass>`"* and names no command, so
+ * the placement is an implementation choice and this is the narrowest one
+ * available: the step *"runs every agent over the five DEV seeds"*, which is this
+ * command's own agent loop with everything that makes a run **scored** removed.
+ * M58: `--baseline` is *"the IMPLEMENTATION SPELLING of step 0"*, T0-11's list of
+ * **eight** stays *"unchanged and unedited"*, and **no step is added or
+ * renumbered**. **No second benchmark procedure is created** — the solver is not
+ * duplicated, the agents are the same objects `selectAgents` returns, and
+ * `Agent.run` is the same seam.
+ *
+ * **One invocation per `llm_mode`, which M58 also clarifies rather than
+ * changes.** `§9` step 0's *"under each `llm_mode`"* constrains *"the
+ * COMPLETENESS of `§7`'s table"* — a row per `(agent_id, llm_mode)` — *"and NOT
+ * the number of process invocations"*, so the operator may take step 0 once per
+ * mode. Where `DECISION_BRIEF.md §F` **F2** is unresolved the `replay` rows are
+ * deferred exactly as F2 already defers `B2-LLM-DIRECT` and metric 3's
+ * `--llm=replay` column: **F2's semantics are applied here, not reopened.**
+ *
+ * **What it does not do, checked rather than merely omitted:** it forms no
+ * `RunKey`, opens no `ground_truth.jsonl` and no `oracle_labels.jsonl`, computes
+ * no metric on `PREREGISTRATION.md §8`'s list, runs no ε, τ or cost sweep, calls
+ * `context.sink` **not at all** — so no `runs/` artifact, no `metrics.json` and
+ * no `benchmark_manifest.json` — and cuts no tag. `§9`: *"It EMITS NO
+ * `metrics.json`, is NOT a scored run, and reports NO scored number of its own."*
+ *
+ * **DEV-only, and the split is refused rather than defaulted.** `§7`'s producer
+ * row and `§9` step 0's own two command lines are `--split dev`; `§6.1`'s
+ * forbidden list bars `--split test` before the seal in any case. The seeds are
+ * `§7`'s five and are **not** taken from `--seeds`: the population is frozen
+ * before the measurement, which is the property that keeps
+ * `DECISION_BRIEF.md §L.4` out of this entry (M53). An explicit `--seeds` naming
+ * anything else is a usage error rather than a silently-honoured override.
+ *
+ * **The result is emitted, not written.** `§7` is the record — *"recorded here
+ * once step 0 has run and EMPTY until then. It is NOT a `BenchmarkManifest`
+ * field"* — so the pass prints `§7`'s table for transcription into the document,
+ * and `packages/eval/src/frozen.ts` transcribes `§7` as it does every other `§7`
+ * parameter. A machine-readable baseline file would be a second, uncommitted
+ * evidence path for a figure `§7` alone is authoritative for.
+ */
+async function baselinePass(context: CommandContext): Promise<void> {
+  const requested = stringFlag(context.args, "split");
+  if (requested !== null && requested !== BASELINE_SPLIT) {
+    throw new UsageError(
+      `--baseline runs PREREGISTRATION.md §9 step 0, whose population is §7's five DEV seeds ` +
+        `${BASELINE_SEEDS.join(", ")}. --split ${JSON.stringify(requested)} is refused: §7's ` +
+        `producer row is "§9 step 0's NON-SCORED pre-seal DEV baseline pass", and §6.1's ` +
+        `forbidden list bars --split test before the seal.`,
+    );
+  }
+  if (stringFlag(context.args, "seeds") !== null || stringFlag(context.args, "seed") !== null) {
+    throw new UsageError(
+      `--baseline takes no seed argument. PREREGISTRATION.md §7 fixes metric 17's baseline ` +
+        `population as the five DEV seeds ${BASELINE_SEEDS.join(", ")} — ONE RATE EACH, ` +
+        `n = 5 — BEFORE the measurement, which is why DECISION_BRIEF.md §L.4 is not engaged ` +
+        `by it (M53). A population chosen on the command line would give that argument away.`,
+    );
+  }
+  if (stringFlag(context.args, "run-id") !== null) {
+    throw new UsageError(
+      `--baseline takes no --run-id. PREREGISTRATION.md §9 step 0 "EMITS NO metrics.json" and ` +
+        `writes no runs/ artifact, so there is no run to identify; its result is recorded into ` +
+        `§7's metric-17 baseline table, which is not a run artifact.`,
+    );
+  }
+
+  const agents = selectAgents(stringFlag(context.args, "agents") ?? "all");
+  const llmMode = readLlmMode(context.config.llmProvider);
+  const benchRoot = stringFlag(context.args, "bench") ?? "bench";
+
+  const rows = await runBaselinePass({
+    agents,
+    llmMode,
+    strictReplay: context.config.strictReplay,
+    // One read per seed, of the ONE artifact this pass needs. §9 step 0 runs
+    // after `assay generate --split dev`, and the answer key is not opened:
+    // abstention_rate_by_value is computed from the agent's own outcomes.
+    observationsForSeed: (seed) =>
+      loadObservations(join(join(join(benchRoot, BASELINE_SPLIT), String(seed)), OBSERVATIONS)),
+  });
+
+  context.out(BASELINE_NOT_SCORED);
+  context.out("");
+  for (const line of baselineTableLines(rows)) context.out(line);
+  context.out("");
+  // M58's transcription path, printed where the rows are: §7 first as the
+  // authoritative record, then frozen.ts as its executable transcription, both
+  // before §9 step 1's tag. This command writes neither.
+  context.out(BASELINE_TRANSCRIPTION);
+  context.out("");
+  context.out(`agents              ${String(rows.length)}`);
+  context.out(`seeds               ${BASELINE_SEEDS.join(", ")}  (n = ${String(BASELINE_SEEDS.length)})`);
+  context.out(`llm_mode            ${llmMode}`);
+  context.out(`artifacts           none — §9 step 0 writes nothing`);
 }
 
 /**
@@ -359,6 +477,10 @@ async function execute(
     // §4.8, through the one seam. No population, covered set or per-case harm
     // is derived in this file.
     robustness: scoreRobustness(run, robustnessSource),
+    // Metric 17 (§4.10, M53). The rate is this run's; the baseline is READ from
+    // PREREGISTRATION.md §7 and only on TEST, per §7's consumer row. Nothing
+    // here derives a baseline from the unit being scored.
+    abstention_spike: scoreAbstentionSpike(run, input.config.split, agent.id, input.config.llm_mode),
     // §4.2, §4.3, §4.4, §4.5, §4.6 and §4.13, through the other. Every formula
     // is `packages/eval`'s; this file supplies the two artifacts and the run.
     truth,
@@ -418,6 +540,10 @@ export const benchCommand: Command = {
     split: { kind: "string", describe: "PREREGISTRATION.md §6.1 split: train, dev or test." },
     "run-id": { kind: "string", describe: "Run identifier; names runs/<run_id>/." },
     bench: { kind: "string", describe: "Dataset root. Default: bench." },
+    baseline: {
+      kind: "boolean",
+      describe: "PREREGISTRATION.md §9 step 0: the non-scored pre-seal DEV baseline pass (M53).",
+    },
   },
   run,
 };

@@ -20,12 +20,14 @@ import {
   isExercisedSplit,
   M54_METRIC_10_NOT_COMPUTABLE,
   METRIC_7_ECE_EMPTY_POPULATION,
+  METRIC_17_BASELINE_NOT_RECORDED,
   loadGroundTruth,
   memorySink,
   metric7EceState,
   notExercisedOnSplit,
   overDataset,
   readGroundTruthRecord,
+  scoreAbstentionSpike,
   scoreCostSensitivity,
   scoreRiskCoverage,
   scoreRobustness,
@@ -536,6 +538,9 @@ function baseWith(robustness: RobustnessMetrics): BaseMetrics {
     probes_spent: 0,
     abstentions_resolved_by_probe: 0,
     robustness,
+    // Metric 17 (§4.10, M53) is `truth-scoring.test.ts`'s and the M53 suite's
+    // subject; on TRAIN the rate is published and §7's baseline is not read.
+    abstention_spike: scoreAbstentionSpike(agentRun(), "train", "ASSAY", "offline"),
     // The rest of the truth side is `truth-scoring.test.ts`'s subject; these
     // cases assert that §4.8's two metrics survive into the artifact unchanged
     // beside it, so the source here is the "not scored" state.
@@ -877,6 +882,9 @@ describe("8/9. the whole command writes M48's one artifact, unchanged apart from
       "probes_spent",
       "abstentions_resolved_by_probe",
       "robustness",
+      // Metric 17 (§4.10, M53), appended after §4.8's field in the order the
+      // command writes it. Nothing before it is renamed or reordered.
+      "abstention_spike",
       "truth",
       "ece",
       "ece_state",
@@ -1183,6 +1191,10 @@ describe("11. M56 — a sealed TEST run reads the answer key and emits aggregate
       // for metric 7 — both published rather than fabricated.
       M54_METRIC_10_NOT_COMPUTABLE,
       METRIC_7_ECE_EMPTY_POPULATION,
+      // M53's state for metric 17, where PREREGISTRATION.md §7's baseline table
+      // records no row for this (agent_id, llm_mode). It names §7, §9 step 0 and
+      // §4.10 and carries no figure from this run or from the answer key.
+      METRIC_17_BASELINE_NOT_RECORDED,
     ]);
     for (const leaf of stringLeaves(written)) {
       expect(allowed.has(leaf), `metrics.json carries an unexpected string: ${leaf}`).toBe(true);

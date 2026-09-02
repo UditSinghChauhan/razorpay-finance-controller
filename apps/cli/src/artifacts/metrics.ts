@@ -159,6 +159,119 @@ export const METRIC_7_ECE_EMPTY_POPULATION =
   "population is a structural property of M57's population and never grounds for redefining it.";
 
 /**
+ * Metric 17's state where `PREREGISTRATION.md §7` records no baseline for this
+ * `(agent_id, llm_mode)` — spec 1.4.32, register row `DATA_MODEL.md §22.2`
+ * **M53**.
+ *
+ * **A state, not a `false`, and the distinction is the whole reason this
+ * exists.** `abstention_spike_flag` is a **detector**: a `false` published
+ * without a baseline says *"no spike"* about a split nothing was compared
+ * against, which is a fabricated number in exactly `EVALUATION_SPEC.md §5.5`'s
+ * sense and, worse, the permissive answer. `M56` refused a `0.0` standing in for
+ * an unavailable metric and `M57` carries the rule forward — *"publishes the
+ * metric UNAVAILABLE with its reason and never `0.0`"*; this is the same rule
+ * applied to a boolean.
+ *
+ * **An absent row is a procedural state `§7` itself describes**, not a defect in
+ * the run being scored: *"recorded here once step 0 has run and EMPTY until
+ * then"*. `§9` orders **step 0** before step 1's tag, so at step 7 the pair
+ * exists by construction; a TEST unit that finds none was scored against a
+ * procedure whose first step was skipped, and it says so rather than reporting a
+ * flag it has no baseline for.
+ */
+export const METRIC_17_BASELINE_NOT_RECORDED =
+  "UNAVAILABLE: PREREGISTRATION.md §7's metric-17 baseline table records no (agent_id, " +
+  "llm_mode) row for this scored unit. §7 keys the baseline per (agent_id, llm_mode) and the " +
+  "table is EMPTY until §9 step 0 — the non-scored pre-seal DEV baseline pass over seeds " +
+  "2000-2004 (DATA_MODEL.md §22.2 M53) — has been taken and its result recorded against §7. " +
+  "No baseline is computed at scoring time on any split, and no run contributes to the " +
+  "baseline it is judged against, so nothing is derived from this run to stand in for it. " +
+  "The flag is published UNAVAILABLE rather than false: a detector that reports \"no spike\" " +
+  "against a baseline it does not have is the broken detector EVALUATION_SPEC.md §4.10 names, " +
+  "and §5.5 bars a number that does not exist in a committed artifact.";
+
+/**
+ * Metric 17's state on a split `PREREGISTRATION.md §7` does not have TEST
+ * scoring read the baseline for (M53).
+ *
+ * `§7`'s consumer row names **one** reader: *"TEST scoring READS this table."*
+ * DEV is excluded by the same entry's closing clause — *"no run contributes to
+ * the baseline it is judged against"* — and the five DEV seeds `2000`–`2004`
+ * **are** the baseline population, so a DEV unit judged against it would be
+ * judged against itself. TRAIN is outside `EVALUATION_SPEC.md §2`'s scoring loop
+ * entirely and opens nothing.
+ *
+ * The **rate** is still computed and published on every split: it is `§4.10`'s
+ * input and a property of the run alone, and it is the quantity `§9` step 0
+ * records. What is withheld off TEST is the **comparison**.
+ */
+export function metric17SplitState(split: string): string {
+  return (
+    `NOT COMPARED ON ${split.toUpperCase()}: PREREGISTRATION.md §7 gives metric 17's baseline ` +
+    `one consumer — "TEST scoring READS this table" (DATA_MODEL.md §22.2 M53). DEV is not a ` +
+    `consumer because the five DEV seeds 2000-2004 ARE the baseline population and "no run ` +
+    `contributes to the baseline it is judged against"; TRAIN is outside EVALUATION_SPEC.md ` +
+    `§2's scoring loop. abstention_rate_by_value is reported above regardless — it is §4.10's ` +
+    `input and a property of this run alone.`
+  );
+}
+
+/**
+ * Metric 17 for one scored unit — `§4.10`'s rate, and the flag when `§7` has a
+ * baseline to compare it against.
+ *
+ * The four fields are `DATA_MODEL.md §21` `AbstentionTelemetry`'s first four,
+ * kept in the same shape and with the same meanings: the rate, the **echoed**
+ * frozen baseline pair — *"read from `PREREGISTRATION §7` … echoed here, never
+ * computed per run"* — and the flag. `§21`'s attribution and queue fields are
+ * metrics 18 and 19 and are not this record's.
+ *
+ * `spike_flag` is `boolean | null` rather than `boolean` because `§21` was
+ * written for a run served by an API that already holds a baseline, while a
+ * scored unit can legitimately have none: {@link METRIC_17_BASELINE_NOT_RECORDED}
+ * and {@link metric17SplitState} are the two reasons, and `state` carries
+ * whichever applies. `null` exactly where a flag exists, so a reader never sees
+ * a verdict and a refusal together.
+ */
+export interface AbstentionSpikeMetrics {
+  /** `§4.10`'s `abstention_rate_by_value`, as a ratio. Computed on every split. */
+  readonly abstention_rate_by_value: number;
+  /** Its numerator, `Σ recon_line.amount` where the component reached `ABSTAINED`. */
+  readonly abstained_recon_line_value_paise: number;
+  /** Its denominator, `batch_value_paise` (`§4.1`). */
+  readonly batch_value_paise: number;
+  /** `§7`'s `mean_bps`, echoed and never computed per run. `null` where none is recorded. */
+  readonly baseline_mean_bps: number | null;
+  /** `§7`'s `stddev_bps`, same source and same rule. */
+  readonly baseline_stddev_bps: number | null;
+  /** `§7`'s `k_sigma`, echoed beside the pair it multiplies. */
+  readonly k_sigma: number;
+  /** Metric 17. `null` with a {@link state} rather than a `false` without a baseline. */
+  readonly abstention_spike_flag: boolean | null;
+  /** Why there is no flag, or `null` where there is one (`§5.4` item 5). */
+  readonly state: string | null;
+  /** `PREREGISTRATION.md §10` **V28**, printed beside a flag that exists. */
+  readonly v28_disclosure: string | null;
+}
+
+/**
+ * `PREREGISTRATION.md §10` **V28**, carried in the artifact beside metric 17.
+ *
+ * `§10` V28 declares the residual in terms and `EVALUATION_SPEC.md §4.10` is to
+ * be *"read with that attached"*, so the sentence travels with the figure for the
+ * same reason {@link V30_NON_ADDITIVITY} does: a reporter that has the flag
+ * necessarily has the qualification.
+ */
+export const V28_BASELINE_COMPOSITION =
+  "PREREGISTRATION.md §10 V28: metric 17's baseline is built on DEV's F01-F06 while the " +
+  "flag's expected firing site is F10 at TEST seeds 9100-9104 beside F07-F09, so the " +
+  "comparison crosses a family-composition boundary and a fired flag is not attributable to " +
+  "the injection alone. n = 5 and the statistic is a SAMPLE standard deviation, so a 3σ bar " +
+  "sits near the maximum of a five-point sample and the detector's power is correspondingly " +
+  "low. Neither is repaired: widening the population would require generating F07-F10 into " +
+  "DEV, which §6.1's forbidden list bars.";
+
+/**
  * Metric 7's published state, or `null` where a figure exists.
  *
  * Two reasons a scored unit can carry no `ece`, and they are different facts that
@@ -306,6 +419,12 @@ export interface BaseMetrics {
   readonly abstentions_resolved_by_probe: number;
   /** Metrics 15 and 16 (`§4.8`), or M52's *"not exercised"*. */
   readonly robustness: RobustnessMetrics;
+  /**
+   * Metric 17 (`§4.10`, M53) — `abstention_rate_by_value` on every split, and
+   * `abstention_spike_flag` where `PREREGISTRATION.md §7` records a baseline for
+   * this `(agent_id, llm_mode)` to compare it against.
+   */
+  readonly abstention_spike: AbstentionSpikeMetrics;
   /** Metrics 2, 4, 5, 6, 7 and 8, or the reason no answer key was supplied. */
   readonly truth: TruthMetrics;
   /**

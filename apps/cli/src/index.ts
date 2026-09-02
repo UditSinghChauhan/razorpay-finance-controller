@@ -60,9 +60,13 @@ export {
 export {
   M54_METRIC_10_NOT_COMPUTABLE,
   METRIC_7_ECE_EMPTY_POPULATION,
+  METRIC_17_BASELINE_NOT_RECORDED,
+  V28_BASELINE_COMPOSITION,
   V30_NON_ADDITIVITY,
   encodeMetrics,
   metric7EceState,
+  metric17SplitState,
+  type AbstentionSpikeMetrics,
   type BaseMetrics,
   type CostSensitivityMetrics,
   type RiskCoverageMetrics,
@@ -75,18 +79,21 @@ export {
 export { loadOracleLabels, readOracleLabelRecord } from "./artifacts/oracle-labels.js";
 export { valueByEntityId, valueOf } from "./values.js";
 export {
+  BASELINE_CONSUMING_SPLIT,
   COST_SENSITIVITY_NEEDS_TRUTH,
   EMPTY_INJECTED_POPULATION,
   EXERCISED_SPLIT,
   NO_RISK_AXIS,
   TRUTH_SCORED_SPLITS,
   balanceHarmOf,
+  consumesBaseline,
   isExercisedSplit,
   isTruthScoredSplit,
   notExercised,
   notExercisedOnSplit,
   overDataset,
   overTruth,
+  scoreAbstentionSpike,
   scoreCostSensitivity,
   scoreRiskCoverage,
   scoreRobustness,
@@ -98,6 +105,17 @@ export {
   type TruthDataset,
   type TruthSource,
 } from "./bench/scorer.js";
+export {
+  BASELINE_NOT_SCORED,
+  BASELINE_SEEDS,
+  BASELINE_SPLIT,
+  BASELINE_TRANSCRIPTION,
+  baselineTableLines,
+  runBaselinePass,
+  type BaselinePassInput,
+  type BaselineRow,
+  type BaselineSample,
+} from "./bench/baseline.js";
 export {
   EPSILON_GRID_BPS,
   EPSILON_OPERATING_POINT_BPS,

@@ -11,18 +11,26 @@ import {
   netCost,
   oraclePolicyNetCost,
   riskCoverage,
+  metric17,
+  metric17BaselineFor,
   robustness,
   scoringTruth,
   trulyAmbiguousTargets,
   unresolvedEntityIds,
+  type AgentId,
   type AgentRun,
   type RiskCoveragePoint,
+  type ScoredLlmMode,
 } from "@assay/eval";
 import type { GroundTruth, Split } from "@assay/generator";
 import type { OracleLabel } from "@assay/oracle";
 
 import {
+  METRIC_17_BASELINE_NOT_RECORDED,
+  V28_BASELINE_COMPOSITION,
   V30_NON_ADDITIVITY,
+  metric17SplitState,
+  type AbstentionSpikeMetrics,
   type CostSensitivityMetrics,
   type RiskCoverageMetrics,
   type RobustnessMetrics,
@@ -586,5 +594,93 @@ export function scoreCostSensitivity(run: AgentRun, truth: TruthMetrics): CostSe
     scored: true,
     not_scored: null,
     report: costSensitivity(run, truth.report.harm.balance_harm_paise),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Metric 17 — EVALUATION_SPEC.md §4.10, PREREGISTRATION.md §7, register row M53
+// ---------------------------------------------------------------------------
+
+/**
+ * `PREREGISTRATION.md §7`'s one consumer of the metric-17 baseline.
+ *
+ * `§7`: *"consumer — **TEST scoring READS this table**. No baseline is computed
+ * at scoring time on any split, and no run contributes to the baseline it is
+ * judged against."* One split, named. DEV is excluded by that second sentence
+ * rather than by omission — the five DEV seeds `2000`–`2004` **are** the
+ * population — and TRAIN is outside `EVALUATION_SPEC.md §2`'s scoring loop.
+ *
+ * Deliberately **not** {@link TRUTH_SCORED_SPLITS}, which is `{dev, test}`: the
+ * baseline is not ground truth and the two scopes are different facts, exactly
+ * as `§4.8`'s and `§2`'s are kept apart above.
+ */
+export const BASELINE_CONSUMING_SPLIT: Split = "test";
+
+/** Whether `§7`'s baseline is read when scoring this split. */
+export function consumesBaseline(split: Split): boolean {
+  return split === BASELINE_CONSUMING_SPLIT;
+}
+
+/**
+ * Metric 17 for one scored unit — the rate always, the flag on TEST alone.
+ *
+ * **The rate is computed on every split and the comparison on one.**
+ * `abstention_rate_by_value` is a property of the run's own observations
+ * (`§4.10`, M53) and is the quantity `§9` step 0 records; `§7` gives the
+ * **baseline** one consumer, TEST scoring. So a DEV or TRAIN unit publishes the
+ * rate and {@link metric17SplitState}'s sentence in place of a flag, and no
+ * baseline is looked up for it at all.
+ *
+ * **Nothing here recomputes, derives or falls back to a baseline.**
+ * `metric17BaselineFor` reads `packages/eval/src/frozen.ts`'s transcription of
+ * `§7`'s table and answers `null` where `§7` records no row; this function turns
+ * that `null` into {@link METRIC_17_BASELINE_NOT_RECORDED} and a `null` flag. It
+ * does **not** compute a mean over this run, over this split's seeds, or over
+ * anything else: `§7`'s *"no run contributes to the baseline it is judged
+ * against"* is enforced by there being no code path from an `AgentRun` to a
+ * baseline value, in this module or any other outside `§9` step 0's DEV pass.
+ *
+ * **A malformed `§7` row is a throw and is not caught here.** `§7`'s table is a
+ * frozen document; a row carrying a non-integer or an out-of-range figure is a
+ * corrupt transcription, and scoring past it would put a number in a report that
+ * `§7` does not contain. That is the fail-closed half of the same rule the
+ * `null` half implements.
+ *
+ * **What TEST scoring consumes is the TRANSCRIPTION, at `§7`'s own encoding**
+ * (`DATA_MODEL.md §22.2` **M58**). `METRIC_17_BASELINE` in
+ * `packages/eval/src/frozen.ts` is `§7`'s executable transcription and the only
+ * source a scored run reads; it carries the pair as **integer basis points**
+ * rounded once at the end of `§9` step 0, and this function neither re-rounds
+ * it, re-derives `stddev_bps` from `mean_bps`, nor computes a statistic of any
+ * kind. The run's own `abstention_rate_by_value` stays at **full precision** on
+ * the other side of the comparison. `PREREGISTRATION.md §10` **V33** is the
+ * declared residual of that pairing and rides beside `V28` in the artifact.
+ *
+ * `§7` records the pair in basis points and `§4.10`'s formula compares ratios, so
+ * the pair is divided once, here, at the boundary between the frozen encoding and
+ * the metric.
+ */
+export function scoreAbstentionSpike(
+  run: AgentRun,
+  split: Split,
+  agentId: AgentId,
+  llmMode: ScoredLlmMode,
+): AbstentionSpikeMetrics {
+  // §7's table is read on TEST and on no other split, and a throw on a malformed
+  // row is deliberate: a null is §7's own "EMPTY until then", a corrupt figure
+  // is not. Nothing here can produce a baseline from `run`.
+  const baseline = consumesBaseline(split) ? metric17BaselineFor(agentId, llmMode) : null;
+  const report = metric17(run, baseline);
+  const state = consumesBaseline(split)
+    ? baseline === null
+      ? METRIC_17_BASELINE_NOT_RECORDED
+      : null
+    : metric17SplitState(split);
+  return Object.freeze({
+    ...report,
+    state,
+    // §10 V28 travels with a flag that exists: §4.10's expectation "is read with
+    // that attached", and a reporter that has the verdict has the qualification.
+    v28_disclosure: report.abstention_spike_flag === null ? null : V28_BASELINE_COMPOSITION,
   });
 }
