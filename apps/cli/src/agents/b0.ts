@@ -1,4 +1,5 @@
 import {
+  entityIdOf,
   isReferenceKind,
   type Observation,
   type ObservationId,
@@ -174,20 +175,8 @@ function valueOf(o: Observation): number {
   }
 }
 
-/** The business identifier `§16` calls "the observation's own". */
-function entityIdOf(o: Observation): string {
-  switch (o.kind) {
-    case "recon_line":
-    case "adjustment":
-      return o.payload.entity_id;
-    case "bank_line":
-      return o.payload.bank_line_id;
-    case "ledger_entry":
-      return o.payload.ledger_entry_id;
-    default:
-      return o.payload.id;
-  }
-}
+// `entityIdOf` is `@assay/domain`'s from spec 1.4.33 — see the note in
+// `assay.ts`. Both agents read one definition of §16's business identifier.
 
 // ---------------------------------------------------------------------------
 // AN1 — recon_line/adjustment -> settlement, referent required

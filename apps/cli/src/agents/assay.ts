@@ -1,4 +1,5 @@
 import {
+  entityIdOf,
   isReferenceKind,
   type ConstraintId,
   type Observation,
@@ -306,20 +307,11 @@ function valueOf(o: Observation): number {
   }
 }
 
-/** The business identifier `§16` calls *"the observation's own"*. */
-function entityIdOf(o: Observation): string {
-  switch (o.kind) {
-    case "recon_line":
-    case "adjustment":
-      return o.payload.entity_id;
-    case "bank_line":
-      return o.payload.bank_line_id;
-    case "ledger_entry":
-      return o.payload.ledger_entry_id;
-    default:
-      return o.payload.id;
-  }
-}
+// `entityIdOf` — the business identifier `§16` calls "the observation's own" —
+// is `@assay/domain`'s from spec 1.4.33 (register row DATA_MODEL.md §22.2 M55).
+// It was transcribed here and in `b0.ts`; M55's metric 15 keys on the same field
+// from `packages/eval`, and three copies of one §16 rule is three places for the
+// two journals to come to disagree about what keys them.
 
 // ---------------------------------------------------------------------------
 // The bank side — §17.1.1's P2/P4 trigger and I5's two comparands

@@ -7,13 +7,23 @@ import {
   RECONCILABLE_KINDS,
   REFERENCE_KINDS,
   SOURCE_SYSTEMS,
+  entityIdOf,
   isReconcilableKind,
   isReferenceKind,
+  isSourceEntityId,
   type ObservationKind,
   type SourceSystem,
 } from "@assay/domain";
 
 import {
+  ADJ_ID,
+  BNK_ID,
+  DISP_ID,
+  MLE_ID,
+  ORDER_ID,
+  PAY_ID,
+  RFND_ID,
+  SETL_ID,
   provenance,
   validAdjustment,
   validAdjustmentLine,
@@ -224,5 +234,108 @@ describe("§10.1 reconcilable and reference classification", () => {
     expect(Object.isFrozen(RECONCILABLE_KINDS)).toBe(true);
     expect(Object.isFrozen(REFERENCE_KINDS)).toBe(true);
     expect(Object.isFrozen(KIND_SOURCE_SYSTEM)).toBe(true);
+  });
+});
+
+
+/**
+ * `entityIdOf` — `§16`'s *"the identifier of the observation whose obligation
+ * the posting records"*, and the one definition of it (spec 1.4.33, register row
+ * `§22.2` M55's implementation).
+ *
+ * The rule was transcribed independently in `apps/cli/src/agents/assay.ts`,
+ * `apps/cli/src/agents/b0.ts` and would have been a third time in
+ * `packages/eval/src/metrics/robustness.ts`. The table below is the semantics all
+ * three carried, asserted once here so the copies cannot come back and diverge.
+ */
+describe("§16 — entityIdOf, the observation's own business identifier", () => {
+  /** The field the §10 payload table names for each kind, and the id it holds. */
+  const EXPECTED: Record<ObservationKind, string> = {
+    recon_line: PAY_ID,
+    adjustment: ADJ_ID,
+    bank_line: BNK_ID,
+    ledger_entry: MLE_ID,
+    payment: PAY_ID,
+    order: ORDER_ID,
+    refund: RFND_ID,
+    settlement: SETL_ID,
+    dispute: DISP_ID,
+  };
+
+  it("reads the identifier the §10 table gives each of the nine kinds", () => {
+    for (const kind of OBSERVATION_KINDS) {
+      const parsed = ObservationSchema.parse(
+        observation(kind, KIND_SOURCE_SYSTEM[kind], PAYLOAD[kind]()),
+      );
+      expect(entityIdOf(parsed), kind).toBe(EXPECTED[kind]);
+    }
+  });
+
+  it("is total over the nine kinds and never returns an obs_id", () => {
+    // §16: "a business identifier drawn from the observation set, never an
+    // ASSAY-internal handle" -- so `obs_` must never be the answer.
+    for (const kind of OBSERVATION_KINDS) {
+      const parsed = ObservationSchema.parse(
+        observation(kind, KIND_SOURCE_SYSTEM[kind], PAYLOAD[kind]()),
+      );
+      const id = entityIdOf(parsed);
+      expect(id.length, kind).toBeGreaterThan(0);
+      expect(id.startsWith("obs_"), kind).toBe(false);
+      expect(id, kind).not.toBe(parsed.obs_id);
+    }
+  });
+
+  it("reproduces the switch the two agent modules carried, branch for branch", () => {
+    // The retired local copies, restated as a table: recon_line and adjustment
+    // read payload.entity_id, bank_line reads payload.bank_line_id,
+    // ledger_entry reads payload.ledger_entry_id, and every other kind reads
+    // payload.id. Identical semantics is the condition of the refactor.
+    const fieldOf: Record<ObservationKind, string> = {
+      recon_line: "entity_id",
+      adjustment: "entity_id",
+      bank_line: "bank_line_id",
+      ledger_entry: "ledger_entry_id",
+      payment: "id",
+      order: "id",
+      refund: "id",
+      settlement: "id",
+      dispute: "id",
+    };
+    for (const kind of OBSERVATION_KINDS) {
+      const parsed = ObservationSchema.parse(
+        observation(kind, KIND_SOURCE_SYSTEM[kind], PAYLOAD[kind]()),
+      );
+      const payload = parsed.payload as Record<string, unknown>;
+      expect(entityIdOf(parsed), kind).toBe(payload[fieldOf[kind]]);
+    }
+  });
+
+  it("gives a reference kind a well-formed identifier that §16 still refuses", () => {
+    // The two structural zeros M55 keeps apart. A `payment` carries a `pay_...`,
+    // which IS in §16's grammar -- so only §10.1's classification decides it.
+    // An `order` carries an `order_...`, which the grammar itself refuses.
+    const paymentObs = ObservationSchema.parse(
+      observation("payment", KIND_SOURCE_SYSTEM.payment, validPayment()),
+    );
+    const orderObs = ObservationSchema.parse(
+      observation("order", KIND_SOURCE_SYSTEM.order, validOrder()),
+    );
+    expect(isReferenceKind(paymentObs.kind)).toBe(true);
+    expect(isSourceEntityId(entityIdOf(paymentObs))).toBe(true);
+    expect(isReferenceKind(orderObs.kind)).toBe(true);
+    expect(isSourceEntityId(entityIdOf(orderObs))).toBe(false);
+  });
+
+  it("gives ledger_entry and dispute identifiers §16's grammar refuses", () => {
+    // §17.1.1 reasons from exactly this: the grammar "admits no mle_... or
+    // disp_..., so truth posts no line attributable to either kind" -- even
+    // though §10.1 makes both reconcilable.
+    for (const kind of ["ledger_entry", "dispute"] as const) {
+      const parsed = ObservationSchema.parse(
+        observation(kind, KIND_SOURCE_SYSTEM[kind], PAYLOAD[kind]()),
+      );
+      expect(isReconcilableKind(kind), kind).toBe(true);
+      expect(isSourceEntityId(entityIdOf(parsed)), kind).toBe(false);
+    }
   });
 });

@@ -171,3 +171,32 @@ export function hasRazorpayPrefix(value: string): boolean {
 export function hasAssayPrefix(value: string): boolean {
   return ID_PREFIXES.assay.some((prefix) => value.startsWith(prefix));
 }
+
+/**
+ * Whether `value` is admissible as a `source_entity_id` — `§16`'s **journal join
+ * key**, and `§1`'s *"JOIN KEY for covered-set projection"*.
+ *
+ * `§16` types the field `pay_… | rfnd_… | adj_… | setl_… | bnk_…` and `§1` types
+ * `true_journal.source_entity_id` identically. **Five prefixes, not eight**, and
+ * the two omissions are load-bearing rather than incidental: `§17.1.1`'s last row
+ * reasons from this very grammar to conclude that for `ledger_entry` and `dispute`
+ * it *"admits no `mle_…` or `disp_…`, so **truth posts no line attributable to
+ * either kind**"*. `order_…` is absent for the same reason one step earlier —
+ * `§10.1` makes `order` a reference kind that *"never posts a journal line"*.
+ *
+ * A predicate rather than a cast: `EVALUATION_SPEC.md §4.8`'s metric 15 asks, per
+ * injected observation, whether that observation's own business identifier can
+ * name a journal line at all, and an identifier outside this grammar cannot
+ * (`DATA_MODEL.md §22.2` **M55**). Answering it by prefix test rather than by
+ * kind lookup keeps the question about the **identifier**, which is what `§16`
+ * constrains.
+ */
+export function isSourceEntityId(value: string): boolean {
+  return (
+    isPaymentId(value) ||
+    isRefundId(value) ||
+    isAdjustmentId(value) ||
+    isSettlementId(value) ||
+    isBankLineId(value)
+  );
+}

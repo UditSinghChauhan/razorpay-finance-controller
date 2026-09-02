@@ -64,6 +64,7 @@ export {
   KIND_SOURCE_SYSTEM,
   RECONCILABLE_KINDS,
   REFERENCE_KINDS,
+  entityIdOf,
   isReconcilableKind,
   isReferenceKind,
 } from "./observation.js";

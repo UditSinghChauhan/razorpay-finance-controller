@@ -47,6 +47,8 @@ export const SETL = (n: number): string => pad("setl_", n);
 export const ORDER = (n: number): string => pad("order_", n);
 export const BNK = (n: number): string => pad("bnk_", n);
 export const LEDG = (n: number): string => pad("ldgr_", n);
+/** `DATA_MODEL.md §8`'s grammar, which `LEDG` above deliberately is not. */
+export const MLE = (n: number): string => pad("mle_", n);
 export { DAY };
 
 export type ReconObs = Extract<Observation, { kind: "recon_line" | "adjustment" }>;
@@ -162,6 +164,96 @@ export function bankLine(id: string, amount: number, bankRef: string | null): Ba
   });
   if (parsed.kind !== "bank_line") throw new Error("fixture: not a bank line");
   return parsed;
+}
+
+/**
+ * An `order` observation — `§10.1`'s other reference kind.
+ *
+ * Its identifier is an `order_…`, which `§16`'s `source_entity_id` grammar
+ * (`pay_… | rfnd_… | adj_… | setl_… | bnk_…`) does not admit. M55's metric 15
+ * gives it a structural zero on **both** grounds.
+ */
+export function order(id: string, amount: number): Observation {
+  return ObservationSchema.parse({
+    obs_id: obsId(),
+    source_system: "pg_orders",
+    source_file: "pg_orders.jsonl",
+    source_line: counter,
+    ingest_hash: "f".repeat(64),
+    ingested_at: T0,
+    kind: "order",
+    payload: {
+      id,
+      entity: "order",
+      amount: paise(amount),
+      amount_paid: paise(amount),
+      amount_due: paise(0),
+      currency: "INR",
+      status: "paid",
+      attempts: 1,
+      created_at: T0,
+    },
+  });
+}
+
+/**
+ * A `refund` observation — the PG-side entity, not the recon row.
+ *
+ * `emit.ts` writes **both** for one refund, and both carry the same `rfnd_…`.
+ * M52's population is of observations, so if both are injected both are members;
+ * they are not deduplicated by identifier.
+ */
+export function refundEntity(id: string, amount: number, paymentId: string): Observation {
+  return ObservationSchema.parse({
+    obs_id: obsId(),
+    source_system: "pg_refunds",
+    source_file: "pg_refunds.jsonl",
+    source_line: counter,
+    ingest_hash: "9".repeat(64),
+    ingested_at: T0,
+    kind: "refund",
+    payload: {
+      id,
+      entity: "refund",
+      amount: paise(amount),
+      currency: "INR",
+      payment_id: paymentId,
+      status: "processed",
+      speed_requested: null,
+      speed_processed: null,
+      created_at: T0,
+    },
+  });
+}
+
+/**
+ * A `ledger_entry` observation — **reconcilable** under `§10.1`, and yet keyed
+ * `mle_…`, which `§16`'s grammar does not admit.
+ *
+ * It is the case that separates M55's two structural zeros: the reference-kind
+ * test does not fire on it, and the grammar test does. `§17.1.1` reaches the same
+ * conclusion from the same grammar — *"truth posts no line attributable to either
+ * kind"*.
+ */
+export function ledgerEntry(id: string, grossPaise: number): Observation {
+  return ObservationSchema.parse({
+    obs_id: obsId(),
+    source_system: "merchant_ledger",
+    source_file: "merchant_ledger.jsonl",
+    source_line: counter,
+    ingest_hash: "8".repeat(64),
+    ingested_at: T0,
+    kind: "ledger_entry",
+    payload: {
+      ledger_entry_id: id,
+      booked_at: T0,
+      order_ref: "INV-202608-00001",
+      invoice_no: null,
+      gross_paise: paise(grossPaise),
+      expected_net_paise: null,
+      gl_account: "1100_GATEWAY_RECEIVABLE",
+    },
+  });
 }
 
 export function payment(id: string, amount: number, orderId: string): Observation {
