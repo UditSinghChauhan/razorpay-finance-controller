@@ -64,15 +64,18 @@ export {
   encodeMetrics,
   metric7EceState,
   type BaseMetrics,
+  type CostSensitivityMetrics,
   type RiskCoverageMetrics,
   type RobustnessMetrics,
   type ScoredMetrics,
+  type ScoredSweeps,
   type TruthMetrics,
   type TruthReport,
 } from "./artifacts/metrics.js";
 export { loadOracleLabels, readOracleLabelRecord } from "./artifacts/oracle-labels.js";
 export { valueByEntityId, valueOf } from "./values.js";
 export {
+  COST_SENSITIVITY_NEEDS_TRUTH,
   EMPTY_INJECTED_POPULATION,
   EXERCISED_SPLIT,
   NO_RISK_AXIS,
@@ -84,6 +87,7 @@ export {
   notExercisedOnSplit,
   overDataset,
   overTruth,
+  scoreCostSensitivity,
   scoreRiskCoverage,
   scoreRobustness,
   scoreTruth,

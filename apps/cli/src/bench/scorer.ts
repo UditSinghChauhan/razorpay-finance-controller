@@ -1,6 +1,7 @@
 import type { Observation } from "@assay/domain";
 import {
   abstentionMetrics,
+  costSensitivity,
   coveredEntityIds,
   degradationPopulations,
   gapToOracle,
@@ -22,6 +23,7 @@ import type { OracleLabel } from "@assay/oracle";
 
 import {
   V30_NON_ADDITIVITY,
+  type CostSensitivityMetrics,
   type RiskCoverageMetrics,
   type RobustnessMetrics,
   type TruthMetrics,
@@ -523,3 +525,66 @@ export const NO_RISK_AXIS =
   "computes it against ground truth, which this scored unit was not given. aurc_inr is " +
   "undefined rather than 0 — an area over a zero risk axis is the best possible score, and " +
   "§5.5 bars a number that does not exist in a committed run artifact.";
+
+// ---------------------------------------------------------------------------
+// §5.3's cost row — metric 26's c_review_sensitivity half (M51)
+// ---------------------------------------------------------------------------
+
+/**
+ * Why metric 26's cost half is withheld on a unit that was given no answer key.
+ *
+ * `§5.3`'s cost row re-scores `net_cost_inr`, whose first term is `§4.4(a)`'s
+ * `balance_harm_inr` — measured against ground truth. With no answer key that term
+ * has no value, and a sweep reporting the abstention and exception charges alone
+ * would publish three figures that are **not** `net_cost_inr` under a field that
+ * says they are. `§5.5` bars a number no committed run artifact holds, so the
+ * reason is filed instead, with {@link TruthMetrics.not_scored}'s own sentence
+ * appended rather than paraphrased.
+ */
+export const COST_SENSITIVITY_NEEDS_TRUTH =
+  "not scored: EVALUATION_SPEC.md §5.3's cost row re-scores net_cost_inr at C_review and " +
+  "C_exception = ₹100 / ₹250 / ₹1,000, and §4.5's first term is §4.4(a)'s balance_harm_inr, " +
+  "which is measured against ground truth this scored unit was not given. The three points " +
+  "are withheld rather than reported without that term — §5.5 bars a number that does not " +
+  "exist in a committed run artifact.";
+
+/**
+ * Metric 26's `c_review_sensitivity` half for one scored unit — `§5.3`, M51.
+ *
+ * **Post-hoc, over the run that was already scored.** `§5.3`'s procedure table
+ * gives this sweep's owner as the `packages/eval` scorer and its re-runs as
+ * *"**nothing** — post-hoc over one unit's artifacts"*. Both arguments are the
+ * unit's own: the same `AgentRun` metric 2 scored, and the {@link TruthMetrics}
+ * {@link scoreTruth} already produced. **No agent is re-executed, no oracle label
+ * is read, no `harm()` call is made a second time and no `RunKey` is formed** —
+ * this function's only computation is `packages/eval`'s `costSensitivity`, which
+ * is three `netCost` calls.
+ *
+ * **The operating point is metric 2 and is not recomputed here.** `§5.2` and
+ * `§5.4` item 5 report `net_cost_inr` at `PREREGISTRATION.md §7`'s frozen
+ * `C_review = ₹250` **and `C_exception = ₹500`**, which
+ * `truth.report.net_cost` already carries. `§7` puts `C_exception`'s ₹500
+ * deliberately off this sweep's grid, so **none** of the three points reproduces
+ * that figure and none claims to: every point's `is_operating_point` is `false`.
+ *
+ * **`§4.4(a)`'s harm is read off the report rather than measured again**, for the
+ * reason `netCost` gives of its own signature — *"passed in rather than recomputed
+ * so that the two metrics cannot disagree about which set they scored"*. The swept
+ * figures and the reported one differ in the cost pair and in nothing else.
+ */
+export function scoreCostSensitivity(run: AgentRun, truth: TruthMetrics): CostSensitivityMetrics {
+  if (truth.report === null) {
+    return Object.freeze({
+      scored: false,
+      not_scored: `${COST_SENSITIVITY_NEEDS_TRUTH} ${
+        truth.not_scored ?? "No ground truth was supplied for this scored unit."
+      }`,
+      report: null,
+    });
+  }
+  return Object.freeze({
+    scored: true,
+    not_scored: null,
+    report: costSensitivity(run, truth.report.harm.balance_harm_paise),
+  });
+}

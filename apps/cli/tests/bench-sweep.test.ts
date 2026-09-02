@@ -265,7 +265,13 @@ describe("G/H. the sweeps nest inside one metrics.json beside the base metrics",
   it("carries base and sweeps side by side — the base is not replaced", () => {
     const metrics = readFileSync(join(SRC, "artifacts", "metrics.ts"), "utf8");
     expect(metrics).toMatch(/readonly base: BaseMetrics;/);
-    expect(metrics).toMatch(/readonly sweeps: AgentSweeps;/);
+    // `ScoredSweeps` is `AgentSweeps` — the two curves `bench/sweep.ts` executes
+    // — plus M51's third point set, §5.3's cost row, which re-executes nothing.
+    // The two executed curves keep their fields and their producer; what the
+    // artifact type adds is a sibling, not a replacement.
+    expect(metrics).toMatch(/readonly sweeps: ScoredSweeps;/);
+    expect(metrics).toMatch(/export interface ScoredSweeps extends AgentSweeps \{/);
+    expect(metrics).toMatch(/readonly cost: CostSensitivityMetrics;/);
     // One `ScoredMetrics` literal, carrying the base and the sweeps side by
     // side. `risk_coverage` joined them when metric 3 was wired: §5.1's AURC is
     // a function of the CURVE and so of the unit rather than of one execution,

@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { ObservationSchema, type Observation, type ObservationId } from "@assay/domain";
 import {
+  COST_SWEEP_PARAMETER_NAME,
   C_EXCEPTION_PAISE,
   C_REVIEW_PAISE,
   FROZEN_METRICS,
@@ -14,6 +15,7 @@ import {
 import { afterAll, describe, expect, it } from "vitest";
 
 import {
+  COST_SENSITIVITY_NEEDS_TRUTH,
   EPSILON_OPERATING_POINT_BPS,
   EXERCISED_SPLIT,
   M54_METRIC_10_NOT_COMPUTABLE,
@@ -930,6 +932,14 @@ interface WrittenMetrics {
   readonly sweeps: {
     readonly epsilon: readonly Record<string, unknown>[];
     readonly tau: readonly Record<string, unknown>[];
+    readonly cost: {
+      readonly scored: boolean;
+      readonly not_scored: string | null;
+      readonly report: {
+        readonly points: readonly Record<string, number | string | boolean>[];
+        readonly covers_declared_range: boolean;
+      } | null;
+    };
   };
   readonly risk_coverage: {
     readonly scored: boolean;
@@ -1256,5 +1266,297 @@ describe("the whole command files the truth side into M48's one artifact", () =>
     }
     // Exactly one artifact per scored unit; no label file is rewritten.
     expect([...sealed.sink.files.keys()]).toStrictEqual([path]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// M51(3) — §5.3's cost row, wired into the same scored unit
+// ---------------------------------------------------------------------------
+
+describe("metric 26's c_review_sensitivity half rides in the same metrics.json", () => {
+  /** Every field an ε or τ row is allowed to carry — `bench/sweep.ts`'s two types. */
+  const TAU_FIELDS = [
+    "abstentions", "coverage_by_value", "decisions", "is_operating_point",
+    "parameter_name", "parameter_value", "solve_outcomes",
+  ];
+
+  it("12 — both halves of metric 26 are present, and neither is the other", async () => {
+    const root = tempDir();
+    writeDataset(root, EXERCISED_SPLIT, 9100);
+    const written = readMetrics(
+      await bench(root, EXERCISED_SPLIT, 9100, "ASSAY"), EXERCISED_SPLIT, 9100, "ASSAY",
+    );
+
+    // tau_sensitivity: apps/cli's, four floors, each an agent re-execution.
+    expect(written.sweeps.tau).toHaveLength(4);
+    expect(written.sweeps.tau.map((p) => p.parameter_name)).toStrictEqual(
+      Array.from({ length: 4 }, () => "tau_floor_paise"),
+    );
+    // c_review_sensitivity: the scorer's, three points, re-executing nothing.
+    expect(written.sweeps.cost.scored).toBe(true);
+    expect(written.sweeps.cost.report?.points).toHaveLength(3);
+    expect(written.sweeps.cost.report?.points.map((p) => p.parameter_name)).toStrictEqual(
+      Array.from({ length: 3 }, () => COST_SWEEP_PARAMETER_NAME),
+    );
+    // No collision: the three sweeps sit side by side under `sweeps`, and the
+    // top level is still M48's key + base + the sweeps + metric 3.
+    expect(Object.keys(written.sweeps).sort()).toStrictEqual(["cost", "epsilon", "tau"]);
+    expect(Object.keys(written).sort()).toStrictEqual([
+      "base", "key", "risk_coverage", "sweeps",
+    ]);
+  });
+
+  it("1/2 — the artifact carries §7's frozen pairs, in paise, in the declared order", async () => {
+    const root = tempDir();
+    writeDataset(root, EXERCISED_SPLIT, 9100);
+    const points = readMetrics(
+      await bench(root, EXERCISED_SPLIT, 9100, "A3-NOLLM"), EXERCISED_SPLIT, 9100, "A3-NOLLM",
+    ).sweeps.cost.report?.points ?? [];
+
+    expect(points.map((p) => p.parameter_value)).toStrictEqual([10_000, 25_000, 100_000]);
+    expect(points.map((p) => p.c_review_paise)).toStrictEqual([10_000, 25_000, 100_000]);
+    // C_exception takes THE SAME THREE POINTS -- moved together, never scaled.
+    expect(points.map((p) => p.c_exception_paise)).toStrictEqual([10_000, 25_000, 100_000]);
+    // Paise integers, never a locale-formatted rupee string.
+    for (const point of points) {
+      expect(typeof point.net_cost_paise).toBe("number");
+      expect(Number.isInteger(point.net_cost_paise)).toBe(true);
+    }
+  });
+
+  it("3/7 — the operating point is metric 2's own figure and is not a swept point", async () => {
+    const root = tempDir();
+    writeDataset(root, EXERCISED_SPLIT, 9100);
+    const written = readMetrics(
+      await bench(root, EXERCISED_SPLIT, 9100, "A3-NOLLM"), EXERCISED_SPLIT, 9100, "A3-NOLLM",
+    );
+    const operating = written.base.truth.report?.net_cost.net_cost_paise;
+    expect(typeof operating).toBe("number");
+
+    // §5.2 reports it at C_review = ₹250 AND C_exception = ₹500, and §7 puts
+    // ₹500 deliberately off this grid -- so no point reproduces it and none
+    // claims to.
+    const points = written.sweeps.cost.report?.points ?? [];
+    expect(points.every((p) => p.is_operating_point === false)).toBe(true);
+    expect(points.map((p) => p.net_cost_paise)).not.toContain(operating);
+    // And metric 2 is unchanged by the sweep: the reported figure still uses
+    // the frozen pair, which the ₹250 point does not.
+    const atFrozenCReview = points.find((p) => p.parameter_value === C_REVIEW_PAISE);
+    expect(atFrozenCReview?.c_exception_paise).not.toBe(C_EXCEPTION_PAISE);
+  });
+
+  it("4/7 — the same inputs at a different RunKey give identical cost points", async () => {
+    // The cost row is a function of the AgentRun and §4.4(a)'s harm. Two seeds
+    // carrying byte-identical datasets differ in RunKey and in nothing the
+    // sweep reads, so the three rows must agree exactly.
+    const root = tempDir();
+    writeDataset(root, EXERCISED_SPLIT, 9100);
+    writeDataset(root, EXERCISED_SPLIT, 9101);
+    const a = readMetrics(
+      await bench(root, EXERCISED_SPLIT, 9100, "A3-NOLLM"), EXERCISED_SPLIT, 9100, "A3-NOLLM",
+    );
+    const b = readMetrics(
+      await bench(root, EXERCISED_SPLIT, 9101, "A3-NOLLM"), EXERCISED_SPLIT, 9101, "A3-NOLLM",
+    );
+    expect(a.key).not.toStrictEqual(b.key);
+    expect(a.sweeps.cost).toStrictEqual(b.sweeps.cost);
+  });
+
+  it("5 — the same AgentRun and truth give a byte-identical sweep", async () => {
+    const root = tempDir();
+    writeDataset(root, EXERCISED_SPLIT, 9100);
+    const path = ["runs", "truth", EXERCISED_SPLIT, "9100", "ASSAY", "offline", "metrics.json"]
+      .join("/");
+    const first = await bench(root, EXERCISED_SPLIT, 9100, "ASSAY");
+    const second = await bench(root, EXERCISED_SPLIT, 9100, "ASSAY");
+    expect(first.sink.files.get(path)).toBe(second.sink.files.get(path));
+  });
+
+  it("6 — the oracle is not consulted: the cost row does not move with its labels", async () => {
+    // §4.5's formula carries no oracle term, so a different label set moves
+    // metrics 4 and 8 and leaves metric 26's cost half exactly where it was.
+    const a = tempDir();
+    const b = tempDir();
+    writeDataset(a, EXERCISED_SPLIT, 9100);
+    const dir = writeDataset(b, EXERCISED_SPLIT, 9100, { oracleLabels: false });
+    writeFileSync(
+      join(dir, "oracle_labels.jsonl"),
+      // BOTH targets truly ambiguous, against the fixture's one: metric 8's
+      // reference policy pays C_review on the whole set, so |truly_ambiguous|
+      // moving is visible in the artifact.
+      labelsJsonl([
+        { target_id: SETL(80), label: "TRULY_AMBIGUOUS" },
+        { target_id: BNK(81), label: "TRULY_AMBIGUOUS" },
+      ]),
+      "utf8",
+    );
+    const fromA = readMetrics(
+      await bench(a, EXERCISED_SPLIT, 9100, "A3-NOLLM"), EXERCISED_SPLIT, 9100, "A3-NOLLM",
+    );
+    const fromB = readMetrics(
+      await bench(b, EXERCISED_SPLIT, 9100, "A3-NOLLM"), EXERCISED_SPLIT, 9100, "A3-NOLLM",
+    );
+    // The labels DID reach the artifact somewhere -- metric 8's reference policy
+    // is |truly_ambiguous| x C_review -- so this is a live control, not a
+    // fixture that happens to be identical.
+    expect(fromA.base.truth.report?.oracle_policy_net_cost_paise)
+      .not.toBe(fromB.base.truth.report?.oracle_policy_net_cost_paise);
+    expect(fromA.sweeps.cost).toStrictEqual(fromB.sweeps.cost);
+  });
+
+  it("7 — one scored unit, one artifact, one RunKey of four fields", async () => {
+    const root = tempDir();
+    writeDataset(root, EXERCISED_SPLIT, 9100);
+    const result = await bench(root, EXERCISED_SPLIT, 9100, "ASSAY");
+    // Three nested sweeps and still exactly one file, keyed once.
+    expect([...result.sink.files.keys()]).toStrictEqual([
+      ["runs", "truth", EXERCISED_SPLIT, "9100", "ASSAY", "offline", "metrics.json"].join("/"),
+    ]);
+    const written = readMetrics(result, EXERCISED_SPLIT, 9100, "ASSAY");
+    expect(Object.keys(written.key).sort()).toStrictEqual([
+      "agent_id", "llm_mode", "seed", "split",
+    ]);
+    // No sweep row carries a key of its own -- M51's RunKey half is written once.
+    for (const row of [...written.sweeps.epsilon, ...written.sweeps.tau,
+      ...(written.sweeps.cost.report?.points ?? [])]) {
+      expect(Object.keys(row)).not.toContain("key");
+      expect(Object.keys(row)).not.toContain("run_key");
+    }
+  });
+
+  it("8/9 — the ε and τ sweeps are untouched: 21 points, 4 floors, same fields", async () => {
+    const root = tempDir();
+    writeDataset(root, EXERCISED_SPLIT, 9100);
+    const written = readMetrics(
+      await bench(root, EXERCISED_SPLIT, 9100, "ASSAY"), EXERCISED_SPLIT, 9100, "ASSAY",
+    );
+    expect(written.sweeps.epsilon).toHaveLength(21);
+    expect(written.sweeps.tau).toHaveLength(4);
+    expect(written.sweeps.epsilon.filter((p) => p.is_operating_point === true)).toHaveLength(1);
+    // No cost field reached either curve, and neither lost one.
+    for (const row of written.sweeps.tau) {
+      expect(Object.keys(row).sort()).toStrictEqual(TAU_FIELDS);
+    }
+    for (const row of written.sweeps.epsilon) {
+      expect(Object.keys(row).sort()).toStrictEqual([...TAU_FIELDS, "balance_harm_paise"].sort());
+    }
+  });
+
+  it("10/13 — TRAIN takes no cost sweep and says why, never a cost without harm", async () => {
+    const root = tempDir();
+    writeDataset(root, "train", 1000, { groundTruth: false, oracleLabels: false });
+    const written = readMetrics(
+      await bench(root, "train", 1000, "A3-NOLLM"), "train", 1000, "A3-NOLLM",
+    );
+    expect(written.sweeps.cost.scored).toBe(false);
+    expect(written.sweeps.cost.report).toBeNull();
+    expect(written.sweeps.cost.not_scored).toContain(COST_SENSITIVITY_NEEDS_TRUTH);
+    // The truth side's own reason travels with it rather than being paraphrased.
+    expect(written.sweeps.cost.not_scored).toContain("not scored on train");
+    // And no zero stands in for the missing figure anywhere in the row.
+    expect(JSON.stringify(written.sweeps.cost)).not.toContain("net_cost_paise");
+  });
+
+  it("13 — DEV and TEST both produce the cost row, on §2's own loop", async () => {
+    for (const [split, seed] of [["dev", 2000], [EXERCISED_SPLIT, 9100]] as const) {
+      const root = tempDir();
+      writeDataset(root, split, seed);
+      const written = readMetrics(
+        await bench(root, split, seed, "A3-NOLLM"), split, seed, "A3-NOLLM",
+      );
+      expect(written.sweeps.cost.scored, split).toBe(true);
+      expect(written.sweeps.cost.report?.covers_declared_range, split).toBe(true);
+      expect(written.sweeps.cost.report?.points, split).toHaveLength(3);
+    }
+  });
+
+  it("11 — metrics 1-25 and 27-28 keep their fields and their values", async () => {
+    const root = tempDir();
+    writeDataset(root, EXERCISED_SPLIT, 9100);
+    const written = readMetrics(
+      await bench(root, EXERCISED_SPLIT, 9100, "A3-NOLLM"), EXERCISED_SPLIT, 9100, "A3-NOLLM",
+    );
+    // `base` gained nothing: the cost row is a SWEEP, not a figure at the
+    // frozen thresholds, so it is not a `base` field.
+    expect(Object.keys(written.base as unknown as Record<string, unknown>).sort())
+      .toStrictEqual([
+        "abstentions", "abstentions_resolved_by_probe", "batch_value_paise",
+        "coverage_by_count", "coverage_by_value", "coverage_by_value_all_observations",
+        "coverage_by_value_bank", "coverage_by_value_ledger", "decisions", "ece",
+        "ece_state", "exception_class_confusion", "exception_class_confusion_state",
+        "open_exceptions", "probes_spent", "robustness", "truth",
+      ]);
+    // ...and the truth report's own fields are unchanged: metric 26's cost half
+    // is not filed among metrics 2, 4, 5, 6, 7 and 8.
+    expect(Object.keys(written.base.truth.report ?? {}).sort()).toStrictEqual([
+      "abstention", "calibration", "gap_to_oracle_paise", "harm", "match", "net_cost",
+      "oracle_policy_net_cost_paise", "truly_ambiguous",
+    ]);
+    expect(FROZEN_METRICS.find((m) => m.number === 26)?.name)
+      .toBe("tau_sensitivity, c_review_sensitivity");
+    expect(FROZEN_METRICS.find((m) => m.number === 26)?.computedBy)
+      .toBe("metrics/sensitivity.ts");
+    expect(FROZEN_METRICS).toHaveLength(28);
+  });
+
+  it("15 — the cost row neither reads nor moves metric 7's ECE", async () => {
+    const root = tempDir();
+    writeDataset(root, EXERCISED_SPLIT, 9100);
+    const written = readMetrics(
+      await bench(root, EXERCISED_SPLIT, 9100, "A3-NOLLM"), EXERCISED_SPLIT, 9100, "A3-NOLLM",
+    );
+    // M57's population is empty on this fixture and stays UNAVAILABLE with its
+    // reason, while metric 26's cost half is fully scored beside it. The two
+    // are independent: §4.5 prices decisions, §4.6 prices nothing.
+    expect(written.base.ece).toBeNull();
+    expect(written.base.ece_state).toBe(METRIC_7_ECE_EMPTY_POPULATION);
+    expect(written.sweeps.cost.scored).toBe(true);
+    // And no calibration symbol is on the cost path, in either layer.
+    const SRC = join(import.meta.dirname, "..", "src");
+    const EVAL_SRC = join(SRC, "..", "..", "..", "packages", "eval", "src");
+    for (const file of [
+      join(EVAL_SRC, "metrics", "sensitivity.ts"),
+      join(EVAL_SRC, "metrics", "cost.ts"),
+    ]) {
+      const body = readFileSync(file, "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+      expect(body, file).not.toMatch(/calibration|ScoredPrediction|ece/i);
+    }
+  });
+
+  it("14 — a sealed TEST run produces the cost row and leaks no GroundTruth field", async () => {
+    const root = tempDir();
+    writeDataset(root, EXERCISED_SPLIT, 9100);
+    const sealed = await bench(root, EXERCISED_SPLIT, 9100, "A3-NOLLM", ["--sealed"]);
+    expect(sealed.err, sealed.err).toBe("");
+    const written = readMetrics(sealed, EXERCISED_SPLIT, 9100, "A3-NOLLM");
+
+    // M56: AL5 is an emission rule, so the sealed scorer reads the answer key
+    // and §5.3's cost row is producible -- which is exactly what M56 names.
+    expect(written.sweeps.cost.scored).toBe(true);
+    expect(written.sweeps.cost.report?.points).toHaveLength(3);
+
+    // What leaves is scalars. No ground-truth row, field or path.
+    const path = ["runs", "truth", EXERCISED_SPLIT, "9100", "A3-NOLLM", "offline", "metrics.json"]
+      .join("/");
+    const costRow = JSON.stringify(written.sweeps.cost);
+    const artifact = sealed.sink.files.get(path) ?? "";
+    for (const token of [
+      "gt_version", "family_id", "true_journal", "true_balances", "degradations",
+      "source_entity_id", "dr_paise", "cr_paise", "target_id",
+      SETL(80), PAY(82), BNK(81), "1.1.0", "ground_truth.jsonl",
+    ]) {
+      expect(costRow, `cost row carries ${token}`).not.toContain(token);
+      expect(artifact, `artifact carries ${token}`).not.toContain(token);
+      expect(`${sealed.out}\n${sealed.err}`, `stdout carries ${token}`).not.toContain(token);
+    }
+    // Every leaf of the cost row is a number, a boolean, or M51's parameter name.
+    for (const point of written.sweeps.cost.report?.points ?? []) {
+      for (const [field, value] of Object.entries(point)) {
+        if (typeof value === "string") {
+          expect(value, field).toBe(COST_SWEEP_PARAMETER_NAME);
+        }
+      }
+    }
   });
 });
