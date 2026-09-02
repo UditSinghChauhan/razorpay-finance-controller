@@ -1,6 +1,17 @@
 # ARCHITECTURE — ASSAY
 
-**Spec version:** 1.4.34 · **Date:** 2026-09-02
+**Spec version:** 1.4.35 · **Date:** 2026-09-02
+
+**At spec 1.4.35** this document is unchanged apart from the version header. Register
+row `DATA_MODEL.md §22.2` **M57** supplies `EVALUATION_SPEC.md §4.6`'s missing
+correctness semantics for **metric 7 `ece`** — the population is
+`RECONCILIATION_SPEC.md §6` step 3's `DISCRIMINATED` branch, the binned prediction is
+that decision's ε-gap `Δs`, one committed decision is one prediction, and a decision
+is correct **iff its asserted allocation equals ground truth's for the same target**.
+**`§4.6`'s formula, its ten bins and its reliability diagram are unchanged**, metric 7
+keeps its name and number, and `EVALUATION_SPEC.md §8`'s list stays at **28** with no
+other formula, universe or threshold moved. `§3`'s package boundaries, `§4`'s trust boundaries and `§10`'s read zones are untouched. Benchmark moves to
+**v1.0.12**. See `DECISION_BRIEF.md §A.42` and `PREREGISTRATION.md §10` **V32**.
 
 **At spec 1.4.34** this document changes **one clause in one `§10` paragraph** — the
 access restatement's *"is withdrawn under `--sealed` by `AL5`"* is narrowed to the two

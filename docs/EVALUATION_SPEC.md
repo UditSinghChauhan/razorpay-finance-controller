@@ -1,6 +1,29 @@
 # EVALUATION_SPEC — ASSAY
 
-**Spec version:** 1.4.34 · **Date:** 2026-09-02
+**Spec version:** 1.4.35 · **Date:** 2026-09-02
+
+**At spec 1.4.35** this document supplies **metric 7's missing correctness
+semantics** in `§4.6`, and changes nothing else. Register row `DATA_MODEL.md §22.2`
+**M57**. `§4.6` fixed the formula, the ten equal-width bins, the reliability diagram
+and the ε-gap scope, and stated **no correctness source for `accuracy(bin)`** — more
+than one reading was admissible on the frozen text and they disagree on a decision
+that asserts a **subset** of the true members, so the choice is **ratified rather
+than dressed as derivation**, on the `M35`/`M49`/`M50`/`M55`/`M56` precedent. **The
+formula is preserved verbatim** — `ECE = Σ_bins (n_bin / N) × | accuracy(bin) −
+mean_score(bin) |` — as are the ten bins and `§5.4` item 7's reliability diagram;
+what `§4.6` gains is the **population**, the **binned prediction** and the
+**correctness predicate**. The population is `RECONCILIATION_SPEC.md §6` step 3's
+**`DISCRIMINATED`** branch, the prediction is that decision's **ε-gap `Δs`**, and a
+decision is correct **iff its allocation identity equals ground truth's for the same
+target** — `M35`'s own term, reused rather than reinvented. **`§4.2` is read and NOT
+amended**: its edge unit, its `FP`/`FN` clauses and its abstained/excepted exclusion
+are untouched, and metric **5** remains the place partial credit is reported. **No
+metric formula changes, none is added, none is removed and none is renumbered** — the
+frozen list stays at **28**, `§5.4`'s thirteen obligations and `§5.5`'s forbidden
+practices are unchanged, `§4.1`–`§4.5` and `§4.7`–`§4.13` are untouched, and `RunKey`
+stays `(agent_id, split, seed, llm_mode)`. Benchmark v1.0.11 → **v1.0.12**;
+`GT_VERSION` stays 1.1.0 and `constraint_set_hash` does not move. See
+`DECISION_BRIEF.md §A.42` and `PREREGISTRATION.md §10` **V32**.
 
 **At spec 1.4.34** this document is unchanged apart from the version header, and **`§2`
 is the clause the amendment reads to settle the question**. Register row
@@ -797,6 +820,116 @@ number. Note that ASSAY's *primary* abstention path is evidential (the
 second-best certificate), not score-based; calibration is reported for the ε-gap
 component, which is the one place a soft score influences the gate.
 
+**Metric 7's population, binned prediction and correctness predicate, ratified at
+spec 1.4.35 `[ASSAY-MODEL]`, register row `DATA_MODEL.md §22.2` M57.** Everything
+above is **unchanged** — the formula, the ten equal-width bins, the reliability
+diagram and the ε-gap scope. What this paragraph supplies is the three things the
+section never stated: **which** decisions are binned, **which** number is binned,
+and what makes one of them *right*. Through spec 1.4.34 `accuracy(bin)` had **no
+correctness source in any frozen clause**; more than one reading was admissible and
+they disagree numerically, so this is **ratified rather than dressed as a
+derivation**, on the `M35`/`M49`/`M50`/`M55`/`M56` precedent.
+
+```
+  population    the scored unit's COMMITTED decisions carrying a non-null score --
+                RECONCILIATION_SPEC.md §6 step 3's DISCRIMINATED branch, the one
+                accept in which the ε-gap decided the gate.
+
+  prediction    ONE COMMITTED DECISION = ONE PREDICTION. N is the number of such
+                decisions in the scored unit; n_bin is the number falling in
+                that bin.
+
+  binned value  Δs = |evidence_score_bps(best) − evidence_score_bps(second)|,
+                an integer in basis points -- the quantity DATA_MODEL.md §13
+                carries as AmbiguityCertificate.evidence_score_gap_bps and §6
+                names "the evidence gap".
+
+  correctness   assert(d) = { (d.target_id, e) : e a member entity of d }
+                truth(d)  = { (target_id, entity_id) : a TRUE allocation edge
+                              whose target_id = d.target_id }
+                correct(d)  iff  assert(d) = truth(d)        SET EQUALITY
+
+  bins          ten equal-width bins of 1000 bps over the FULL 0..10_000 range,
+                never the observed range; lower edge inclusive and upper edge
+                exclusive, EXCEPT the tenth, which includes 10_000; an empty bin
+                contributes no term to the sum.
+
+  N = 0         the metric is published UNAVAILABLE with its reason. NEVER 0.0.
+```
+
+**The unit of correctness is the decision, and that is derived.** Every score in
+this corpus is a property of a `Candidate` — `DATA_MODEL.md §11`: *"It orders
+candidates and feeds the ε-margin ambiguity test"* — and a `Candidate` is a whole
+allocation, `(target_id, member_obs_ids)`. **No frozen field carries a per-edge
+score**, and `RECONCILIATION_SPEC.md §6`'s gate fires once per decision, so `N`
+counts gate events. Binning an **edge** would replicate one gate event into as many
+predictions as the allocation has members and weight `n_bin / N` by allocation size,
+so a settlement with forty constituents would carry forty times the weight of one
+gate event — the unit confusion `§4.2` warns against, running in the other direction.
+`§4.2` chose the **edge** for a set-membership metric; metric 7's unit is fixed by
+what carries the score, and that is the allocation.
+
+**The population is derived, not chosen.** `§6` step 3 tests **materiality first**,
+so a `UNIQUE` decision has no second solution and therefore **no `Δs` to bin** — one
+would have to be invented, which `§5.5` bars — and an `IMMATERIALLY_AMBIGUOUS`
+decision was decided by the materiality clause, whose own `§6.1` rationale is that
+*"the ledger is identical either way"*, so the score influenced nothing and the
+sentence above (*"the one place a soft score influences the gate"*) does not reach
+it. An `AMBIGUOUS` decision **abstains**: `DATA_MODEL.md §13`'s
+`Decision.chosen_candidate_id` is `null`, there is no committed allocation for
+`accuracy(bin)` to test, and `§4.3`'s metrics 4 and the oracle own that population.
+`INTRACTABLE` commits nothing. What remains is exactly `DISCRIMINATED`.
+
+**What set equality decides, stated exhaustively so that no case is left to an
+implementation.** A **strict subset** of the true member set for that target is
+**incorrect**; a **superset** is **incorrect**; any differing member makes the
+decision incorrect. A target the truth carries no allocation edge for gives
+`truth(d) = ∅`, so any non-empty assertion against it is **incorrect**. An asserted
+**empty** allocation is correct **only** against a true empty allocation, which is
+`M35`'s own convention — *"a target with an empty allocation contributes the single
+pair `(target_id, "")`"* — read here as a comparison rather than as a sort key.
+Correctness is evaluated against the **full true member set for the decision's
+target** and never against individual truth edges.
+
+**`§4.2` is read and NOT substituted, and its exclusion is NOT imported.** `§4.2`'s
+`FP`/`FN` clauses, its edge unit and its parenthesis *"(excluding
+abstained/excepted)"* are untouched and continue to govern **metric 5**, which
+remains the place partial credit is reported. Two consequences follow and both are
+deliberate. First, an *"every asserted edge is true"* predicate would be `§4.2`'s
+`FP` clause with its `FN` clause deleted, and `§4.2` pairs them precisely because
+*"how much does it miss"* is a separate question — under that reading metric 7 would
+calibrate `match_precision` and duplicate metric 5's numerator, while the claim the
+gate actually makes is that **this allocation explains this target**, which is what
+`§6` step 1 accepts, what stage `S5` validates and what `DATA_MODEL.md §17.1` posts.
+Second, `§4.2`'s abstained/excepted exclusion exists to prevent **cost
+double-counting** — *"`§4.5` already prices that decision at `C_review` or
+`C_exception`"* — and metric 7 prices nothing, so the rationale does not reach it;
+importing it would make one decision's correctness depend on the agent's **other**
+decisions, so two agents asserting an identical allocation against identical truth
+could be scored differently, which destroys the cross-agent comparability `§2`'s
+protocol is built on.
+
+**Three alternatives are rejected and preserved as rejected.** Calibrating
+**`evidence_score_bps` itself** instead of `Δs`: the section's own purpose is that
+*"an uncalibrated score cannot justify a threshold"*, and the only threshold this
+corpus applies to a score-derived quantity is **ε**, which `§6` compares against
+`Δs` and against nothing else — so that reading would calibrate a quantity no frozen
+threshold is applied to and would justify no threshold at all. **Edge-level or
+partial-credit correctness**, and **the edge as the prediction unit**: both are
+refused on the grounds above. Leaving the metric **unresolved** is likewise
+rejected: `§5.4` item 5 requires every metric on `PREREGISTRATION.md §8`'s list of
+28 in the report, the gap was in this section's own text rather than in the
+population, and `M54`'s disposition does not transfer — metric 10 has **no truth
+axis**, while metric 7 has one whose definition was merely undetermined. None of
+these may be adopted without reopening `M57`.
+
+**The residual is declared rather than argued away**, at `PREREGISTRATION.md §10`
+**V32**: set-equality correctness is **not equivalent** to edge-level correctness,
+so metric 7 is not comparable with any externally computed edge-wise figure; and
+because only score-consulting `DISCRIMINATED` decisions enter, sparse or empty bins
+are a **structural property of the population** and are never grounds for changing
+this definition.
+
 ### 4.7 Throughput and cost
 
 ```
@@ -1307,7 +1440,13 @@ run. Only the ε grid carries that obligation, and `§5.1` discharges it.
    row `DATA_MODEL.md §22.2` **M54**) — the metric keeps its number and its place on
    `PREREGISTRATION.md §8`'s list of 28, and what is published is its honest state
    rather than a fabricated matrix, `§5.5` barring *"any number that does not exist
-   in a committed run artifact"*. This is an existing obligation read onto existing
+   in a committed run artifact"*. **Metric 7 `ece` is carried in that table with
+   `PREREGISTRATION.md §10` **V32** printed beside it** (spec 1.4.35, register row
+   `DATA_MODEL.md §22.2` **M57**) — the ratified correctness predicate is set
+   equality on the allocation, which is not equivalent to edge-level agreement, and
+   a reader who cannot see that cannot compare the figure with an edge-wise one;
+   where the `§4.6` population is empty for an agent the cell reads `UNAVAILABLE`
+   with its reason and never `0.0`. This is an existing obligation read onto existing
    fields, and the count of obligations in this list is **thirteen**, unchanged.
 6. **Two columns for every primary metric:** `--llm=replay` and `--llm=offline`,
    with the delta and whether the CIs overlap (metric 24, `offline_parity`).

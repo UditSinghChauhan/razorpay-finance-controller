@@ -2,8 +2,19 @@
 
 **Track:** 04 — AI Finance Controller
 **Status:** Specification. Frozen scope for implementation.
-**Spec version:** 1.4.34
+**Spec version:** 1.4.35
 **Date:** 2026-09-02
+
+**At spec 1.4.35** this document is unchanged apart from the version header, and **one
+`§7` success criterion is read rather than amended**. Register row `DATA_MODEL.md
+§22.2` **M57** supplies `EVALUATION_SPEC.md §4.6`'s missing correctness semantics for
+**metric 7 `ece`**. **S10** — every claimed number traceable to a committed run
+artifact — is the criterion the ruling serves: a metric whose correctness term has no
+determinate value cannot yield a traceable number, and `EVALUATION_SPEC.md §5.5` bars
+substituting one. **No success criterion moves, none is added and none is withdrawn**;
+`S1`–`S12` are untouched, as are `§9`'s dataset bound and `§10`'s demo script.
+Benchmark moves to **v1.0.12**. See `DECISION_BRIEF.md §A.42` and
+`PREREGISTRATION.md §10` **V32**.
 
 **At spec 1.4.34** this document is unchanged apart from the version header, and **one
 `§7` success criterion is read rather than amended**. Register row `DATA_MODEL.md

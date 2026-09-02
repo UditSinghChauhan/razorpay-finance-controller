@@ -495,8 +495,35 @@ export const K_MAX = 22;
  * `blockOf`, `AL7`'s successor rule and every `target_record_count` are unchanged;
  * `constraint_set_hash` is `packages/domain`'s and is unmodified. **No dataset exists
  * to regenerate.**
+ *
+ * **1.0.11 -> 1.0.12 at spec 1.4.35** (register row M57). The pre-registered surface
+ * changes in what the SEALED RUN YIELDS for metric 7 `ece`. `EVALUATION_SPEC.md §4.6`
+ * froze the formula, the ten equal-width bins, the reliability diagram and the ε-gap
+ * scope, and named `accuracy(bin)` without ever defining what makes a committed
+ * decision right; two readings were admissible and they disagree on a decision
+ * asserting a SUBSET of the true members, so the metric had no determinate value and
+ * `§5.5` bars inventing one. M57 ratifies SET EQUALITY of the asserted allocation
+ * against the true one for the same target, over `RECONCILIATION_SPEC.md §6` step 3's
+ * DISCRIMINATED branch, binning that decision's `Δs`. The bump is taken on **M39**'s
+ * precedent -- as 1.0.4 -> 1.0.5, 1.0.8 -> 1.0.9, 1.0.9 -> 1.0.10 and 1.0.10 -> 1.0.11
+ * all were -- and NOT on M49's, whose test is whether a conforming agent's postings
+ * change: none does. **M50's non-bump is distinguished, not overlooked:** that row
+ * WITHDREW two expectations and changed nothing a scored artifact contains, whereas
+ * this one decides whether metric 7 is a number or an unavailable state. `§9` step 1
+ * now tags `bench-v1.0.12` and step 5 requires this field to read `"1.0.12"`;
+ * `apps/cli` derives the tag from this constant, so M46's class of drift cannot recur.
+ *
+ * **Nothing this package produces changes.** M57 is a rule about how the SCORER reads
+ * what this package already writes. `GroundTruth`'s field list -- `allocations` and
+ * `bank_mappings` supply the truth side through the scorer's own projection --
+ * `true_journal`, `degradations` and every emitted byte are untouched, which is why
+ * `GT_VERSION` stays 1.1.0. No population, seed, family, rate, degradation operator,
+ * `§7` threshold this package reads, composition figure or artifact byte moves;
+ * `SPLIT_TABLE`, `SEED_BLOCKS`, `blockOf`, `AL7`'s successor rule and every
+ * `target_record_count` are unchanged; `constraint_set_hash` is `packages/domain`'s
+ * and is unmodified. **No dataset exists to regenerate.**
  */
-export const BENCHMARK_VERSION = "1.0.11";
+export const BENCHMARK_VERSION = "1.0.12";
 
 /** `DATA_MODEL.md §1`: `GroundTruth.gt_version`. */
 export const GT_VERSION = "1.1.0";
@@ -699,5 +726,24 @@ export const GT_VERSION = "1.1.0";
  * no formula changed; `constraint_set_hash` is `packages/domain`'s and is unmodified.
  * **No dataset exists to regenerate**, and the implementation M56 authorises is
  * deliberately not in this commit (`DECISION_BRIEF.md §A.41`, `§I`).
+ *
+ * **1.4.34 -> 1.4.35 (M57) -- required ONE thing of this package, and it is
+ * `BENCHMARK_VERSION` above.** The amendment supplies `EVALUATION_SPEC.md §4.6`'s
+ * missing correctness semantics for metric 7 `ece`: the population is
+ * `RECONCILIATION_SPEC.md §6` step 3's DISCRIMINATED branch, the binned prediction is
+ * that decision's ε-gap `Δs`, one committed decision is one prediction, and a decision
+ * is correct iff the set of `(target_id, entity_id)` edges it asserts EQUALS the true
+ * allocation's set for that same target. **It reaches this package nowhere else.** The
+ * truth side of that predicate is `GroundTruth.allocations` and `bank_mappings`, both
+ * of which the scorer already projects, so no field is added, retyped, renamed, read
+ * differently or regenerated and `GT_VERSION` stays **1.1.0**; the degradation
+ * operators, families, rates and magnitudes and every emitted byte are preserved
+ * verbatim. `SPLIT_TABLE`, `SEED_BLOCKS`, `blockOf`, `AL7`'s successor rule, `§4.1`'s
+ * composition, every `target_record_count` and every `§7` threshold this package reads
+ * are unchanged; `§7` gains one entry at this amendment and revises none, and `§8`'s
+ * list stays at 28 with metric 7 keeping its name and number and no formula changed;
+ * `constraint_set_hash` is `packages/domain`'s and is unmodified. **No dataset exists
+ * to regenerate**, and the implementation M57 authorises is deliberately not in this
+ * commit (`DECISION_BRIEF.md §A.42`, `§I`).
  */
-export const SPEC_VERSION = "1.4.34";
+export const SPEC_VERSION = "1.4.35";
