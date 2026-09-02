@@ -1,6 +1,25 @@
 # ARCHITECTURE — ASSAY
 
-**Spec version:** 1.4.33 · **Date:** 2026-09-02
+**Spec version:** 1.4.34 · **Date:** 2026-09-02
+
+**At spec 1.4.34** this document changes **one clause in one `§10` paragraph** — the
+access restatement's *"is withdrawn under `--sealed` by `AL5`"* is narrowed to the two
+readers it was written against, the `§5.3` completeness gate and the `§9` seal — and is
+otherwise unchanged apart from the version header. Register row `DATA_MODEL.md §22.2`
+**M56** rules that `PREREGISTRATION.md §6.2` `AL5` is an **emission** rule, so the
+**scorer** reads ground truth at `§9` step 7 under `--sealed` and emits only aggregate
+metrics. **`§10`'s pipeline is unchanged in every arrow, node and artifact**, including
+*"`bench/<split>/<seed>/ground_truth.jsonl` (sealed for the test split)"*, whose
+*"sealed"* has always meant withheld from commit and from the developer rather than
+unreadable by the scoring process. `§3`'s single filesystem door and package ownership
+are untouched and are what makes the ruling expressible at all; `§4`'s trust boundaries
+are unchanged, the agent side of the boundary being state **A** of `M56` and explicitly
+not moved; `§7.1`–`§7.3`'s oracle independence, `§8`'s debit-positive projection,
+`§11`'s vendored PRNG, the provider and role tables, the probe enum and the gate
+definitions are all unchanged. **No trust boundary, data flow, interface, package
+ownership, provider, role, probe enum, gate definition or failure-handling row
+changes**, and benchmark moves to **v1.0.11**. See `DECISION_BRIEF.md §A.41` and
+`PREREGISTRATION.md §10` **V31**.
 
 **At spec 1.4.33** this document is unchanged apart from the version header. Register
 row `DATA_MODEL.md §22.2` **M55** supplies metric 15's per-case `balance_harm`, which
@@ -954,7 +973,11 @@ going to be the composition root; `DECISION_BRIEF.md §K` keeps `completeness-ga
 in `packages/oracle` and `consistency-gate.ts` in `packages/eval`, and `§L.2` builds
 `oracle` before `eval`, which is why the completeness gate could never have been
 eval's. Ground truth reaches the completeness gate through zone `GENERATOR_TRUST`
-alone and is withdrawn under `--sealed` by `AL5`; `recon_report.jsonl` reaches
+alone and is withdrawn under `--sealed` by `AL5` **for that gate and for the `§9`
+seal** — narrowed to those two readers at spec 1.4.34, register row `DATA_MODEL.md
+§22.2` **M56**, `AL5` being an **emission** rule that withdraws no route from the
+**scorer**, which `PREREGISTRATION.md §9` step 7 runs sealed and which
+`EVALUATION_SPEC.md §2` defines as consuming ground truth; `recon_report.jsonl` reaches
 **neither** gate (`AL8`); and the consistency gate **never** receives ground truth.
 On the test split the gate writes aggregate counts only, `AL4` and `AL7` barring any
 record-level output.

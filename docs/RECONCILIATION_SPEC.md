@@ -1,6 +1,19 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.4.33 · **Date:** 2026-09-02
+**Spec version:** 1.4.34 · **Date:** 2026-09-02
+
+**At spec 1.4.34** this document is unchanged apart from the version header. Register
+row `DATA_MODEL.md §22.2` **M56** rules that `PREREGISTRATION.md §6.2` `AL5` is an
+**emission** rule, so the scorer reads ground truth at `§9` step 7 under `--sealed`.
+The ruling is entirely **scorer-side and post-run**; it reaches no stage, no gate and no
+threshold here, and the agent path it explicitly leaves unchanged is this document's.
+**No gate, invariant, constraint, threshold, anchor, probe or terminal state changes**:
+`§3`'s anchor table, `§4.1`'s `C1`–`C8`, `§4.2`'s `SE1`–`SE5`, `§6`'s four outcomes and
+materiality definition, `§6.1`, `§6.2`'s probe enum and `P_max`, `§7`'s `I1`–`I9`, `§8`,
+`§9`'s terminal states and `§10`'s five gates, three outcomes, close policy and
+procedure are all untouched. `§6.2`'s probe surface is unaffected: `AL8` is not amended
+and `--sealed` never governed the recon report. **`constraint_set_hash` does not move**;
+benchmark moves to **v1.0.11**. See `DECISION_BRIEF.md §A.41`.
 
 **At spec 1.4.33** this document is unchanged apart from the version header. Register
 row `DATA_MODEL.md §22.2` **M55** supplies metric 15's per-case `balance_harm`, a

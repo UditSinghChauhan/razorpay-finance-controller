@@ -230,5 +230,28 @@ export const BPS_DENOMINATOR = 10_000;
  * gate are unchanged; `C1`-`C8` are untouched so `constraint_set_hash` does not move.
  * **`BENCHMARK_VERSION` moves 1.0.9 -> 1.0.10** and `GT_VERSION` stays 1.1.0; both
  * remain `packages/generator`'s.
+ *
+ * **1.4.33 -> 1.4.34 (M56) -- required nothing of this package, and the reason is
+ * structural rather than incidental.** M56 rules that `PREREGISTRATION.md §6.2` `AL5`
+ * is an EMISSION rule, so the SCORER reads `ground_truth.jsonl` at `§9` step 7 under
+ * `--sealed` and emits only aggregate metrics. This package is on the OTHER side of
+ * that rule and stays there: `AL1` and `AL2` bind `packages/oracle` BY NAME, both are
+ * untouched in substance and in wording, and nothing here may read ground truth sealed
+ * or not -- `§5.1`'s independence and `§10` V1 rest on exactly that. The `§5.3`
+ * completeness gate, which DOES compare oracle output to ground truth, is one of the
+ * two readers `§5.3`'s narrowed sentence still names, and it still never runs sealed:
+ * `§9` step 3 carries no such flag, and the withdrawal that keeps it that way is now a
+ * FLAG REFUSAL on `assay oracle` rather than a read refusal -- stricter, since it
+ * cannot be reached by a gate call site that happens to open the file. The gate logic
+ * itself does not move and gains no parameter. `oracle_labels.jsonl` is never
+ * regenerated, shadowed or overwritten, `BenchmarkManifest.oracle_labels_sha256` stays
+ * valid, and `AL4`/`AL7`'s aggregate-only rule on the test split is never approached.
+ * Metric 4 scores against the labels this package emits and is one of the few figures
+ * the amendment does NOT touch, being oracle-side rather than truth-side.
+ * `SETTLEMENT_WINDOW_DAYS`, `K_ORACLE`, `C_ORACLE`, `TAU_FLOOR_PAISE` and
+ * `TAU_RATE_BPS` are unchanged; `§5.1`'s completeness gate and `§5.3`'s differential
+ * gate are unchanged; `C1`-`C8` are untouched so `constraint_set_hash` does not move.
+ * **`BENCHMARK_VERSION` moves 1.0.10 -> 1.0.11** and `GT_VERSION` stays 1.1.0; both
+ * remain `packages/generator`'s.
  */
-export const SPEC_VERSION = "1.4.33";
+export const SPEC_VERSION = "1.4.34";

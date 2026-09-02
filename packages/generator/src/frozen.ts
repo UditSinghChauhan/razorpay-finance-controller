@@ -467,8 +467,36 @@ export const K_MAX = 22;
  * moves; `SPLIT_TABLE`, `SEED_BLOCKS`, `blockOf`, `AL7`'s successor rule and every
  * `target_record_count` are unchanged; `constraint_set_hash` is `packages/domain`'s
  * and is unmodified. **No dataset exists to regenerate.**
+ *
+ * **1.0.10 -> 1.0.11 at spec 1.4.34** (register row M56). The pre-registered surface
+ * changes in what the SEALED RUN CAN YIELD. `EVALUATION_SPEC.md §2` defines a scored
+ * unit as `score(agent output, ground truth, oracle labels)` on both splits and
+ * `PREREGISTRATION.md §9` step 7 makes `assay bench --sealed` the only run that ever
+ * scores TEST, while `§5.3` said `AL5` withdrew the ground-truth route under that
+ * flag -- so nine figures on `§8`'s list (metrics 2, 3, 5, 6, 7, 8, 15, 16 and 26's
+ * cost half) could not be produced there at all. M56 rules `AL5` an EMISSION rule:
+ * it refuses to print, log or write a ground-truth field, and reading is none of the
+ * three. The bump is taken on **M39**'s precedent -- as 1.0.4 -> 1.0.5, 1.0.8 -> 1.0.9
+ * and 1.0.9 -> 1.0.10 all were -- and NOT on M49's, whose test is whether a conforming
+ * agent's postings change: none does. **M45's non-bump is distinguished, not
+ * overlooked:** that row governed WHEN the test dataset becomes reachable and changed
+ * nothing about a scored artifact's contents, whereas this one decides whether step 7
+ * yields a number or a "not exercised" state. `§9` step 1 now tags `bench-v1.0.11` and
+ * step 5 requires this field to read `"1.0.11"`; `apps/cli` derives the tag from this
+ * constant, so M46's class of drift cannot recur.
+ *
+ * **Nothing this package produces changes.** M56 is a rule about who may READ what this
+ * package already writes. `GroundTruth`'s field list, `true_journal`, `degradations`
+ * and every emitted byte are untouched -- which is why `GT_VERSION` stays 1.1.0 -- and
+ * the artifact keeps its path, its `.gitignore` hold-back and its `§9` step 4 digest,
+ * M56 rejecting any copy or re-key of it precisely to keep that digest total. No
+ * population, seed, family, rate, degradation operator, `§7` threshold this package
+ * reads, composition figure or artifact byte moves; `SPLIT_TABLE`, `SEED_BLOCKS`,
+ * `blockOf`, `AL7`'s successor rule and every `target_record_count` are unchanged;
+ * `constraint_set_hash` is `packages/domain`'s and is unmodified. **No dataset exists
+ * to regenerate.**
  */
-export const BENCHMARK_VERSION = "1.0.10";
+export const BENCHMARK_VERSION = "1.0.11";
 
 /** `DATA_MODEL.md §1`: `GroundTruth.gt_version`. */
 export const GT_VERSION = "1.1.0";
@@ -650,5 +678,26 @@ export const GT_VERSION = "1.1.0";
  * `packages/domain`'s and is unmodified. **No dataset exists to regenerate**, and the
  * implementation M55 authorises is deliberately not in this commit
  * (`DECISION_BRIEF.md §A.40`, `§I`).
+ *
+ * **1.4.33 -> 1.4.34 (M56) -- required ONE thing of this package, and it is
+ * `BENCHMARK_VERSION` above.** The amendment closes a contradiction wiring M55
+ * exposed: `EVALUATION_SPEC.md §2` scores every unit against ground truth on both
+ * splits, `PREREGISTRATION.md §9` step 7 is the only run that ever scores TEST and is
+ * `--sealed`, and `§5.3` said `AL5` withdrew the ground-truth route under that flag.
+ * **M56** rules `AL5` an EMISSION rule -- "refuses to print, log or write any
+ * ground-truth field; only aggregate metrics are emitted" -- so the SCORER reads and
+ * the artifact stays aggregate-only, while `§5.3`'s sentence is narrowed to the two
+ * readers it was written against, the completeness gate and the seal, whose withdrawal
+ * is re-grounded on a flag refusal. **It reaches this package nowhere else**: `AL1` and
+ * `AL2` bind `packages/engine` and `packages/oracle` by name and are untouched in
+ * substance and wording, no agent may read this package's truth artifact sealed or
+ * not, and `GroundTruth`'s field list, the degradation operators, families, rates and
+ * magnitudes and every emitted byte are preserved verbatim -- so `GT_VERSION` stays
+ * **1.1.0**. `SPLIT_TABLE`, `SEED_BLOCKS`, `blockOf`, `AL7`'s successor rule, `§4.1`'s
+ * composition, every `target_record_count` and every `§7` threshold this package reads
+ * are unchanged; `§7` gains no entry at this amendment and `§8`'s list stays at 28 with
+ * no formula changed; `constraint_set_hash` is `packages/domain`'s and is unmodified.
+ * **No dataset exists to regenerate**, and the implementation M56 authorises is
+ * deliberately not in this commit (`DECISION_BRIEF.md §A.41`, `§I`).
  */
-export const SPEC_VERSION = "1.4.33";
+export const SPEC_VERSION = "1.4.34";

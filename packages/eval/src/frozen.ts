@@ -371,6 +371,36 @@ export const LEGACY_MAX_UNRESOLVED_ABS_PAISE = 5_000_000;
  *     row authorises is deliberately not in this commit** (`DECISION_BRIEF.md §A.40`,
  *     `§I`).
  *
+ *   - **1.4.34 (M56)** -- `PREREGISTRATION.md §6.2` `AL5` is an EMISSION rule, and the
+ *     SCORER reads ground truth under `--sealed`. `AL5` refuses to "print, log or
+ *     write any ground-truth field; only aggregate metrics are emitted", and reading
+ *     is none of those three -- so `§9` step 7's `assay bench --sealed` reads
+ *     `ground_truth.jsonl` and emits aggregates, which is what `EVALUATION_SPEC.md §2`
+ *     has always required of a scored unit on BOTH splits. `§5.3`'s access
+ *     restatement is narrowed to the two readers it was written against, the `§5.3`
+ *     completeness gate and the `§9` seal, neither of which `§9` runs sealed; their
+ *     withdrawal is re-grounded on a FLAG REFUSAL rather than a read refusal. **This
+ *     package is the constrained party's opposite and always was:** `AL1` and `AL2`
+ *     bind `packages/engine` and `packages/oracle` BY NAME, and `truth.ts` has
+ *     recorded since it landed that "neither rule binds the scorer, and neither
+ *     could". No permission is created; one already granted is stated. **`truth.ts`
+ *     is NOT touched by this amendment**, nor is `metrics/robustness.ts`, nor any
+ *     metric module: `ScoringTruth`, `DegradationPopulations`, `projectTruth`,
+ *     `trueTargetByEntity` and `INJECTING_OPS` are unchanged, `metric-list.ts` stays
+ *     at 28 and keeps its numbering, `run-key.ts` is unchanged and `RunKey` stays
+ *     `(agent_id, split, seed, llm_mode)`, and `EPSILON_BPS`, `C_REVIEW_PAISE`,
+ *     `C_EXCEPTION_PAISE`, `K_SIGMA`, `TAU_SWEEP_FLOOR_PAISE`, `C_REVIEW_SWEEP_PAISE`,
+ *     `EPSILON_SWEEP_BPS` and every other constant below are unchanged -- the
+ *     amendment adds NO `§7` entry and revises none. What it restores is the
+ *     PRODUCIBILITY on the sealed path of metrics 2, 3, 5, 6, 7, 8, 15, 16 and 26's
+ *     cost half. Four alternatives are rejected and preserved as rejected: a fifth
+ *     `ReadZone`, a second scoring pass or step 7b, copying or re-keying the truth
+ *     artifact, and emitting `0.0` for an unavailable metric. **`BENCHMARK_VERSION`
+ *     moves 1.0.10 -> 1.0.11**, that constant being `packages/generator`'s, and
+ *     `GT_VERSION` stays 1.1.0. The residual is `PREREGISTRATION.md §10` **V31**.
+ *     **The implementation this row authorises is deliberately not in this commit**
+ *     (`DECISION_BRIEF.md §A.41`, `§I`).
+ *
  * **Nothing below moves with it**, and neither does `metric-list.ts`.
  */
-export const SPEC_VERSION = "1.4.33";
+export const SPEC_VERSION = "1.4.34";
