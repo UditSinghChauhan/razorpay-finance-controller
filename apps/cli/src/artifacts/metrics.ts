@@ -1,5 +1,6 @@
 import type {
   AbstentionReport,
+  CalibrationReport,
   HarmReport,
   MatchReport,
   NetCostReport,
@@ -123,52 +124,62 @@ export const M54_METRIC_10_NOT_COMPUTABLE =
   "classes is EXPLORATORY and supports no claim about triage accuracy.";
 
 /**
- * `PREREGISTRATION.md §8` metric 7's published state — `ece` is **not computed
- * by this scorer**, and the reason is that `§4.6` does not determine it.
+ * `PREREGISTRATION.md §8` metric 7's state where `M57`'s population is **empty**.
  *
- * `§4.6` fixes the formula, the bin count and the score: *"For the score used by
- * the abstention gate, bin predictions into 10 equal-width bins and compute
- * `ECE = Σ_bins (n_bin / N) × | accuracy(bin) − mean_score(bin) |`"*, and
- * `RECONCILIATION_SPEC.md §6` step 3 fixes the population as the committed
- * decisions whose gate read the ε-gap. What no frozen clause states is
- * **`accuracy(bin)`'s correctness source** — what makes one committed decision
- * *right*.
+ * **A state, not a zero, and the distinction is the whole reason this exists.**
+ * `calibration([])` answers `0` — the best possible `ECE` — and
+ * `EVALUATION_SPEC.md §5.5` bars *"any number that does not exist in a committed
+ * run artifact"*. `M56` refused a `0.0` standing in for an unavailable metric on
+ * exactly that ground, and `M57` carries the rule forward in terms: *"`N = 0`
+ * publishes the metric UNAVAILABLE with its reason and never `0.0`"*.
  *
- * Two readings are admissible on the frozen text and they **disagree
- * numerically**. `RECONCILIATION_SPEC.md §6`'s tie-break ratification
- * (`DATA_MODEL.md §22.2` **M35**) fixes *"allocation identity — the set of
- * `(target_id, member_obs_id)` pairs the solution asserts"*, which reads as
- * **set equality** against ground truth's pairs for that target; but
- * `EVALUATION_SPEC.md §4.2` scores the same pair as an **edge**, under which a
- * decision asserting a subset of the true members has no false positive and
- * would count as correct. A decision that asserted two of three true members is
- * right under the second and wrong under the first, so the choice **moves a
- * figure on `§8`'s list**.
+ * **Superseding the spec-1.4.34 refusal.** Through spec 1.4.34 this constant read
+ * `NOT COMPUTED: … §4.6 … states no correctness source for accuracy(bin)`, and the
+ * scorer published it on **every** unit because the predicate was unratified.
+ * `M57` ratifies it, so the metric is computed wherever there is a population and
+ * the only remaining reason to withhold a figure is that there was nothing to
+ * measure. That is a fact about the run, not about the specification.
  *
- * `DECISION_BRIEF.md §A.41` states the standard that applies to exactly this
- * shape: *"Both readings are admissible on the frozen text, so this is marked
- * **ratified rather than dressed as derivation**, on the `M35`/`M45`/`M49`/`M50`/
- * `M55` precedent."* An outcome-bearing choice among admissible readings is a
- * governance act taken **before any figure exists**, not a decision a scorer
- * makes for itself — so this scorer takes none, and publishes the state instead.
- *
- * **What is not done here, deliberately.** No conventional ECE correctness rule
- * is substituted, no replacement formula is written, and `metrics/calibration.ts`
- * is **not** amended: `calibration()` remains implemented and correct for the
- * predictions it is given, and `PREREGISTRATION.md §8`'s row 7 still names it.
- * What is missing is the input, and `§5.5` bars publishing a number in place of
- * one that does not exist.
+ * **An empty population is not a defect.** `PREREGISTRATION.md §10` **V32**
+ * records that only score-consulting `DISCRIMINATED` decisions enter, so an agent
+ * whose gate consults no score contributes no prediction at all — `B0-IDONLY`
+ * joins on an identifier and never solves — and sparse or empty bins are a
+ * structural property of the population rather than grounds for changing the
+ * definition.
  */
-export const METRIC_7_ECE_UNRATIFIED =
-  "NOT COMPUTED: EVALUATION_SPEC.md §4.6 fixes ECE's formula, its 10 equal-width bins and " +
-  "the score they bin, but states no correctness source for accuracy(bin). Two readings are " +
-  "admissible on the frozen text and disagree numerically — set equality against the true " +
-  "allocation (RECONCILIATION_SPEC.md §6 / DATA_MODEL.md §22.2 M35's allocation identity), " +
-  "and edge-level agreement (EVALUATION_SPEC.md §4.2), which differ on a decision asserting " +
-  "a subset of the true members. DECISION_BRIEF.md §A.41 requires an outcome-bearing choice " +
-  "between admissible readings to be RATIFIED before a figure exists, so this scorer computes " +
-  "no value. packages/eval's calibration() is unchanged and unwired; §5.5 bars a number in " +
-  "place of one that does not exist.";
+export const METRIC_7_ECE_EMPTY_POPULATION =
+  "UNAVAILABLE: EVALUATION_SPEC.md §4.6's population is empty for this scored unit. " +
+  "DATA_MODEL.md §22.2 M57 fixes metric 7's population as the committed decisions carrying a " +
+  "non-null score — RECONCILIATION_SPEC.md §6 step 3's DISCRIMINATED branch, the one accept " +
+  "in which the ε-gap decided the gate — and this run committed none, so N = 0. No ECE is " +
+  "reported rather than the 0.0 an empty population would otherwise produce: §5.5 bars a " +
+  "number that does not exist in a committed run artifact, and M57 requires the metric be " +
+  "published UNAVAILABLE with its reason. PREREGISTRATION.md §10 V32 records that an empty " +
+  "population is a structural property of M57's population and never grounds for redefining it.";
+
+/**
+ * Metric 7's published state, or `null` where a figure exists.
+ *
+ * Two reasons a scored unit can carry no `ece`, and they are different facts that
+ * `§5.4` item 5 requires a reader be able to tell apart: **no answer key was
+ * opened for this unit at all** — `§2`'s scoring loop runs over `{dev, test}`, so
+ * a TRAIN unit takes no truth-side measurement — or an answer key was opened and
+ * `M57`'s population came back **empty**. The first reason is
+ * {@link TruthMetrics.not_scored}'s own sentence, carried here rather than
+ * paraphrased so the two fields cannot drift; the second is
+ * {@link METRIC_7_ECE_EMPTY_POPULATION}.
+ *
+ * Returning `null` exactly when a number exists is what keeps the pair honest: a
+ * reader never sees a figure and a refusal together, and never sees neither.
+ */
+export function metric7EceState(truth: TruthMetrics): string | null {
+  if (truth.report === null) {
+    return `UNAVAILABLE: metric 7 needs EVALUATION_SPEC.md §4.6's truth side. ${
+      truth.not_scored ?? "No ground truth was supplied for this scored unit."
+    }`;
+  }
+  return truth.report.calibration === null ? METRIC_7_ECE_EMPTY_POPULATION : null;
+}
 
 /**
  * The truth- and oracle-side metrics for one scored unit — `EVALUATION_SPEC.md
@@ -198,6 +209,24 @@ export interface TruthReport {
   readonly oracle_policy_net_cost_paise: number;
   /** Metric 8 — signed and unclamped; a negative gap is valid (`§4.13`, M36). */
   readonly gap_to_oracle_paise: number;
+  /**
+   * Metric 7 — `ece` **and** `§4.6`'s reliability diagram, or `null` where
+   * `M57`'s population is empty.
+   *
+   * It rides here for the reason this interface's header already gives: *"`§4.6`
+   * requires the reliability diagram beside metric 7 … each of those companions
+   * rides inside the report that produced its headline figure, so no reporter can
+   * print one without the other."* `CalibrationReport.bins` **is** that diagram —
+   * ten `(lower_bps, upper_bps, count, accuracy, mean_score)` rows — so the
+   * artifact carries the figure and its diagram as one value and no renderer has
+   * to recompute either.
+   *
+   * `null` is `M57`'s `N = 0`, never a report of zeros;
+   * {@link METRIC_7_ECE_EMPTY_POPULATION} is the reason printed beside it, and
+   * `BaseMetrics.ece` reads its headline off this field rather than computing a
+   * second one.
+   */
+  readonly calibration: CalibrationReport | null;
 }
 
 /**
@@ -245,8 +274,6 @@ export interface RiskCoverageMetrics {
  * is exactly the number it forbids:
  *
  * ```
- *   7              §4.6 states no correctness source for accuracy(bin); the
- *                  choice is outcome-bearing and unratified
  *   10             NOT COMPUTABLE ON THE FROZEN POPULATION (M54, §10 V29)
  *   20, 21, 22     LLM telemetry and wall-clock instrumentation of a run
  *   23             two committed run artifacts to compare root hashes across
@@ -278,17 +305,29 @@ export interface BaseMetrics {
   /** Metrics 2, 4, 5, 6, 7 and 8, or the reason no answer key was supplied. */
   readonly truth: TruthMetrics;
   /**
-   * Metric 7 — `null`, always, until `§4.6`'s correctness source is ratified.
+   * Metric 7 — `EVALUATION_SPEC.md §4.6`'s `ECE`, computed from spec 1.4.35
+   * (`DATA_MODEL.md §22.2` **M57**), or `null` where the population is empty.
    *
-   * Beside metric 10's pair and in the same shape, because the two are the same
-   * kind of fact: a metric on `§8`'s frozen list that keeps its number and
-   * publishes its honest state rather than a fabricated figure. The **reasons
-   * differ** and the two fields keep them apart — metric 10 has no truth axis at
-   * all (`M54`), while metric 7 has one whose definition is undetermined.
+   * **The headline is read off `truth.report.calibration`, never computed
+   * twice.** `§4.6` requires the reliability diagram beside the figure, so the
+   * whole `CalibrationReport` rides inside {@link TruthReport} and this field
+   * carries its `ece` — one measurement, surfaced where a report expects to find
+   * a scalar. A second `calibration()` call here could disagree with the diagram
+   * printed next to it.
+   *
+   * **Still beside metric 10's pair and still in the same shape, because the
+   * shape is about honesty rather than about unavailability.** `§5.4` item 5 and
+   * `§5.5` require a metric on `§8`'s list to publish its state rather than a
+   * fabricated number, and the two fields keep the **reasons** apart: metric 10
+   * has no truth axis at all (`M54`), while metric 7 now has a ratified one and
+   * withholds a figure only where `M57`'s population is empty.
    */
-  readonly ece: null;
-  /** {@link METRIC_7_ECE_UNRATIFIED}, printed beside the `null` (`§5.4` item 5). */
-  readonly ece_state: string;
+  readonly ece: number | null;
+  /**
+   * {@link metric7EceState}'s sentence, printed beside a `null` `ece`
+   * (`§5.4` item 5), and `null` exactly where a figure exists.
+   */
+  readonly ece_state: string | null;
   /**
    * Metric 10 — `null`, always, and never a matrix.
    *

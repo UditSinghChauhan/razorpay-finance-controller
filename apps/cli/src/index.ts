@@ -59,9 +59,10 @@ export {
 } from "./artifacts/ground-truth.js";
 export {
   M54_METRIC_10_NOT_COMPUTABLE,
-  METRIC_7_ECE_UNRATIFIED,
+  METRIC_7_ECE_EMPTY_POPULATION,
   V30_NON_ADDITIVITY,
   encodeMetrics,
+  metric7EceState,
   type BaseMetrics,
   type RiskCoverageMetrics,
   type RobustnessMetrics,

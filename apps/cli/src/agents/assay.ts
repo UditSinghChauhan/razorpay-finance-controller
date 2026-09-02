@@ -1134,7 +1134,18 @@ async function runAssayComposed(
     }
     const record = post(obs, classification);
     if (record.state === "RECONCILED") {
-      commitAllocation(obs, classification.members, outcome.solve.delta_s_bps);
+      // §4.6 / M57: the score is carried on `RECONCILIATION_SPEC.md §6` step 3's
+      // DISCRIMINATED branch and NOWHERE else, because that branch is metric 7's
+      // whole population. `delta_s_bps` is also non-null on
+      // IMMATERIALLY_AMBIGUOUS -- §6 computes the gap and then decides on
+      // MATERIALITY, never consulting it -- so passing it through unfiltered
+      // would put a decision the gap did not decide into the calibration set.
+      // `run.ts` states the contract; this is the one site that satisfies it.
+      commitAllocation(
+        obs,
+        classification.members,
+        outcome.solve.outcome === "DISCRIMINATED" ? outcome.solve.delta_s_bps : null,
+      );
     }
   }
 

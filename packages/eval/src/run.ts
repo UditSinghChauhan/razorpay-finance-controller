@@ -85,9 +85,27 @@ export interface AllocationEdge {
  * float here and `§13` carries the same quantity into the hashed body as
  * `evidence_score_gap_bps`.
  *
- * `null` where the agent's gate consulted no score at all. `B0-IDONLY` joins on
- * an identifier and `A2-NOABSTAIN` has no gate, so a required number would have
- * to be invented for both.
+ * **`null` unless `RECONCILIATION_SPEC.md §6` step 3 reached `DISCRIMINATED`,
+ * and from spec 1.4.35 that is a contract rather than a convention**
+ * (`DATA_MODEL.md §22.2` **M57**). `M57` fixes metric 7's population as the
+ * committed decisions *"carrying a non-null score — `§6` step 3's
+ * `DISCRIMINATED` branch, the one accept in which the ε-gap decided the gate"*,
+ * so this field's **nullity is that population test** and not merely correlated
+ * with it. An agent must therefore carry the gap on `DISCRIMINATED` and `null`
+ * on every other committed decision:
+ *
+ * ```
+ *   UNIQUE                    null -- no second solution, so no gap exists and
+ *                                     §5.5 bars inventing one
+ *   IMMATERIALLY_AMBIGUOUS    null -- §6 tests materiality FIRST, so the gap was
+ *                                     computed and never consulted
+ *   DISCRIMINATED             Δs   -- the one branch the gap decided
+ *   no solve at all           null -- B0-IDONLY joins on an identifier
+ * ```
+ *
+ * `AMBIGUOUS` abstains and reaches `abstentions` rather than this list, and
+ * `INTRACTABLE` commits nothing. `packages/eval/src/metrics/calibration-population.ts`
+ * reads the field on exactly that understanding and invents nothing.
  */
 export interface CommittedDecision {
   readonly target_id: string;

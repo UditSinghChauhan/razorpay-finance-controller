@@ -238,6 +238,18 @@ export {
   calibration,
 } from "./metrics/calibration.js";
 
+/**
+ * Metric 7's population and correctness predicate — `DATA_MODEL.md §22.2`
+ * **M57**, spec 1.4.35. Separate from `calibration.ts`, which owns the
+ * arithmetic and is unchanged: what `EVALUATION_SPEC.md §4.6` never supplied was
+ * the `correct` flag, and that is all this module builds.
+ */
+export {
+  allocationIdentityCorrect,
+  calibrationPredictions,
+  metric7Calibration,
+} from "./metrics/calibration-population.js";
+
 export {
   type RiskCoveragePoint,
   type RiskCoverageReport,
