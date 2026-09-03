@@ -1,7 +1,15 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useRun } from "../context/RunContext.js";
-import { abstentionGranularityNote, affectedObservationsLabel } from "../lib/copy.js";
+import {
+  abstentionGranularityNote,
+  affectedObservationsLabel,
+  openExceptionRecordsLabel,
+  SUSPENSE_ABSTAINED_BASIS,
+  SUSPENSE_ABSTAINED_LABEL,
+  SUSPENSE_EXCEPTIONS_BASIS,
+  SUSPENSE_EXCEPTIONS_LABEL,
+} from "../lib/copy.js";
 import { formatPaise, formatCount } from "../lib/format.js";
 import type { ExceptionItem } from "../hooks/useAssayApi.js";
 
@@ -247,16 +255,18 @@ export function InvestigationQueue(): React.ReactElement {
           <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Queued Observations</p>
           <p className="font-display-metric">{formatCount(exceptions?.total ?? 0)}</p>
           <p className="font-body-sm text-muted" style={{ fontSize: 11, marginTop: 2 }}>
-            {affectedObservationsLabel(absCount)} abstained &middot; {formatCount(excCount)} exception rows
+            {affectedObservationsLabel(absCount)} abstained &middot; {openExceptionRecordsLabel(excCount)}
           </p>
         </div>
         <div className="card" style={{ padding: "var(--space-md)", borderLeft: "3px solid var(--color-abstained)" }}>
-          <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Value Abstained</p>
+          <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>{SUSPENSE_ABSTAINED_LABEL}</p>
           <p className="font-numeric-mono" style={{ fontSize: 18, fontWeight: 600, color: "var(--color-abstained)" }}>{formatPaise(exceptions?.value_abstained_paise ?? 0)}</p>
+          <p className="font-body-sm text-muted" style={{ fontSize: 11, marginTop: 2 }}>{SUSPENSE_ABSTAINED_BASIS}</p>
         </div>
         <div className="card" style={{ padding: "var(--space-md)", borderLeft: "3px solid var(--color-exception)" }}>
-          <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Value Exceptions</p>
+          <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>{SUSPENSE_EXCEPTIONS_LABEL}</p>
           <p className="font-numeric-mono" style={{ fontSize: 18, fontWeight: 600, color: "var(--color-exception)" }}>{formatPaise(exceptions?.value_exceptions_paise ?? 0)}</p>
+          <p className="font-body-sm text-muted" style={{ fontSize: 11, marginTop: 2 }}>{SUSPENSE_EXCEPTIONS_BASIS}</p>
         </div>
       </div>
 
