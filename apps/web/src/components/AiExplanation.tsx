@@ -1,6 +1,7 @@
 import { useRun } from "../context/RunContext.js";
 import {
   useExplainDecision,
+  type EvidenceSummary,
   type ExplanationResponse,
   type GroundingCheckOutcome,
 } from "../hooks/useAssayApi.js";
@@ -21,6 +22,14 @@ import {
  * renders a prompt (it is never sent one), never presents model prose as
  * system evidence, and on every failure path it says what failed and leaves the
  * certificate exactly where it was.
+ *
+ * **And it never presents ASSAY's own text as a model's.** When apps/api has no
+ * answer it serves a deterministic `fallback` in its own field, which
+ * {@link EvidenceSummaryBlock} renders under the server's own label in the
+ * neutral surface style -- no `auto_awesome`, no model attribution, no "AI"
+ * anywhere in the block. The model's prose only ever appears in the `ok` branch,
+ * from the `explanation` field, and the two cannot be confused because they are
+ * not the same field.
  */
 
 /** One line of the grounding indicator. */
@@ -93,6 +102,63 @@ function Shell({ children }: { children: React.ReactNode }): React.ReactElement 
   );
 }
 
+/**
+ * The deterministic summary, rendered as what it is.
+ *
+ * Visually the opposite of the AI branch on purpose: the server's own label at
+ * the top, a monospace-neutral surface rather than the secondary indigo, and the
+ * "written by ASSAY" attribution stated rather than implied. A reader who
+ * glances at this panel should not have to check a status field to know that no
+ * model wrote it.
+ */
+function EvidenceSummaryBlock({ fallback }: { fallback: EvidenceSummary }): React.ReactElement {
+  return (
+    <div
+      style={{
+        marginTop: "var(--space-md)",
+        padding: "var(--space-md)",
+        background: "var(--color-surface-container)",
+        border: "1px solid var(--color-outline-variant)",
+        borderRadius: "var(--radius-md)",
+      }}
+    >
+      <p
+        className="font-label-caps"
+        style={{ marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}
+      >
+        <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 15 }}>
+          description
+        </span>
+        {fallback.label}
+      </p>
+      <p className="font-body-sm text-muted" style={{ fontSize: 11, marginBottom: "var(--space-md)" }}>
+        Written by ASSAY from the verified evidence on this page. Not an AI explanation.
+      </p>
+
+      <p className="font-body-sm" style={{ marginBottom: "var(--space-md)", lineHeight: 1.6 }}>
+        {fallback.summary}
+      </p>
+      <ul style={{ margin: 0, marginBottom: "var(--space-md)", paddingLeft: 18 }}>
+        {fallback.points.map((point) => (
+          <li key={point} className="font-body-sm" style={{ marginBottom: 6, lineHeight: 1.6 }}>
+            {point}
+          </li>
+        ))}
+      </ul>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-lg)" }}>
+        <div>
+          <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Risk while unresolved</p>
+          <p className="font-body-sm" style={{ lineHeight: 1.6 }}>{fallback.risk}</p>
+        </div>
+        <div>
+          <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Suggested next step</p>
+          <p className="font-body-sm" style={{ lineHeight: 1.6 }}>{fallback.next_step}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** The idle state: one button, and a sentence about what it will and will not do. */
 export function AiExplanationPrompt({
   onExplain, disabled,
@@ -156,7 +222,7 @@ export function AiExplanationLoading(): React.ReactElement {
 export function AiExplanationResult({
   response, onRetry,
 }: { response: ExplanationResponse; onRetry?: () => void }): React.ReactElement {
-  const { grounding, explanation, provider, failure, status } = response;
+  const { grounding, explanation, fallback, provider, failure, status } = response;
 
   return (
     <Shell>
@@ -240,6 +306,7 @@ export function AiExplanationResult({
               ASSAY&apos;s decision, its certificate and the ledger are unchanged. Everything
               shown on this page is the deterministic engine&apos;s evidence and is unaffected.
             </p>
+            {fallback !== null && <EvidenceSummaryBlock fallback={fallback} />}
             {onRetry !== undefined && (
               <button
                 className="btn btn-ghost"
@@ -326,6 +393,11 @@ export function AiExplanation({
           audience: "analyst",
           status: "unavailable",
           explanation: null,
+          // No fallback: apps/api builds it from the sealed evidence, and this
+          // is the branch where apps/api itself did not answer. Inventing one
+          // in the browser would be the frontend composing a decision summary
+          // out of props, which is the failure this feature exists to prevent.
+          fallback: null,
           provider: null,
           grounding: {
             decision_evidence_verified: true,

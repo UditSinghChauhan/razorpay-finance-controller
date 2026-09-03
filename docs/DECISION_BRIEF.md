@@ -1,8 +1,20 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.37 · **Date:** 2026-09-02
+**Spec version:** 1.4.38 · **Date:** 2026-09-03
 **Reviewer role:** principal architect / skeptical reviewer
+
+**At spec 1.4.38** `§A.45` records **one derivation and one ratification**, and it is a
+**transport declaration rather than a measurement row**: `PREREGISTRATION.md §6.2`
+**AL3** and `§L.4`'s bar on result-driven revision are satisfied rather than merely not
+engaged, because nothing here references an observed figure. Register row `DATA_MODEL.md
+§22.2` **M60** widens `§19`'s `LlmProviderId` to a **fifth** member, **`gemini`**, and
+adds the matching `ARCHITECTURE.md §6.5` row. `§L.4` is **not** engaged: the addition
+introduces no LLM call outside roles R1–R4 and none outside the `LlmProvider` interface.
+`§L.5` sentence 4 stays literally true — the model still cannot express a monetary
+amount, cannot name an entity that does not exist, cannot commit a decision, and can be
+removed entirely with `--llm=offline`. **Benchmark stays v1.0.13**, no scored run is
+affected, and `§C`'s Tier-0 rows are unchanged.
 
 **At spec 1.4.37** §A.44 records **one ratification**, and it is **the first in this
 register taken after a measured figure exists** — so the condition its four
@@ -358,7 +370,7 @@ engineering scrutiny.
 | 10 | **Implied a gap in Razorpay's reconciliation.** Unverifiable and needlessly adversarial toward the host. | Repositioned: ASSAY **consumes the recon report as authoritative anchor input** and claims no defect in it. Differentiation is verification-first, evidence-bounded reconciliation and safe period close. Vendor claims reduced to what is publicly documented. | `PROJECT_SPEC.md §3`, `RELATED_WORK.md §1–2` |
 | 11 | **No dated scope boundary.** | Tier-0 frozen for **31 August**; **5 September** is the submission deadline. Seal and sealed run occur 1 September, inside the gap. | §C, §I |
 | 12 | **Tier-0 vs stretch undefined.** | §C is binding and complete; §H is explicitly optional and ordered. | §C, §H |
-| 13 | **Hard dependency on one LLM vendor**, and an implicit assumption that a consumer subscription could serve as an API. | `LlmProvider` interface with four implementations — `offline`, `replay`, `anthropic`, `openai-compatible`. Full pipeline must pass every acceptance test with `--llm=offline`. Consumer subscriptions (Claude Pro, ChatGPT Go, Google AI Pro) are never used as API access. | `ARCHITECTURE.md §6.5`, `PROJECT_SPEC.md §6.1` |
+| 13 | **Hard dependency on one LLM vendor**, and an implicit assumption that a consumer subscription could serve as an API. | `LlmProvider` interface with five implementations — `offline`, `replay`, `anthropic`, `openai-compatible`, `gemini` (fifth added at spec 1.4.38, M60). Full pipeline must pass every acceptance test with `--llm=offline`. Consumer subscriptions (Claude Pro, ChatGPT Go, Google AI Pro) are never used as API access. | `ARCHITECTURE.md §6.5`, `PROJECT_SPEC.md §6.1` |
 
 ### A.2 What survived review unchanged
 
@@ -3951,6 +3963,90 @@ transition was known in advance to break, **no file changes in any package** and
 metric, agent or scorer changes in behaviour.
 
 
+### A.45 Spec 1.4.38 / benchmark 1.0.13 — the fifth provider id
+
+**What was asked, and the constraint it met.** A second live provider was needed for
+the product explanation surface so that a demonstration need not spend on a metered
+Anthropic account. The requirement named the official Google SDK and a Flash-family
+model on the current free tier. `ARCHITECTURE.md §6.5` declares four providers and
+`DATA_MODEL.md §19` freezes `LlmProviderId` at four members, so the request could not
+be satisfied without deciding which id a native `@google/genai` call records.
+
+**Three readings were open. Two are foreclosed by the frozen text.**
+
+*Reading (i) — record it as `openai-compatible`.* `§6.5`'s row for that id reads *"any
+endpoint speaking the OpenAI chat-completions schema with JSON-schema response
+format"*. `@google/genai` speaks Google's own `generateContent` schema. The id was
+therefore available only on a description of the transport that is false, and the field
+it would be written into is `§19`'s `provider`, whose stated purpose is that *"a report
+can always state exactly what produced each decision"*. A provenance field that
+misdescribes the transport is the one failure `§19` exists to prevent, so this reading
+is **foreclosed by the sentence that defines the field**, not merely disfavoured.
+
+*Reading (ii) — reach Gemini through its OpenAI-compatible endpoint and record
+`openai-compatible` truthfully.* This one is textually clean and was **rejected on the
+requirement rather than on the text**: the request named the official Google SDK. It is
+recorded here because it remains available, and because a later phase that prefers it
+would need no amendment at all.
+
+*Reading (iii) — widen the union.* What is left. Adopted.
+
+**Derived — the widening is additive and moves nothing already written.** No committed
+artifact carries the new member. `LLM_PROVIDER_IDS` is read for **validation** and is
+not hashed, so no sealed event re-hashes and no ledger root changes. Every scored run
+records `offline`. `PREREGISTRATION.md §6.2` **AL3** and `§L.4`'s bar on result-driven
+revision are **satisfied rather than merely not engaged**: no frozen threshold, decision
+parameter, population, metric or line of scoring code is altered, and **no observed
+result is referenced anywhere in this row** — it is a transport declaration taken for a
+cost reason stated in advance.
+
+**Ratified — the position in the list.** Appended fifth, never inserted. `§8`'s
+*"appended, never renumbered"* principle governs an ordered declaration for the same
+reason, and `apps/cli`'s `--llm` usage text reads the list in order.
+
+**Derived — `meteredCost: true`, and the free tier does not change it.** The flag
+describes the provider row, and a free tier is a commercial term of a vendor account.
+`apps/cli`'s `buildProvider` refuses on `meteredCost || requiresNetwork`, so no test run
+and no scored run can reach this provider; `§L.1` rule 10's `--llm=offline` guarantee is
+untouched and `§C` **T0-11**'s clean checkout with no API key still runs. A free tier
+encoded as `meteredCost: false` would have quietly made a networked vendor reachable
+from the benchmark path, which is the opposite of what the flag is for.
+
+**`§L.4` is not engaged and `§L.5` stays true.** The addition introduces no LLM call
+outside roles R1–R4 and none outside the `LlmProvider` interface; the interface itself
+is unchanged — one `invoke`, one schema, one allowlist, one grounding rule. `§L.5`
+sentence 4 holds literally: the model still cannot express a monetary amount, cannot
+name an entity that does not exist, cannot commit a decision, and can be removed
+entirely with `--llm=offline`.
+
+**Where the implementation lives, and why not where the row is declared.**
+`apps/api/src/explain/gemini.ts`, beside the `anthropic` provider, for the reason that
+one is there: `packages/llm`'s discipline suite fails the build on a transport import,
+on a `process.env` read and on a `providers/<network-id>.ts`, which is what makes
+T0-11's guarantee structural rather than promised. `apps/api` is `ARCHITECTURE.md §3`'s
+one socket in the workspace and the credential belongs with the socket. `packages/llm`
+gains **no transport** at this spec version, and `PROVIDER_DESCRIPTORS` records the new
+row `built: false` on the same honest reading the other two network rows already carry —
+*not built in this package*.
+
+**One product behaviour is added with it, and it is deterministic.** When no provider is
+configured or the configured one cannot be reached, the endpoint now serves a
+**deterministic evidence summary** composed by `apps/api` from the sealed
+`DecisionEvidence`, in a response field of its own and under the label *"Evidence summary
+— AI unavailable"*. It is not carried in `explanation`, which stays *"the model's, or
+`null`"*, so *"the fallback is never presented as an AI-generated explanation"* is a
+property of the response **shape**. `ARCHITECTURE.md §12`'s two halves are what force
+this: a finance close *"must not be blocked on a third-party API"*, and degradation must
+be *"visible in the report ... not hidden"* — a blank panel fails the first and an
+unlabelled template fails the second.
+
+**The residual is structural and carries no magnitude.** `R4` is the only role this
+provider serves and it is served from `apps/api` alone; no benchmark population is
+defined over it. Nothing in this row supports a claim about how often the provider
+answers, how often a response is refused by boundary 2, or how it compares with any
+other provider. **Benchmark stays v1.0.13** and `GT_VERSION` stays **1.1.0**.
+
+
 ## B. Locked project definition
 
 > **ASSAY is a settlement reconciliation controller for Razorpay-shaped payment
@@ -4003,8 +4099,8 @@ a choice, cut anything else first.
 ## D. Architecture changes in this revision
 
 1. **`LlmProvider` interface** (`ARCHITECTURE.md §6.5`) — four implementations
-   (`offline`, `replay`, `anthropic`, `openai-compatible`) behind one `invoke()`
-   entry point. Roles R1–R4 have no knowledge of which is behind it. No vendor is
+   (`offline`, `replay`, `anthropic`, `openai-compatible`, `gemini`) behind one
+   `invoke()` entry point. Roles R1–R4 have no knowledge of which is behind it. No vendor is
    load-bearing; `meteredCost` providers are refused in CI so no test can spend.
 2. **Two-layer shadow ledger** (`ARCHITECTURE.md §8`) — Layer A append-only
    hash-chained audit events; Layer B a pure double-entry projection over them.
@@ -4356,7 +4452,7 @@ ratify-first order requires.
 | API | `hono` | Minimal, local bind only |
 | UI | Vite + React + Tailwind | No component library; four screens |
 | Charts | Hand-rolled SVG or `recharts` | Only risk–coverage and reliability diagram are needed |
-| **LLM** | **`LlmProvider` interface, 4 implementations.** Default `offline`. `anthropic` provider uses `@anthropic-ai/sdk` with `messages.parse()` + `zodOutputFormat`, `thinking: {type:"adaptive"}`, prompt caching on the stable system prefix. `openai-compatible` covers self-hosted and third-party endpoints. | No vendor is load-bearing. Model choice on the live path is the team's cost decision (F2), not an architectural dependency. |
+| **LLM** | **`LlmProvider` interface, 5 implementations.** Default `offline`. `anthropic` provider uses `@anthropic-ai/sdk` with `messages.parse()` + `zodOutputFormat`, `thinking: {type:"adaptive"}`, prompt caching on the stable system prefix. `openai-compatible` covers self-hosted and third-party endpoints. `gemini` (spec 1.4.38, M60) uses `@google/genai` with `responseJsonSchema`; it is a fifth id rather than a reuse of `openai-compatible`, whose row is the chat-completions schema. | No vendor is load-bearing. Model choice on the live path is the team's cost decision (F2), not an architectural dependency. |
 | Secrets | `.env`, gitignored; `gitleaks` pre-commit | Already scaffolded |
 
 Deliberately excluded: Docker, Postgres, Redis, vector databases, LangChain or
@@ -4410,7 +4506,9 @@ razorpay-finance-controller/
 │   │                      event.ts}       # the PROBE LedgerEvent body
 │   │                 # pure: no I/O, no network, no clock, no llm import
 │   ├── llm/          src/{provider.ts,                    # the LlmProvider interface
-│   │                      providers/{offline,replay,anthropic,openai-compatible}.ts,
+│   │                      providers/{offline,replay}.ts,   # network providers
+│   │                      #   live in apps/api/src/explain/ — the layer that owns
+│   │                      #   the socket. See M60 and L.4.
 │   │                      roles/{r1..r4}.ts,
 │   │                      verify/{schema,allowlist,grounding}.ts}
 │   ├── ledger/       src/{events.ts,hash-chain.ts,        # Layer A

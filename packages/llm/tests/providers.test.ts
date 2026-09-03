@@ -9,13 +9,14 @@ import { R1OutputSchema, R1_SYSTEM_PROMPT_ID } from "../src/roles/r1.js";
 import { NumericSchemaError } from "../src/verify/schema.js";
 import { r1Input, r1Request, r2Request, r3Request } from "./fixtures.js";
 
-describe("the four-provider architecture (ARCHITECTURE §6.5)", () => {
-  it("declares all four, with the two network ones marked unbuilt at this phase", () => {
+describe("the five-provider architecture (ARCHITECTURE §6.5)", () => {
+  it("declares all five, with the three network ones marked unbuilt HERE", () => {
     expect(PROVIDER_DESCRIPTORS.map((d) => d.id)).toEqual([
       "offline",
       "replay",
       "anthropic",
       "openai-compatible",
+      "gemini",
     ]);
     expect(PROVIDER_DESCRIPTORS.filter((d) => d.built).map((d) => d.id)).toEqual([
       "offline",
@@ -34,8 +35,22 @@ describe("the four-provider architecture (ARCHITECTURE §6.5)", () => {
   it("every metered provider requires a network, so CI can refuse it by config", () => {
     for (const d of PROVIDER_DESCRIPTORS.filter((x) => x.meteredCost)) {
       expect(d.requiresNetwork).toBe(true);
+      // `built: false` is a claim about THIS PACKAGE. `anthropic` and `gemini`
+      // are both implemented in apps/api/src/explain/, which owns the socket
+      // and the credential; what must not exist here is a transport, and the
+      // flag is what keeps apps/cli refusing every one of these by config.
       expect(d.built).toBe(false);
     }
+  });
+
+  it("declares gemini as a metered, networked, non-deterministic provider", () => {
+    const gemini = providerDescriptor("gemini");
+    expect(gemini.requiresNetwork).toBe(true);
+    expect(gemini.meteredCost).toBe(true);
+    expect(gemini.deterministic).toBe(false);
+    // A free tier is a commercial term of an account, not a property of the
+    // provider — so meteredCost stays true and CI still refuses it outright.
+    expect(gemini.purpose).toContain("@google/genai");
   });
 
   it("descriptors are frozen", () => {

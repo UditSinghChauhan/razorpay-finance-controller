@@ -23,6 +23,7 @@
     "@assay/domain": "workspace:*",
     "@assay/ledger": "workspace:*",
     "@assay/llm": "workspace:*",
+    "@google/genai": "2.21.0",
     "@hono/node-server": "2.1.1",
     "hono": "4.10.7",
     "zod": "4.4.3"

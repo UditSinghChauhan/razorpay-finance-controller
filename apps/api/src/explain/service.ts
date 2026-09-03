@@ -4,6 +4,7 @@ import { adjudicate, type GroundingCheck, type LlmCall, type LlmProvider } from 
 
 import type { StoredRun } from "../registry.js";
 import { explainEvidence } from "./evidence.js";
+import { evidenceSummary, type EvidenceSummary } from "./fallback.js";
 import type { ExplainFailure } from "./failure.js";
 import {
   R4OutputSchema,
@@ -85,8 +86,20 @@ export interface ExplainProviderMeta {
 
 export interface ExplainOutcome {
   readonly status: ExplainStatus;
-  /** `null` on every status but `ok`. */
+  /** `null` on every status but `ok`. Always the model's; never a template. */
   readonly explanation: R4Output | null;
+  /**
+   * ASSAY's own summary of the same evidence, when there was no model answer.
+   *
+   * Present on `unavailable` — the provider was not configured, or was
+   * configured and could not be reached — and `null` otherwise. A **separate
+   * field** from {@link explanation} on purpose: see `fallback.ts`. It is never
+   * populated on `ok`, where the model answered, and never on `rejected`, where
+   * the model answered and `§4` boundary 2 discarded it — that branch's finding
+   * is that the control worked, and burying it under a summary would replace
+   * the most informative thing this surface ever says with a template.
+   */
+  readonly fallback: EvidenceSummary | null;
   readonly provider: ExplainProviderMeta;
   readonly grounding: ExplainGrounding;
   readonly failure: ExplainFailure | null;
@@ -267,6 +280,7 @@ export async function explainDecision(args: ExplainDecisionArgs): Promise<Explai
     return {
       status: "ok",
       explanation: result.value,
+      fallback: null,
       provider: providerMeta,
       grounding,
       failure: null,
@@ -278,6 +292,7 @@ export async function explainDecision(args: ExplainDecisionArgs): Promise<Explai
     return {
       status: "rejected",
       explanation: null,
+      fallback: null,
       provider: providerMeta,
       grounding,
       failure: rejected,
@@ -288,6 +303,9 @@ export async function explainDecision(args: ExplainDecisionArgs): Promise<Explai
   return {
     status: "unavailable",
     explanation: null,
+    // Built from `evidence`, the same envelope the provider was sent, so the
+    // panel says something true about this decision rather than going blank.
+    fallback: evidenceSummary(evidence),
     provider: providerMeta,
     grounding,
     failure: transport ?? {

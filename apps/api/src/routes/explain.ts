@@ -1,8 +1,11 @@
+import type { DecisionEvidence } from "@assay/cli";
 import { Hono } from "hono";
 
 import { resolveProvider } from "../explain/config.js";
+import { explainEvidence } from "../explain/evidence.js";
+import { evidenceSummary } from "../explain/fallback.js";
 import type { ExplainFailure } from "../explain/failure.js";
-import type { AnthropicProvider } from "../explain/provider.js";
+import type { ExplainProvider } from "../explain/provider.js";
 import { explainDecision, type ExplainOutcome } from "../explain/service.js";
 import type { RunRegistry, StoredRun } from "../registry.js";
 
@@ -25,10 +28,17 @@ import type { RunRegistry, StoredRun } from "../registry.js";
  *   decision_id, run_id     the pair that was asked about
  *   status                  ok | rejected | unavailable
  *   explanation             the model's, or null
+ *   fallback                ASSAY's own evidence summary, on `unavailable`
  *   provider                which model answered, and how long it took
  *   grounding               what was checked, and the state ASSAY decided
  *   failure                 why there is no explanation, when there is none
  * ```
+ *
+ * **`explanation` and `fallback` are never both populated, and `fallback` is
+ * never a model's words.** The provider is selected on the server from
+ * `ASSAY_EXPLAIN_PROVIDER`; the browser asks for an explanation and is told
+ * which provider answered, never which one to use and never with what
+ * credential.
  *
  * `grounding.deterministic_state` is read off the sealed decision on **every**
  * branch of `explain/service.ts`, so the state this route reports is the
@@ -112,41 +122,52 @@ function body(
     audience,
     status: outcome.status,
     explanation: outcome.explanation,
+    fallback: outcome.fallback,
     provider: outcome.provider,
     grounding: outcome.grounding,
     failure: outcome.failure,
   };
 }
 
-/** The body used when no provider could be built — nothing was ever sent. */
+/**
+ * The body used when no provider could be built — nothing was ever sent.
+ *
+ * It still carries the deterministic summary. An unconfigured server and an
+ * unreachable one are different facts about the deployment and the same fact
+ * about the analyst's screen: there is no model answer, and the evidence is
+ * still there to be read. `failure.code` keeps the two apart.
+ */
 function unconfigured(
   stored: StoredRun,
   decisionId: string,
+  decision: DecisionEvidence,
   audience: Audience,
   failure: ExplainFailure,
-  certificateUsed: boolean,
-  state: string,
 ): unknown {
+  const evidence = explainEvidence(stored, decision);
   return {
     run_id: stored.run_id,
     decision_id: decisionId,
     audience,
     status: "unavailable",
     explanation: null,
+    fallback: evidenceSummary(evidence),
     provider: null,
     grounding: {
       decision_evidence_verified: true,
-      certificate_used: certificateUsed,
+      certificate_used: decision.certificate !== null,
       decision_authority: "none",
-      deterministic_state: state,
+      deterministic_state: evidence.deterministicState,
       checks: { schema: "not_reached", allowlist: "not_reached", numerals: "not_reached" },
       rejected_entity_ids: [],
       rejected_numerals: [],
+      // Nothing was hashed because nothing was sent. The count is the evidence
+      // the summary above IS grounded in, which is not zero.
       system_prompt_id: null,
       system_prompt_hash: "",
       input_hash: "",
       cache_key: "",
-      evidence_item_count: 0,
+      evidence_item_count: evidence.evidenceSet.length,
     },
     failure,
   };
@@ -160,7 +181,7 @@ export interface ExplainRouteOptions {
    * Absent in production: `resolveProvider()` reads the environment, which is
    * the only place a credential lives.
    */
-  readonly provider?: (() => AnthropicProvider) | undefined;
+  readonly provider?: (() => ExplainProvider) | undefined;
 }
 
 export function explainRoutes(
@@ -211,20 +232,13 @@ export function explainRoutes(
     }
     const { audience } = preferences.preferences;
 
-    let provider: AnthropicProvider;
+    let provider: ExplainProvider;
     if (options.provider === undefined) {
       const resolved = resolveProvider();
       if (!resolved.ok) {
         // Nothing was sent anywhere: there was no provider to send it to.
         return c.json(
-          unconfigured(
-            stored,
-            decisionId,
-            audience,
-            resolved.failure,
-            decision.certificate !== null,
-            decision.state,
-          ),
+          unconfigured(stored, decisionId, decision, audience, resolved.failure),
           503,
         );
       }

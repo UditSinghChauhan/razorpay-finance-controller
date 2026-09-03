@@ -312,5 +312,21 @@ export const BPS_DENOMINATOR = 10_000;
  * `packages/generator`'s. The existing `bench/dev` oracle gates and labels are `§9`
  * step 0's evidence and are **not** re-derived; each gate's `spec_version` stamp
  * records the version under which the gate RAN and correctly reads `1.4.36`.
+ *
+ * **1.4.37 -> 1.4.38 (M60) -- required NOTHING of this package.** `DATA_MODEL.md §19`'s
+ * `LlmProviderId` gains a fifth member, `gemini`, and `ARCHITECTURE.md §6.5` gains the
+ * matching row: `@google/genai` against the Gemini Developer API, implemented in
+ * `apps/api/src/explain/` where the socket and the credential already live. **This
+ * package reads no provider, opens no socket and is not on the explanation path.**
+ * `BENCHMARK_VERSION` STAYS **1.0.13** and `GT_VERSION` stays **1.1.0**: no rule
+ * determining what the sealed run yields changes, M39's test is not met and M49's is
+ * not either. The new row is `meteredCost: true` regardless of any free tier, so
+ * `apps/cli` refuses it exactly as it refuses `anthropic` and `openai-compatible` and no
+ * scored run can reach it; every scored run still records `offline`. **No frozen
+ * threshold, decision parameter, population, metric or line of scoring code moves and no
+ * observed result is referenced**, so `PREREGISTRATION.md §6.2` `AL3` and `§L.4`'s bar on
+ * result-driven revision are satisfied rather than merely not engaged. **`bench/` is NOT
+ * regenerated and must not be**: a gate's `spec_version` stamp records the version the
+ * gate RAN under, so the existing gates correctly continue to read `1.4.37`.
  */
-export const SPEC_VERSION = "1.4.37";
+export const SPEC_VERSION = "1.4.38";

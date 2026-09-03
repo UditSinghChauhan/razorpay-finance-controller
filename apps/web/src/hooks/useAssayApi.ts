@@ -265,6 +265,26 @@ export interface ExplanationFailure {
   message: string;
 }
 
+/**
+ * ASSAY's own summary of the same evidence, served on `unavailable`.
+ *
+ * A SEPARATE field from `explanation`, and the separation is the guarantee: the
+ * page renders `explanation` as the model's prose under an "AI explanation"
+ * heading, and this can therefore never be shown in that position. It is
+ * deterministic text the server composed out of the sealed evidence, and it
+ * carries its own label saying so.
+ */
+export interface EvidenceSummary {
+  /** Always "Evidence summary — AI unavailable". Rendered, never paraphrased. */
+  label: string;
+  /** Always "assay-deterministic". Never a provider id. */
+  generated_by: string;
+  summary: string;
+  points: string[];
+  risk: string;
+  next_step: string;
+}
+
 export interface ExplanationResponse {
   run_id: string;
   decision_id: string;
@@ -276,6 +296,8 @@ export interface ExplanationResponse {
    */
   status: "ok" | "rejected" | "unavailable";
   explanation: AiExplanationText | null;
+  /** Present on `unavailable` only. Never model output. */
+  fallback: EvidenceSummary | null;
   provider: ExplanationProvider | null;
   grounding: ExplanationGrounding;
   failure: ExplanationFailure | null;

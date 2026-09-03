@@ -2,8 +2,19 @@
 
 **Track:** 04 — AI Finance Controller
 **Status:** Specification. Frozen scope for implementation.
-**Spec version:** 1.4.37
-**Date:** 2026-09-02
+**Spec version:** 1.4.38
+**Date:** 2026-09-03
+
+**At spec 1.4.38** this document is unchanged apart from the version header and **one
+`§6.1` table row**. Register row `DATA_MODEL.md §22.2` **M60** adds a fifth
+`LlmProvider` implementation, **`gemini`** — `@google/genai` against the Gemini Developer
+API — and `§6.1`'s list of interchangeable implementations moves from four to five to
+match. **Both of `§6.1`'s hard rules are unchanged and both still hold**: the full
+pipeline must pass every acceptance test with `--llm=offline`, which the new row does not
+touch, and a consumer subscription is still never API access — `GEMINI_API_KEY` is a
+Gemini Developer API credential, and Google AI Pro remains named in this document as
+something that must never be used here. **No `§7` success criterion, no scope statement
+and no deliverable changes.**
 
 **At spec 1.4.37** this document is unchanged apart from the version header, and **one
 `§7` success criterion is read rather than amended**. Register row `DATA_MODEL.md
@@ -392,7 +403,7 @@ this?", and each is independently measured against a rule-based counterpart in
 
 ASSAY must never be undemonstrable because a model endpoint is unavailable,
 rate-limited, or unaffordable. All four roles are reached through one
-`LlmProvider` interface (`ARCHITECTURE.md §6.5`) with four interchangeable
+`LlmProvider` interface (`ARCHITECTURE.md §6.5`) with five interchangeable
 implementations:
 
 | Provider | Use |
@@ -401,6 +412,7 @@ implementations:
 | `replay` | Serves recorded responses from a committed cache, keyed by content hash. The mode all scored benchmark runs use, because it is reproducible. |
 | `anthropic` | Live metered API via `@anthropic-ai/sdk`. |
 | `openai-compatible` | Any endpoint speaking the OpenAI chat-completions schema — self-hosted, local, or third-party. |
+| `gemini` | Live metered API via `@google/genai` against the Gemini Developer API. Added at spec 1.4.38 (`DATA_MODEL.md §22.2` M60). |
 
 Two hard rules follow:
 

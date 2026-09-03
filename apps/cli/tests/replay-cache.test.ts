@@ -130,8 +130,11 @@ describe("§L.1 rule 11 — a miss is a hard error", () => {
 });
 
 describe("ARCHITECTURE.md §6.5 — metered providers are refused by configuration", () => {
-  it("refuses anthropic and openai-compatible, so no test run can incur spend", () => {
-    for (const id of ["anthropic", "openai-compatible"]) {
+  it("refuses every networked provider, so no test run can incur spend", () => {
+    // gemini joins the list at spec 1.4.38. A free tier does not change the
+    // answer: `meteredCost` is a property of the provider row and buildProvider
+    // refuses on `meteredCost || requiresNetwork`, so the CLI stays offline.
+    for (const id of ["anthropic", "openai-compatible", "gemini"]) {
       expect(() => buildProvider(config(["run", `--llm=${id}`])), id).toThrow(/refused/);
     }
   });

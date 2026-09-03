@@ -8,7 +8,7 @@ import { UsageError } from "./errors.js";
  * declares it, plus the two flags the specification names by name.
  *
  * ```
- *   ASSAY_LLM_PROVIDER   offline | replay | anthropic | openai-compatible
+ *   ASSAY_LLM_PROVIDER   offline | replay | anthropic | openai-compatible | gemini
  *   ASSAY_LLM_MODEL_ID   "rules-v1" for offline
  *   ASSAY_STRICT_REPLAY  DECISION_BRIEF.md §L.1 rule 11
  *   ASSAY_DB_PATH        ARCHITECTURE.md §8's single-file SQLite database
@@ -69,7 +69,7 @@ function readProviderId(raw: string): LlmProviderId {
   if (found === undefined) {
     throw new UsageError(
       `unknown LLM provider ${JSON.stringify(raw)}. ARCHITECTURE.md §6.5 declares exactly ` +
-        `four: ${LLM_PROVIDER_IDS.join(", ")}.`,
+        `five: ${LLM_PROVIDER_IDS.join(", ")}.`,
     );
   }
   return found;

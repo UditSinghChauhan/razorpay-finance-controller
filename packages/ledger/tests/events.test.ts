@@ -89,13 +89,18 @@ describe("the record transcribes DATA_MODEL.md §16", () => {
     ]);
   });
 
-  it("declares the three actor types and four providers of §16 and §19", () => {
+  it("declares the three actor types and five providers of §16 and §19", () => {
     expect([...ACTOR_TYPES]).toEqual(["deterministic", "llm", "human"]);
+    // `gemini` is the FIFTH member, added at spec 1.4.38 (register row
+    // DATA_MODEL.md §22.2 M60) so a native @google/genai call is not recorded
+    // under `openai-compatible`, whose §6.5 row is the chat-completions schema.
+    // Appended last: the order is read by apps/cli's --llm usage text.
     expect([...LLM_PROVIDER_IDS]).toEqual([
       "offline",
       "replay",
       "anthropic",
       "openai-compatible",
+      "gemini",
     ]);
   });
 
@@ -263,9 +268,17 @@ describe("the actor block", () => {
     expect(() =>
       sealDraft(withField("actor", makeActor({ type: "robot" as never }))),
     ).toThrow(LedgerEventError);
+    // `gemini` was this sentinel until spec 1.4.38 made it §19's fifth member.
+    // A non-member has to be a genuine non-member, so the sentinel moved rather
+    // than the assertion being dropped: the closed set is still closed, and a
+    // vendor id nobody declared is still refused.
     expect(() =>
-      sealDraft(withField("actor", makeActor({ llm_provider: "gemini" as never }))),
+      sealDraft(withField("actor", makeActor({ llm_provider: "vertex-ai" as never }))),
     ).toThrow(LedgerEventError);
+    // And the new member is accepted, so the widening is actually in force.
+    expect(() =>
+      sealDraft(withField("actor", makeActor({ llm_provider: "gemini" }))),
+    ).not.toThrow();
   });
 
   it("forces a RECONCILE event to be deterministic, by construction", () => {

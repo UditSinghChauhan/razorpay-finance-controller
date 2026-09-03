@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 
-import type { AnthropicProvider } from "./explain/provider.js";
+import type { ExplainProvider } from "./explain/provider.js";
 import { RunRegistry, type RegistryOptions } from "./registry.js";
 import { explainRoutes } from "./routes/explain.js";
 import { runRoutes } from "./routes/runs.js";
@@ -52,8 +52,12 @@ export interface ApiOptions extends RegistryOptions {
    * credential lives in the server process and nowhere else. Present so the
    * suite can exercise every branch of `§12`'s failure table, and so an
    * end-to-end check can run without spending a metered call.
+   *
+   * Typed as the shared {@link ExplainProvider} contract rather than as one
+   * class, so a check can drive `anthropic` or `gemini` through the same door
+   * the environment selects between.
    */
-  readonly explainProvider?: (() => AnthropicProvider) | undefined;
+  readonly explainProvider?: (() => ExplainProvider) | undefined;
 }
 
 export function createApp(options: ApiOptions = {}): Hono {
