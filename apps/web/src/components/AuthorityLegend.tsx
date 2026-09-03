@@ -54,8 +54,19 @@ function Layer({ accent, icon, name, role, authority, bounds }: LayerProps): Rea
 export function AuthorityLegend(): React.ReactElement {
   return (
     <div style={{ marginBottom: "var(--space-xl)" }}>
-      <p className="font-label-caps text-muted" style={{ marginBottom: "var(--space-sm)" }}>
+      <p className="font-label-caps text-muted" style={{ marginBottom: 2 }}>
         Who decides what
+      </p>
+      {/* The ladder in one line, because the three cards below are only
+          legible as a ranking if the ranking is stated. Read left to right it
+          is the authority ordering: one layer decides, one orchestrates
+          within bounds, one describes. */}
+      <p
+        className="font-body-sm text-muted"
+        style={{ fontSize: 11, lineHeight: 1.6, marginBottom: "var(--space-sm)", maxWidth: 720 }}
+      >
+        ASSAY decides and is the only financial authority. The Controller orchestrates within
+        bounds and writes nothing. Gemini explains an outcome already sealed and decides nothing.
       </p>
       <div
         style={{
@@ -67,7 +78,7 @@ export function AuthorityLegend(): React.ReactElement {
         <Layer
           accent="var(--color-reconciled)"
           icon="gavel"
-          name="ASSAY — deterministic"
+          name="ASSAY — deterministic financial authority"
           role="Decides. The financial authority."
           authority="Reconciles the batch, validates invariants, issues the Ambiguity Certificate, and runs the close gate. Every rupee figure on this page is its output."
           bounds="Abstains rather than guess when two allocations are equally supported. Nothing on this page can overrule it."
@@ -75,7 +86,7 @@ export function AuthorityLegend(): React.ReactElement {
         <Layer
           accent="var(--color-secondary)"
           icon="route"
-          name="Controller — orchestration"
+          name="Controller — bounded orchestration"
           role="Chooses what to look at next. No authority."
           authority="Reads the close gate, the queue and one decision's evidence, then plans the shortest path to a closed period and escalates what it may not decide."
           bounds="Deterministic policy, not a model — a planner asked what to do next would be a fifth LLM role the spec forbids. Its tool surface is four reads, so it opens no ledger event and moves no balance."
@@ -83,7 +94,7 @@ export function AuthorityLegend(): React.ReactElement {
         <Layer
           accent="var(--color-abstained)"
           icon="auto_awesome"
-          name="Gemini — explanation"
+          name="Gemini — explanation only"
           role="Describes a decision already made. No authority."
           authority="Puts the verified evidence into plain language on request, after the outcome is sealed. Its output is checked against that evidence and discarded if it invents a figure or an identifier."
           bounds="Cannot express an amount, name an entity that does not exist, or commit a decision. Removable entirely — the close loop runs unchanged without it."
