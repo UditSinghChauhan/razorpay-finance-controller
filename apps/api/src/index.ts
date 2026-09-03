@@ -19,6 +19,12 @@
  */
 
 export { createApp, type ApiOptions } from "./app.js";
+export {
+  certificateAllocation,
+  type AllocationMember,
+  type AllocationSolution,
+  type CertificateAllocation,
+} from "./allocation.js";
 export { RunRegistry, type RegistryOptions, type StoredRun } from "./registry.js";
 export {
   DEMO_DATASET_IDS,

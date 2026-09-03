@@ -11,9 +11,13 @@ export default defineConfig({
     // §K places each package's tests under packages/<name>/tests/. The
     // workspace-level tests/ directory holds checks that belong to no single
     // package — currently the §L.3 suite floor.
+    // `.test.tsx` is matched as well as `.test.ts` because apps/web's units are
+    // React components and a component test that may not write JSX is a
+    // component test that will be written against a string instead.
     include: [
       "packages/*/tests/**/*.test.ts",
       "apps/*/tests/**/*.test.ts",
+      "apps/*/tests/**/*.test.tsx",
       "tests/**/*.test.ts",
     ],
 

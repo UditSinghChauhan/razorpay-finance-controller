@@ -1,6 +1,7 @@
 import { SUSPENSE_ACCOUNT } from "@assay/domain";
 import { Hono } from "hono";
 
+import { certificateAllocation } from "../allocation.js";
 import { isDemoDatasetId, DEMO_DATASET_IDS } from "../datasets.js";
 import type { RunRegistry, StoredRun } from "../registry.js";
 
@@ -262,6 +263,15 @@ export function runRoutes(registry: RunRegistry): Hono {
    * `evidence_score_gap_bps`, `materiality_paise`, `epsilon_bps`, `tau_paise`,
    * `probes_attempted` and `reason`. `event` is the sealed `§16` record the
    * decision was appended as, with its `prev_hash` and `hash`.
+   *
+   * `certificate_allocation` is the **only** field on this surface that is not
+   * a passthrough, and it is deliberately a sibling rather than an addition to
+   * the certificate: `§13`'s record names each solution's members but prices
+   * none of them, and `§17.1.1`'s journal lines are settlement-level, so a
+   * drill-down comparing the two hypotheses has no member amount to read. It
+   * carries the price the run's own observations state, leaves the certificate
+   * byte-identical to the one the chain sealed, and is `null` where there is no
+   * certificate. See `allocation.ts` for what it does and does not compute.
    */
   app.get("/runs/:id/decisions/:decision_id", (c) => {
     const found = require_(c);
@@ -289,6 +299,14 @@ export function runRoutes(registry: RunRegistry): Hono {
       // §9's "hash-chain segment". Present for every decision: each is appended
       // as exactly one event, so the drill-down never dead-ends.
       event: found.eventsById.get(decision.evt_id as string) ?? null,
+      certificate_allocation:
+        decision.certificate === null
+          ? null
+          : certificateAllocation(
+              decision.certificate,
+              found.result.evidence.decisions,
+              found.observationsById,
+            ),
     });
   });
 
