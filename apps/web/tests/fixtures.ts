@@ -1,5 +1,6 @@
 import type {
   CertificateAllocation,
+  CloseReport,
   DecisionDetail,
   ExceptionsResponse,
   RunSummary,
@@ -218,15 +219,143 @@ export const EXCEPTIONS: ExceptionsResponse = {
 };
 
 /** A context value a page can be rendered against without a live API. */
+/**
+ * `GET /runs/:id/close` over a period that CLOSED — the `demo-close` shape.
+ *
+ * Every figure was read off a live run of `demo/demo-close`, which holds twenty
+ * open `E13_LEDGER_ONLY` exceptions and no abstention at all: `§17.1.1` gives a
+ * `ledger_entry` no posting in any state, so none of them opens a Suspense item
+ * and `G3`'s residual is exactly zero. It is here so a page can be rendered for
+ * a period whose headline fact is that it closed — the case the Command Center
+ * previously had no fixture for, because `demo-500` never produces it.
+ */
+export const CLOSE_CLOSED: CloseReport = {
+  run_id: "run_cc2aa4476d82276c4a87d61c94fc4023b04dedf07c4d60815044b05af5826270",
+  period_status: "CLOSED",
+  gate: {
+    g1_all_terminal: true,
+    g2_trial_balance: true,
+    g3_suspense_identity: true,
+    g4_hash_chain: true,
+    g5_no_failed_invariant_posted: true,
+    failed_gates: [],
+  },
+  batch_value_paise: 114_530_859,
+  unresolved_value_paise: 0,
+  value_abstained_paise: 0,
+  value_exceptions_paise: 0,
+  suspense_gross_item_paise: 0,
+  suspense_balance_paise: 0,
+  trial_balance_ok: true,
+  total_dr_paise: 229_061_718,
+  total_cr_paise: 229_061_718,
+  account_balances: {},
+  genesis_hash: "5ba81036207621968bb8fc946baa859191fbdd7d627be658d48866b78d182fc3",
+  ledger_root_hash: "57f989e97ddd7c5849c01d4e8863de736f38eda83b0c0f0e76ad9e8ac25f98a0",
+  event_count: 483,
+  journal_line_count: 2_418,
+  close_threshold_paise: 572_654,
+  // `§10.2`'s close report artifact. Omitted rather than transcribed: it is a
+  // large nested object, no surface under test reads it, and the pages take
+  // every figure they show from the flat fields above. On a live OPEN or
+  // CLOSED run this field is non-null.
+  report: null,
+};
+
+/**
+ * `GET /runs/:id/close` over a period whose residual has TWO halves — the
+ * `demo-multi` shape.
+ *
+ * Every figure was read off a live run of `demo/demo-multi`. It is here because
+ * it is the one shape that separates `DATA_MODEL.md §20`'s split: the residual
+ * is ₹1,89,000, of which ₹1,00,000 is the abstained settlement and ₹89,000 is
+ * four unattributed bank credits that reached `E03` and opened Suspense items
+ * of their own. On `demo-500` those two figures are equal, so a panel that
+ * showed the residual where it meant the abstained value read correctly by
+ * coincidence and no fixture could catch it.
+ */
+export const CLOSE_MULTI: CloseReport = {
+  run_id: "run_aba602a5968ef868ebb4eb97d30ada5a80b9b82238d8c9bbc26e5e1406d73c7d",
+  period_status: "OPEN",
+  gate: {
+    g1_all_terminal: true,
+    g2_trial_balance: true,
+    g3_suspense_identity: true,
+    g4_hash_chain: true,
+    g5_no_failed_invariant_posted: true,
+    failed_gates: [],
+  },
+  batch_value_paise: 134_943_859,
+  unresolved_value_paise: 18_900_000,
+  value_abstained_paise: 10_000_000,
+  value_exceptions_paise: 8_900_000,
+  suspense_gross_item_paise: 18_900_000,
+  suspense_balance_paise: 1_100_000,
+  trial_balance_ok: true,
+  total_dr_paise: 268_374_718,
+  total_cr_paise: 268_374_718,
+  account_balances: {},
+  genesis_hash: "0c727f80876b6396a2cea4c3fe6904de70cfd7a0a7a682491d25ec8ed1279b6f",
+  ledger_root_hash: "edd2fa985e451b9e684f8db3bc394da40178382551152fba6e08ca6b3eb4bc3f",
+  event_count: 495,
+  journal_line_count: 2_438,
+  close_threshold_paise: 674_719,
+  // `§10.2`'s close report artifact. Omitted rather than transcribed: it is a
+  // large nested object, no surface under test reads it, and the pages take
+  // every figure they show from the flat fields above. On a live OPEN or
+  // CLOSED run this field is non-null.
+  report: null,
+};
+
+/**
+ * `GET /runs/:id/close` over `demo-500` — the period where the two halves of
+ * `§20`'s split coincide, so the abstained value and the residual are both
+ * ₹1,00,000 and the exception half is zero.
+ */
+export const CLOSE_500: CloseReport = {
+  run_id: RUN.run_id,
+  period_status: "OPEN",
+  gate: {
+    g1_all_terminal: true,
+    g2_trial_balance: true,
+    g3_suspense_identity: true,
+    g4_hash_chain: true,
+    g5_no_failed_invariant_posted: true,
+    failed_gates: [],
+  },
+  batch_value_paise: 134_943_859,
+  unresolved_value_paise: 10_000_000,
+  value_abstained_paise: 10_000_000,
+  value_exceptions_paise: 0,
+  suspense_gross_item_paise: 10_000_000,
+  suspense_balance_paise: 10_000_000,
+  trial_balance_ok: true,
+  total_dr_paise: 259_474_718,
+  total_cr_paise: 259_474_718,
+  account_balances: {},
+  genesis_hash: "8a51faa670358bfbb38c9657a8620ec2988cc7fc305c4be875a0ccf1060026b1",
+  ledger_root_hash: "f4c9c7a962be138423636b94c8c431ebf6bb9a30a76e1e56d70d5769e6a68124",
+  event_count: 490,
+  journal_line_count: 2_430,
+  close_threshold_paise: 674_719,
+  // `§10.2`'s close report artifact. Omitted rather than transcribed: it is a
+  // large nested object, no surface under test reads it, and the pages take
+  // every figure they show from the flat fields above. On a live OPEN or
+  // CLOSED run this field is non-null.
+  report: null,
+};
+
 export function runContext(overrides: Partial<RunContextValue> = {}): RunContextValue {
   return {
     run: RUN,
     close: null,
     exceptions: EXCEPTIONS,
     selectedDecisionId: null,
+    dataset: "demo-500",
     loading: false,
     error: null,
     startDemo: () => Promise.resolve(),
+    selectDataset: () => undefined,
     selectDecision: () => undefined,
     ...overrides,
   };

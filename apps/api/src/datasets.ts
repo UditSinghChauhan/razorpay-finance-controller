@@ -18,23 +18,43 @@ import { resolve } from "node:path";
  * `EVALUATION_SPEC.md §5.5`. The allowlist makes that unreachable rather than
  * discouraged.
  *
- * **`demo-500` is the only entry, and it is deliberately the only one.**
+ * **Every entry is a `demo/` fixture, and that is the rule the table enforces.**
  * `PROJECT_SPEC.md §10` specifies the demo against `--dataset demo-500`;
- * `demo/README.md` records that the fixture is a product artifact, outside
+ * `demo/README.md` records that these fixtures are product artifacts, outside
  * `bench/`, never scored and never benchmark evidence. Adding a benchmark seed
- * to this table would contradict that record, so the table has no room for one.
+ * to this table would contradict that record, so the table has no room for one:
+ * every path below is under `demo/`, and `tests/datasets.test.ts` asserts it of
+ * the table rather than of any one row.
+ *
+ * **The three scenarios beside `demo-500` exist for `@assay/controller`.**
+ * `demo-500` holds exactly one queue row that opens a Suspense item, so the
+ * close controller's plan can only ever have one member and its policy is
+ * unobservable — every branch but `P3_ESCALATE` is unreachable on it. The three
+ * below are periods the same frozen engine resolves differently, so the
+ * controller's own choices become something a reviewer can watch it make rather
+ * than something a test asserts. They add no capability: the engine, the ledger,
+ * the close gate and the certificate are untouched, and the only thing that
+ * differs between the four runs is the evidence.
  */
 
 /** The repository root, from this module's own location. */
 const REPO_ROOT = resolve(import.meta.dirname, "..", "..", "..");
 
-export const DEMO_DATASET_IDS = Object.freeze(["demo-500"] as const);
+export const DEMO_DATASET_IDS = Object.freeze([
+  "demo-500",
+  "demo-close",
+  "demo-multi",
+  "demo-backlog",
+] as const);
 
 export type DemoDatasetId = (typeof DEMO_DATASET_IDS)[number];
 
 /** Where each allowlisted dataset's `observations.jsonl` lives, relative to the root. */
 const RELATIVE_PATHS: Readonly<Record<DemoDatasetId, string>> = Object.freeze({
   "demo-500": "demo/demo-500/observations.jsonl",
+  "demo-close": "demo/demo-close/observations.jsonl",
+  "demo-multi": "demo/demo-multi/observations.jsonl",
+  "demo-backlog": "demo/demo-backlog/observations.jsonl",
 });
 
 export function isDemoDatasetId(value: string): value is DemoDatasetId {

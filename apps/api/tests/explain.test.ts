@@ -646,13 +646,19 @@ describe("no benchmark file is reachable from this surface", () => {
     text: readFileSync(file, "utf8"),
   }));
 
-  it("the dataset allowlist holds the demo fixture and nothing else", async () => {
+  it("the dataset allowlist holds demo fixtures and nothing else", async () => {
     const { DEMO_DATASET_IDS, observationsPathFor } = await import("../src/datasets.js");
-    expect([...DEMO_DATASET_IDS]).toEqual(["demo-500"]);
-    const path = observationsPathFor("demo-500").replaceAll("\\", "/");
-    expect(path).toContain("/demo/demo-500/");
-    expect(path).not.toContain("/bench/");
-    expect(path).not.toContain("/runs/");
+    // The table grew from one entry to four when the controller scenarios were
+    // added (`demo/README.md`). What matters to THIS file is unchanged and is
+    // asserted of every entry rather than of a count: each id resolves under
+    // `demo/`, and none of them reaches `bench/` or a scored run artifact.
+    expect(DEMO_DATASET_IDS.length).toBeGreaterThan(0);
+    for (const id of DEMO_DATASET_IDS) {
+      const path = observationsPathFor(id).replaceAll("\\", "/");
+      expect(path, id).toContain(`/demo/${id}/`);
+      expect(path, id).not.toContain("/bench/");
+      expect(path, id).not.toContain("/runs/");
+    }
   });
 
   it("no source under apps/api names a benchmark artifact", () => {

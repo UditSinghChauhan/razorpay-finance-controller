@@ -129,3 +129,28 @@ export const SUSPENSE_EXCEPTIONS_BASIS =
   "Suspense-queue total, from the close gate. Open exception records that post " +
   "no suspense entry are outside this figure — it is not a statement of their " +
   "value. Each record's own rupee value is ranked in the table below.";
+
+/**
+ * The Command Center's ambiguity alert shows the **abstention share** of the
+ * residual, never the residual.
+ *
+ * `DATA_MODEL.md §20` splits `unresolved_value_paise` into an abstention half
+ * and an open-exception half, and the close gate reports both —
+ * `value_abstained_paise` and `value_exceptions_paise`. On a period whose only
+ * Suspense-opening item is the abstained settlement the two are equal, and a
+ * panel headed *"Ambiguity Detected"* over the residual read correctly by
+ * coincidence. On a period that also carries unattributed bank credits it does
+ * not: those reach `E03`, open a Suspense item under `P5`, and are counted in
+ * the exception half — so rendering the residual there would attribute money to
+ * an ambiguity that no certificate covers.
+ *
+ * The alert therefore reads `value_abstained_paise`, and the basis line says
+ * which figure it is and where the other one is. Neither is recomputed,
+ * summed or derived in this app; both are the close gate's own.
+ */
+export const ABSTAINED_VALUE_LABEL = "Abstained Value";
+
+export const ABSTAINED_VALUE_BASIS =
+  "The close gate's abstained value — the share of the period's unresolved " +
+  "value that ASSAY declined to allocate. It is not the total unresolved " +
+  "value, which is reported against the close threshold under Close Gates.";

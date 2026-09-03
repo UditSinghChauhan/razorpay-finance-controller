@@ -232,17 +232,41 @@ function narrativeStages(trace: ControllerTrace): NarrativeStage[] {
         : "clearing every item on it would still leave the residual above the threshold.");
   }
 
+  // The two escalation reasons are different findings and the narrative must
+  // not collapse them. `AMBIGUOUS_CERTIFICATE` means ASSAY reached two
+  // allocations it could not separate and declined to choose;
+  // `NO_DETERMINISTIC_WARRANT` means there was no admissible allocation to
+  // choose between at all, and no rule that could clear the Suspense item it
+  // opened. Counted from the records rather than assumed, because a period
+  // whose residual is mostly unattributed bank credits carries almost none of
+  // the first kind.
+  const abstained = trace.escalations.filter((e) => e.certificate_reason !== null).length;
+  const unwarranted = trace.escalations.length - abstained;
+
   const inspected =
     inspections === 0
       ? "no decision's evidence was opened."
-      : `${formatCount(inspections)} decision(s) were read in full \u2014 the Ambiguity ` +
-        `Certificate, the candidates it left open, and the ledger event behind them.`;
+      : `${formatCount(inspections)} decision(s) were read in full \u2014 the evidence behind ` +
+        `each one, and the ledger event that sealed it.`;
 
   let escalated: string;
   if (trace.escalations.length > 0) {
-    escalated =
-      `${formatCount(trace.escalations.length)} item(s) were routed to a person: ASSAY abstained ` +
-      `and the controller has no authority to choose between the allocations it left open.`;
+    const routed = `${formatCount(trace.escalations.length)} item(s) were routed to a person`;
+    const ambiguity =
+      "ASSAY abstained and the controller has no authority to choose between the " +
+      "allocations it left open";
+    const warrant =
+      "a Suspense item was opened that no deterministic rule can clear, and the correct " +
+      "posting is the thing that is not known";
+    if (unwarranted === 0) {
+      escalated = `${routed}: ${ambiguity}.`;
+    } else if (abstained === 0) {
+      escalated = `${routed}: ${warrant}.`;
+    } else {
+      escalated =
+        `${routed} \u2014 ${formatCount(abstained)} where ${ambiguity}, and ` +
+        `${formatCount(unwarranted)} where ${warrant}.`;
+    }
   } else if (trace.stop_reason === "CLOSED") {
     escalated = "nothing needed escalating \u2014 the period was already within its close threshold.";
   } else if (trace.stop_reason === "NO_ELIGIBLE_ITEM") {
@@ -251,11 +275,27 @@ function narrativeStages(trace: ControllerTrace): NarrativeStage[] {
     escalated = "nothing was escalated.";
   }
 
-  const review = trace.awaiting_human_review
-    ? `${formatCount(trace.escalations.length)} item(s) are waiting on a person. No financial ` +
-      `write is available in this phase: the controller's terminal state is a human, not a posting.`
-    : "no handoff was made. Nothing was written either way \u2014 this phase performs no " +
+  // The handoff is only claimed where the loop actually reached it. On a run
+  // that stopped on its own step bound the escalations are real but the
+  // closing set was not finished, and saying "waiting on a person" alone would
+  // report a partial pass as a completed one.
+  const unworked = (plan?.ids.length ?? 0) - trace.escalations.length;
+  let review: string;
+  if (trace.stop_reason === "BUDGET_EXHAUSTED") {
+    review =
+      `the step budget ran out before the closing set was finished: ` +
+      `${formatCount(trace.escalations.length)} of ${formatCount(plan?.ids.length ?? 0)} planned ` +
+      `item(s) reached a person and ${formatCount(Math.max(unworked, 0))} were not worked. The ` +
+      `result is partial and is reported as partial. Nothing was written on any path.`;
+  } else if (trace.awaiting_human_review) {
+    review =
+      `${formatCount(trace.escalations.length)} item(s) are waiting on a person. No financial ` +
+      `write is available in this phase: the controller's terminal state is a human, not a posting.`;
+  } else {
+    review =
+      "no handoff was made. Nothing was written either way \u2014 this phase performs no " +
       "financial write on any path.";
+  }
 
   return [
     { key: "observed", state: "OBSERVE_CLOSE", label: "Observed the close gate", detail: observed },
