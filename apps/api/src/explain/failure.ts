@@ -8,6 +8,8 @@
  * are meaningfully different to a reader:
  *
  * - **Configuration** — the server has no provider to call. Nothing was sent.
+ *   A configuration code always names the variable the operator must change,
+ *   because this is the one group whose remedy is entirely in their hands.
  * - **Transport** — the provider was called and did not answer usefully.
  *   `ARCHITECTURE.md §12`'s first row, split finely enough for a UI to say
  *   *"rate-limited"* rather than *"unavailable"*.
@@ -21,6 +23,7 @@ export type ExplainFailureCode =
   // Configuration
   | "MISSING_CREDENTIAL"
   | "UNSUPPORTED_PROVIDER"
+  | "INVALID_MODEL_ID"
   // Transport
   | "AUTHENTICATION"
   | "BAD_REQUEST"

@@ -1,6 +1,7 @@
 import { serve } from "@hono/node-server";
 
 import { createApp } from "./app.js";
+import { resolveProvider } from "./explain/config.js";
 
 /**
  * `ARCHITECTURE.md §9`: *"Internal HTTP, `apps/api`, consumed only by
@@ -28,7 +29,36 @@ function port(): number {
   return parsed;
 }
 
+/**
+ * One line naming the explanation provider this process resolved, at startup.
+ *
+ * **Why it exists.** The provider is chosen from the environment, and an
+ * environment that never reached this process fails silently: the server starts,
+ * every reconciliation route answers, and the misconfiguration surfaces only as a
+ * sentence inside one 503 on one panel — where it reads as the wrong provider
+ * having been chosen rather than as no environment having arrived. Saying it once
+ * at boot puts the fact where an operator is already looking.
+ *
+ * **It calls `resolveProvider` rather than re-reading the environment**, so what
+ * it prints is what the route will do and not a second derivation that can drift
+ * from it. Resolution constructs an SDK client and makes no network call; nothing
+ * is sent to a provider until a request asks for an explanation.
+ *
+ * **It cannot print a credential.** `ExplainProvider` exposes an id and a model
+ * id and no key, and `ExplainFailure.message` is by contract safe to display —
+ * `THREAT_MODEL.md §T11` keeps configuration out of the strings this surface
+ * produces. The presence of a key is reported by whether a provider resolved at
+ * all, which is the only thing an operator needs from this line.
+ */
+function explainProviderLine(): string {
+  const resolved = resolveProvider();
+  return resolved.ok
+    ? `assay-api explanations: ${resolved.provider.id} / ${resolved.provider.modelId}\n`
+    : `assay-api explanations: unavailable (${resolved.failure.code}) — ${resolved.failure.message}\n`;
+}
+
 const chosen = port();
 serve({ fetch: createApp().fetch, hostname: HOST, port: chosen }, (info) => {
   process.stdout.write(`assay-api listening on http://${HOST}:${String(info.port)}\n`);
+  process.stdout.write(explainProviderLine());
 });

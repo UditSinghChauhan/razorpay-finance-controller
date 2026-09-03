@@ -66,6 +66,21 @@ API keys live in `.env`, which is gitignored. They are never written into source
 documentation, prompts, fixtures, or commit history. This repository stays
 private.
 
+`.env.example` is the documented template: copy it to `.env` at the repository
+root and fill in the values there. The API reads the file through Node's own
+`--env-file-if-exists`, wired into `apps/api`'s own `dev` script — there is no
+dotenv dependency and no loader. That script is the single definition of how the
+server starts, so every command below launches an API with the same environment;
+`if-exists` is what keeps a clean checkout with no `.env` starting normally.
+
+    pnpm run check:env   # provider / model / GEMINI_API_KEY=set|missing
+    pnpm run dev:api     # start apps/api alone, with .env loaded
+    pnpm run dev         # start apps/api and apps/web together
+
+`check:env` reports whether the credential is present and never prints it. The
+API itself prints the provider and model it resolved as its second startup line,
+so a `.env` that did not reach the server is visible before any request is made.
+
 Consumer AI subscriptions (Claude Pro, ChatGPT Go, Google AI Pro and equivalents)
 are **not** API credentials and are never used as such. The only supported live
 path is a metered API key; the default `offline` provider needs none.

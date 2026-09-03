@@ -381,6 +381,115 @@ describe("configuration is environment-only, and its absence is reported", () =>
     expect(explicit.provider.modelId).toBe("claude-sonnet-5");
   });
 
+  /**
+   * The regression this block exists for.
+   *
+   * `apps/api`'s `dev` script started the server with no `--env-file`, so the
+   * process saw no `ASSAY_EXPLAIN_PROVIDER` at all, fell to the code default, and
+   * asked its operator for `ANTHROPIC_API_KEY` while their `.env` said `gemini`.
+   * The script is fixed; these assertions cover the half of the fault that was in
+   * this module — a message that could not tell the operator which of the two
+   * things had happened.
+   */
+  it("says the provider was DEFAULTED when ASSAY_EXPLAIN_PROVIDER is unset", () => {
+    const resolved = resolveProvider({});
+    expect(resolved.ok).toBe(false);
+    if (resolved.ok) return;
+    expect(resolved.failure.code).toBe("MISSING_CREDENTIAL");
+    // The provider is named, so the sentence cannot be read as "your gemini
+    // configuration was ignored" when the truth is "no configuration arrived".
+    expect(resolved.failure.message).toContain("anthropic");
+    expect(resolved.failure.message).toContain("ASSAY_EXPLAIN_PROVIDER is not set");
+    expect(resolved.failure.message).toContain("ANTHROPIC_API_KEY");
+  });
+
+  it("says the provider was SELECTED when the variable is set", () => {
+    const resolved = resolveProvider({ ASSAY_EXPLAIN_PROVIDER: "gemini" });
+    expect(resolved.ok).toBe(false);
+    if (resolved.ok) return;
+    expect(resolved.failure.message).toContain("The configured explanation provider is gemini");
+    expect(resolved.failure.message).not.toContain("defaulted");
+  });
+
+  /**
+   * The second reported symptom: a model id arriving as `NAME=value`.
+   *
+   * Node's `--env-file` does not overwrite a variable already exported in the
+   * shell, so a one-off `GEMINI_MODEL=GEMINI_MODEL=...` on a command line wins over
+   * a correct `.env` and travels to the provider as the model name. It is refused
+   * here rather than repaired: stripping the prefix would call a model the operator
+   * can no longer see they named, and `§19` would record that as deliberate.
+   */
+  it("refuses a model id that carries its own variable name", () => {
+    for (const bad of [
+      "GEMINI_MODEL=gemini-2.5-flash",
+      "gemini-2.5-flash extra",
+      "=gemini-2.5-flash",
+    ]) {
+      const resolved = resolveProvider({
+        ASSAY_EXPLAIN_PROVIDER: "gemini",
+        GEMINI_API_KEY: SENTINEL_KEY,
+        GEMINI_MODEL: bad,
+      });
+      expect(resolved.ok, bad).toBe(false);
+      if (resolved.ok) return;
+      expect(resolved.failure.code).toBe("INVALID_MODEL_ID");
+      expect(resolved.failure.message).toContain("GEMINI_MODEL");
+      // §T11: the message describes the shape and quotes no configuration, because
+      // the variable holding the wrong thing may be holding a credential.
+      expect(resolved.failure.message).not.toContain(bad);
+    }
+  });
+
+  it("applies the same refusal to the anthropic model variable", () => {
+    const resolved = resolveProvider({
+      ANTHROPIC_API_KEY: SENTINEL_ANTHROPIC_KEY,
+      ASSAY_EXPLAIN_MODEL_ID: "ASSAY_EXPLAIN_MODEL_ID=claude-opus-5",
+    });
+    expect(resolved.ok).toBe(false);
+    if (resolved.ok) return;
+    expect(resolved.failure.code).toBe("INVALID_MODEL_ID");
+    expect(resolved.failure.message).toContain("ASSAY_EXPLAIN_MODEL_ID");
+  });
+
+  it("trims a padded model id and treats a blank one as unset", () => {
+    const padded = resolveProvider({
+      ASSAY_EXPLAIN_PROVIDER: "gemini",
+      GEMINI_API_KEY: SENTINEL_KEY,
+      GEMINI_MODEL: "  gemini-3.1-flash-lite  ",
+    });
+    expect(padded.ok).toBe(true);
+    if (!padded.ok) return;
+    expect(padded.provider.modelId).toBe("gemini-3.1-flash-lite");
+
+    const blank = resolveProvider({
+      ASSAY_EXPLAIN_PROVIDER: "gemini",
+      GEMINI_API_KEY: SENTINEL_KEY,
+      GEMINI_MODEL: "   ",
+    });
+    expect(blank.ok).toBe(true);
+    if (!blank.ok) return;
+    expect(blank.provider.modelId).toBe("gemini-2.5-flash");
+  });
+
+  /**
+   * The demo path, resolved exactly as the running server resolves it.
+   *
+   * `model_id` is what `§19` records and what the panel prints, so the id the
+   * environment names must reach the provider character-for-character.
+   */
+  it("carries GEMINI_MODEL to the provider unchanged", () => {
+    const resolved = resolveProvider({
+      ASSAY_EXPLAIN_PROVIDER: "gemini",
+      GEMINI_API_KEY: SENTINEL_KEY,
+      GEMINI_MODEL: "gemini-3.1-flash-lite",
+    });
+    expect(resolved.ok).toBe(true);
+    if (!resolved.ok) return;
+    expect(resolved.provider.id).toBe("gemini");
+    expect(resolved.provider.modelId).toBe("gemini-3.1-flash-lite");
+  });
+
   it("refuses a provider this surface does not build", () => {
     for (const id of ["openai-compatible", "offline", "replay", "google"]) {
       const resolved = resolveProvider({
@@ -391,6 +500,46 @@ describe("configuration is environment-only, and its absence is reported", () =>
       if (resolved.ok) return;
       expect(resolved.failure.code).toBe("UNSUPPORTED_PROVIDER");
     }
+  });
+});
+
+/**
+ * The environment has to REACH the process, and that is a wiring fact.
+ *
+ * Every assertion above drives `resolveProvider` with an explicit `env` object,
+ * which is right for the branches and blind to the one thing that actually broke
+ * the demo: the server was started by a script that loaded no `.env`, so the real
+ * `process.env` reaching `resolveProvider()` was empty and every correct branch
+ * above ran on nothing. No unit test could have failed. This one reads the launch
+ * command itself, which is where the fault was.
+ */
+describe("the launch command loads the environment it resolves from", () => {
+  const ROOT_DIR = join(import.meta.dirname, "..", "..", "..");
+  const readJson = (...parts: string[]): Record<string, unknown> =>
+    JSON.parse(readFileSync(join(ROOT_DIR, ...parts), "utf8")) as Record<string, unknown>;
+
+  it("starts apps/api with the repository .env", () => {
+    const scripts = readJson("apps", "api", "package.json")["scripts"] as Record<string, string>;
+    const dev = scripts["dev"] ?? "";
+    expect(dev).toContain("bin/assay-api.mjs");
+    // `if-exists`, not `--env-file`: §C T0-11 requires a clean checkout with no
+    // .env to start normally, and a hard --env-file makes an absent file fatal.
+    expect(dev).toContain("--env-file-if-exists=../../.env");
+  });
+
+  it("has exactly one definition of how the server starts", () => {
+    // The regression was two: a root `dev:api` that loaded .env and a package
+    // `dev` that did not, with `pnpm dev` reaching the second one. A second
+    // literal `node ... assay-api.mjs` anywhere is that fault returning.
+    const root = readJson("package.json")["scripts"] as Record<string, string>;
+    for (const [name, command] of Object.entries(root)) {
+      if (!command.includes("assay-api.mjs")) continue;
+      expect(command, `root script ${name} restates the launch command`).toContain(
+        "--env-file",
+      );
+    }
+    expect(root["dev"]).toContain("--filter @assay/api dev");
+    expect(root["dev:api"]).toContain("--filter @assay/api dev");
   });
 });
 

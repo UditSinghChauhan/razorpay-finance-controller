@@ -15,7 +15,7 @@
     }
   },
   "scripts": {
-    "dev": "node --experimental-transform-types --disable-warning=ExperimentalWarning bin/assay-api.mjs"
+    "dev": "node --env-file-if-exists=../../.env --experimental-transform-types --disable-warning=ExperimentalWarning bin/assay-api.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.123.0",

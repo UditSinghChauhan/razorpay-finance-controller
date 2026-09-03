@@ -12,6 +12,8 @@
   },
   "scripts": {
     "dev": "npx concurrently --names api,web --prefix-colors blue,green \"pnpm --filter @assay/api dev\" \"pnpm --filter @assay/web dev\"",
+    "dev:api": "pnpm --filter @assay/api dev",
+    "check:env": "node --env-file-if-exists=.env scripts/check-env.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json && pnpm --filter @assay/web typecheck",
     "lint": "eslint .",
     "test": "vitest run",
