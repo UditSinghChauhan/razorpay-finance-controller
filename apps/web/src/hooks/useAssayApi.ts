@@ -652,3 +652,85 @@ export function useController(): {
 
   return { start, refresh, state };
 }
+
+// ---------------------------------------------------------------------------
+// Chain verification — GET /runs/:id/ledger/verify, ARCHITECTURE.md §9's
+// "Recomputes the hash chain from genesis, re-projects balances, re-checks the
+// Suspense identity. Returns pass/fail per check."
+//
+// Additive: nothing above this line is touched.
+// ---------------------------------------------------------------------------
+
+/** One named pass/fail check. The names are the route's own, not the UI's. */
+export interface LedgerCheck {
+  name: string;
+  passed: boolean;
+}
+
+/**
+ * `GET /api/runs/:id/ledger/verify`'s body, exactly as
+ * `apps/api/src/routes/ledger-verify.ts` builds it.
+ *
+ * **Three of these fields are recomputed and one is not, and the difference is
+ * load-bearing.** `chain_ok`, `root_matches` and `trial_balance_ok` come from a
+ * fresh `verifyChain` call over the run's own `chain.events` and
+ * `chain.genesis_hash` — the chain is re-hashed from genesis on every request.
+ * The `suspense_identity` check reports the run's sealed
+ * `close.gate.g3_suspense_identity`, because computing `G3` a second time in
+ * `apps/api` would put reconciliation logic in a layer that states it holds
+ * none. Any surface rendering this must say which is which.
+ */
+export interface LedgerVerification {
+  run_id: string;
+  chain_ok: boolean;
+  recomputed_root_hash: string;
+  stored_root_hash: string;
+  root_matches: boolean;
+  trial_balance_ok: boolean;
+  total_dr_paise: number;
+  total_cr_paise: number;
+  event_count: number;
+  checks: LedgerCheck[];
+}
+
+/**
+ * Recomputes one run's hash chain from genesis and reads the result back.
+ *
+ * Imperative rather than an effect, for the reason `useController`'s `start`
+ * and `useExplainDecision`'s `explain` are: `§9` says the route exists "so a
+ * reviewer can check tamper-evidence live rather than be told about it", and a
+ * verification that ran itself on mount would put a verdict on screen that
+ * nobody asked for — indistinguishable, at a glance, from the cached flag this
+ * endpoint exists to not be.
+ *
+ * A non-2xx body is read for its `message` before falling back to the status
+ * code. `apps/api` answers an unknown run with a sentence explaining that runs
+ * live in memory for the life of the server; discarding it would replace a
+ * stated reason with "404".
+ */
+export function useLedgerVerify(): {
+  verify: (runId: string) => Promise<void>;
+  state: ApiState<LedgerVerification>;
+} {
+  const [state, setState] = useState<ApiState<LedgerVerification>>({
+    data: null, loading: false, error: null,
+  });
+
+  const verify = useCallback(async (runId: string) => {
+    setState({ data: null, loading: true, error: null });
+    try {
+      const res = await fetch(`/api/runs/${runId}/ledger/verify`);
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { message?: string } | null;
+        throw new Error(body?.message ?? `${String(res.status)}`);
+      }
+      const result = (await res.json()) as LedgerVerification;
+      setState({ data: result, loading: false, error: null });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setState({ data: null, loading: false, error: msg });
+    }
+  }, []);
+
+  return { verify, state };
+}
