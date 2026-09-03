@@ -27,12 +27,30 @@ export {
 } from "./allocation.js";
 export { RunRegistry, type RegistryOptions, type StoredRun } from "./registry.js";
 export { explainRoutes, type ExplainRouteOptions } from "./routes/explain.js";
-export { EXPLAIN_PROMPTS, resolveProvider, type ProviderResolution } from "./explain/config.js";
+export {
+  EXPLAIN_PROMPTS,
+  resolveProvider,
+  type ExplainProviderId,
+  type ProviderResolution,
+} from "./explain/config.js";
 export { explainEvidence, type ExplainEvidence } from "./explain/evidence.js";
 export type { ExplainFailure, ExplainFailureCode } from "./explain/failure.js";
 export {
+  FALLBACK_LABEL,
+  evidenceSummary,
+  type EvidenceSummary,
+} from "./explain/fallback.js";
+export {
+  GeminiProvider,
+  failureFor as geminiFailureFor,
+  responseJsonSchema,
+  type GeminiProviderOptions,
+  type GeminiTransport,
+} from "./explain/gemini.js";
+export {
   AnthropicProvider,
   type AnthropicProviderOptions,
+  type ExplainProvider,
   type PromptTemplate,
 } from "./explain/provider.js";
 export {

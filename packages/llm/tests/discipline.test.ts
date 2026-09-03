@@ -232,12 +232,17 @@ describe("scope is declared honestly, not stubbed", () => {
     }
   });
 
-  it("the two metered providers are declared and NOT built", () => {
+  it("the three metered providers are declared and NOT built HERE", () => {
     const unbuilt = PROVIDER_DESCRIPTORS.filter((d) => !d.built).map((d) => d.id);
-    expect(unbuilt).toEqual(["anthropic", "openai-compatible"]);
+    expect(unbuilt).toEqual(["anthropic", "openai-compatible", "gemini"]);
     const rel = files.map((f) => f.slice(SRC.length + 1).replaceAll("\\", "/"));
     expect(rel).not.toContain("providers/anthropic.ts");
     expect(rel).not.toContain("providers/openai-compatible.ts");
+    // Added with the fifth provider at spec 1.4.38. `anthropic` and `gemini`
+    // both HAVE implementations, in apps/api/src/explain/ — the layer that owns
+    // the socket. This assertion is what keeps them out of the package whose
+    // no-network, no-process.env guarantee makes §C T0-11 structural.
+    expect(rel).not.toContain("providers/gemini.ts");
   });
 
   it("no consumer AI subscription is referenced (§L.4, §T11)", () => {

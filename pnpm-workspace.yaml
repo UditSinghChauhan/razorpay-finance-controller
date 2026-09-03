@@ -11,4 +11,12 @@ packages:
   - "packages/*"
   - "apps/*"
 allowBuilds:
+  # @google/genai and protobufjs are FALSE deliberately. The Gemini provider in
+  # apps/api reaches the Developer API over the SDK's fetch transport, which
+  # needs no postinstall step; leaving their build scripts unrun keeps the
+  # dependency's install side-effect-free.
+  '@google/genai': false
   esbuild: true
+  protobufjs: false
+minimumReleaseAgeExclude:
+  - '@google/genai@2.21.0'

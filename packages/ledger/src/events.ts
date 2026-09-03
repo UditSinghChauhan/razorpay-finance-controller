@@ -92,12 +92,27 @@ export type LlmCallId = string & { readonly __llmCallId: unique symbol };
 /** A probe id (`§6`). Reaches the body via the certificate; no grammar is stated. */
 export type ProbeId = string & { readonly __probeId: unique symbol };
 
-/** The four providers of `DATA_MODEL.md §19`. */
+/**
+ * The five providers of `DATA_MODEL.md §19`.
+ *
+ * **`gemini` is the fifth, added at spec 1.4.38 (register row `§22.2` M60).**
+ * The union widened rather than a native Google implementation being recorded
+ * under `openai-compatible`: `ARCHITECTURE.md §6.5` scopes that row to *"any
+ * endpoint speaking the OpenAI chat-completions schema"*, and `@google/genai`
+ * speaks its own, so reusing the id would have made `§19`'s per-call provenance
+ * record — the field whose whole purpose is *"a report can always state exactly
+ * what produced each decision"* — misdescribe the transport that produced it.
+ *
+ * Widening is additive and no existing artifact moves: every sealed run records
+ * `offline`, no committed event carries the new member, and this list is read
+ * for **validation** rather than hashed, so nothing already written re-hashes.
+ */
 export const LLM_PROVIDER_IDS = Object.freeze([
   "offline",
   "replay",
   "anthropic",
   "openai-compatible",
+  "gemini",
 ] as const);
 
 /** `DATA_MODEL.md §19`. */

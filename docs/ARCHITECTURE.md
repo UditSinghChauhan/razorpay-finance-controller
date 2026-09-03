@@ -1,6 +1,21 @@
 # ARCHITECTURE — ASSAY
 
-**Spec version:** 1.4.37 · **Date:** 2026-09-02
+**Spec version:** 1.4.38 · **Date:** 2026-09-03
+
+**At spec 1.4.38** `§6.5`'s provider table gains a **fifth row, `gemini`**, and `§6.5`'s
+`LlmProvider.id` union, `§3`'s diagram and package table, `§4` boundary 2's schema-check
+sentence and `§13`'s trade-off row are updated to match. Register row `DATA_MODEL.md
+§22.2` **M60** carries the argument: `openai-compatible` is scoped to the chat-completions
+schema and `@google/genai` speaks Google's own, so the id was available only on a false
+description of the transport that `DATA_MODEL.md §19`'s `provider` field exists to record.
+**The interface itself does not change** — one `invoke`, one schema, one allowlist, one
+grounding rule — and the new row is `requiresNetwork: true`, `meteredCost: true`, so
+`apps/cli` refuses it exactly as it refuses the other two networked providers and `§L.1`
+rule 10's `--llm=offline` guarantee is untouched. `packages/llm` gains **no transport**:
+the implementation lives at `apps/api/src/explain/gemini.ts` beside the `anthropic` one,
+in the layer `§3` gives the workspace's only socket, and the credential is read
+server-side from `GEMINI_API_KEY`. `§12`'s failure table is applied, not amended. **No
+other section changes.**
 
 **At spec 1.4.37** this document is unchanged apart from the version header. Register
 row `DATA_MODEL.md §22.2` **M59** records that `PREREGISTRATION.md §9` **step 0 has
@@ -309,7 +324,7 @@ carries.
    │   R4 explain_decision       (post-hoc, numeral-grounded)               │
    │                                                  │                     │
    │   -- all four reached ONLY through LlmProvider --                      │
-   │      offline | replay | anthropic | openai-compatible                  │
+   │      offline | replay | anthropic | openai-compatible | gemini         │
    │      outputs: strict-schema JSON, id-allowlisted, NEVER numeric -------┘
    └────────────────────────────────────────────────────────────────────────┘
                                                       │
@@ -354,7 +369,7 @@ carries.
 | `packages/oracle` | Exhaustive enumeration of evidence-admissible allocations from **observations only** | Deliberately a second, slow, naive implementation. Its whole value is being *not* the engine and *not* the generator. See §7. |
 | `packages/engine` | Stages S1–S5. Pure functions, no I/O, no network | Purity makes the core replayable and property-testable, and makes the LLM absence from the arithmetic path structurally verifiable. |
 | `packages/probe` | The `§6.2` probe **loop**, as a pure state machine: `P_max` accounting, pre-call `I6`, construction of the closed five-probe call, and the `PROBE` event body (spec 1.4.23) | The one place `THREAT_MODEL.md §T7`'s four controls meet. It is the **only** constructor of a probe call, so a caller cannot dispatch around them. Pure and I/O-free, so the caller owns the read and the append — the split spec 1.4.18 already made for `S0`. |
-| `packages/llm` | **`LlmProvider` interface + four providers**; four bounded roles; response cache; output verification | Single choke point. Every model call goes through one interface, so swapping providers — or removing the model entirely — is configuration, not a rewrite. See §6.5. |
+| `packages/llm` | **`LlmProvider` interface + five providers**; four bounded roles; response cache; output verification | Single choke point. Every model call goes through one interface, so swapping providers — or removing the model entirely — is configuration, not a rewrite. See §6.5. |
 | `packages/ledger` | **Layer A** append-only hash-chained audit events; **Layer B** double-entry projection; close gate | Append-only semantics, the trial-balance invariant and the Suspense identity are properties of this package, not conventions its callers must remember. |
 | `packages/eval` | Metrics, bootstrap CIs, report generation, and the **agent interface** the baselines and ablations implement. **The implementations themselves are `apps/cli`'s from spec 1.4.29 (register row `DATA_MODEL.md §22.2` M47)** and are injected; `report/` does not move | Must run against any agent behind one interface, so ablations are configuration, not forked code. An agent must import `engine`, `llm` and `probe`, all three refused here — **M37 already rejected this package as a run-loop host**, and `§K` had not absorbed that. |
 | `apps/api` | Thin HTTP over engine + ledger | — |
@@ -429,7 +444,8 @@ adversarial. Every response passes three checks before use:
    containing **no number-typed field**; a CI lint fails the build if one
    appears. The `anthropic` provider enforces it with `messages.parse()` +
    `zodOutputFormat`; the `openai-compatible` provider with JSON-schema response
-   format; `offline` and `replay` satisfy it by construction. Parse failure →
+   format; the `gemini` provider with `responseJsonSchema`; `offline` and
+   `replay` satisfy it by construction. Parse failure →
    the role's `offline` fallback, logged as `LLM_SCHEMA_REJECT`.
 2. **Allowlist check.** Any entity ID in the response must be a member of the
    allowlist passed in that call. A reference to an ID that does not exist in the
@@ -664,7 +680,7 @@ against this interface and have no knowledge of which provider is behind it.
 
 ```ts
 interface LlmProvider {
-  readonly id: "offline" | "replay" | "anthropic" | "openai-compatible";
+  readonly id: "offline" | "replay" | "anthropic" | "openai-compatible" | "gemini";
   readonly modelId: string;               // "rules-v1" for offline
   readonly requiresNetwork: boolean;
   readonly meteredCost: boolean;
@@ -680,7 +696,7 @@ interface LlmProvider {
 }
 ```
 
-**Four implementations, all interchangeable at runtime via `--llm=<id>`:**
+**Five implementations, all interchangeable at runtime via `--llm=<id>`:**
 
 | Provider | Network | Cost | Determinism | Purpose |
 |---|---|---|---|---|
@@ -688,6 +704,7 @@ interface LlmProvider {
 | `replay` | none | zero | **fully deterministic** | Serves committed responses from `fixtures/llm-cache/`, keyed by `sha256(provider ‖ model_id ‖ system_prompt_hash ‖ input_hash)`. Cache miss under `--strict-replay` is a hard error, never a silent live call. **All scored benchmark runs use this mode.** |
 | `anthropic` | yes | metered | not reproducible | `@anthropic-ai/sdk`, `messages.parse()` with `zodOutputFormat` for strict schemas, `thinking: {type:"adaptive"}`, prompt caching on the stable system prefix. |
 | `openai-compatible` | yes | metered | not reproducible | Any endpoint speaking the OpenAI chat-completions schema with JSON-schema response format — self-hosted, local runtime, or third-party. Present so no single vendor is load-bearing. |
+| `gemini` | yes | metered | not reproducible | **Added at spec 1.4.38 (M60).** `@google/genai` against the Gemini Developer API, with `responseJsonSchema` for strict schemas and `systemInstruction` for the role prompt. A **fifth id rather than a reuse of `openai-compatible`**: that row is scoped to the chat-completions schema, and `@google/genai` speaks Google's own, so recording a native call under it would make `DATA_MODEL.md §19`'s per-call provenance describe a transport that was never used. `meteredCost` is `true` regardless of any free tier, which is a commercial term of an account and not a property of the provider — so `apps/cli` refuses it exactly as it refuses the other two. |
 
 **Why this exists, beyond portability.** Three separate failures are prevented by
 the same interface:
@@ -1057,7 +1074,7 @@ fixed slice — and closes **V24**.
 | Branded `Paise` integer type | Makes float money a compile error. | `decimal.js` — correct but invites float-shaped thinking and is slower in hot loops. |
 | Own xorshift128+ PRNG | Reproducibility must survive dependency upgrades. A vendored 20-line generator cannot drift. | `seedrandom` — fine, but an external dependency inside the definition of the benchmark. |
 | `zod` at both trust boundaries | The same schema validates ingest and constrains LLM output. | Hand-written guards — drift between the two uses. |
-| **`LlmProvider` interface with 4 implementations** | No vendor is load-bearing; `offline` guarantees the demo; `replay` guarantees reproducibility. §6.5 | A direct SDK call at each site — couples the architecture to one vendor and makes offline operation a rewrite. |
+| **`LlmProvider` interface with 5 implementations** | No vendor is load-bearing; `offline` guarantees the demo; `replay` guarantees reproducibility. §6.5 | A direct SDK call at each site — couples the architecture to one vendor and makes offline operation a rewrite. |
 | `better-sqlite3` | Synchronous, transactional, single file, fast enough for 100k rows. | Postgres (ops overhead), JSON files (no transactions). |
 | `vitest` + `fast-check` | Property-based tests are the right tool for conservation invariants: "for all batches, debits equal credits." | Example-based tests only — they miss the adversarial middle. |
 | Hono + Vite/React | Minimal, no framework ceremony. | Next.js — server/client boundary complexity for a local tool. |

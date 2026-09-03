@@ -77,7 +77,31 @@ function response(overrides: Partial<ExplanationResponse> = {}): ExplanationResp
       latency_ms: 2100,
     },
     grounding: grounding(),
+    fallback: null,
     failure: null,
+    ...overrides,
+  };
+}
+
+/** The deterministic summary, in the shape apps/api serves it on `unavailable`. */
+function fallback(
+  overrides: Partial<NonNullable<ExplanationResponse["fallback"]>> = {},
+): NonNullable<ExplanationResponse["fallback"]> {
+  return {
+    label: "Evidence summary — AI unavailable",
+    generated_by: "assay-deterministic",
+    summary:
+      "ASSAY abstained on this observation and attached an ambiguity certificate. This is " +
+      "ASSAY's own record of the evidence, written by the engine because no AI explanation " +
+      "was available. It adds nothing to the decision and interprets nothing.",
+    points: [
+      "Certificate reason recorded by the engine: TWO_VALID_ALLOCATIONS.",
+      "The evidence score gap is 0 bps against a pre-registered margin of 1500 bps.",
+    ],
+    risk: "Unresolved value across this close is ₹1,00,000.00 (10000000 paise), and the period status is OPEN.",
+    next_step:
+      "The certificate and the ledger on this page are complete and unaffected. Read them " +
+      "directly, or retry the AI explanation once the provider is configured and reachable.",
     ...overrides,
   };
 }
@@ -235,6 +259,14 @@ describe("when the provider fails, the certificate is what remains", () => {
     });
   }
 
+  it("renders no evidence-summary block when the server sent none", () => {
+    // The API-unreachable branch: apps/api never answered, so there is no
+    // fallback to render and the browser composes none of its own.
+    const html = markup(<AiExplanationResult response={cases[1]?.[1] ?? response()} />);
+    expect(html).not.toContain("Evidence summary");
+    expect(html).not.toContain("Written by ASSAY");
+  });
+
   it("offers a retry rather than a dead panel", () => {
     const html = markup(
       <AiExplanationResult
@@ -325,5 +357,68 @@ describe("the panel is subordinate to the deterministic decision", () => {
   it("is introduced as an explanation, not as a finding", () => {
     expect(ok).toContain("Explaining ASSAY&#x27;s decision");
     expect(ok).toContain("Grounded in ASSAY evidence");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 7b. The deterministic fallback, and what makes it not an AI explanation.
+// ---------------------------------------------------------------------------
+
+describe("the deterministic evidence summary", () => {
+  const unavailable = response({
+    status: "unavailable",
+    explanation: null,
+    provider: null,
+    fallback: fallback(),
+    grounding: grounding({
+      checks: { schema: "not_reached", allowlist: "not_reached", numerals: "not_reached" },
+      system_prompt_id: null,
+      system_prompt_hash: "",
+    }),
+    failure: {
+      code: "MISSING_CREDENTIAL",
+      message:
+        "No provider credential is configured on the server. Set GEMINI_API_KEY in the API " +
+        "process environment to enable AI explanations. ASSAY's decision, certificate and " +
+        "ledger are unaffected.",
+    },
+  });
+  const html = markup(<AiExplanationResult response={unavailable} />);
+
+  it("renders the server's label verbatim", () => {
+    expect(html).toContain("Evidence summary — AI unavailable");
+  });
+
+  it("attributes it to ASSAY and denies that it is an AI explanation", () => {
+    expect(html).toContain("Written by ASSAY from the verified evidence on this page");
+    expect(html).toContain("Not an AI explanation");
+  });
+
+  it("still says the AI is unavailable and why", () => {
+    // The summary supplements the failure notice; it does not replace it, so a
+    // reader is never left thinking the AI answered.
+    expect(html).toContain("No AI explanation is available");
+    expect(html).toContain("GEMINI_API_KEY");
+    expect(html).not.toContain("AIzaSy");
+  });
+
+  it("shows the evidence points the server composed", () => {
+    for (const point of unavailable.fallback?.points ?? []) {
+      expect(html).toContain(escaped(point));
+    }
+    expect(html).toContain(escaped(unavailable.fallback?.risk ?? ""));
+  });
+
+  it("keeps ASSAY's verdict as the panel's header, exactly as on the AI path", () => {
+    expect(html).toContain("ABSTAINED");
+    expect(html).toContain("decided deterministically");
+    expect(html).toContain("are unchanged");
+  });
+
+  it("puts no model prose on screen and claims no model", () => {
+    expect(html).not.toContain("materially indistinguishable");
+    expect(html).not.toContain("Model ");
+    expect(html).not.toContain("via gemini");
+    expect(html).not.toContain("via anthropic");
   });
 });

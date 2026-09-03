@@ -47,6 +47,26 @@ export interface PromptTemplate {
   readonly user: (input: StructuredRoleInput) => string;
 }
 
+/**
+ * What this surface needs of a provider, over and above `§6.5`'s interface.
+ *
+ * Exactly one addition: {@link failures}. `LlmCallMeta.failure` is `§6.5`'s
+ * closed four-member union and cannot distinguish a rate limit from a rejected
+ * credential — a distinction `ARCHITECTURE.md §12` collapses on purpose for the
+ * pipeline and a product surface has to be able to show a user. Recording it on
+ * the instance keeps `§6.5`'s interface exactly as specified, which `§L.4`
+ * requires, while letting the route say which of `§12`'s rows fired.
+ *
+ * Both network providers this surface builds implement it — {@link
+ * AnthropicProvider} here and `GeminiProvider` in `gemini.ts` — so the route,
+ * the app options and the service are written against the contract rather than
+ * against either class. Adding a sixth provider is a new file and a `config.ts`
+ * branch; no call site changes.
+ */
+export interface ExplainProvider extends LlmProvider {
+  readonly failures: ExplainFailure[];
+}
+
 export interface AnthropicProviderOptions {
   /** The credential. Read from the environment by `config.ts`; never logged. */
   readonly apiKey: string;
@@ -111,8 +131,8 @@ function isResponseShapeFailure(error: unknown): boolean {
   return error instanceof Anthropic.AnthropicError && !(error instanceof Anthropic.APIError);
 }
 
-export class AnthropicProvider implements LlmProvider {
-  /** `DATA_MODEL.md §19`'s closed four-member union. */
+export class AnthropicProvider implements ExplainProvider {
+  /** `DATA_MODEL.md §19`'s provider union, third member. */
   readonly id = "anthropic" as const;
   readonly modelId: string;
   readonly requiresNetwork = true;

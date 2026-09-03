@@ -21,18 +21,27 @@ import type { ZodType } from "zod";
  *   interface + verification    built
  *   offline, replay             built        no network, deterministic
  *   anthropic, openai-compatible DECLARED, not built    -- §H tier H2, blocked
- *                                                          on §F F2 (no metered
+ *   gemini                                                 on §F F2 (no metered
  *                                                          credential)
  *   R1, R2                      built
  *   R3                          built        spec 1.4.25, §H tier H1
  *   R4                          DECLARED, not built     -- §H tier H2
  * ```
  *
- * The four-provider architecture is **preserved as a declared table**
+ * The provider architecture is **preserved as a declared table**
  * (`PROVIDER_DESCRIPTORS` below) rather than stubbed with invented network code.
- * `LLM_PROVIDER_IDS` still has four members and `DATA_MODEL.md §19`'s
- * `LlmProviderId` is unchanged; what a later phase adds is two implementations
- * behind an interface that already describes them.
+ * `LLM_PROVIDER_IDS` has five members from spec 1.4.38 and `DATA_MODEL.md §19`'s
+ * `LlmProviderId` is widened to match; what a later phase adds is the three
+ * network implementations behind an interface that already describes them.
+ *
+ * **"Not built" means "not built HERE", and that distinction is the whole
+ * point of this table.** `anthropic` and `gemini` both have working
+ * implementations in `apps/api/src/explain/`, which is the layer that owns the
+ * socket and the credential; neither may exist in this package, because
+ * `tests/discipline.test.ts` fails the build on a transport import, on a
+ * `process.env` read and on a `providers/<network-id>.ts`. That is what makes
+ * `§C` T0-11's *"clean checkout with no API key"* a property rather than a
+ * promise, and `built: false` records it honestly for every row it holds of.
  */
 
 /** The four bounded roles (`ARCHITECTURE.md §6`). Closed; `§L.4` bars a fifth. */
@@ -81,7 +90,7 @@ export type RoleCallName = (typeof ROLE_CALL_NAMES)[RoleId];
 /**
  * `§6.5`'s provider table, as data.
  *
- * Kept as a declaration so that the architecture's four-provider claim is
+ * Kept as a declaration so that the architecture's provider claim is
  * checkable at Phase 8 — when only two are built — rather than asserted in
  * prose. `built: false` is the honest encoding of `§F` F2: the row exists, the
  * implementation does not, and nothing pretends otherwise.
@@ -98,7 +107,7 @@ export interface ProviderDescriptor {
   readonly purpose: string;
 }
 
-/** `ARCHITECTURE.md §6.5`'s four implementations, in the order it lists them. */
+/** `ARCHITECTURE.md §6.5`'s five implementations, in the order it lists them. */
 export const PROVIDER_DESCRIPTORS: readonly ProviderDescriptor[] = Object.freeze([
   Object.freeze({
     id: "offline",
@@ -134,6 +143,22 @@ export const PROVIDER_DESCRIPTORS: readonly ProviderDescriptor[] = Object.freeze
     built: false,
     purpose:
       "Any endpoint speaking the OpenAI chat-completions schema. Present so no single vendor is load-bearing.",
+  }),
+  // Appended last, never inserted: `LLM_PROVIDER_IDS` and this table are read
+  // in parallel by `apps/cli`'s `--llm` usage text, and `§8`'s "appended, never
+  // renumbered" principle governs an ordered declaration for the same reason.
+  Object.freeze({
+    id: "gemini",
+    requiresNetwork: true,
+    // Metered in the sense this field means -- a vendor account is billed by
+    // request. A free tier is a commercial term of that account and not a
+    // property of the provider, so the flag that makes `apps/cli` refuse a
+    // network provider outright stays true and CI keeps refusing this one.
+    meteredCost: true,
+    deterministic: false,
+    built: false,
+    purpose:
+      "@google/genai against the Gemini Developer API, with responseJsonSchema for strict schemas.",
   }),
 ] as const);
 
