@@ -85,3 +85,97 @@ exception queue look like a real period rather than a single contrived case.
 
 `apps/cli/tests/demo-fixture.test.ts` runs the real ASSAY agent over this file
 and asserts the abstention. It asserts no rate, no accuracy and no comparison.
+
+## The three controller scenarios
+
+`demo-close/`, `demo-multi/` and `demo-backlog/` are the same kind of artifact
+as `demo-500/` and carry the same five boundaries above without exception. They
+are never scored, they enter no `RunKey`, `assay bench` cannot reach them, and no
+figure computed over any of them is a measurement. In particular **`demo-close`'s
+`CLOSED` period is not evidence for `PROJECT_SPEC.md §7` `S12`**, which reads
+against the sealed corpus and against nothing else.
+
+### Why they exist
+
+`demo-500` holds exactly **one** queue row that opens a Suspense item — the
+abstained settlement. `@assay/controller`'s closing set is computed over exactly
+those rows, so on `demo-500` the plan can only ever have one member: the cursor
+never iterates, the greedy value-descending selection never selects, and every
+policy rule but `P3_ESCALATE` is unreachable. The controller's own claim — that
+it re-derives its plan from a fresh observation rather than following a script —
+is true, is unit-tested, and is invisible.
+
+These three are periods the **same frozen engine** resolves differently. Nothing
+in `packages/engine`, `packages/ledger`, the close gate, the certificate or the
+constraint set is touched or configured; the only thing that differs between the
+four runs is the evidence, which is what makes the controller's differing
+behaviour a property of the evidence rather than of a switch.
+
+Each is built from `demo-500`'s own rows, so the ordinary clean traffic — the
+`AN1`-anchored settlements that tie out, their matched bank credits, the
+reference payments and orders — is the same in all four and the scenarios differ
+only in what is added or withheld.
+
+### `demo-close/` — a period that closes
+
+`demo-500` minus the ambiguous settlement, its bank credit and its five recon
+lines. **493 observations.** Nothing left in the batch opens a Suspense item, so
+`G3`'s residual is exactly `0`, and `0 ≤ close_threshold_paise` puts the period
+in `CLOSED`.
+
+The twenty `E13_LEDGER_ONLY` exceptions are **kept**, and keeping them is the
+point: the queue is not empty, it holds twenty open exceptions carrying real
+money, and the period closes anyway — because `DATA_MODEL.md §17.1.1` gives a
+`ledger_entry` no posting in any state, so none of them contributes a paisa to
+the residual. That is the distinction between *"an exception"* and *"an exception
+that blocks the close"*, which is otherwise something a reader has to take on
+trust from `§10.1`.
+
+### `demo-multi/` — a closing set with several members
+
+`demo-500` plus four unattributed bank credits and one large merchant-ledger row.
+**505 observations.**
+
+The four bank credits carry a `bank_ref` no settlement's UTR matches, so `AN2`
+cannot match them; `s1-s2-seam.ts` makes each one a target, `S2` finds no
+admissible member for it, and `§9` sends it to `E03_BANK_CREDIT_UNMATCHED` —
+which `§17.1.1` posts under `P5`, opening a Suspense item. None of that is
+asserted by the fixture; it is what the engine does with a bank credit nobody can
+attribute.
+
+The merchant-ledger row is the **largest single value in the queue** and opens no
+Suspense item at all. It is there so the eligibility discrimination is visible at
+the top of the queue rather than buried: a planner ranking on rupee value alone
+would open the biggest row first and move the residual by zero.
+
+The abstained settlement is retained, so the closing set mixes a decision that
+carries an Ambiguity Certificate with three that do not — and both escalation
+reasons, `AMBIGUOUS_CERTIFICATE` and `NO_DETERMINISTIC_WARRANT`, appear in one
+trace.
+
+### `demo-backlog/` — more work than one pass can do
+
+`demo-500` plus twenty-four unattributed bank credits, built the same way.
+**524 observations.** The residual is spread across twenty-five eligible items,
+none of which would bring the period under its threshold on its own, and working
+them exceeds `DEFAULT_STEP_BUDGET`. The controller stops on its own bound and
+reports the result as **partial** rather than dressing it as complete.
+
+**One thing this fixture was designed to produce and does not.** The intent was a
+`ClosingPlan` with `covers_residual: false` — an eligible set too small to clear
+the residual. That state is **unreachable on any coherent run**, and the fixture
+is the evidence: `unresolved_value_paise` is summed over exactly the decisions
+whose `suspense_key` is non-null, which is exactly the set `closingSet` calls
+eligible, so `Σ eligible value = unresolved` by construction and taking the whole
+eligible set always covers `unresolved − close_threshold_paise`. A run where the
+two disagree fails `G3` and is `BLOCKED` before the controller plans anything.
+`covers_residual` is therefore a defensive branch, not a business state, and it
+is recorded here as such rather than left looking untested.
+
+**That is also why the fixture is named for its evidence and not for that
+intent.** It was drafted as `demo-shortfall`, which names an arithmetic
+shortfall between the eligible set and the residual — the state the paragraph
+above shows cannot occur. A directory name is rendered to reviewers in the
+Command Center's period picker, so the name would have kept asserting what the
+text beneath it retracts. `demo-backlog` names what the period actually holds: a
+backlog of unattributed bank credits, larger than one bounded pass can work.

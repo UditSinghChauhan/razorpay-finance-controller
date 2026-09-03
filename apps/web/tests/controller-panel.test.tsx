@@ -612,3 +612,109 @@ describe("the escalation explains itself in words, from its own fields", () => {
     expect(other).not.toContain("ASSAY abstained (EVIDENCE_TIE)");
   });
 });
+
+/**
+ * The narrative follows the escalation reasons the trace actually carries.
+ *
+ * `demo-500` escalates exactly one item and it carries a `§13` certificate, so
+ * for a long time "ASSAY abstained" was true of every escalation the panel had
+ * ever rendered. It is not true of a period whose residual is mostly
+ * unattributed bank credits: those reach `E03`, open a Suspense item under
+ * `P5`, and carry no certificate — ASSAY did not abstain on them and left no
+ * allocations open, because `S2` found no admissible allocation at all.
+ *
+ * The traces below are the escalated trace with its escalation list varied.
+ * Nothing else changes, so what is being asserted is that the sentence follows
+ * the records rather than the shape of the run.
+ */
+const WARRANT_ESCALATION: ControllerTrace["escalations"][number] = {
+  decision_id: "dec_unattributed_bank_credit",
+  entity_id: "bnk_UNATTRIB000001",
+  obs_id: "obs_bankline90001",
+  kind: "bank_line",
+  reason: "NO_DETERMINISTIC_WARRANT",
+  value_paise: 4_500_000,
+  suspense_key: "bnk_UNATTRIB000001",
+  comp_id: null,
+  certificate_reason: null,
+  probes_attempted: [],
+  evidence_score_gap_bps: null,
+  epsilon_bps: null,
+  materiality_paise: null,
+  tau_paise: null,
+  closes_alone: false,
+};
+
+const narrativeOf = (trace: ControllerTrace): string =>
+  renderToStaticMarkup(<ControllerTraceView trace={trace} onReviewClick={() => undefined} />);
+
+describe("the escalated stage names the reasons the trace carries", () => {
+  it("claims abstention only where every escalation carries a certificate", () => {
+    const html = narrativeOf(ESCALATED_TRACE);
+    expect(html).toContain("1 item(s) were routed to a person: ASSAY abstained");
+    expect(html).not.toContain("no deterministic rule can clear, and the correct");
+  });
+
+  it("claims no abstention where no escalation carries a certificate", () => {
+    const html = narrativeOf({
+      ...ESCALATED_TRACE,
+      escalations: [WARRANT_ESCALATION],
+    });
+    expect(html).toContain(
+      "1 item(s) were routed to a person: a Suspense item was opened that no deterministic " +
+        "rule can clear",
+    );
+    // The abstention claim must be absent, not merely outnumbered.
+    expect(html).not.toContain("routed to a person: ASSAY abstained");
+  });
+
+  it("splits the count when the closing set holds both kinds", () => {
+    const html = narrativeOf({
+      ...ESCALATED_TRACE,
+      escalations: [...ESCALATED_TRACE.escalations, WARRANT_ESCALATION],
+    });
+    expect(html).toContain("2 item(s) were routed to a person — 1 where ASSAY abstained");
+    expect(html).toContain("and 1 where a Suspense item was opened that no deterministic rule");
+  });
+
+  it("does not attribute a certificate to every inspected decision", () => {
+    const html = narrativeOf({
+      ...ESCALATED_TRACE,
+      escalations: [WARRANT_ESCALATION],
+    });
+    expect(html).toContain("1 decision(s) were read in full");
+    expect(html).not.toContain("were read in full — the Ambiguity Certificate");
+  });
+});
+
+/**
+ * A run that stopped on its own step bound.
+ *
+ * The escalations are real and the handoff is not: `AWAIT_HUMAN` was never
+ * entered, and part of the closing set was never worked. Reporting it as
+ * "waiting on a person" alone would present a partial pass as a completed one.
+ */
+describe("the review stage reports a budget-exhausted run as partial", () => {
+  const html = narrativeOf({
+    ...ESCALATED_TRACE,
+    stop_reason: "BUDGET_EXHAUSTED",
+    plan: {
+      ...(ESCALATED_TRACE.plan ?? { eligible: [], ineligible_count: 0, covers_residual: true, already_under_threshold: false }),
+      ids: ["a", "b", "c"],
+    },
+  });
+
+  it("names how much of the closing set was worked and how much was not", () => {
+    expect(html).toContain("the step budget ran out before the closing set was finished");
+    expect(html).toContain("1 of 3 planned item(s) reached a person and 2 were not worked");
+    expect(html).toContain("The result is partial and is reported as partial");
+  });
+
+  it("claims no handoff, because the loop never reached one", () => {
+    expect(html).not.toContain("item(s) are waiting on a person");
+  });
+
+  it("still states the no-financial-write boundary", () => {
+    expect(html).toContain("Nothing was written on any path");
+  });
+});

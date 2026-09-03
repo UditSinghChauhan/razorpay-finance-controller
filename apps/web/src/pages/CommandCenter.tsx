@@ -1,8 +1,11 @@
 import { useNavigate } from "react-router-dom";
 import { AuthorityLegend } from "../components/AuthorityLegend.js";
 import { ControllerPanel } from "../components/ControllerPanel.js";
+import { ScenarioPicker } from "../components/ScenarioPicker.js";
 import { useRun } from "../context/RunContext.js";
 import {
+  ABSTAINED_VALUE_BASIS,
+  ABSTAINED_VALUE_LABEL,
   abstentionDecisionLabel,
   affectedObservationsLabel,
   RECONCILIATION_BASIS,
@@ -79,9 +82,11 @@ interface PipelineStageProps {
   label: string;
   status: "done" | "pending" | "error";
   count?: number;
+  /** A word under the node where a count would go — the close gate's outcome. */
+  note?: string | undefined;
 }
 
-function PipelineStage({ label, status, count }: PipelineStageProps): React.ReactElement {
+function PipelineStage({ label, status, count, note }: PipelineStageProps): React.ReactElement {
   const color = status === "done" ? "var(--color-reconciled)" :
                 status === "error" ? "var(--color-exception)" :
                 "var(--color-outline)";
@@ -101,6 +106,9 @@ function PipelineStage({ label, status, count }: PipelineStageProps): React.Reac
       </div>
       <p className="font-label-caps" style={{ color, marginBottom: 2 }}>{label}</p>
       {count !== undefined && <p className="font-body-sm text-muted">{formatCount(count)}</p>}
+      {note !== undefined && (
+        <p className="font-label-caps" style={{ color, fontSize: 9 }}>{note}</p>
+      )}
     </div>
   );
 }
@@ -121,7 +129,7 @@ function GateStatusRow({ label, passed }: { label: string; passed: boolean }): R
 
 export function CommandCenter(): React.ReactElement {
   const navigate = useNavigate();
-  const { run, close, loading, error, startDemo } = useRun();
+  const { run, close, loading, error, startDemo, dataset, selectDataset } = useRun();
 
   const s = run?.summary;
   const bvp = s?.batch_value_paise ?? 0;
@@ -148,14 +156,15 @@ export function CommandCenter(): React.ReactElement {
           <h1 className="page-title">ASSAY Command Center</h1>
           <p className="page-subtitle" style={{ marginTop: "var(--space-sm)", maxWidth: 480 }}>
             Settlement reconciliation intelligence for Razorpay-shaped payment data.
-            Start a demo run to process 500 observations through the ASSAY engine.
+            Start a demo run to process one period through the ASSAY engine.
           </p>
         </div>
+        <ScenarioPicker selected={dataset} disabled={loading} onSelect={selectDataset} />
         <button className="btn btn-primary" onClick={() => void startDemo()} style={{ padding: "var(--space-md) var(--space-xl)", fontSize: 16 }}>
           <span className="material-symbols-outlined" style={{ fontSize: 20 }}>play_arrow</span>
           Run Demo
         </button>
-        <p className="font-body-sm text-muted">dataset: demo-500 &middot; llm: offline &middot; no credentials required</p>
+        <p className="font-body-sm text-muted">dataset: {dataset} &middot; llm: offline &middot; no credentials required</p>
       </div>
     );
   }
@@ -164,7 +173,7 @@ export function CommandCenter(): React.ReactElement {
     return (
       <div style={{ padding: "var(--space-xl)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "60vh", gap: "var(--space-lg)" }}>
         <div className="loading-spinner" />
-        <p className="font-body-md text-muted">Running ASSAY engine over demo-500...</p>
+        <p className="font-body-md text-muted">Running ASSAY engine over {dataset}...</p>
         <p className="font-body-sm text-muted">Processing observations through S0-S5 pipeline</p>
       </div>
     );
@@ -193,9 +202,17 @@ export function CommandCenter(): React.ReactElement {
         <div style={{ display: "flex", gap: "var(--space-md)" }}>
           <button className="btn btn-primary" onClick={() => void startDemo()} aria-label="Run batch job">
             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>play_arrow</span>
-            Re-Run Demo
+            {dataset === run?.dataset ? "Re-Run Demo" : "Run this period"}
           </button>
         </div>
+      </div>
+
+      {/* The period this run read, and the three others the same engine can be
+          pointed at. Selecting one changes the evidence; nothing else about the
+          pipeline changes, which is why the controller panel below can behave
+          differently without anything having been configured. */}
+      <div className="card" style={{ padding: "var(--space-md)", marginBottom: "var(--space-lg)" }}>
+        <ScenarioPicker selected={dataset} disabled={loading} onSelect={selectDataset} />
       </div>
 
       {/* Metric cards */}
@@ -266,9 +283,20 @@ export function CommandCenter(): React.ReactElement {
             Investigation Queue lists the affected observations one row each.
           </p>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-lg)", marginBottom: "var(--space-md)" }}>
+            {/* The ABSTENTION half of §20's split, not the residual. This panel
+                is headed "Ambiguity Detected", and the residual on a period
+                that also carries unattributed bank credits includes money no
+                certificate covers — so showing it here would attribute the
+                exception half to an ambiguity. Read straight off the close
+                gate; nothing is summed or derived. */}
             <div style={{ background: "rgba(255,255,255,0.7)", borderRadius: "var(--radius-md)", padding: "var(--space-md)" }}>
-              <p className="font-label-caps text-muted" style={{ marginBottom: "var(--space-xs)" }}>Unresolved Value</p>
-              <p className="font-display-metric text-warning">{formatPaise(unresolvedPaise)}</p>
+              <p className="font-label-caps text-muted" style={{ marginBottom: "var(--space-xs)" }}>{ABSTAINED_VALUE_LABEL}</p>
+              <p className="font-display-metric text-warning">
+                {close ? formatPaise(close.value_abstained_paise) : "—"}
+              </p>
+              <p className="font-body-sm text-muted" style={{ fontSize: 11, marginTop: 4, lineHeight: 1.5 }}>
+                {ABSTAINED_VALUE_BASIS}
+              </p>
             </div>
             <div style={{ background: "rgba(255,255,255,0.7)", borderRadius: "var(--radius-md)", padding: "var(--space-md)" }}>
               <p className="font-label-caps text-muted" style={{ marginBottom: "var(--space-xs)" }}>Period Status</p>
@@ -299,7 +327,19 @@ export function CommandCenter(): React.ReactElement {
           <div style={{ height: 2, flex: 1, background: "var(--color-reconciled)", marginTop: 18 }} />
           <PipelineStage label="Validate S5" status="done" count={decisions + exceptions} />
           <div style={{ height: 2, flex: 1, background: "var(--color-reconciled)", marginTop: 18 }} />
-          <PipelineStage label="Close" status={periodStatus === "BLOCKED" ? "error" : "done"} />
+          {/* The three outcomes are three different states and the node shows
+              which one. `done` for CLOSED only: an OPEN period passed all five
+              gates and is a legitimate business state, but it is not a closed
+              one, and rendering it with the same green tick made a period that
+              closed and a period that did not look identical at a glance.
+              §10.2's BLOCKED stays the error state. */}
+          <PipelineStage
+            label="Close"
+            status={
+              periodStatus === "BLOCKED" ? "error" : periodStatus === "CLOSED" ? "done" : "pending"
+            }
+            note={periodStatus ?? undefined}
+          />
         </div>
       </div>
 
@@ -308,6 +348,28 @@ export function CommandCenter(): React.ReactElement {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-md)", marginBottom: "var(--space-xl)" }}>
           <div className="card" style={{ padding: "var(--space-lg)" }}>
             <p className="font-label-caps text-muted" style={{ marginBottom: "var(--space-md)" }}>Close Gates</p>
+            {/* The outcome, stated where the gates are — unconditionally.
+                It previously appeared only inside the abstention alert, so a
+                period with no abstention on it (every gate passing, residual
+                inside the threshold, CLOSED) said so nowhere on this page. */}
+            <div style={{
+              display: "flex", justifyContent: "space-between", alignItems: "baseline",
+              paddingBottom: "var(--space-sm)", marginBottom: "var(--space-sm)",
+              borderBottom: "1px solid var(--color-outline-variant)",
+            }}>
+              <span className="font-body-sm text-muted">Period</span>
+              <span className="font-headline-sm" style={{
+                color: close.period_status === "CLOSED" ? "var(--color-reconciled)"
+                  : close.period_status === "BLOCKED" ? "var(--color-exception)"
+                    : "var(--color-abstained)",
+              }}>{close.period_status}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "var(--space-sm)" }}>
+              <span className="font-body-sm text-muted">Unresolved vs. threshold</span>
+              <span className="font-numeric-mono">
+                {formatPaise(close.unresolved_value_paise)} / {formatPaise(close.close_threshold_paise)}
+              </span>
+            </div>
             <GateStatusRow label="G1 All Terminal" passed={close.gate.g1_all_terminal} />
             <GateStatusRow label="G2 Trial Balance" passed={close.gate.g2_trial_balance} />
             <GateStatusRow label="G3 Suspense Identity" passed={close.gate.g3_suspense_identity} />
@@ -352,8 +414,15 @@ export function CommandCenter(): React.ReactElement {
       {/* Close controller — packages/controller's trace over this sealed run.
           A second strip beneath the reconciliation pipeline above: the engine
           ran first and decided everything; this orchestrates the residual and
-          writes nothing. */}
-      {run && <ControllerPanel runId={run.run_id} />}
+          writes nothing.
+
+          `key` is the run id, and it is load-bearing rather than a list-key
+          habit. The panel holds its trace in `useController`'s own state, and
+          without a key React reuses the component across a change of run —
+          leaving the PREVIOUS period's trace on screen beside the new period's
+          figures until someone presses the button again. A trace is about
+          exactly one run, so the panel's identity is that run. */}
+      {run && <ControllerPanel key={run.run_id} runId={run.run_id} />}
 
       {/* Live data indicator */}
       {run && (

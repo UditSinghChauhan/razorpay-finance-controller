@@ -317,22 +317,30 @@ export interface ApiState<T> {
 // Hooks
 // ---------------------------------------------------------------------------
 
-/** POST /api/runs - start a demo run. */
+/**
+ * POST /api/runs - start a demo run over one allowlisted period.
+ *
+ * `dataset` is a parameter rather than a constant because the Command Center
+ * can now start any of `demo/`'s periods. It is still **the server** that
+ * decides which names are runnable: `apps/api/src/datasets.ts` resolves a name
+ * to a path under `demo/` and answers `400` with the ids it supports for
+ * anything else, so an unknown id here is refused rather than resolved.
+ */
 export function useCreateRun(): {
-  create: () => Promise<RunSummary>;
+  create: (dataset: string) => Promise<RunSummary>;
   state: ApiState<RunSummary>;
 } {
   const [state, setState] = useState<ApiState<RunSummary>>({
     data: null, loading: false, error: null,
   });
 
-  const create = useCallback(async () => {
+  const create = useCallback(async (dataset: string) => {
     setState({ data: null, loading: true, error: null });
     try {
       const res = await fetch("/api/runs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dataset: "demo-500", llm_provider: "offline" }),
+        body: JSON.stringify({ dataset, llm_provider: "offline" }),
       });
       if (!res.ok) {
         const body = await res.text().catch(() => "");

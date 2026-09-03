@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
 import { useCreateRun, useCloseReport, useExceptions, type RunSummary, type CloseReport, type ExceptionsResponse } from "../hooks/useAssayApi.js";
+import { DEFAULT_SCENARIO_ID } from "../lib/scenarios.js";
 
 // ---------------------------------------------------------------------------
 // Context shape
@@ -14,12 +15,22 @@ export interface RunContextValue {
   exceptions: ExceptionsResponse | null;
   /** Currently selected decision_id for drill-down. */
   selectedDecisionId: string | null;
+  /**
+   * The demo period the next run will use, and the one the last run used.
+   *
+   * Held here rather than in the page so that a scenario survives a navigation
+   * to the queue and back. It is a *request*: the server's allowlist decides
+   * whether it can be run, and `run.dataset` is what actually ran.
+   */
+  dataset: string;
   /** Whether any data is loading. */
   loading: boolean;
   /** Error message, if any. */
   error: string | null;
-  /** Start the demo run. */
-  startDemo: () => Promise<void>;
+  /** Start a run over one demo period. Defaults to the currently selected one. */
+  startDemo: (dataset?: string) => Promise<void>;
+  /** Choose the period the next run will use, without starting one. */
+  selectDataset: (id: string) => void;
   /** Select a decision for drill-down. */
   selectDecision: (id: string | null) => void;
 }
@@ -38,17 +49,30 @@ export const RunContext = createContext<RunContextValue | null>(null);
 export function RunProvider({ children }: { children: ReactNode }): React.ReactElement {
   const [run, setRun] = useState<RunSummary | null>(null);
   const [selectedDecisionId, setSelectedDecisionId] = useState<string | null>(null);
+  const [dataset, setDataset] = useState<string>(DEFAULT_SCENARIO_ID);
   const { create, state: createState } = useCreateRun();
 
   const runId = run?.run_id ?? null;
   const closeState = useCloseReport(runId);
   const exceptionsState = useExceptions(runId);
 
-  const startDemo = useCallback(async () => {
-    setSelectedDecisionId(null);
-    const result = await create();
-    setRun(result);
-  }, [create]);
+  // The drill-down is cleared first: a decision_id belongs to the run that
+  // minted it, and carrying one across a period change would point the Evidence
+  // Trail at a decision the new run does not hold.
+  const startDemo = useCallback(
+    async (next?: string) => {
+      const id = next ?? dataset;
+      setSelectedDecisionId(null);
+      setDataset(id);
+      const result = await create(id);
+      setRun(result);
+    },
+    [create, dataset],
+  );
+
+  const selectDataset = useCallback((id: string) => {
+    setDataset(id);
+  }, []);
 
   const loading = createState.loading || closeState.loading || exceptionsState.loading;
   const error = createState.error ?? closeState.error ?? exceptionsState.error;
@@ -60,9 +84,11 @@ export function RunProvider({ children }: { children: ReactNode }): React.ReactE
         close: closeState.data,
         exceptions: exceptionsState.data,
         selectedDecisionId,
+        dataset,
         loading,
         error,
         startDemo,
+        selectDataset,
         selectDecision: setSelectedDecisionId,
       }}
     >
