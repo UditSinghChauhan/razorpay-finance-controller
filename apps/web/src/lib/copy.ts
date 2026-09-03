@@ -87,3 +87,45 @@ export function probeSummary(probeCount: number, reason: string): string {
     `that discriminates the hypotheses.`
   );
 }
+
+/**
+ * The Investigation Queue's row count for the exception population.
+ *
+ * "Records", not "value": the queue is a list of things to work, and its length
+ * is a count of open exception records. It is deliberately worded so that it
+ * cannot be read as, or against, the suspense figures below it — those are a
+ * different population and {@link SUSPENSE_EXCEPTIONS_LABEL} says so.
+ */
+export function openExceptionRecordsLabel(records: number): string {
+  return `${String(records)} open exception record${records === 1 ? "" : "s"}`;
+}
+
+/**
+ * The two rupee totals on the queue header are **suspense-queue** totals, and
+ * the labels now say which queue they are totals of.
+ *
+ * `value_abstained_paise` and `value_exceptions_paise` are the close gate's, and
+ * DATA_MODEL.md §20 splits them over the unresolved items that reach the
+ * suspense account — the items carrying a `suspense_key`. A row in the table
+ * below can be an open exception, carry real money, and contribute to neither,
+ * because §17.1.1 keys the posting to the component target rather than to every
+ * affected record.
+ *
+ * On the demo run that is exactly what happens: twenty `E13_LEDGER_ONLY`
+ * records are open and none of them is keyed, so the gate's exception total is
+ * zero while the records themselves are not. A card labelled "Value Exceptions"
+ * over that figure reads as a claim that the twenty records are worth nothing,
+ * which is the misreading these labels exist to prevent. Neither figure is
+ * adjusted, recomputed or replaced here; only the label and the basis line are.
+ */
+export const SUSPENSE_ABSTAINED_LABEL = "Abstained Value in Suspense";
+export const SUSPENSE_EXCEPTIONS_LABEL = "Exception Value in Suspense";
+
+export const SUSPENSE_ABSTAINED_BASIS =
+  "Suspense-queue total, from the close gate. It counts the keyed component " +
+  "target, not every abstained observation row listed below.";
+
+export const SUSPENSE_EXCEPTIONS_BASIS =
+  "Suspense-queue total, from the close gate. Open exception records that post " +
+  "no suspense entry are outside this figure — it is not a statement of their " +
+  "value. Each record's own rupee value is ranked in the table below.";
