@@ -207,6 +207,80 @@ export interface DecisionDetail {
   certificate_allocation: CertificateAllocation | null;
 }
 
+
+/**
+ * POST /api/runs/:id/decisions/:decision_id/explain
+ *
+ * The AI explanation surface. Every field below is produced by apps/api: the
+ * page sends presentation preferences and receives an explanation that already
+ * passed ARCHITECTURE.md §4 boundary 2's three checks, or a stated reason why
+ * there is none. The browser holds no credential, builds no prompt and sees no
+ * prompt -- `system_prompt_hash` travels, prompt text never does (§T11).
+ */
+export interface AiExplanationText {
+  summary: string;
+  why: string[];
+  risk: string;
+  next_step: string;
+}
+
+/** Which of §4 boundary 2's three checks ran, and how it went. */
+export type GroundingCheckOutcome = "pass" | "fail" | "not_reached";
+
+export interface ExplanationGrounding {
+  decision_evidence_verified: boolean;
+  certificate_used: boolean;
+  /** Always "none". The model explains; ASSAY decides. */
+  decision_authority: string;
+  /**
+   * The terminal state ASSAY decided, read by the server off the sealed
+   * DecisionEvidence on every branch -- success, refusal and failure alike.
+   * It is never anything the model returned.
+   */
+  deterministic_state: string;
+  checks: {
+    schema: GroundingCheckOutcome;
+    allowlist: GroundingCheckOutcome;
+    numerals: GroundingCheckOutcome;
+  };
+  rejected_entity_ids: string[];
+  rejected_numerals: string[];
+  system_prompt_id: string | null;
+  system_prompt_hash: string;
+  input_hash: string;
+  cache_key: string;
+  evidence_item_count: number;
+}
+
+export interface ExplanationProvider {
+  provider: string;
+  model_id: string;
+  requires_network: boolean;
+  attempts: number;
+  latency_ms: number;
+}
+
+export interface ExplanationFailure {
+  code: string;
+  message: string;
+}
+
+export interface ExplanationResponse {
+  run_id: string;
+  decision_id: string;
+  audience: string;
+  /**
+   * ok        the model answered and every check passed
+   * rejected  the model answered and ASSAY discarded the answer
+   * unavailable  no answer was obtained (no credential, or the provider failed)
+   */
+  status: "ok" | "rejected" | "unavailable";
+  explanation: AiExplanationText | null;
+  provider: ExplanationProvider | null;
+  grounding: ExplanationGrounding;
+  failure: ExplanationFailure | null;
+}
+
 // ---------------------------------------------------------------------------
 // Generic fetch helper
 // ---------------------------------------------------------------------------
@@ -319,4 +393,54 @@ export function useDecisionDetail(
   }, [runId, decisionId]);
 
   return state;
+}
+
+/**
+ * POST /api/runs/:id/decisions/:decision_id/explain - ask for an explanation.
+ *
+ * Imperative rather than an effect: §5's interaction is a button, and an
+ * explanation that fetched itself on mount would spend a metered call on every
+ * page view of a certificate nobody asked about.
+ *
+ * A non-2xx response is NOT thrown away. apps/api answers 503 with a full body
+ * naming the reason, and that body is the thing the panel has to render -- an
+ * error path that discarded it would replace a stated reason with a generic
+ * one. Only a genuinely unreadable response becomes an `error`.
+ */
+export function useExplainDecision(): {
+  explain: (runId: string, decisionId: string) => Promise<void>;
+  reset: () => void;
+  state: ApiState<ExplanationResponse>;
+} {
+  const [state, setState] = useState<ApiState<ExplanationResponse>>({
+    data: null, loading: false, error: null,
+  });
+
+  const explain = useCallback(async (runId: string, decisionId: string) => {
+    setState({ data: null, loading: true, error: null });
+    try {
+      const res = await fetch(
+        `/api/runs/${runId}/decisions/${decisionId}/explain`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ audience: "analyst" }),
+        },
+      );
+      const parsed = (await res.json()) as ExplanationResponse | { error?: string; message?: string };
+      if (!("status" in parsed)) {
+        throw new Error(parsed.message ?? `${String(res.status)}`);
+      }
+      setState({ data: parsed, loading: false, error: null });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setState({ data: null, loading: false, error: msg });
+    }
+  }, []);
+
+  const reset = useCallback(() => {
+    setState({ data: null, loading: false, error: null });
+  }, []);
+
+  return { explain, reset, state };
 }

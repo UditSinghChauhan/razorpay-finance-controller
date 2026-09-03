@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { AiExplanation } from "../components/AiExplanation.js";
 import { useRun } from "../context/RunContext.js";
 import {
   useDecisionDetail,
@@ -34,6 +35,14 @@ import { formatPaise } from "../lib/format.js";
  * field here. On the demo certificate that is ₹590.00 against ₹204.13.
  *
  * Visually communicates that abstention is a deliberate safety decision.
+ *
+ * The AI explanation sits BELOW the hypothesis comparison, the shared
+ * constraints, the evidence scores and the probes -- after every piece of
+ * deterministic evidence, not in place of any of it. Nothing it renders is read
+ * from the model: the amounts, the constraints, the gap, epsilon, materiality
+ * and tau above it all come from the certificate, and the state inside the
+ * panel comes from the DecisionEvidence apps/api served. See
+ * components/AiExplanation.tsx.
  */
 
 /** A technical identifier, rendered subordinate to the content it labels. */
@@ -472,6 +481,16 @@ export function AmbiguityCertificate(): React.ReactElement {
             </p>
           </div>
         </div>
+      </section>
+
+      {/* AI explanation — subordinate to every deterministic section above it,
+          and to the ASSAY ABSTAINED verdict in the hero. */}
+      <section style={{ marginBottom: "var(--space-xl)" }}>
+        <AiExplanation
+          decisionId={decision.decision_id}
+          deterministicState={decision.state}
+          certificateUsed={decision.certificate !== null}
+        />
       </section>
 
       {/* Cryptographic attestation */}

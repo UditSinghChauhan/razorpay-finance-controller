@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 
+import type { AnthropicProvider } from "./explain/provider.js";
 import { RunRegistry, type RegistryOptions } from "./registry.js";
+import { explainRoutes } from "./routes/explain.js";
 import { runRoutes } from "./routes/runs.js";
 
 /**
@@ -30,10 +32,28 @@ import { runRoutes } from "./routes/runs.js";
  * one, and a liveness probe answers a question nobody in this architecture is
  * asking: the API binds to loopback and is consumed by one page on the same
  * machine.
+ *
+ * **One route here is not in `§9`'s table, and it is not a reconciliation
+ * route.** `POST /runs/:id/decisions/:decision_id/explain` is the product's
+ * *"Explain with AI"*: it reads the `DecisionEvidence` this process already
+ * sealed, sends it through `ARCHITECTURE.md §6.5`'s `LlmProvider` interface,
+ * and returns prose that passed `§4` boundary 2's three checks. It decides
+ * nothing — `routes/explain.ts` states the guarantee and `explain/service.ts`
+ * implements it — and every other route on this surface answers identically
+ * whether it is configured, unreachable or absent.
  */
 export interface ApiOptions extends RegistryOptions {
   /** Injectable so a test can drive a registry it also inspects. */
   readonly registry?: RunRegistry | undefined;
+  /**
+   * Explanation provider override.
+   *
+   * Absent in production, where `explain/config.ts` reads the environment: the
+   * credential lives in the server process and nowhere else. Present so the
+   * suite can exercise every branch of `§12`'s failure table, and so an
+   * end-to-end check can run without spending a metered call.
+   */
+  readonly explainProvider?: (() => AnthropicProvider) | undefined;
 }
 
 export function createApp(options: ApiOptions = {}): Hono {
@@ -41,6 +61,7 @@ export function createApp(options: ApiOptions = {}): Hono {
   const app = new Hono();
 
   app.route("/", runRoutes(registry));
+  app.route("/", explainRoutes(registry, { provider: options.explainProvider }));
 
   // A JSON 404 rather than Hono's text default: every other answer on this API
   // is JSON, and a client that has to branch on content type to read an error

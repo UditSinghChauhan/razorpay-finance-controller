@@ -153,7 +153,7 @@ export function providerDescriptor(id: LlmProviderId): ProviderDescriptor {
  * in which, per `ARCHITECTURE.md §6`, amounts appear **as opaque references**
  * and never as values.
  */
-export type StructuredRoleInput = R1Input | R2Input | R3Input;
+export type StructuredRoleInput = R1Input | R2Input | R3Input | R4Input;
 
 /** `R1 parse_bank_narration` input (`ARCHITECTURE.md §6`). */
 export interface R1Input {
@@ -300,6 +300,113 @@ export interface R3CertificateSummary {
    * deterministic side; what crosses is a token naming the quantity.
    */
   readonly materiality_ref: string;
+}
+
+/** One member of a candidate allocation, priced, as `R4` receives it. */
+export interface R4MemberAllocation {
+  readonly obs_id: string;
+  /** `C6`'s term, rendered — or a plain statement that this run does not price it. */
+  readonly allocation: string;
+}
+
+/**
+ * One candidate allocation, as `R4` receives it.
+ *
+ * `DATA_MODEL.md §13` names each solution by `candidate_id` and
+ * `member_obs_ids` and prices no member; `member_allocations` is the caller's
+ * **read model** for the same members, already rendered. `R4` differs from
+ * `R2` and `R3` on exactly this point and the difference is `§4`'s, not a
+ * relaxation: those two roles sit **on** the decision path, so an amount
+ * reaching them is an amount the model could echo into a candidate ranking. By
+ * the time `R4` is called the decision is sealed, and `§4` boundary 2 states
+ * its rule as *"every numeral in the prose must appear in the attached evidence
+ * set"* — a rule that presupposes an evidence set with numerals in it.
+ */
+export interface R4CandidateSummary {
+  readonly candidate_id: string;
+  readonly member_obs_ids: readonly string[];
+  /**
+   * Each member's `C6` term, **already rendered by deterministic code**.
+   *
+   * Strings, not numbers, because this envelope IS the *"attached evidence
+   * set"* the grounding rule checks the prose against: a figure the model may
+   * cite has to be present here in the form it may cite it in.
+   *
+   * The id and the amount are separate fields rather than one `"<id>: <amount>"`
+   * line, so that `verify/allowlist.ts` sees an identifier where there is one:
+   * `isEntityIdShaped` tests a string's prefix, and a string that merely
+   * *starts* with an obs id is neither an id nor recognisable as prose.
+   */
+  readonly member_allocations: readonly R4MemberAllocation[];
+  /** The rendered sum of the above, or `null` where a member has no term. */
+  readonly total_allocation: string | null;
+}
+
+/**
+ * `R4 explain_decision` input (`ARCHITECTURE.md §6`).
+ *
+ * **`R4` is declared here and implemented nowhere in this package.** `§H` tier
+ * H2 leaves the role unbuilt, `providers/offline.ts` returns
+ * `ROLE_NOT_IMPLEMENTED` for it, and `tests/discipline.test.ts` fails the build
+ * if a `roles/r4.ts` appears. What this type adds is the **shape of the
+ * envelope**, so that a caller which does implement the role — `apps/api`'s
+ * product explanation surface — reaches a provider through `§6.5`'s one
+ * interface and `§4`'s three checks rather than around them. `§L.4` prohibits
+ * *"adding an LLM call outside roles R1-R4, or outside the `LlmProvider`
+ * interface"*; a declared role with no declared input is an invitation to do
+ * both.
+ *
+ * **Every field is a value the deterministic side already decided.** Nothing
+ * here is computed to be explained: the state, the reason, the two candidates,
+ * the four thresholds and the period status are read off the sealed
+ * `DecisionEvidence` and its `AmbiguityCertificate`. The role's whole contract
+ * is that it receives a decision and returns prose about it.
+ */
+export interface R4Input {
+  readonly role: "R4";
+  readonly decision_id: string;
+  readonly comp_id: string | null;
+  /**
+   * `§L.1` rule 5's terminal state, **as ASSAY decided it**.
+   *
+   * Carried so the model can name the outcome it is explaining, and carried as
+   * an input for the reason it is not an output: the `R4` response schema has
+   * no state field, so nothing the model returns can contradict this.
+   */
+  readonly state: string;
+  /** `DATA_MODEL.md §13`'s certificate reason, or `null` off an abstention. */
+  readonly reason: string | null;
+  readonly subject: {
+    readonly obs_id: string;
+    readonly entity_id: string;
+    readonly kind: string;
+    /** `§14.1`'s `value(observation)`, rendered. */
+    readonly value: string;
+  };
+  readonly candidate_a: R4CandidateSummary | null;
+  readonly candidate_b: R4CandidateSummary | null;
+  /** `C1`-`C8` clauses both solutions satisfy identically. */
+  readonly shared_hard_constraints: readonly string[];
+  /** `§4.2`'s `|score_a − score_b|`, rendered in basis points. */
+  readonly evidence_score_gap: string | null;
+  /** The pre-registered margin in force, rendered in basis points. */
+  readonly epsilon: string | null;
+  /** The materiality between the two solutions, rendered. */
+  readonly materiality: string | null;
+  /** The materiality threshold, rendered. */
+  readonly tau: string | null;
+  /** `§13`: *"what we tried before giving up"*, as ids. */
+  readonly probes_attempted: readonly string[];
+  /** `§20`'s unresolved value for the whole close, rendered. */
+  readonly unresolved_value: string;
+  /** `DATA_MODEL.md §20`'s three outcomes. */
+  readonly period_status: string;
+  /**
+   * Every string above, flattened — `§4` boundary 2's *"attached evidence
+   * set"*, named so that the grounding rule and the prompt cannot disagree
+   * about what was attached.
+   */
+  readonly evidence_set: readonly string[];
 }
 
 /** Why a call did not return a usable value. */
