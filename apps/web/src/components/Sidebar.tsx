@@ -33,6 +33,14 @@ function NavItem({ to, icon, label }: NavItemProps): React.ReactElement {
 /**
  * Sidebar — v2 design (w-72, ASSAY logo + wordmark, border-r-[3px]).
  * Source: Stitch screen a6f740ffe62c4bb090d97bb76233faad (Command Center v2).
+ *
+ * **Every item here reaches a page that does something.** Ledger Explorer and
+ * Settings were removed with their routes — see `App.tsx` for why each was the
+ * wrong promise to make — and Audit Logs, the last entry that was still
+ * awaiting its page, now runs `GET /runs/:id/ledger/verify` against the current
+ * run. Evidence Trail and Ambiguity Certificate are deliberately absent: both
+ * are about ONE decision and are reached by drilling into it, so a nav entry
+ * would open them with nothing selected.
  */
 export function Sidebar(): React.ReactElement {
   return (
@@ -45,15 +53,13 @@ export function Sidebar(): React.ReactElement {
         <p className="sidebar-nav-section-label" style={{ marginBottom: "var(--space-xs)" }}>
           Operations
         </p>
-        <NavItem to="/command-center"      icon="dashboard"            label="Command Center" />
-        <NavItem to="/investigation-queue" icon="search_check"         label="Investigation Queue" />
-        <NavItem to="/ledger-explorer"     icon="account_balance_wallet" label="Ledger Explorer" />
+        <NavItem to="/command-center"      icon="dashboard"    label="Command Center" />
+        <NavItem to="/investigation-queue" icon="search_check" label="Investigation Queue" />
 
         <p className="sidebar-nav-section-label" style={{ marginTop: "var(--space-lg)", marginBottom: "var(--space-xs)" }}>
           Compliance
         </p>
         <NavItem to="/audit-logs" icon="history_edu" label="Audit Logs" />
-        <NavItem to="/settings"   icon="settings"    label="Settings" />
       </nav>
     </aside>
   );
