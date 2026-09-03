@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { AiExplanation } from "../components/AiExplanation.js";
 import { useRun } from "../context/RunContext.js";
 import { useDecisionDetail, type EventActor } from "../hooks/useAssayApi.js";
 import { probeSummary } from "../lib/copy.js";
@@ -15,7 +16,8 @@ import { formatActor, formatPaise, formatTimestamp } from "../lib/format.js";
  * - Journal lines
  * - Ledger event (hash chain)
  * - Constraint satisfaction from certificate (if present)
- * - AI explanation placeholder slot
+ * - The grounded AI explanation (components/AiExplanation.tsx), over the same
+ *   DecisionEvidence this page renders
  *
  * Data from GET /runs/:id/decisions/:decision_id + GET /runs/:id/close.
  */
@@ -352,32 +354,13 @@ export function EvidenceTrail(): React.ReactElement {
             </section>
           )}
 
-          {/* AI Explanation Slot */}
-          <section>
-            <h2 className="font-headline-sm" style={{ marginBottom: "var(--space-md)" }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: "middle", marginRight: "var(--space-sm)" }}>smart_toy</span>
-              AI Explanation
-            </h2>
-            <div style={{
-              border: "1px dashed var(--color-outline-variant)",
-              borderRadius: "var(--radius-lg)",
-              padding: "var(--space-lg)",
-              background: "var(--color-surface-container-lowest)",
-              textAlign: "center",
-            }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 36, color: "var(--color-secondary)", marginBottom: "var(--space-sm)", display: "block" }}>auto_awesome</span>
-              <p className="font-body-md" style={{ fontWeight: 500, marginBottom: "var(--space-sm)" }}>Explain with AI</p>
-              <p className="font-body-sm text-muted" style={{ marginBottom: "var(--space-md)", maxWidth: 260, margin: "0 auto var(--space-md)" }}>
-                AI explanation will be grounded in the verified ASSAY evidence shown on this page.
-                The AI reads the evidence; it does not make decisions.
-              </p>
-              <button className="btn btn-secondary" style={{ margin: "0 auto" }} onClick={() => { /* placeholder */ }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>auto_awesome</span>
-                Explain This Decision
-              </button>
-              <p className="font-body-sm text-muted" style={{ marginTop: "var(--space-sm)", fontSize: 11, fontStyle: "italic" }}>Coming soon</p>
-            </div>
-          </section>
+          {/* AI explanation — the real interaction, over the same verified
+              DecisionEvidence this page is already rendering. */}
+          <AiExplanation
+            decisionId={decision.decision_id}
+            deterministicState={decision.state}
+            certificateUsed={decision.certificate !== null}
+          />
 
           {/* Certificate link */}
           {cert && (

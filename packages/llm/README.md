@@ -44,11 +44,11 @@ providers; roles R1, R2; schema/allowlist/grounding verification"*.
 | `LlmProvider` interface | built | `§6.5`, transcribed |
 | `offline` provider | built | `§C` T0-7; the demo guarantee and `A3-NOLLM` |
 | `replay` provider | built | `§C` T0-7; `§L.1` rule 11 |
-| `anthropic`, `openai-compatible` | **declared, not built** | `§H` tier H2, blocked on `§F` **F2** — no metered credential. Declared as data in `PROVIDER_DESCRIPTORS` so the four-provider architecture stays checkable while two are unimplemented. |
+| `anthropic`, `openai-compatible` | **declared, not built here** | `§H` tier H2, blocked on `§F` **F2** — no metered credential. Declared as data in `PROVIDER_DESCRIPTORS` so the four-provider architecture stays checkable while two are unimplemented **in this package**. `anthropic` is now built in `apps/api` — see below. |
 | `R1 parse_bank_narration` | built | `§C` T0-7 |
 | `R2 classify_exception` | built | `§C` T0-7 |
 | `R3 propose_probe` | built | `§H` tier **H1**, spec 1.4.25 — `roles/r3.ts` |
-| `R4 explain_decision` | **declared, not built** | `§H` tier H2 |
+| `R4 explain_decision` | **declared, not built here** | `§H` tier H2. Input type `R4Input` declared in `provider.ts`; the role is implemented in `apps/api` — see below. |
 | schema / allowlist / grounding | built | `§4` boundary 2, all three |
 
 **`R3`'s offline half is a pre-registered parameter, not a list written here.**
@@ -75,8 +75,44 @@ executor's enum stays closed at **five**; only what this proposer may name is
 four. A discipline test fails the build if any code in this package names that
 probe, or a `days` field.
 
-**`R4` is still declared and not built** (`§H` tier H2), and `offlineProvider()`
-returns `ROLE_NOT_IMPLEMENTED` for it rather than a plausible default.
+**`R4` is still declared and not built _here_** (`§H` tier H2), and
+`offlineProvider()` returns `ROLE_NOT_IMPLEMENTED` for it rather than a
+plausible default.
+
+## Where `R4` and the `anthropic` provider actually live
+
+Both are built, and **neither may be built in this package**. Every guarantee at
+the top of this file is asserted by reading this package's own source as text:
+no transport import, no `process.env`, no `providers/anthropic.ts`, no
+`roles/r4.ts`. Those assertions are unchanged and still pass, and they are what
+makes `§C` T0-11's *"clean checkout with **no API key**"* a property rather than
+a promise. A metered provider written here would end that in one commit.
+
+So the product's *"Explain with AI"* lives in **`apps/api/src/explain/`**, which
+is already `ARCHITECTURE.md §3`'s one socket in the workspace — *"`apps/cli` is
+the filesystem door and reaches no network; `apps/api` binds a port and reaches
+no file"*. The credential belongs with the socket.
+
+```
+  packages/llm         provider.ts    R4Input, R4CandidateSummary   DECLARED
+                       verify/*       schema, allowlist, grounding  APPLIED
+                       adjudicator    the one choke point           APPLIED
+  apps/api/src/explain provider.ts    the `anthropic` LlmProvider   BUILT
+                       r4.ts          R4's schema, prompt, rule     BUILT
+                       evidence.ts    the envelope, from the run    BUILT
+```
+
+What this package still owns is everything that makes the answer checkable.
+`apps/api` implements `§6.5`'s interface rather than a second one, and calls
+`adjudicate()` rather than re-spelling `§4`'s three checks — so `§L.4`'s
+*"adding an LLM call outside roles R1-R4, or outside the `LlmProvider`
+interface"* stays satisfied by construction. `groundNumerals`, written at Phase 8
+against `§4`'s `R4` rule and left *"without a caller"*, now has one.
+
+`§L.1` rule 2 is unweakened: `R4OutputSchema` is four string-typed fields, and
+`checkSchema`'s zod walk enforces the rule on every call regardless of where the
+schema was written — which is exactly the case `verify/schema.ts` exists for,
+since *"a lint over this package alone could never see a caller's schema"*.
 
 **No probe execution and no probe loop live here.**
 `RECONCILIATION_SPEC.md §6.2` has `R3` propose a probe and *"deterministic code

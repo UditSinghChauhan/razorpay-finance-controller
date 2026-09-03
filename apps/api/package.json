@@ -18,10 +18,13 @@
     "dev": "node --experimental-transform-types --disable-warning=ExperimentalWarning bin/assay-api.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "0.123.0",
     "@assay/cli": "workspace:*",
     "@assay/domain": "workspace:*",
     "@assay/ledger": "workspace:*",
+    "@assay/llm": "workspace:*",
     "@hono/node-server": "2.1.1",
-    "hono": "4.10.7"
+    "hono": "4.10.7",
+    "zod": "4.4.3"
   }
 }
