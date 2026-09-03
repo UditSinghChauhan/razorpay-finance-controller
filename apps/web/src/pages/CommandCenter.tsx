@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { AuthorityLegend } from "../components/AuthorityLegend.js";
 import { ControllerPanel } from "../components/ControllerPanel.js";
 import { useRun } from "../context/RunContext.js";
 import {
@@ -342,6 +343,11 @@ export function CommandCenter(): React.ReactElement {
           </div>
         </div>
       )}
+
+      {/* Who decides what — read before the controller panel below, because
+          the panel is the one place on this page where three different kinds
+          of authority sit next to each other. Displays no figure. */}
+      {run && <AuthorityLegend />}
 
       {/* Close controller — packages/controller's trace over this sealed run.
           A second strip beneath the reconciliation pipeline above: the engine

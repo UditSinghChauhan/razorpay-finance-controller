@@ -1,4 +1,9 @@
-import { runController, type ControllerTrace } from "@assay/controller";
+import {
+  DEFAULT_STEP_BUDGET,
+  evaluateController,
+  runController,
+  type ControllerTrace,
+} from "@assay/controller";
 import { Hono, type Context } from "hono";
 
 import { controllerToolsFor } from "../controller/runtime.js";
@@ -39,10 +44,23 @@ function notFound(id: string): { error: string; message: string; run_id: string 
 
 /**
  * The body every branch answers with — the trace, plus the two facts a reader
- * should not have to compute from it: whether anything was written, and
- * whether a person is now waiting on this batch.
+ * should not have to compute from it, plus the telemetry derived from it.
+ *
+ * **`telemetry` is additive and derived, never authoritative.**
+ * `evaluateController` is a pure function of the trace above it: a client that
+ * distrusts these figures can recompute every one of them from `steps`,
+ * `escalations` and `plan` in the same response and must get the same answer.
+ * It is served here rather than computed in the browser only so `apps/web`
+ * need not take a dependency on `@assay/controller`; it adds no fact the trace
+ * did not already carry, and it is labelled `EXPLORATORY` at its own root
+ * (`DECISION_BRIEF.md §L.4`).
+ *
+ * `stepBudget` is passed in rather than defaulted here. It is the ONE bound
+ * the trace was actually produced under, and {@link controllerRoutes} hands
+ * the identical value to `runController`; see that function on why the two
+ * must not be allowed to default independently.
  */
-function traceBody(trace: ControllerTrace): unknown {
+function traceBody(trace: ControllerTrace, stepBudget: number): unknown {
   return {
     ...trace,
     // Restated at the top level, so a client reading the response does not
@@ -50,19 +68,52 @@ function traceBody(trace: ControllerTrace): unknown {
     // to notice that both are always zero in this phase.
     financial_write_performed: trace.writes_attempted > 0 || trace.writes_applied > 0,
     awaiting_human_review: trace.escalations.length > 0,
+    telemetry: evaluateController(trace, stepBudget),
   };
 }
 
-export function controllerRoutes(registry: RunRegistry): Hono {
+export interface ControllerRouteOptions {
+  /**
+   * The step bound every request on these routes is driven under.
+   *
+   * Optional, and absent in production: `app.ts` mounts these routes with no
+   * options, so the value stays `DEFAULT_STEP_BUDGET` exactly as before. It
+   * exists so the bound can be driven to a non-default value in a test, which
+   * is the only way the single-source-of-truth below can be proved rather than
+   * asserted.
+   */
+  readonly stepBudget?: number | undefined;
+}
+
+/**
+ * Mount the two controller routes.
+ *
+ * **The step budget is resolved once, here, and the same value reaches both
+ * `runController` and `evaluateController`.** Both of those parameters default
+ * to `DEFAULT_STEP_BUDGET` independently, and the trace does not carry the
+ * bound it ran under — so a call site that passed a budget to the machine and
+ * let the telemetry default would report `step_budget` as 64 beside a run that
+ * actually stopped at, say, 3. That is not a wrong pixel: `budget_not_exhausted`
+ * is a policy-compliance check, and a stale bound next to it turns the
+ * telemetry's own guarantee — *every figure here is recomputable from the
+ * trace* — into something a reader cannot in fact recompute. Binding the value
+ * to one `const` makes the two calls unable to disagree.
+ */
+export function controllerRoutes(registry: RunRegistry, options: ControllerRouteOptions = {}): Hono {
   const app = new Hono();
+  const stepBudget = options.stepBudget ?? DEFAULT_STEP_BUDGET;
 
   const handler = async (c: Context): Promise<Response> => {
     const id = c.req.param("id") ?? "";
     const stored = registry.get(id);
     if (stored === undefined) return c.json(notFound(id), 404);
 
-    const trace = await runController({ runId: stored.run_id, tools: controllerToolsFor(stored) });
-    return c.json(traceBody(trace));
+    const trace = await runController({
+      runId: stored.run_id,
+      tools: controllerToolsFor(stored),
+      budget: stepBudget,
+    });
+    return c.json(traceBody(trace, stepBudget));
   };
 
   app.post("/runs/:id/controller/start", handler);

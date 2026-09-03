@@ -68,6 +68,43 @@ const ESCALATED_TRACE: ControllerTrace = {
   writes_applied: 0,
   financial_write_performed: false,
   awaiting_human_review: true,
+  // The shape apps/api derives via evaluateController. Abbreviated to the
+  // rows these tests assert on; packages/controller/tests/telemetry.test.ts
+  // covers the full 17 against the real captured run.
+  telemetry: {
+    scope: "EXPLORATORY",
+    trace_id: "a83f9b288bfd2dc2f90f9ba3063d3484517e08b55bee44e0a5b7ee33c2d22257",
+    run_id: "run_fixture",
+    terminal: "COMPLETE",
+    stop_reason: "ESCALATED",
+    halt_reason: null,
+    checks: [
+      { id: "terminal_reached", group: "terminal", passed: true, detail: "the loop ended in COMPLETE" },
+      { id: "transitions_declared", group: "policy", passed: true, detail: "all 10 transitions appear in the declared table" },
+      { id: "no_writes_attempted", group: "containment", passed: true, detail: "writes_attempted = 0" },
+      { id: "no_model_call", group: "containment", passed: true, detail: "the controller consulted no model; its policy is deterministic code" },
+      { id: "trace_id_recomputes", group: "grounding", passed: true, detail: "trace_id recomputes from (run_id, steps) — the run is reproducible by construction" },
+      { id: "escalations_inspected", group: "grounding", passed: true, detail: "all 1 escalation(s) trace to a decision_evidence call whose recomputed input hash matches" },
+      { id: "escalations_eligible", group: "escalation", passed: true, detail: "every escalated item opens a Suspense item, so clearing it could move the residual" },
+    ],
+    checks_passed: 7,
+    checks_total: 7,
+    all_passed: true,
+    counters: {
+      steps: 10,
+      step_budget: 64,
+      tool_calls: 4,
+      tool_calls_by_name: { close_report: 1, exception_queue: 1, decision_evidence: 1, ledger_verify: 1 },
+      writes_attempted: 0,
+      writes_applied: 0,
+      caused_events: 0,
+      model_calls: 0,
+      escalations: 1,
+      plan_size: 1,
+      eligible_items: 1,
+      ineligible_items: 25,
+    },
+  },
 };
 
 const HALT_TRACE: ControllerTrace = {
@@ -305,5 +342,273 @@ describe("the fix introduces no hardcoded demo figure or identifier", () => {
     expect(html).toContain(">Closed<");
     expect(html).toContain(">CLOSED<");
     expect(html).not.toContain(">Escalated<");
+  });
+});
+
+/**
+ * A run that stopped at triage: the tool the loop needed next refused, so
+ * `PLAN`, `ACT`, `ESCALATE` and `AWAIT_HUMAN` were never entered.
+ *
+ * Built by truncating the escalated trace's own steps rather than by inventing
+ * a new one, so the only difference between it and the run above is how far the
+ * loop got — which is exactly what the narrative is supposed to make visible.
+ */
+const STOPPED_AT_TRIAGE: ControllerTrace = {
+  ...ESCALATED_TRACE,
+  terminal: "HALT",
+  stop_reason: null,
+  halt_reason: "TOOL_REFUSED",
+  steps: ESCALATED_TRACE.steps.slice(0, 5),
+  escalations: [],
+  plan: null,
+  awaiting_human_review: false,
+  telemetry: {
+    ...ESCALATED_TRACE.telemetry,
+    terminal: "HALT",
+    stop_reason: null,
+    halt_reason: "TOOL_REFUSED",
+    counters: {
+      ...ESCALATED_TRACE.telemetry.counters,
+      steps: 5,
+      tool_calls: 2,
+      tool_calls_by_name: { close_report: 1, exception_queue: 1, decision_evidence: 0, ledger_verify: 0 },
+      escalations: 0,
+      plan_size: 0,
+      eligible_items: 0,
+      ineligible_items: 0,
+    },
+  },
+};
+
+/**
+ * The reviewer-facing reading of the trace: observed → triaged → planned →
+ * inspected → escalated → human review, in that order and in words.
+ *
+ * Each assertion pins the sentence to the structured field it is derived from,
+ * so a detail line that stopped tracking the trace would fail here rather than
+ * quietly render a plausible story. The label separator (`" — "`) is part of
+ * the asserted string because the label and its dash are one text node — the
+ * narrative deliberately emits no bare `>Escalated<` that the terminal-node
+ * assertions above would collide with.
+ */
+describe("the run narrative — the six stages, in words", () => {
+  const html = renderToStaticMarkup(
+    <ControllerTraceView trace={ESCALATED_TRACE} onReviewClick={() => undefined} />,
+  );
+
+  it("names all six stages, in the order the loop ran them", () => {
+    const labels = [
+      "Observed the close gate — ",
+      "Triaged the queue — ",
+      "Planned the closing set — ",
+      "Inspected the evidence — ",
+      "Escalated what it may not decide — ",
+      "Handed to human review — ",
+    ];
+    const positions = labels.map((l) => html.indexOf(l));
+    for (const [i, p] of positions.entries()) expect(p, labels[i]).toBeGreaterThan(-1);
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+    expect(html).toContain("What this run did");
+  });
+
+  it("reads the observed stage off residual_trajectory, not off a summary string", () => {
+    expect(html).toContain(
+      "the close gate reports the period OPEN on ₹1,00,000 unresolved against a close threshold of ₹6,747.19.",
+    );
+  });
+
+  it("reads the triaged stage off the telemetry counters", () => {
+    expect(html).toContain("1 item(s) whose clearing could move the residual");
+    expect(html).toContain("25 open with no Suspense item");
+  });
+
+  it("reads the planned stage off plan.ids and plan.covers_residual", () => {
+    expect(html).toContain("a closing set of 1 was chosen");
+    expect(html).toContain("clearing it would bring the residual under the close threshold.");
+  });
+
+  it("reads the inspected stage off the decision_evidence call count", () => {
+    expect(html).toContain("1 decision(s) were read in full");
+  });
+
+  it("says why the escalated item reached a person rather than being decided", () => {
+    expect(html).toContain("1 item(s) were routed to a person");
+    expect(html).toContain("the controller has no authority to choose between the allocations");
+  });
+
+  it("keeps the no-financial-write boundary on the handoff stage itself", () => {
+    expect(html).toContain("No financial write is available in this phase");
+    expect(html).toContain("terminal state is a human, not a posting");
+  });
+});
+
+describe("the narrative shows how far a stopped run actually got", () => {
+  const html = renderToStaticMarkup(
+    <ControllerTraceView trace={STOPPED_AT_TRIAGE} onReviewClick={() => undefined} />,
+  );
+
+  it("marks the stages the loop never entered rather than hiding them", () => {
+    // All six stages are still listed — a reviewer must see what did not
+    // happen, not infer it from an absence.
+    expect(html).toContain("Observed the close gate — ");
+    expect(html).toContain("Planned the closing set — ");
+    expect(html).toContain("Handed to human review — ");
+    expect(html).toContain("radio_button_unchecked");
+  });
+
+  it("says no plan was formed and no evidence was opened", () => {
+    expect(html).toContain("no plan was formed.");
+    expect(html).toContain("no decision");
+    expect(html).toContain("evidence was opened.");
+  });
+
+  it("does not report a zero triage split the run never actually computed", () => {
+    // The queue WAS read (one exception_queue call) but PLAN never ran, so the
+    // eligible/ineligible counters are legitimately zero. Rendering them as
+    // "0 item(s) whose clearing could move the residual" would state a finding
+    // this run never made.
+    expect(html).toContain("the exception queue was read, but the loop stopped before the plan");
+    expect(html).not.toContain("0 item(s) whose clearing could move the residual");
+  });
+
+  it("still states the write boundary on the path where nothing was handed over", () => {
+    expect(html).toContain("no handoff was made");
+    expect(html).toContain("this phase performs no financial write on any path");
+  });
+
+  it("does not claim an escalation the trace does not carry", () => {
+    expect(html).not.toContain("1 item(s) were routed to a person");
+    expect(html).toContain("nothing was escalated.");
+  });
+});
+
+/**
+ * The runtime telemetry block.
+ *
+ * What is asserted is that the panel renders the checks the API derived —
+ * grouped, labelled `EXPLORATORY`, and with the failing ones visibly failing.
+ * The figures themselves are `@assay/controller`'s;
+ * `packages/controller/tests/telemetry.test.ts` proves them against the real
+ * captured `demo-500` evidence, and nothing is recomputed here.
+ */
+describe("the telemetry block — runtime checks, on screen", () => {
+  const html = renderToStaticMarkup(
+    <ControllerTraceView trace={ESCALATED_TRACE} onReviewClick={() => undefined} />,
+  );
+
+  it("labels the block EXPLORATORY, as §L.4 requires of any metric outside §8", () => {
+    expect(html).toContain("Runtime checks");
+    expect(html).toContain("EXPLORATORY");
+  });
+
+  it("reports the passed/total tally the API computed", () => {
+    expect(html).toContain("7 / 7 passed");
+  });
+
+  it("groups the checks under the five questions they answer", () => {
+    expect(html).toContain("Terminal correctness");
+    expect(html).toContain("Policy compliance");
+    expect(html).toContain("Containment");
+    expect(html).toContain("Evidence grounding");
+    expect(html).toContain("Escalation correctness");
+  });
+
+  it("shows each check by id with the detail that makes it recomputable", () => {
+    expect(html).toContain("no_writes_attempted");
+    expect(html).toContain("writes_attempted = 0");
+    expect(html).toContain("trace_id_recomputes");
+    expect(html).toContain("escalations_inspected");
+  });
+
+  it("shows the counters a reviewer needs, including the four write-boundary zeroes", () => {
+    for (const label of [
+      "writes attempted", "writes applied", "ledger events caused", "model calls",
+      "escalations", "tool calls", "steps",
+    ]) {
+      expect(html, label).toContain(label);
+    }
+    expect(html).toContain("10 / 64 budget");
+  });
+
+  it("names the read tools the run actually called", () => {
+    expect(html).toContain("close_report");
+    expect(html).toContain("exception_queue");
+    expect(html).toContain("decision_evidence");
+    expect(html).toContain("ledger_verify");
+  });
+
+  it("renders a failed check as failed, with the API's own explanation", () => {
+    const failing: ControllerTrace = {
+      ...ESCALATED_TRACE,
+      telemetry: {
+        ...ESCALATED_TRACE.telemetry,
+        checks: ESCALATED_TRACE.telemetry.checks.map((c) =>
+          c.id === "no_writes_attempted"
+            ? { ...c, passed: false, detail: "writes_attempted = 3" }
+            : c,
+        ),
+        checks_passed: 6,
+        all_passed: false,
+      },
+    };
+    const failedHtml = renderToStaticMarkup(
+      <ControllerTraceView trace={failing} onReviewClick={() => undefined} />,
+    );
+    expect(failedHtml).toContain("6 / 7 passed");
+    expect(failedHtml).toContain("writes_attempted = 3");
+    // The failure icon, which the all-passing render does not produce.
+    expect(failedHtml).toContain("cancel");
+    expect(html).not.toContain("cancel");
+  });
+});
+
+/**
+ * The escalation card's plain-language chain.
+ *
+ * A reviewer should not need to know what `AMBIGUOUS_CERTIFICATE` means, nor
+ * hold ε and τ in their head, to follow why one item reached a person. Every
+ * quantity in the sentence is the certificate's own, formatted.
+ */
+describe("the escalation explains itself in words, from its own fields", () => {
+  const html = renderToStaticMarkup(
+    <ControllerTraceView trace={ESCALATED_TRACE} onReviewClick={() => undefined} />,
+  );
+
+  it("says what ASSAY decided and why the evidence did not separate the candidates", () => {
+    expect(html).toContain("ASSAY abstained (EVIDENCE_TIE)");
+    expect(html).toContain("two allocations satisfy every hard constraint");
+    expect(html).toContain("they differ by 0 bps, inside the ε tolerance of 1500 bps");
+  });
+
+  it("places the amount at stake against the materiality floor, both from the record", () => {
+    expect(html).toContain("the amount at stake (₹590)");
+    expect(html).toContain("above the materiality floor τ of ₹204.13");
+  });
+
+  it("reports the probe attempts rather than implying a search happened", () => {
+    expect(html).toContain("no admissible probe could break the tie");
+  });
+
+  it("ends on the authority boundary — the controller may not choose", () => {
+    expect(html).toContain("The controller may not choose between them, so it escalated.");
+  });
+
+  it("uses the other wording when there is no certificate to abstain on", () => {
+    const noWarrant: ControllerTrace = {
+      ...ESCALATED_TRACE,
+      escalations: [
+        {
+          ...ESCALATED_TRACE.escalations[0]!,
+          reason: "NO_DETERMINISTIC_WARRANT",
+          certificate_reason: null,
+        },
+      ],
+    };
+    const other = renderToStaticMarkup(
+      <ControllerTraceView trace={noWarrant} onReviewClick={() => undefined} />,
+    );
+    expect(other).toContain("no deterministic rule can clear it");
+    expect(other).toContain("the correct posting is the thing that is not known");
+    expect(other).not.toContain("ASSAY abstained (EVIDENCE_TIE)");
   });
 });

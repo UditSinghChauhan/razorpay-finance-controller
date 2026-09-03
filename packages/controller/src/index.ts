@@ -106,3 +106,14 @@ export {
   runController,
   type RunControllerOptions,
 } from "./machine.js";
+
+export {
+  TELEMETRY_CHECK_IDS,
+  TELEMETRY_GROUPS,
+  evaluateController,
+  type ControllerTelemetry,
+  type TelemetryCheck,
+  type TelemetryCheckId,
+  type TelemetryCounters,
+  type TelemetryGroup,
+} from "./telemetry.js";
