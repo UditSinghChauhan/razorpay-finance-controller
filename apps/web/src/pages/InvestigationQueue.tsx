@@ -1,0 +1,348 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useRun } from "../context/RunContext.js";
+import { abstentionGranularityNote, affectedObservationsLabel } from "../lib/copy.js";
+import { formatPaise, formatCount } from "../lib/format.js";
+import type { ExceptionItem } from "../hooks/useAssayApi.js";
+
+/**
+ * Investigation Queue - ASSAY Reconciliation Intelligence.
+ *
+ * Visual source of truth: Stitch screen 4a8912729c14499da36b4110e88de1e2
+ * Design system v2: Indigo secondary, display-metric, w-72 nav.
+ *
+ * Dense exception queue with filter chips, status badges, and
+ * investigation panel. Data from GET /runs/:id/exceptions.
+ *
+ * This queue is OBSERVATION-level, and the labelling says so. One abstention
+ * decision can put several rows here: DATA_MODEL.md §17.1.1 keys the posting to
+ * the component's target, while every member of that component still reaches an
+ * ABSTAINED terminal state and still carries real money, so §9's rupee-ranked
+ * queue must show each one. The rows are therefore the consequences of the
+ * Command Center's decision count, not a second, larger count of abstentions.
+ * Neither number is adjusted here and the rows are never collapsed.
+ */
+
+type StatusFilter = "all" | "ABSTAINED" | "EXCEPTION";
+
+function StatusBadge({ state }: { state: string }): React.ReactElement {
+  const color = state === "ABSTAINED" ? "var(--color-abstained)" :
+                state === "EXCEPTION" ? "var(--color-exception)" :
+                state === "RECONCILED" ? "var(--color-reconciled)" :
+                "var(--color-outline)";
+  const bg = state === "ABSTAINED" ? "var(--color-abstained-bg)" :
+             state === "EXCEPTION" ? "var(--color-exception-bg)" :
+             state === "RECONCILED" ? "var(--color-reconciled-bg)" :
+             "var(--color-surface-container)";
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 4,
+      padding: "2px 8px", borderRadius: 3, fontSize: 11,
+      fontWeight: 600, letterSpacing: "0.05em",
+      color, background: bg,
+    }}>
+      <span style={{ width: 6, height: 6, borderRadius: "50%", background: color }} />
+      {state}
+    </span>
+  );
+}
+
+function InvestigationPanel({
+  item, onClose,
+}: {
+  item: ExceptionItem; onClose: () => void;
+}): React.ReactElement {
+  const navigate = useNavigate();
+  const { selectDecision } = useRun();
+
+  const goEvidence = (): void => {
+    selectDecision(item.decision_id);
+    void navigate("/evidence-trail");
+  };
+  const goCert = (): void => {
+    selectDecision(item.decision_id);
+    void navigate("/ambiguity-certificate");
+  };
+
+  return (
+    <aside
+      style={{
+        position: "fixed", top: "var(--topbar-height)", right: 0, bottom: 0,
+        width: 400, background: "var(--color-surface-container-lowest)",
+        borderLeft: "1px solid var(--color-outline-variant)",
+        boxShadow: "-4px 0 24px rgba(0,0,0,0.06)",
+        zIndex: 30, display: "flex", flexDirection: "column", overflow: "hidden",
+      }}
+    >
+      {/* Panel header */}
+      <div style={{ padding: "var(--space-md) var(--space-lg)", borderBottom: "1px solid var(--color-outline-variant)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span className="font-label-caps text-muted">Investigation Detail</span>
+        <button className="btn-ghost" onClick={onClose} aria-label="Close panel" style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
+        </button>
+      </div>
+
+      <div style={{ flex: 1, overflowY: "auto", padding: "var(--space-lg)" }}>
+        {/* Entity info */}
+        <div style={{ marginBottom: "var(--space-lg)" }}>
+          <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Entity ID</p>
+          <p className="cell-id" style={{ fontSize: 13 }}>{item.entity_id}</p>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-md)", marginBottom: "var(--space-lg)" }}>
+          <div>
+            <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>State</p>
+            <StatusBadge state={item.state} />
+          </div>
+          <div>
+            <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Value</p>
+            <p className="font-numeric-mono" style={{ fontWeight: 600 }}>{formatPaise(item.value_paise)}</p>
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-md)", marginBottom: "var(--space-lg)" }}>
+          <div>
+            <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Kind</p>
+            <p className="font-body-sm">{item.kind}</p>
+          </div>
+          <div>
+            <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Exception Class</p>
+            <p className="font-body-sm">{item.exception_class ?? "--"}</p>
+          </div>
+        </div>
+
+        {item.suspense_key && (
+          <div style={{ marginBottom: "var(--space-lg)" }}>
+            <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Suspense Key</p>
+            <p className="cell-id" style={{ fontSize: 12 }}>{item.suspense_key}</p>
+          </div>
+        )}
+
+        {item.has_certificate && (
+          <div style={{
+            background: "var(--color-abstained-bg)",
+            border: "1px solid var(--color-abstained)",
+            borderRadius: "var(--radius-md)",
+            padding: "var(--space-md)",
+            marginBottom: "var(--space-lg)",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", marginBottom: "var(--space-sm)" }}>
+              <span className="material-symbols-outlined" style={{ color: "var(--color-abstained)", fontSize: 18 }}>workspace_premium</span>
+              <span className="font-label-caps" style={{ color: "var(--color-abstained)" }}>Ambiguity Certificate Issued</span>
+            </div>
+            <p className="font-body-sm text-muted">
+              Multiple hypotheses satisfy all hard constraints.
+              ASSAY abstained as a safety decision.
+            </p>
+          </div>
+        )}
+
+        {/* Decision ID */}
+        <div style={{ marginBottom: "var(--space-lg)" }}>
+          <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Decision ID</p>
+          <p className="cell-id" style={{ fontSize: 11, wordBreak: "break-all" }}>{item.decision_id}</p>
+        </div>
+
+        {/* Event ID */}
+        <div style={{ marginBottom: "var(--space-lg)" }}>
+          <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Event ID</p>
+          <p className="cell-id" style={{ fontSize: 11, wordBreak: "break-all" }}>{item.evt_id}</p>
+        </div>
+      </div>
+
+      {/* Panel actions */}
+      <div style={{ padding: "var(--space-lg)", borderTop: "1px solid var(--color-outline-variant)", display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
+        <button className="btn btn-primary" style={{ width: "100%", justifyContent: "center" }} onClick={goEvidence}>
+          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>receipt_long</span>
+          Investigate
+        </button>
+        {item.has_certificate && (
+          <button className="btn btn-secondary" style={{ width: "100%", justifyContent: "center" }} onClick={goCert}>
+            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>workspace_premium</span>
+            View Certificate
+          </button>
+        )}
+      </div>
+    </aside>
+  );
+}
+
+export function InvestigationQueue(): React.ReactElement {
+  const navigate = useNavigate();
+  const { run, exceptions, loading, error, selectDecision, startDemo } = useRun();
+  const [filter, setFilter] = useState<StatusFilter>("all");
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+
+  const items = exceptions?.items ?? [];
+  const filtered = filter === "all" ? items : items.filter(i => i.state === filter);
+  const selected = selectedIdx !== null ? filtered[selectedIdx] ?? null : null;
+
+  // No run yet
+  if (!run && !loading) {
+    return (
+      <div style={{ padding: "var(--space-xl)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "60vh", gap: "var(--space-lg)" }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 48, color: "var(--color-outline)" }}>search_check</span>
+        <h1 className="page-title">Investigation Queue</h1>
+        <p className="page-subtitle">Run the demo first to populate the exception queue.</p>
+        <button className="btn btn-primary" onClick={() => void startDemo()}>Run Demo</button>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div style={{ padding: "var(--space-xl)", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
+        <div className="loading-spinner" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: "var(--space-xl)", textAlign: "center" }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 48, color: "var(--color-exception)" }}>error</span>
+        <p className="font-body-md text-error" style={{ marginTop: "var(--space-md)" }}>{error}</p>
+      </div>
+    );
+  }
+
+  // Row counts — observations, not decisions.
+  const absCount = items.filter(i => i.state === "ABSTAINED").length;
+  const excCount = items.filter(i => i.state === "EXCEPTION").length;
+  // The decision count is the Command Center's, read from the same POST /runs
+  // summary rather than re-derived, so the two pages cannot disagree.
+  const abstentionDecisions = run?.summary.abstentions ?? 0;
+
+  return (
+    <div style={{ padding: "var(--space-lg)" }}>
+      {/* Header */}
+      <div className="page-header" style={{ padding: 0, marginBottom: "var(--space-lg)" }}>
+        <div>
+          <h1 className="page-title">Investigation Queue</h1>
+          <p className="page-subtitle">
+            Affected observations from exceptions and abstentions, ranked by rupee value
+          </p>
+        </div>
+      </div>
+
+      {/* Granularity note: why six rows is not six abstentions. */}
+      {absCount > 0 && (
+        <div
+          className="card"
+          style={{
+            padding: "var(--space-md)",
+            marginBottom: "var(--space-md)",
+            borderLeft: "3px solid var(--color-abstained)",
+            display: "flex", gap: "var(--space-sm)", alignItems: "flex-start",
+          }}
+        >
+          <span className="material-symbols-outlined" style={{ color: "var(--color-abstained)", fontSize: 18, marginTop: 1, flexShrink: 0 }}>info</span>
+          <p className="font-body-sm">{abstentionGranularityNote(abstentionDecisions, absCount)}</p>
+        </div>
+      )}
+
+      {/* Summary cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "var(--space-md)", marginBottom: "var(--space-lg)" }}>
+        <div className="card" style={{ padding: "var(--space-md)" }}>
+          <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Queued Observations</p>
+          <p className="font-display-metric">{formatCount(exceptions?.total ?? 0)}</p>
+          <p className="font-body-sm text-muted" style={{ fontSize: 11, marginTop: 2 }}>
+            {affectedObservationsLabel(absCount)} abstained &middot; {formatCount(excCount)} exception rows
+          </p>
+        </div>
+        <div className="card" style={{ padding: "var(--space-md)", borderLeft: "3px solid var(--color-abstained)" }}>
+          <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Value Abstained</p>
+          <p className="font-numeric-mono" style={{ fontSize: 18, fontWeight: 600, color: "var(--color-abstained)" }}>{formatPaise(exceptions?.value_abstained_paise ?? 0)}</p>
+        </div>
+        <div className="card" style={{ padding: "var(--space-md)", borderLeft: "3px solid var(--color-exception)" }}>
+          <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Value Exceptions</p>
+          <p className="font-numeric-mono" style={{ fontSize: 18, fontWeight: 600, color: "var(--color-exception)" }}>{formatPaise(exceptions?.value_exceptions_paise ?? 0)}</p>
+        </div>
+      </div>
+
+      {/* Filter chips */}
+      <div style={{ display: "flex", gap: "var(--space-sm)", marginBottom: "var(--space-md)" }}>
+        {(["all", "ABSTAINED", "EXCEPTION"] as StatusFilter[]).map(f => (
+          <button
+            key={f}
+            className={`btn ${filter === f ? "btn-primary" : "btn-secondary"}`}
+            style={{ padding: "var(--space-xs) var(--space-md)", fontSize: 12 }}
+            onClick={() => { setFilter(f); setSelectedIdx(null); }}
+          >
+            {f === "all" ? `All observations (${String(items.length)})` :
+             f === "ABSTAINED" ? `Abstained observations (${String(absCount)})` :
+             `Exception observations (${String(excCount)})`}
+          </button>
+        ))}
+      </div>
+
+      {/* Data table */}
+      <div className="card" style={{ padding: 0 }}>
+        <table className="data-table">
+          <caption
+            className="font-body-sm text-muted"
+            style={{ captionSide: "top", textAlign: "left", padding: "var(--space-sm) var(--space-md)" }}
+          >
+            One row per affected observation. An abstained component contributes its target and
+            each of its members, so several rows can belong to a single abstention decision.
+          </caption>
+          <thead>
+            <tr>
+              <th>Entity ID</th>
+              <th>State</th>
+              <th style={{ textAlign: "right" }}>Value</th>
+              <th>Kind</th>
+              <th>Exception Class</th>
+              <th>Certificate</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((item, idx) => (
+              <tr
+                key={item.decision_id}
+                onClick={() => setSelectedIdx(idx)}
+                style={selectedIdx === idx ? { background: "var(--color-surface-container-low)" } : {}}
+              >
+                <td className="cell-id">{item.entity_id}</td>
+                <td><StatusBadge state={item.state} /></td>
+                <td style={{ textAlign: "right", fontFamily: "Inter", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>{formatPaise(item.value_paise)}</td>
+                <td className="font-body-sm">{item.kind}</td>
+                <td className="font-body-sm">{item.exception_class ?? "--"}</td>
+                <td>
+                  {item.has_certificate && (
+                    <span className="material-symbols-outlined" style={{ fontSize: 18, color: "var(--color-abstained)" }} title="Certificate issued">workspace_premium</span>
+                  )}
+                </td>
+                <td>
+                  <button
+                    className="btn btn-secondary"
+                    style={{ padding: "2px 8px", fontSize: 11, borderRadius: 3 }}
+                    onClick={(e) => { e.stopPropagation(); selectDecision(item.decision_id); void navigate("/evidence-trail"); }}
+                  >
+                    Investigate
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={7} style={{ textAlign: "center", padding: "var(--space-xl)", color: "var(--color-on-surface-variant)" }}>
+                  No items match the current filter.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Side panel */}
+      {selected && (
+        <InvestigationPanel
+          item={selected}
+          onClose={() => setSelectedIdx(null)}
+        />
+      )}
+    </div>
+  );
+}

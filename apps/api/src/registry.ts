@@ -4,6 +4,7 @@ import {
   type AssayRunResult,
   type DecisionEvidence,
 } from "@assay/cli";
+import type { Observation } from "@assay/domain";
 import type { LedgerEvent } from "@assay/ledger";
 
 import { observationsPathFor, type DemoDatasetId } from "./datasets.js";
@@ -44,6 +45,15 @@ export interface StoredRun {
   readonly result: AssayRunResult;
   readonly decisionsById: ReadonlyMap<string, DecisionEvidence>;
   readonly eventsById: ReadonlyMap<string, LedgerEvent>;
+  /**
+   * The observation set this run was executed over, by `obs_id`.
+   *
+   * Held for the same reason the two indexes above are: the run already read
+   * these and a second read would be a second thing to keep in step. Its one
+   * consumer is `allocation.ts`, which prices a certificate's members from the
+   * observations they name — a lookup, not a re-run.
+   */
+  readonly observationsById: ReadonlyMap<string, Observation>;
 }
 
 /**
@@ -111,6 +121,7 @@ export class RunRegistry {
       result,
       decisionsById: new Map(result.evidence.decisions.map((d) => [d.decision_id as string, d])),
       eventsById: new Map(result.evidence.chain.events.map((e) => [e.evt_id as string, e])),
+      observationsById: new Map(observations.map((o) => [o.obs_id as string, o])),
     };
     this.#runs.set(stored.run_id, stored);
     return stored;

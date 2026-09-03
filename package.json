@@ -11,7 +11,8 @@
     "pnpm": ">=11.0.0"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "dev": "npx concurrently --names api,web --prefix-colors blue,green \"pnpm --filter @assay/api dev\" \"pnpm --filter @assay/web dev\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json && pnpm --filter @assay/web typecheck",
     "lint": "eslint .",
     "test": "vitest run",
     "verify": "pnpm run typecheck && pnpm run lint && pnpm run test"
@@ -20,6 +21,7 @@
     "@assay/cli": "workspace:*",
     "@eslint/js": "10.0.1",
     "@types/node": "22.20.1",
+    "concurrently": "^9.0.1",
     "eslint": "10.8.1",
     "fast-check": "4.9.0",
     "typescript": "5.9.3",

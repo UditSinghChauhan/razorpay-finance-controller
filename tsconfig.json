@@ -7,5 +7,11 @@
     "tests/**/*.ts",
     "apps/*/src/**/*.ts",
     "apps/*/tests/**/*.ts"
-  ]
+  ],
+  // apps/web is its own TypeScript project and is checked by its own config,
+  // which `pnpm run typecheck` invokes after this one. It has to be: the
+  // frontend is JSX under DOM lib and bundler resolution, and this config is
+  // Node with NodeNext — so checking its files here checks them against
+  // settings they are not written for, and cannot see its .tsx files at all.
+  "exclude": ["apps/web"]
 }
