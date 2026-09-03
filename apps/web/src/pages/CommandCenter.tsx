@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { ControllerPanel } from "../components/ControllerPanel.js";
 import { useRun } from "../context/RunContext.js";
 import {
   abstentionDecisionLabel,
@@ -341,6 +342,12 @@ export function CommandCenter(): React.ReactElement {
           </div>
         </div>
       )}
+
+      {/* Close controller — packages/controller's trace over this sealed run.
+          A second strip beneath the reconciliation pipeline above: the engine
+          ran first and decided everything; this orchestrates the residual and
+          writes nothing. */}
+      {run && <ControllerPanel runId={run.run_id} />}
 
       {/* Live data indicator */}
       {run && (

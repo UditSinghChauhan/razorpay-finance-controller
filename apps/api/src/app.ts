@@ -2,7 +2,9 @@ import { Hono } from "hono";
 
 import type { ExplainProvider } from "./explain/provider.js";
 import { RunRegistry, type RegistryOptions } from "./registry.js";
+import { controllerRoutes } from "./routes/controller.js";
 import { explainRoutes } from "./routes/explain.js";
+import { ledgerVerifyRoutes } from "./routes/ledger-verify.js";
 import { runRoutes } from "./routes/runs.js";
 
 /**
@@ -21,26 +23,36 @@ import { runRoutes } from "./routes/runs.js";
  * a benchmark report. Each is absent rather than answered with an invented
  * value.
  *
- * **`/ledger/verify` is absent for a different reason and it is worth naming.**
- * `§9` gives it as the endpoint that lets *"a reviewer check tamper-evidence
- * live rather than be told about it"*, and everything it needs is already on
- * this API's `close` response — `genesis_hash`, `ledger_root_hash` and the
- * gate's own `g4_hash_chain`. It is a small route over `verifyChain` and it
- * belongs here; it is simply not in this task's four.
+ * **`/ledger/verify` is now built, and the reasoning above is why it was
+ * always going to be one of the next ones.** `§9` gives it as the endpoint
+ * that lets *"a reviewer check tamper-evidence live rather than be told about
+ * it"*; `routes/ledger-verify.ts` is a small route over `verifyChain`, over
+ * the stored run's own `chain.events` and `chain.genesis_hash`. It is built
+ * now because `@assay/controller`'s `ledger_verify` tool reads it — the close
+ * controller refuses to plan against a chain it has not itself recomputed.
  *
  * **No health endpoint.** `§9`'s table declares nine routes and none of them is
  * one, and a liveness probe answers a question nobody in this architecture is
  * asking: the API binds to loopback and is consumed by one page on the same
  * machine.
  *
- * **One route here is not in `§9`'s table, and it is not a reconciliation
- * route.** `POST /runs/:id/decisions/:decision_id/explain` is the product's
- * *"Explain with AI"*: it reads the `DecisionEvidence` this process already
- * sealed, sends it through `ARCHITECTURE.md §6.5`'s `LlmProvider` interface,
- * and returns prose that passed `§4` boundary 2's three checks. It decides
+ * **Two routes here are not in `§9`'s table, and neither is a reconciliation
+ * route.**
+ *
+ * `POST /runs/:id/decisions/:decision_id/explain` is the product's *"Explain
+ * with AI"*: it reads the `DecisionEvidence` this process already sealed,
+ * sends it through `ARCHITECTURE.md §6.5`'s `LlmProvider` interface, and
+ * returns prose that passed `§4` boundary 2's three checks. It decides
  * nothing — `routes/explain.ts` states the guarantee and `explain/service.ts`
  * implements it — and every other route on this surface answers identically
  * whether it is configured, unreachable or absent.
+ *
+ * `routes/controller.ts` drives `@assay/controller`'s close controller over a
+ * sealed run and serves its trace. It is orchestration over the four read
+ * routes above, not a fifth reconciliation surface: it evaluates no
+ * constraint, ranks no candidate, and (in this phase) writes nothing — its
+ * terminal state is human review, never a ledger event. See that module for
+ * the guarantee stated in full.
  */
 export interface ApiOptions extends RegistryOptions {
   /** Injectable so a test can drive a registry it also inspects. */
@@ -66,6 +78,8 @@ export function createApp(options: ApiOptions = {}): Hono {
 
   app.route("/", runRoutes(registry));
   app.route("/", explainRoutes(registry, { provider: options.explainProvider }));
+  app.route("/", ledgerVerifyRoutes(registry));
+  app.route("/", controllerRoutes(registry));
 
   // A JSON 404 rather than Hono's text default: every other answer on this API
   // is JSON, and a client that has to branch on content type to read an error

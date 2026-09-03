@@ -1,0 +1,19 @@
+{
+  "name": "@assay/controller",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "ASSAY close controller \u2014 the pure orchestration state machine: bounded tools, deterministic policy, auditable trace. Observes and escalates; performs no financial write.",
+  "license": "UNLICENSED",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@assay/domain": "workspace:*",
+    "@assay/ledger": "workspace:*",
+    "zod": "4.4.3"
+  }
+}
