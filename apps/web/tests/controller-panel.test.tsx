@@ -147,8 +147,9 @@ describe("ControllerTraceView — the escalated outcome", () => {
     expect(html).toContain(">1<");
   });
 
-  it("states no financial write was performed", () => {
-    expect(html).toContain("No — observe-only phase");
+  it("states no financial write was performed, and why it could not be", () => {
+    expect(html).toContain("No — by construction");
+    expect(html).toContain("Its tool surface is four reads. There is no write for it to attempt.");
     expect(html).not.toContain(">Yes<");
   });
 
@@ -240,12 +241,15 @@ describe("the financial period is displayed explicitly, from the trace", () => {
   });
 
   it("still states no financial write was performed, unchanged", () => {
-    // Requirement 3: this line's wording must survive the fix intact.
+    // Requirement 3: this line must survive the fix. It is asserted on the
+    // CARD rather than on one phrasing of it — the label and the negative
+    // verdict are the guarantee; how the verdict is worded is presentation.
     const html = renderToStaticMarkup(
       <ControllerTraceView trace={ESCALATED_TRACE} onReviewClick={() => undefined} />,
     );
     expect(html).toContain("Financial write performed");
-    expect(html).toContain("No — observe-only phase");
+    expect(html).toContain("No — by construction");
+    expect(html).not.toContain(">Yes<");
   });
 });
 

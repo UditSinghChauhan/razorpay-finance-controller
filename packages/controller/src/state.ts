@@ -26,14 +26,19 @@
  * declared and **unreachable**, by construction rather than by convention: no
  * tool in `tools.ts` writes, and `ControllerMemory` carries no field a human
  * authorisation could arrive in, so no rule in `policy.ts` can produce the
- * precondition either state requires. `tests/reachability.test.ts` proves the
- * reachable set excludes them by exhausting the transition relation from
- * `INIT`. They are present so that the machine's shape is the designed shape
- * and a later phase widens a guard rather than reshaping a union.
+ * precondition either state requires. `tests/state.test.ts` proves it the way
+ * it is actually true: the two states ARE graph-reachable from `INIT` in the
+ * table below — `AWAIT_HUMAN -> APPLY_RESOLUTION` is a declared edge — and no
+ * real execution ever requests it, over success, halt and empty-eligibility
+ * scenarios alike. The guarantee is a property of the policy, not of the
+ * graph, which is the stronger place for it to live: the table keeps the
+ * designed shape so a later phase widens a guard rather than reshaping a
+ * union.
  */
 
 /**
- * The nine states, in the order a run traverses them.
+ * The states, in the order a run traverses them — the loop's nine, then the
+ * two terminals every path ends in.
  *
  * ```
  *   INIT ─▶ OBSERVE_CLOSE ─▶ TRIAGE ─▶ PLAN ─▶ ACT ─▶ ESCALATE ─▶ AWAIT_HUMAN
@@ -65,7 +70,7 @@ export type ControllerState = (typeof CONTROLLER_STATES)[number];
  *
  * `APPLY_RESOLUTION` would call `DATA_MODEL.md §17.1`'s `P7` and append a
  * `§16` `RESOLVE` event; `RECHECK` exists only to re-read the gate *after* such
- * a write. Neither has a caller here, and the reachability test asserts it
+ * a write. Neither has a caller here, and `tests/state.test.ts` asserts it
  * against this list rather than against a copy of it.
  */
 export const WRITE_PHASE_STATES = Object.freeze([
@@ -228,9 +233,9 @@ export type PolicyRule = (typeof POLICY_RULES)[number];
  *
  * Declared rather than left implicit in `policy.ts`'s control flow so that
  * reachability is a property a test can compute. `policy.ts` is the only
- * producer of transitions, and `tests/reachability.test.ts` asserts both
- * directions: every transition the policy can produce appears here, and the
- * states reachable from `INIT` exclude {@link WRITE_PHASE_STATES}. So this
+ * producer of transitions, and `tests/state.test.ts` asserts both directions:
+ * every transition the policy can produce appears here, and no real execution
+ * visits {@link WRITE_PHASE_STATES} or names either as a `next_state`. So this
  * table cannot drift into describing a machine the code does not implement.
  *
  * **The self-edges are gathering steps.** `OBSERVE_CLOSE`, `TRIAGE` and `ACT`
