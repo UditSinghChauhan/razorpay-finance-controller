@@ -78,7 +78,7 @@ export function AuthorityLegend(): React.ReactElement {
           name="Controller — orchestration"
           role="Chooses what to look at next. No authority."
           authority="Reads the close gate, the queue and one decision's evidence, then plans the shortest path to a closed period and escalates what it may not decide."
-          bounds="Deterministic policy, not a model. Performs no financial write in this phase: it opens no ledger event and moves no balance."
+          bounds="Deterministic policy, not a model — a planner asked what to do next would be a fifth LLM role the spec forbids. Its tool surface is four reads, so it opens no ledger event and moves no balance."
         />
         <Layer
           accent="var(--color-abstained)"

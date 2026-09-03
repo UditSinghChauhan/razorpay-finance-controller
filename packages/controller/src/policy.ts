@@ -548,7 +548,7 @@ export function decide(
     case "RECHECK":
       // Unreachable: no tool writes and no memory field can carry an
       // authorisation, so nothing can produce either state's precondition.
-      // `tests/reachability.test.ts` proves it from `INIT`. Answered rather
+      // `tests/state.test.ts` proves it over four scenarios. Answered rather
       // than thrown so the machine is total.
       return transition({
         rule: "P0_INTEGRITY",

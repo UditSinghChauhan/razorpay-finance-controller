@@ -152,10 +152,21 @@ function ResultSummary({ trace }: { trace: ControllerTrace }): React.ReactElemen
           {point ? point.period_status : "—"}
         </p>
       </div>
+      {/* Containment, stated as the guarantee it is rather than as a stage the
+          product has not finished. This read "No — observe-only phase", which
+          invites "so it is not done yet"; the fact is stronger than that. The
+          controller's tool surface is four reads (`packages/controller`'s
+          `ToolRegistry`), `ControllerMemory` carries no field an authorisation
+          could arrive in, and `writes_attempted`/`writes_applied` on this very
+          trace are the checkable record. It is not that no write happened to
+          occur — there is no write for it to attempt. */}
       <div className="card" style={{ padding: "var(--space-md)" }}>
         <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Financial write performed</p>
         <p className="font-headline-sm" style={{ color: trace.financial_write_performed ? "var(--color-exception)" : "var(--color-reconciled)" }}>
-          {trace.financial_write_performed ? "Yes" : "No — observe-only phase"}
+          {trace.financial_write_performed ? "Yes" : "No — by construction"}
+        </p>
+        <p className="font-body-sm text-muted" style={{ fontSize: 11, marginTop: 4, lineHeight: 1.5 }}>
+          Its tool surface is four reads. There is no write for it to attempt.
         </p>
       </div>
     </div>
@@ -690,7 +701,8 @@ export function ControllerPanel({ runId }: { runId: string }): React.ReactElemen
       {trace === null && !state.loading && state.error === null && (
         <p className="font-body-sm text-muted">
           Not yet run. The controller reads the close gate, the exception queue and one
-          decision&apos;s evidence; it writes nothing in this phase.
+          decision&apos;s evidence, then escalates what it may not decide. Its tool surface
+          is four reads, so it writes nothing on any path.
         </p>
       )}
 

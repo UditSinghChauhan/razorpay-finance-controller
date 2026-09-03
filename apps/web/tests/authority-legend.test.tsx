@@ -32,9 +32,13 @@ describe("the authority legend distinguishes the three layers", () => {
   it("names the controller as bounded orchestration with no authority", () => {
     expect(legend).toContain("Controller — orchestration");
     expect(legend).toContain("Chooses what to look at next. No authority.");
-    expect(legend).toContain("Deterministic policy, not a model.");
-    expect(legend).toContain("Performs no financial write in this phase");
+    expect(legend).toContain("Deterministic policy, not a model");
+    // The bound is stated structurally — four reads — rather than as a phase
+    // the product has not finished. A reader must be able to see WHY it cannot
+    // write, not just be told that it did not.
+    expect(legend).toContain("Its tool surface is four reads");
     expect(legend).toContain("opens no ledger event and moves no balance");
+    expect(legend).toContain("would be a fifth LLM role the spec forbids");
   });
 
   it("names Gemini as explanation only, after the fact, and removable", () => {
