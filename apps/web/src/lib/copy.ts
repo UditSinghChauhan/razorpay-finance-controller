@@ -154,3 +154,84 @@ export const ABSTAINED_VALUE_BASIS =
   "The close gate's abstained value — the share of the period's unresolved " +
   "value that ASSAY declined to allocate. It is not the total unresolved " +
   "value, which is reported against the close threshold under Close Gates.";
+
+/**
+ * The scenario lab's own sentence, and the reason the picker is on the page at
+ * all.
+ *
+ * A reviewer with four buttons in front of them and no framing reads them as
+ * four demos. They are not: they are four *inputs* to one frozen system. The
+ * headline says the invariant and the variable in the same breath, so the
+ * controller behaving differently below is legible as a consequence of the
+ * evidence rather than of a mode the operator switched.
+ *
+ * It claims nothing about any outcome. What each period produces is rendered
+ * from the trace the server actually returned; a headline that promised a
+ * result would be a second answer that could disagree with the real one.
+ */
+export const SCENARIO_LAB_HEADLINE =
+  "Same Finance Controller. Different evidence. Different action.";
+
+export const SCENARIO_LAB_SUBHEAD =
+  "One frozen engine, one close gate, one controller policy. Only the period changes — " +
+  "no threshold, constraint or provider is configured differently between these four.";
+
+/**
+ * What selecting a different period means, stated where the selection is made.
+ *
+ * The controller panel holds one trace, and that trace is about exactly one
+ * run: `CommandCenter` keys the panel on `run_id` so a completed new run
+ * cannot leave the previous period's trace on screen. Between choosing a
+ * period and pressing the button, though, the figures below still belong to
+ * the period that ran — and a reviewer who has just clicked "Backlog" is
+ * entitled to be told that, rather than to discover it by reading a rupee
+ * figure that answers a question they stopped asking.
+ */
+export function scenarioTransitionNote(selected: string, ran: string): string {
+  return (
+    `New period selected. Everything below still belongs to ${ran}. ` +
+    `Running ${selected} starts a new period: the controller produces a new trace over it, ` +
+    `and the ${ran} trace does not carry over.`
+  );
+}
+
+/**
+ * `period_status`, in a reviewer's words rather than the gate's.
+ *
+ * The three values are `CLOSED`, `OPEN` and `BLOCKED` and they are the close
+ * gate's own; nothing here replaces or recomputes one. What is added is the
+ * sentence a reader who has not read `PROJECT_SPEC.md §10.2` needs in order to
+ * tell a period that finished from a period that did not — the enum word alone
+ * left `OPEN` looking like a neutral status rather than an unresolved one.
+ */
+export function periodStatusMeaning(status: string): string {
+  switch (status) {
+    case "CLOSED":
+      return "Closed — every gate passed and the residual is inside the close threshold.";
+    case "OPEN":
+      return "Unresolved — the gates passed but value is still in Suspense, so the period cannot close.";
+    case "BLOCKED":
+      return "Blocked — a close gate failed. The period cannot close until that failure is resolved.";
+    default:
+      return "";
+  }
+}
+
+/**
+ * How the run's `llm_provider` should be read.
+ *
+ * `apps/api/src/registry.ts` fixes `llm_mode: "offline"` for every run, and
+ * `routes/runs.ts` refuses any other value, because `PROJECT_SPEC.md §10`'s
+ * demo path must not be able to fail on a missing key. That is a fact about
+ * **the reconciliation engine**: it consults no model on any path.
+ *
+ * Rendered as `ASSAY/offline` beside a run id, it read as *"ASSAY is
+ * offline"* — as though the system were degraded, or as though the
+ * explanation provider had failed. Neither is what the field says. The
+ * explanation provider is a separate, later, optional call
+ * (`apps/api/src/explain/config.ts` resolves `anthropic` or `gemini` in the
+ * server process) and its identity is reported by the explanation panel that
+ * actually made the call, never here.
+ */
+export const ENGINE_MODEL_USE =
+  "Engine: no model consulted — reconciliation is deterministic on every path.";

@@ -23,14 +23,14 @@ const legend = renderToStaticMarkup(<AuthorityLegend />);
 
 describe("the authority legend distinguishes the three layers", () => {
   it("names ASSAY as the deterministic financial authority", () => {
-    expect(legend).toContain("ASSAY — deterministic");
+    expect(legend).toContain("ASSAY — deterministic financial authority");
     expect(legend).toContain("Decides. The financial authority.");
     expect(legend).toContain("Ambiguity Certificate");
     expect(legend).toContain("Nothing on this page can overrule it.");
   });
 
   it("names the controller as bounded orchestration with no authority", () => {
-    expect(legend).toContain("Controller — orchestration");
+    expect(legend).toContain("Controller — bounded orchestration");
     expect(legend).toContain("Chooses what to look at next. No authority.");
     expect(legend).toContain("Deterministic policy, not a model");
     // The bound is stated structurally — four reads — rather than as a phase
@@ -42,7 +42,7 @@ describe("the authority legend distinguishes the three layers", () => {
   });
 
   it("names Gemini as explanation only, after the fact, and removable", () => {
-    expect(legend).toContain("Gemini — explanation");
+    expect(legend).toContain("Gemini — explanation only");
     expect(legend).toContain("Describes a decision already made. No authority.");
     expect(legend).toContain("after the outcome is sealed");
     expect(legend).toContain("Cannot express an amount");
@@ -51,9 +51,9 @@ describe("the authority legend distinguishes the three layers", () => {
 
   it("orders them by authority: ASSAY, then controller, then Gemini", () => {
     const positions = [
-      legend.indexOf("ASSAY — deterministic"),
-      legend.indexOf("Controller — orchestration"),
-      legend.indexOf("Gemini — explanation"),
+      legend.indexOf("ASSAY — deterministic financial authority"),
+      legend.indexOf("Controller — bounded orchestration"),
+      legend.indexOf("Gemini — explanation only"),
     ];
     for (const p of positions) expect(p).toBeGreaterThan(-1);
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
@@ -79,12 +79,12 @@ describe("the Command Center carries the legend above the controller panel", () 
 
   it("renders the legend once a run exists", () => {
     expect(html).toContain("Who decides what");
-    expect(html).toContain("ASSAY — deterministic");
+    expect(html).toContain("ASSAY — deterministic financial authority");
   });
 
   it("puts it before the close controller panel it explains", () => {
     const legendAt = html.indexOf("Who decides what");
-    const panelAt = html.indexOf("Close controller");
+    const panelAt = html.indexOf("Finance Controller — bounded orchestration");
     expect(legendAt).toBeGreaterThan(-1);
     expect(panelAt).toBeGreaterThan(legendAt);
   });

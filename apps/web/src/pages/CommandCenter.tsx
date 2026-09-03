@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { AuthorityLegend } from "../components/AuthorityLegend.js";
-import { ControllerPanel } from "../components/ControllerPanel.js";
+import { ControllerPanel, SCENARIO_LAB_ANCHOR_ID } from "../components/ControllerPanel.js";
 import { ScenarioPicker } from "../components/ScenarioPicker.js";
 import { useRun } from "../context/RunContext.js";
 import {
@@ -8,6 +8,8 @@ import {
   ABSTAINED_VALUE_LABEL,
   abstentionDecisionLabel,
   affectedObservationsLabel,
+  ENGINE_MODEL_USE,
+  periodStatusMeaning,
   RECONCILIATION_BASIS,
   RECONCILIATION_LABEL,
 } from "../lib/copy.js";
@@ -127,6 +129,70 @@ function GateStatusRow({ label, passed }: { label: string; passed: boolean }): R
   );
 }
 
+/**
+ * The period's own outcome, at the top of the page and in words.
+ *
+ * **Why it is here at all.** `period_status` was on the page twice — as a word
+ * under the pipeline's Close node and as a value inside the Close Gates card —
+ * and both are below the fold on a laptop. The single most important fact
+ * about a run was therefore something a reviewer scrolled to. Worse, the enum
+ * alone does not carry its own meaning: `OPEN` looks like a neutral status
+ * rather than the statement that value is still sitting in Suspense and the
+ * period cannot close.
+ *
+ * **It reads `period_status` and adds nothing.** The status is the close
+ * gate's; the sentence beside it is {@link periodStatusMeaning}'s gloss on
+ * that same value, keyed on it and on nothing else. No state is inferred, no
+ * figure is computed, and a status the gloss does not know renders as the bare
+ * enum rather than as a guess.
+ *
+ * The verification control belongs here rather than in a nav item because this
+ * is the claim it checks: the page says the period closed, and Audit Logs is
+ * where that stops being this page's word for it.
+ */
+function PeriodOutcome({
+  status, onVerify,
+}: { status: "CLOSED" | "OPEN" | "BLOCKED"; onVerify: () => void }): React.ReactElement {
+  const color =
+    status === "CLOSED" ? "var(--color-reconciled)"
+      : status === "BLOCKED" ? "var(--color-exception)"
+        : "var(--color-abstained)";
+  const icon =
+    status === "CLOSED" ? "task_alt" : status === "BLOCKED" ? "block" : "pending_actions";
+  return (
+    <div
+      className="card"
+      style={{
+        padding: "var(--space-md)", marginBottom: "var(--space-lg)",
+        borderLeft: `4px solid ${color}`,
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        gap: "var(--space-md)", flexWrap: "wrap",
+      }}
+    >
+      <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+          <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 22, color }}>
+            {icon}
+          </span>
+          <span className="font-label-caps text-muted">Period status</span>
+          <span className="font-headline-sm" style={{ color }}>{status}</span>
+        </div>
+        <p className="font-body-sm text-muted" style={{ lineHeight: 1.6, maxWidth: 620, marginBottom: 0 }}>
+          {periodStatusMeaning(status)}
+        </p>
+      </div>
+      <button
+        className="btn btn-secondary"
+        style={{ fontSize: 12, padding: "var(--space-xs) var(--space-md)" }}
+        onClick={onVerify}
+      >
+        <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 16 }}>verified_user</span>
+        Verify ledger integrity
+      </button>
+    </div>
+  );
+}
+
 export function CommandCenter(): React.ReactElement {
   const navigate = useNavigate();
   const { run, close, loading, error, startDemo, dataset, selectDataset } = useRun();
@@ -164,7 +230,14 @@ export function CommandCenter(): React.ReactElement {
           <span className="material-symbols-outlined" style={{ fontSize: 20 }}>play_arrow</span>
           Run Demo
         </button>
-        <p className="font-body-sm text-muted">dataset: {dataset} &middot; llm: offline &middot; no credentials required</p>
+        {/* "llm: offline" read as a degraded system. What the field records is
+            that the RECONCILIATION ENGINE consults no model on any path, which
+            is a guarantee rather than a state — see {@link ENGINE_MODEL_USE}.
+            The explanation provider is a separate, later, optional call and is
+            named by the panel that makes it. */}
+        <p className="font-body-sm text-muted" style={{ textAlign: "center", maxWidth: 520, lineHeight: 1.6 }}>
+          dataset: {dataset} &middot; {ENGINE_MODEL_USE} No credentials required to run this.
+        </p>
       </div>
     );
   }
@@ -211,9 +284,27 @@ export function CommandCenter(): React.ReactElement {
           pointed at. Selecting one changes the evidence; nothing else about the
           pipeline changes, which is why the controller panel below can behave
           differently without anything having been configured. */}
-      <div className="card" style={{ padding: "var(--space-md)", marginBottom: "var(--space-lg)" }}>
-        <ScenarioPicker selected={dataset} disabled={loading} onSelect={selectDataset} />
+      <div
+        id={SCENARIO_LAB_ANCHOR_ID}
+        className="card"
+        style={{ padding: "var(--space-md)", marginBottom: "var(--space-lg)" }}
+      >
+        {/* `ranDataset` is what the figures below belong to, not what is
+            selected. Passing it is what lets the picker say, while a reviewer
+            is mid-switch, that the page has not changed yet and that running
+            the new period produces a new trace rather than updating this one. */}
+        <ScenarioPicker
+          selected={dataset}
+          disabled={loading}
+          onSelect={selectDataset}
+          ranDataset={run?.dataset}
+        />
       </div>
+
+      {/* The outcome, before the figures that led to it. */}
+      {periodStatus !== null && (
+        <PeriodOutcome status={periodStatus} onVerify={() => void navigate("/audit-logs")} />
+      )}
 
       {/* Metric cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "var(--space-md)", marginBottom: "var(--space-xl)" }}>
@@ -424,11 +515,23 @@ export function CommandCenter(): React.ReactElement {
           exactly one run, so the panel's identity is that run. */}
       {run && <ControllerPanel key={run.run_id} runId={run.run_id} />}
 
-      {/* Live data indicator */}
+      {/* Live data indicator.
+
+          It used to end `{agent_id}/{llm_provider}`, which rendered as
+          "ASSAY/offline" and read as *"ASSAY is offline"* — a degraded system,
+          or a failed provider. Neither is what the field says.
+          `apps/api/src/registry.ts` fixes `llm_mode: "offline"` for every run
+          because the reconciliation engine consults no model on any path; it
+          is a guarantee, and {@link ENGINE_MODEL_USE} states it as one. The
+          explanation provider is a separate, optional, later call and is named
+          by the panel that actually makes it, never here. */}
       {run && (
-        <p className="font-body-sm text-muted" style={{ textAlign: "right" }}>
+        <p className="font-body-sm text-muted" style={{ textAlign: "right", lineHeight: 1.6 }}>
           <span className="material-symbols-outlined" style={{ fontSize: 14, verticalAlign: "middle", color: "var(--color-reconciled)" }}>circle</span>
-          {" "}Live &mdash; {run.run_id.substring(0, 12)}... &middot; {run.dataset} &middot; {run.agent_id}/{run.llm_provider}
+          {" "}Live &mdash; run {run.run_id.substring(0, 12)}... &middot; period {run.dataset}{" "}
+          &middot; engine {run.agent_id}
+          <br />
+          {ENGINE_MODEL_USE}
         </p>
       )}
     </div>

@@ -2,7 +2,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
-import { ControllerPanel, ControllerTraceView } from "../src/components/ControllerPanel.js";
+import {
+  ControllerPanel,
+  ControllerTraceView,
+  TELEMETRY_SUMMARY_ROWS,
+} from "../src/components/ControllerPanel.js";
 import type { ControllerTrace } from "../src/hooks/useAssayApi.js";
 
 /**
@@ -139,7 +143,7 @@ const CLOSED_TRACE: ControllerTrace = {
 
 describe("ControllerTraceView — the escalated outcome", () => {
   const html = renderToStaticMarkup(
-    <ControllerTraceView trace={ESCALATED_TRACE} onReviewClick={() => undefined} />,
+    <ControllerTraceView trace={ESCALATED_TRACE} onReviewClick={() => undefined} onTryAnother={() => undefined} onVerifyLedger={() => undefined} />,
   );
 
   it("shows exactly one item escalated for review", () => {
@@ -184,7 +188,7 @@ describe("ControllerTraceView — the escalated outcome", () => {
 describe("the terminal node names the stop reason, not just 'Complete'", () => {
   it("COMPLETE + stop_reason ESCALATED renders 'Escalated' on the terminal node", () => {
     const html = renderToStaticMarkup(
-      <ControllerTraceView trace={ESCALATED_TRACE} onReviewClick={() => undefined} />,
+      <ControllerTraceView trace={ESCALATED_TRACE} onReviewClick={() => undefined} onTryAnother={() => undefined} onVerifyLedger={() => undefined} />,
     );
     expect(html).toContain(">Escalated<");
     // The old, ambiguous label must be gone from the terminal node. It may
@@ -195,7 +199,7 @@ describe("the terminal node names the stop reason, not just 'Complete'", () => {
 
   it("COMPLETE + stop_reason CLOSED renders 'Closed', not 'Escalated' — proves it is not hardcoded", () => {
     const html = renderToStaticMarkup(
-      <ControllerTraceView trace={CLOSED_TRACE} onReviewClick={() => undefined} />,
+      <ControllerTraceView trace={CLOSED_TRACE} onReviewClick={() => undefined} onTryAnother={() => undefined} onVerifyLedger={() => undefined} />,
     );
     expect(html).toContain(">Closed<");
     expect(html).not.toContain(">Escalated<");
@@ -204,7 +208,7 @@ describe("the terminal node names the stop reason, not just 'Complete'", () => {
 
   it("HALT still renders 'Halted' on the terminal node", () => {
     const html = renderToStaticMarkup(
-      <ControllerTraceView trace={HALT_TRACE} onReviewClick={() => undefined} />,
+      <ControllerTraceView trace={HALT_TRACE} onReviewClick={() => undefined} onTryAnother={() => undefined} onVerifyLedger={() => undefined} />,
     );
     expect(html).toContain(">Halted<");
   });
@@ -213,7 +217,7 @@ describe("the terminal node names the stop reason, not just 'Complete'", () => {
 describe("the financial period is displayed explicitly, from the trace", () => {
   it("shows 'Financial period' labelled with the real OPEN value on an escalated trace", () => {
     const html = renderToStaticMarkup(
-      <ControllerTraceView trace={ESCALATED_TRACE} onReviewClick={() => undefined} />,
+      <ControllerTraceView trace={ESCALATED_TRACE} onReviewClick={() => undefined} onTryAnother={() => undefined} onVerifyLedger={() => undefined} />,
     );
     expect(html).toContain("Financial period");
     expect(html).toContain(">OPEN<");
@@ -221,7 +225,7 @@ describe("the financial period is displayed explicitly, from the trace", () => {
 
   it("shows CLOSED on a trace whose own residual reading says CLOSED — not inferred from stop_reason", () => {
     const html = renderToStaticMarkup(
-      <ControllerTraceView trace={CLOSED_TRACE} onReviewClick={() => undefined} />,
+      <ControllerTraceView trace={CLOSED_TRACE} onReviewClick={() => undefined} onTryAnother={() => undefined} onVerifyLedger={() => undefined} />,
     );
     expect(html).toContain(">CLOSED<");
     expect(html).not.toContain(">OPEN<");
@@ -233,7 +237,7 @@ describe("the financial period is displayed explicitly, from the trace", () => {
     // guessed status is the same discipline `formatPaise`'s fallback already
     // uses on the "Unresolved vs. threshold" card beside it.
     const html = renderToStaticMarkup(
-      <ControllerTraceView trace={HALT_TRACE} onReviewClick={() => undefined} />,
+      <ControllerTraceView trace={HALT_TRACE} onReviewClick={() => undefined} onTryAnother={() => undefined} onVerifyLedger={() => undefined} />,
     );
     expect(html).toContain("Financial period");
     expect(html).not.toContain(">OPEN<");
@@ -245,7 +249,7 @@ describe("the financial period is displayed explicitly, from the trace", () => {
     // CARD rather than on one phrasing of it — the label and the negative
     // verdict are the guarantee; how the verdict is worded is presentation.
     const html = renderToStaticMarkup(
-      <ControllerTraceView trace={ESCALATED_TRACE} onReviewClick={() => undefined} />,
+      <ControllerTraceView trace={ESCALATED_TRACE} onReviewClick={() => undefined} onTryAnother={() => undefined} onVerifyLedger={() => undefined} />,
     );
     expect(html).toContain("Financial write performed");
     expect(html).toContain("No — by construction");
@@ -255,7 +259,7 @@ describe("the financial period is displayed explicitly, from the trace", () => {
 
 describe("ControllerTraceView — the halt outcome", () => {
   const html = renderToStaticMarkup(
-    <ControllerTraceView trace={HALT_TRACE} onReviewClick={() => undefined} />,
+    <ControllerTraceView trace={HALT_TRACE} onReviewClick={() => undefined} onTryAnother={() => undefined} onVerifyLedger={() => undefined} />,
   );
 
   it("states the halt reason and that nothing further was done", () => {
@@ -278,8 +282,8 @@ describe("ControllerPanel — the idle state, with no run started", () => {
         <ControllerPanel runId="run_fixture" />
       </MemoryRouter>,
     );
-    expect(html).toContain("Close controller");
-    expect(html).toContain("Run close loop");
+    expect(html).toContain("Finance Controller — bounded orchestration");
+    expect(html).toContain("Run Finance Controller");
     expect(html).toContain("Not yet run");
     // Nothing from a trace this component never fetched.
     expect(html).not.toContain("Escalated for review");
@@ -321,7 +325,7 @@ describe("the fix introduces no hardcoded demo figure or identifier", () => {
 
   it("still renders 'Escalated' and 'OPEN' from a trace carrying none of the real demo-500 ids or amounts", () => {
     const html = renderToStaticMarkup(
-      <ControllerTraceView trace={SYNTHETIC_ESCALATED} onReviewClick={() => undefined} />,
+      <ControllerTraceView trace={SYNTHETIC_ESCALATED} onReviewClick={() => undefined} onTryAnother={() => undefined} onVerifyLedger={() => undefined} />,
     );
     expect(html).toContain(">Escalated<");
     expect(html).toContain(">OPEN<");
@@ -341,7 +345,7 @@ describe("the fix introduces no hardcoded demo figure or identifier", () => {
       ],
     };
     const html = renderToStaticMarkup(
-      <ControllerTraceView trace={synthetic_closed} onReviewClick={() => undefined} />,
+      <ControllerTraceView trace={synthetic_closed} onReviewClick={() => undefined} onTryAnother={() => undefined} onVerifyLedger={() => undefined} />,
     );
     expect(html).toContain(">Closed<");
     expect(html).toContain(">CLOSED<");
@@ -397,7 +401,7 @@ const STOPPED_AT_TRIAGE: ControllerTrace = {
  */
 describe("the run narrative — the six stages, in words", () => {
   const html = renderToStaticMarkup(
-    <ControllerTraceView trace={ESCALATED_TRACE} onReviewClick={() => undefined} />,
+    <ControllerTraceView trace={ESCALATED_TRACE} onReviewClick={() => undefined} onTryAnother={() => undefined} onVerifyLedger={() => undefined} />,
   );
 
   it("names all six stages, in the order the loop ran them", () => {
@@ -448,7 +452,7 @@ describe("the run narrative — the six stages, in words", () => {
 
 describe("the narrative shows how far a stopped run actually got", () => {
   const html = renderToStaticMarkup(
-    <ControllerTraceView trace={STOPPED_AT_TRIAGE} onReviewClick={() => undefined} />,
+    <ControllerTraceView trace={STOPPED_AT_TRIAGE} onReviewClick={() => undefined} onTryAnother={() => undefined} onVerifyLedger={() => undefined} />,
   );
 
   it("marks the stages the loop never entered rather than hiding them", () => {
@@ -497,7 +501,7 @@ describe("the narrative shows how far a stopped run actually got", () => {
  */
 describe("the telemetry block — runtime checks, on screen", () => {
   const html = renderToStaticMarkup(
-    <ControllerTraceView trace={ESCALATED_TRACE} onReviewClick={() => undefined} />,
+    <ControllerTraceView trace={ESCALATED_TRACE} onReviewClick={() => undefined} onTryAnother={() => undefined} onVerifyLedger={() => undefined} />,
   );
 
   it("labels the block EXPLORATORY, as §L.4 requires of any metric outside §8", () => {
@@ -556,7 +560,7 @@ describe("the telemetry block — runtime checks, on screen", () => {
       },
     };
     const failedHtml = renderToStaticMarkup(
-      <ControllerTraceView trace={failing} onReviewClick={() => undefined} />,
+      <ControllerTraceView trace={failing} onReviewClick={() => undefined} onTryAnother={() => undefined} onVerifyLedger={() => undefined} />,
     );
     expect(failedHtml).toContain("6 / 7 passed");
     expect(failedHtml).toContain("writes_attempted = 3");
@@ -575,7 +579,7 @@ describe("the telemetry block — runtime checks, on screen", () => {
  */
 describe("the escalation explains itself in words, from its own fields", () => {
   const html = renderToStaticMarkup(
-    <ControllerTraceView trace={ESCALATED_TRACE} onReviewClick={() => undefined} />,
+    <ControllerTraceView trace={ESCALATED_TRACE} onReviewClick={() => undefined} onTryAnother={() => undefined} onVerifyLedger={() => undefined} />,
   );
 
   it("says what ASSAY decided and why the evidence did not separate the candidates", () => {
@@ -609,7 +613,7 @@ describe("the escalation explains itself in words, from its own fields", () => {
       ],
     };
     const other = renderToStaticMarkup(
-      <ControllerTraceView trace={noWarrant} onReviewClick={() => undefined} />,
+      <ControllerTraceView trace={noWarrant} onReviewClick={() => undefined} onTryAnother={() => undefined} onVerifyLedger={() => undefined} />,
     );
     expect(other).toContain("no deterministic rule can clear it");
     expect(other).toContain("the correct posting is the thing that is not known");
@@ -650,7 +654,7 @@ const WARRANT_ESCALATION: ControllerTrace["escalations"][number] = {
 };
 
 const narrativeOf = (trace: ControllerTrace): string =>
-  renderToStaticMarkup(<ControllerTraceView trace={trace} onReviewClick={() => undefined} />);
+  renderToStaticMarkup(<ControllerTraceView trace={trace} onReviewClick={() => undefined} onTryAnother={() => undefined} onVerifyLedger={() => undefined} />);
 
 describe("the escalated stage names the reasons the trace carries", () => {
   it("claims abstention only where every escalation carries a certificate", () => {
@@ -720,5 +724,311 @@ describe("the review stage reports a budget-exhausted run as partial", () => {
 
   it("still states the no-financial-write boundary", () => {
     expect(html).toContain("Nothing was written on any path");
+  });
+});
+
+/**
+ * The full seventeen, as `@assay/controller`'s telemetry layer emits them.
+ *
+ * The abbreviated fixture above carries seven, which is enough for the
+ * detailed grid but not for the question the summary raises: does every check
+ * the controller can emit have a home in the six-row read? This list mirrors
+ * `packages/controller/src/telemetry.ts`'s `TELEMETRY_CHECK_IDS` and its group
+ * assignment. It is transcribed rather than imported because `apps/web/tests/`
+ * deliberately depends on nothing outside `apps/web/src` — the same boundary
+ * the shipped bundle is held to — and a drift between this list and the
+ * controller's own is caught by the partition assertion below plus
+ * `packages/controller/tests/telemetry.test.ts`, which asserts the real set.
+ */
+const ALL_CHECKS: ControllerTrace["telemetry"]["checks"] = [
+  { id: "terminal_reached", group: "terminal", passed: true, detail: "the loop ended in COMPLETE" },
+  { id: "terminal_reason_coherent", group: "terminal", passed: true, detail: "COMPLETE carries stop_reason ESCALATED and no halt reason" },
+  { id: "transitions_declared", group: "policy", passed: true, detail: "all 10 transitions appear in the declared table" },
+  { id: "rules_declared", group: "policy", passed: true, detail: "every step names one of the declared rules" },
+  { id: "budget_not_exhausted", group: "policy", passed: true, detail: "10 step(s) against a bound of 64" },
+  { id: "no_write_phase_state", group: "containment", passed: true, detail: "no step entered or targeted a write-phase state" },
+  { id: "no_writes_attempted", group: "containment", passed: true, detail: "writes_attempted = 0" },
+  { id: "no_writes_applied", group: "containment", passed: true, detail: "writes_applied = 0" },
+  { id: "no_caused_events", group: "containment", passed: true, detail: "no step caused a ledger event" },
+  { id: "no_model_call", group: "containment", passed: true, detail: "the controller consulted no model" },
+  { id: "reads_only", group: "containment", passed: true, detail: "every tool call was a read" },
+  { id: "observations_hashed", group: "grounding", passed: true, detail: "every tool call carries a sha256 input hash and observation digest" },
+  { id: "escalations_inspected", group: "grounding", passed: true, detail: "all 1 escalation(s) trace to a decision_evidence call" },
+  { id: "trace_id_recomputes", group: "grounding", passed: true, detail: "trace_id recomputes from (run_id, steps)" },
+  { id: "escalations_eligible", group: "escalation", passed: true, detail: "every escalated item opens a Suspense item" },
+  { id: "escalations_planned", group: "escalation", passed: true, detail: "every escalation was on the closing set of 1" },
+  { id: "escalation_reason_consistent", group: "escalation", passed: true, detail: "AMBIGUOUS_CERTIFICATE is claimed exactly where a §13 certificate exists" },
+];
+
+const FULL_TELEMETRY_TRACE: ControllerTrace = {
+  ...ESCALATED_TRACE,
+  telemetry: {
+    ...ESCALATED_TRACE.telemetry,
+    checks: ALL_CHECKS,
+    checks_passed: ALL_CHECKS.length,
+    checks_total: ALL_CHECKS.length,
+    all_passed: true,
+  },
+};
+
+/** A run that stopped on its own step bound, with a plan larger than what it worked. */
+const BUDGET_EXHAUSTED_TRACE: ControllerTrace = {
+  ...ESCALATED_TRACE,
+  stop_reason: "BUDGET_EXHAUSTED",
+  awaiting_human_review: false,
+  plan: {
+    ids: ["dec_a", "dec_b", "dec_c"],
+    eligible: [],
+    ineligible_count: 0,
+    covers_residual: false,
+    already_under_threshold: false,
+  },
+  telemetry: {
+    ...ESCALATED_TRACE.telemetry,
+    stop_reason: "BUDGET_EXHAUSTED",
+    checks: [
+      ...ESCALATED_TRACE.telemetry.checks,
+      {
+        id: "budget_not_exhausted",
+        group: "policy",
+        passed: false,
+        detail: "the 64-step bound was reached; the result is partial",
+      },
+    ],
+    checks_passed: 7,
+    checks_total: 8,
+    all_passed: false,
+  },
+};
+
+const view = (trace: ControllerTrace): string =>
+  renderToStaticMarkup(
+    <ControllerTraceView
+      trace={trace}
+      onReviewClick={() => undefined}
+      onTryAnother={() => undefined}
+      onVerifyLedger={() => undefined}
+    />,
+  );
+
+/**
+ * The outcome banner — the reviewer-facing answer to "so what happened?",
+ * above the state strip that used to be the first thing on the panel.
+ *
+ * Every assertion below pins a sentence to the trace field it is derived from.
+ * The three outcomes are asserted against three genuinely different traces
+ * rather than three phrasings of one, because the claim being tested is that
+ * the banner tracks `stop_reason` and `terminal` and not the shape of the run
+ * it was written against.
+ */
+describe("the outcome banner reads the result off the trace", () => {
+  it("leads with the terminal outcome and the trace's own reason code", () => {
+    const html = view(ESCALATED_TRACE);
+    expect(html).toContain("Controller outcome");
+    expect(html).toContain(">Escalated<");
+    expect(html).toContain("reason ESCALATED");
+  });
+
+  it("explains an escalated run in plain language, without claiming a write", () => {
+    const html = view(ESCALATED_TRACE);
+    expect(html).toContain("1 item(s) reached a person");
+    expect(html).toContain("terminal state is a human rather than a posting");
+    expect(html).toContain("No financial write was performed.");
+  });
+
+  it("shows the four counts that bound what the run was allowed to do", () => {
+    const html = view(ESCALATED_TRACE);
+    for (const label of ["Steps", "Tool calls", "Escalations", "Writes applied"]) {
+      expect(html, label).toContain(label);
+    }
+    expect(html).toContain("10 / 64");
+  });
+
+  it("reads a CLOSED period as closed, and claims no escalation", () => {
+    const html = view(CLOSED_TRACE);
+    expect(html).toContain("reason CLOSED");
+    expect(html).toContain("The period is inside its close threshold");
+    expect(html).toContain("it escalated nothing and changed nothing");
+    expect(html).not.toContain("reached a person. The controller may not decide them");
+  });
+
+  it("reads a HALT as a guard, naming the halt reason rather than a stop reason", () => {
+    const html = view(HALT_TRACE);
+    expect(html).toContain("reason CHAIN_BROKEN");
+    expect(html).toContain("A guard stopped the loop: CHAIN_BROKEN");
+    expect(html).toContain("the deterministic decision and the ledger are unaffected");
+  });
+
+  it("reads BUDGET_EXHAUSTED as a bounded partial result — neither a close nor a failure", () => {
+    const html = view(BUDGET_EXHAUSTED_TRACE);
+    expect(html).toContain("Bounded partial result");
+    expect(html).toContain("The step bound was reached before the closing set was finished");
+    expect(html).toContain("neither a close nor a failure");
+    expect(html).toContain("1 of 3 planned item(s) reached a person");
+    // It is not reported as a close, and not reported as a completed handoff.
+    expect(html).not.toContain("The period is inside its close threshold");
+  });
+
+  it("does not head a budget-exhausted run's escalations as a completed handoff", () => {
+    const html = view(BUDGET_EXHAUSTED_TRACE);
+    expect(html).toContain("Escalated — the loop stopped before the handoff");
+    expect(html).not.toContain(">Awaiting human review<");
+    // …while the run that DID reach the handoff still says so.
+    expect(view(ESCALATED_TRACE)).toContain("Awaiting human review");
+  });
+});
+
+/**
+ * The financial period is glossed, not just named.
+ *
+ * `OPEN` is an enum value, and on its own it reads as a neutral status rather
+ * than as the statement that value is still sitting in Suspense. The gloss is
+ * keyed on the status the trace's own close reading carries.
+ */
+describe("the financial period card explains what its status means", () => {
+  it("says OPEN means unresolved value, not merely 'not closed'", () => {
+    const html = view(ESCALATED_TRACE);
+    expect(html).toContain(">OPEN<");
+    expect(html).toContain("value is still in Suspense, so the period cannot close");
+  });
+
+  it("says CLOSED means every gate passed and the residual is inside the threshold", () => {
+    const html = view(CLOSED_TRACE);
+    expect(html).toContain(">CLOSED<");
+    expect(html).toContain("every gate passed and the residual is inside the close threshold");
+  });
+
+  it("glosses nothing when there is no close reading to gloss", () => {
+    const html = view(HALT_TRACE);
+    expect(html).not.toContain("value is still in Suspense");
+    expect(html).not.toContain("every gate passed and the residual is inside");
+  });
+});
+
+/**
+ * The compact telemetry summary — six answers over the seventeen checks.
+ *
+ * The partition assertion is the load-bearing one: it proves the six rows
+ * between them cover every check id the controller emits, exactly once. A
+ * check that fell outside them would silently vanish from the summary while
+ * still counting in the tally beside it, which is precisely the kind of
+ * quiet disagreement a summary must not be able to introduce.
+ */
+describe("the telemetry summary answers six questions over the seventeen checks", () => {
+  const html = view(FULL_TELEMETRY_TRACE);
+
+  it("names the six questions a reviewer reads first", () => {
+    for (const label of [
+      "Goal reached",
+      "Policy compliant",
+      "Evidence grounded",
+      "No financial writes",
+      "Escalation correct",
+      "Reproducible trace",
+    ]) {
+      expect(html, label).toContain(label);
+    }
+  });
+
+  it("partitions every one of the seventeen checks into exactly one row", () => {
+    expect(ALL_CHECKS).toHaveLength(17);
+    for (const check of ALL_CHECKS) {
+      const homes = TELEMETRY_SUMMARY_ROWS.filter((row) => row.covers(check));
+      expect(homes.map((h) => h.key), check.id).toHaveLength(1);
+    }
+  });
+
+  it("reports each row as a conjunction of the checks it matched, not as a verdict", () => {
+    // 6 containment checks, 3 policy, 2 terminal, 2 grounding-minus-repro,
+    // 3 escalation, 1 reproducibility — the counts are visible, so a reviewer
+    // can see how much evidence is behind each line.
+    expect(html).toContain("6 / 6 checks");
+    expect(html).toContain("3 / 3 checks");
+    expect(html).toContain("2 / 2 checks");
+    expect(html).toContain("1 / 1 checks");
+  });
+
+  it("keeps the detailed seventeen on the page, behind a disclosure", () => {
+    expect(html).toContain("Show all 17 checks");
+    expect(html).toContain("<details>");
+    // Every id is still rendered — the disclosure hides them visually, it does
+    // not remove them, so nothing that could fail is off the page.
+    for (const check of ALL_CHECKS) expect(html, check.id).toContain(check.id);
+  });
+
+  it("names the failing check inside the row that summarises it", () => {
+    const html2 = view(BUDGET_EXHAUSTED_TRACE);
+    expect(html2).toContain("Policy compliant");
+    expect(html2).toContain("budget_not_exhausted");
+    expect(html2).toContain("the 64-step bound was reached; the result is partial");
+    expect(html2).toContain("cancel");
+  });
+
+  it("says 'not reported' rather than passing a row no check backs", () => {
+    // A telemetry payload that checked nothing must not read as a clean bill
+    // of health: an empty conjunction is true, and rendering it as a tick
+    // would report "nothing was checked" as "everything passed".
+    const empty: ControllerTrace = {
+      ...ESCALATED_TRACE,
+      telemetry: { ...ESCALATED_TRACE.telemetry, checks: [], checks_passed: 0, checks_total: 0, all_passed: true },
+    };
+    const html2 = view(empty);
+    expect([...html2.matchAll(/not reported/g)]).toHaveLength(TELEMETRY_SUMMARY_ROWS.length);
+    expect(html2).not.toContain("0 / 0 checks");
+  });
+});
+
+/**
+ * Where a reviewer goes next, named on the panel rather than left to be found
+ * in the sidebar.
+ */
+describe("the panel names the two next steps after a run", () => {
+  const html = view(ESCALATED_TRACE);
+
+  it("offers the independent check of the chain", () => {
+    expect(html).toContain("Verify ledger integrity");
+    expect(html).toContain("recomputes this run&#x27;s hash chain from genesis");
+  });
+
+  it("offers another period, and says why that is worth doing", () => {
+    expect(html).toContain("Try another scenario");
+    expect(html).toContain("runs the same controller over different evidence");
+  });
+});
+
+/**
+ * The reviewer pass introduces no scenario-specific result.
+ *
+ * The same proof by construction the terminal-label suite above uses: a trace
+ * built from wholly synthetic identifiers, amounts and counts still produces
+ * the right words, which could only happen if every sentence reads the trace's
+ * own fields.
+ */
+describe("the outcome banner and summary hardcode no scenario's result", () => {
+  const SYNTHETIC: ControllerTrace = {
+    ...FULL_TELEMETRY_TRACE,
+    run_id: "run_not_a_demo_period_at_all",
+    trace_id: "f".repeat(64),
+    stop_reason: "NO_ELIGIBLE_ITEM",
+    escalations: [],
+    awaiting_human_review: false,
+    plan: { ids: [], eligible: [], ineligible_count: 7, covers_residual: false, already_under_threshold: false },
+    residual_trajectory: [
+      { step_no: 2, unresolved_value_paise: 77, close_threshold_paise: 3, period_status: "BLOCKED" },
+    ],
+  };
+
+  it("renders the fourth stop reason it was never built against", () => {
+    const html = view(SYNTHETIC);
+    expect(html).toContain(">No eligible item<");
+    expect(html).toContain("reason NO_ELIGIBLE_ITEM");
+    expect(html).toContain("Nothing on the exception queue opens a Suspense item");
+    expect(html).not.toContain("reached a person. The controller may not decide them");
+  });
+
+  it("glosses a BLOCKED period as blocked, a status no demo fixture in this file carries", () => {
+    const html = view(SYNTHETIC);
+    expect(html).toContain(">BLOCKED<");
+    expect(html).toContain("a close gate failed");
   });
 });

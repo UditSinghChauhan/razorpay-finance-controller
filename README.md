@@ -9,7 +9,7 @@ Razorpay AI Buildathon 2026 — **Track 04: AI Finance Controller**.
 >
 > Ten packages and three apps are committed — `money`, `domain`, `ledger`,
 > `engine`, `probe`, `oracle`, `generator`, `eval`, `llm`, `controller`, and
-> `apps/cli`, `apps/api`, `apps/web`. The suite is **3,326 tests across 144
+> `apps/cli`, `apps/api`, `apps/web`. The suite is **3,377 tests across 145
 > files**, with no type errors.
 >
 > **Spec version 1.4.38 · Benchmark version 1.0.13 · sealed, signed tag

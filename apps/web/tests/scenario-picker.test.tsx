@@ -6,7 +6,11 @@ import { ScenarioPicker } from "../src/components/ScenarioPicker.js";
 import { RunContext } from "../src/context/RunContext.js";
 import { CommandCenter } from "../src/pages/CommandCenter.js";
 import { DEMO_SCENARIOS, DEFAULT_SCENARIO_ID, scenarioFor } from "../src/lib/scenarios.js";
-import { ABSTAINED_VALUE_LABEL } from "../src/lib/copy.js";
+import {
+  ABSTAINED_VALUE_LABEL,
+  SCENARIO_LAB_HEADLINE,
+  SCENARIO_LAB_SUBHEAD,
+} from "../src/lib/copy.js";
 import type { CloseReport, RunSummary } from "../src/hooks/useAssayApi.js";
 import { CLOSE_500, CLOSE_CLOSED, CLOSE_MULTI, RUN, runContext } from "./fixtures.js";
 
@@ -56,11 +60,17 @@ describe("ScenarioPicker", () => {
   it.each(DEMO_SCENARIOS.map((s) => s.id))("marks %s pressed when it is the selection", (id) => {
     const markup = picker(id);
     // One pressed button, and it is this one. `aria-pressed` precedes the
-    // label in the rendered attribute order, so the label is what follows the
-    // opening tag it closes.
+    // button's contents in the rendered attribute order, so the label and its
+    // evidence line are what follow the opening tag it closes. Both are
+    // asserted: the button carries the period's name AND the evidence that
+    // distinguishes it, which is the comparison the lab exists to offer.
     expect([...markup.matchAll(/aria-pressed="true"/g)]).toHaveLength(1);
     const pressed = markup.split('aria-pressed="true">')[1] ?? "";
-    expect(pressed.slice(0, pressed.indexOf("</button>"))).toBe(scenarioFor(id)?.label);
+    const inner = pressed.slice(0, pressed.indexOf("</button>"));
+    const scenario = scenarioFor(id);
+    expect(scenario).toBeDefined();
+    expect(inner).toContain(`>${scenario?.label ?? ""}</span>`);
+    expect(inner).toContain(`>${scenario?.evidence ?? ""}</span>`);
   });
 
   it("disables every button while a run is in flight", () => {
@@ -242,5 +252,125 @@ describe("Command Center — the ambiguity alert reports abstained value", () =>
     );
     expect(html).not.toContain("Ambiguity Detected");
     expect(html).not.toContain(ABSTAINED_VALUE_LABEL);
+  });
+});
+
+/**
+ * The scenario lab's story: one system, four inputs.
+ *
+ * Four buttons with no framing read as four demos. The headline states the
+ * invariant and the variable together, so the controller behaving differently
+ * below is legible as a consequence of the evidence rather than of a mode the
+ * operator switched — which is the single claim the lab exists to make.
+ */
+describe("the scenario lab says what varies and what does not", () => {
+  const html = picker(DEFAULT_SCENARIO_ID);
+
+  it("leads with the one-line story", () => {
+    expect(html).toContain(SCENARIO_LAB_HEADLINE);
+    expect(html).toContain("Same Finance Controller. Different evidence. Different action.");
+  });
+
+  it("names what is held constant, so 'same controller' is checkable rather than asserted", () => {
+    expect(html).toContain(SCENARIO_LAB_SUBHEAD);
+    expect(html).toContain("Only the period changes");
+    expect(html).toContain("no threshold, constraint or provider is configured differently");
+  });
+
+  it("shows every period's evidence at once, not only the selected one's", () => {
+    for (const scenario of DEMO_SCENARIOS) {
+      expect(html, scenario.id).toContain(scenario.evidence);
+    }
+  });
+
+  /**
+   * The prohibition the picker has always carried, now asserted over the
+   * evidence lines too. What the controller does with a period is the panel's
+   * answer to give; a caption that predicted it would be a second, unchecked
+   * answer that could disagree with the real one.
+   */
+  it("predicts no outcome in any period's copy", () => {
+    const forbidden = [
+      "escalat", "closes", "will close", "closed period", "budget", "abstains",
+      "resolves", "outcome", "passes", "fails",
+    ];
+    for (const scenario of DEMO_SCENARIOS) {
+      const copy = `${scenario.evidence} ${scenario.description}`.toLowerCase();
+      for (const word of forbidden) {
+        expect(copy, `${scenario.id}: "${word}"`).not.toContain(word);
+      }
+    }
+  });
+});
+
+/**
+ * Switching periods, made legible.
+ *
+ * `CommandCenter` keys the controller panel on `run_id`, so a completed new run
+ * cannot leave the previous period's trace on screen. The gap this notice
+ * closes is the one before that: between clicking a period and pressing the
+ * button, every figure on the page — the trace included — still belongs to the
+ * period that ran, and a reviewer is entitled to be told so rather than to
+ * discover it by reading a rupee figure that answers a question they stopped
+ * asking.
+ */
+describe("switching periods says what carries over and what does not", () => {
+  const transition = (selected: string, ran: string | undefined): string =>
+    renderToStaticMarkup(
+      <ScenarioPicker selected={selected} disabled={false} onSelect={() => undefined} ranDataset={ran} />,
+    );
+
+  it("warns while the selection and the period on screen differ", () => {
+    const html = transition("demo-backlog", "demo-500");
+    expect(html).toContain("New period selected");
+    expect(html).toContain("Everything below still belongs to Ambiguity");
+    expect(html).toContain("Running Backlog starts a new period");
+  });
+
+  it("says the new run produces its own trace, and the old one does not carry over", () => {
+    const html = transition("demo-backlog", "demo-500");
+    expect(html).toContain("the controller produces a new trace over it");
+    expect(html).toContain("the Ambiguity trace does not carry over");
+  });
+
+  it("names both periods by their human labels, in the right roles", () => {
+    // Selected → the one about to run; ran → the one on screen. Reversing them
+    // would be a warning that points at the wrong period.
+    const html = transition("demo-close", "demo-multi");
+    expect(html).toContain("Everything below still belongs to Several items");
+    expect(html).toContain("Running Clean close starts a new period");
+  });
+
+  it("is silent when the selection is the period on screen", () => {
+    expect(transition("demo-500", "demo-500")).not.toContain("New period selected");
+  });
+
+  it("is silent before any run exists — there is nothing to have carried over", () => {
+    expect(transition("demo-500", undefined)).not.toContain("New period selected");
+  });
+});
+
+/**
+ * The Command Center's use of the notice: it must be driven by the period that
+ * actually ran, never by the selection, or the warning would never fire.
+ */
+describe("Command Center — the transition notice is driven by run.dataset", () => {
+  it("warns when the selection differs from the run on screen", () => {
+    const other = DEMO_SCENARIOS.find((s) => s.id !== RUN.dataset);
+    expect(other).toBeDefined();
+    const html = render(<CommandCenter />, runContext({ dataset: other?.id ?? "" }));
+    expect(html).toContain("New period selected");
+    expect(html).toContain("Everything below still belongs to Ambiguity");
+  });
+
+  it("does not warn when they agree", () => {
+    const html = render(<CommandCenter />, runContext({ dataset: RUN.dataset }));
+    expect(html).not.toContain("New period selected");
+  });
+
+  it("does not warn on the start screen, where no run has happened", () => {
+    const html = render(<CommandCenter />, runContext({ run: null, loading: false }));
+    expect(html).toContain(SCENARIO_LAB_HEADLINE);
+    expect(html).not.toContain("New period selected");
   });
 });

@@ -611,7 +611,7 @@ export interface ControllerTrace {
  * Drives the close controller over one run and reads its trace back.
  *
  * `start` is imperative, the same reason `useExplainDecision`'s `explain` is:
- * this is a button ("Run close loop"), not a fetch on mount. `refresh` reruns
+ * this is a button ("Run Finance Controller"), not a fetch on mount. `refresh` reruns
  * the SAME `GET`, which `apps/api`'s `routes/controller.ts` answers by
  * re-driving the controller over the still-sealed run rather than a cache —
  * so a second read is requirement 9's determinism, exercised from the browser.
