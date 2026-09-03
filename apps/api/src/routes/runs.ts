@@ -29,7 +29,13 @@ import type { RunRegistry, StoredRun } from "../registry.js";
  */
 
 /** `§10.2`'s outcome and the figures `PROJECT_SPEC.md §10` step 1 puts on screen. */
-function closeBody(stored: StoredRun): unknown {
+/**
+ * Exported so `apps/api/src/controller/runtime.ts` can bind `@assay/controller`'s
+ * `close_report` tool to it directly, rather than re-deriving the same
+ * projection a second time. `GET /runs/:id/close` and the controller's tool
+ * therefore read one body-building function, not two that could disagree.
+ */
+export function closeBody(stored: StoredRun): unknown {
   const { close, projection, chain } = stored.result.evidence;
   return {
     run_id: stored.run_id,
@@ -76,7 +82,8 @@ function closeBody(stored: StoredRun): unknown {
 }
 
 /** One row of `§9`'s *"exception + abstention queue, ranked by rupee value"*. */
-function queueRow(stored: StoredRun, decisionId: string): unknown {
+/** Exported for the same reason {@link closeBody} is: one shape, one function. */
+export function queueRow(stored: StoredRun, decisionId: string): unknown {
   const decision = stored.decisionsById.get(decisionId);
   if (decision === undefined) return null;
   return {

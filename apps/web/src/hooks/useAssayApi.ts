@@ -466,3 +466,127 @@ export function useExplainDecision(): {
 
   return { explain, reset, state };
 }
+
+// ---------------------------------------------------------------------------
+// The close controller — @assay/controller's trace, over apps/api's two new
+// routes. Additive: nothing above this line is touched.
+//
+// This phase's terminal state is escalation, never a financial write —
+// packages/controller/src/index.ts states the guarantee this surface reads
+// off `financial_write_performed`, which is always false while these
+// endpoints answer from the observe-only phase.
+// ---------------------------------------------------------------------------
+
+/** One item the controller routed to a person. A passthrough of `EscalationRecord`. */
+export interface ControllerEscalation {
+  decision_id: string;
+  entity_id: string;
+  obs_id: string;
+  kind: string;
+  reason: "AMBIGUOUS_CERTIFICATE" | "NO_DETERMINISTIC_WARRANT";
+  value_paise: number;
+  suspense_key: string;
+  comp_id: string | null;
+  certificate_reason: string | null;
+  probes_attempted: string[];
+  evidence_score_gap_bps: number | null;
+  epsilon_bps: number | null;
+  materiality_paise: number | null;
+  tau_paise: number | null;
+  closes_alone: boolean;
+}
+
+/** One point on the residual trajectory — one per close-gate reading. */
+export interface ControllerResidualPoint {
+  step_no: number;
+  unresolved_value_paise: number;
+  close_threshold_paise: number;
+  period_status: string;
+}
+
+/** One controller step — the unit `rule_fired` makes an audit record of. */
+export interface ControllerStep {
+  step_no: number;
+  state: string;
+  rule_fired: string;
+  tool: string | null;
+  tool_input_hash: string | null;
+  observation_digest: string | null;
+  observation_summary: string;
+  next_state: string;
+  caused_events: string[];
+  llm: { role: string; provider: string; status: string } | null;
+}
+
+/** The plan `PLAN` computed, last. */
+export interface ControllerPlan {
+  ids: string[];
+  eligible: ExceptionItem[];
+  ineligible_count: number;
+  covers_residual: boolean;
+  already_under_threshold: boolean;
+}
+
+/** `GET /api/runs/:id/controller` and `POST .../controller/start`'s body. */
+export interface ControllerTrace {
+  trace_id: string;
+  run_id: string;
+  phase: "observe-only";
+  terminal: "COMPLETE" | "HALT";
+  stop_reason: string | null;
+  halt_reason: string | null;
+  steps: ControllerStep[];
+  escalations: ControllerEscalation[];
+  plan: ControllerPlan | null;
+  residual_trajectory: ControllerResidualPoint[];
+  writes_attempted: number;
+  writes_applied: number;
+  financial_write_performed: boolean;
+  awaiting_human_review: boolean;
+}
+
+/**
+ * Drives the close controller over one run and reads its trace back.
+ *
+ * `start` is imperative, the same reason `useExplainDecision`'s `explain` is:
+ * this is a button ("Run close loop"), not a fetch on mount. `refresh` reruns
+ * the SAME `GET`, which `apps/api`'s `routes/controller.ts` answers by
+ * re-driving the controller over the still-sealed run rather than a cache —
+ * so a second read is requirement 9's determinism, exercised from the browser.
+ */
+export function useController(): {
+  start: (runId: string) => Promise<void>;
+  refresh: (runId: string) => Promise<void>;
+  state: ApiState<ControllerTrace>;
+} {
+  const [state, setState] = useState<ApiState<ControllerTrace>>({
+    data: null, loading: false, error: null,
+  });
+
+  const run = useCallback(async (method: "GET" | "POST", path: string) => {
+    setState((prev) => ({ ...prev, loading: true, error: null }));
+    try {
+      const res = await fetch(path, method === "POST" ? { method } : undefined);
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        throw new Error(`${String(res.status)}: ${body}`);
+      }
+      const result = (await res.json()) as ControllerTrace;
+      setState({ data: result, loading: false, error: null });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setState({ data: null, loading: false, error: msg });
+    }
+  }, []);
+
+  const start = useCallback(
+    (runId: string) => run("POST", `/api/runs/${runId}/controller/start`),
+    [run],
+  );
+  const refresh = useCallback(
+    (runId: string) => run("GET", `/api/runs/${runId}/controller`),
+    [run],
+  );
+
+  return { start, refresh, state };
+}
