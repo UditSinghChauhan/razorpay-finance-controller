@@ -527,6 +527,59 @@ export interface ControllerPlan {
   already_under_threshold: boolean;
 }
 
+/** The five questions the controller's runtime checks answer. */
+export type TelemetryGroup =
+  | "terminal"
+  | "policy"
+  | "containment"
+  | "grounding"
+  | "escalation";
+
+/** One runtime check the controller's telemetry layer derived from the trace. */
+export interface TelemetryCheck {
+  id: string;
+  group: TelemetryGroup;
+  passed: boolean;
+  detail: string;
+}
+
+/** Counters over one execution. Not rates, not scores — counts. */
+export interface TelemetryCounters {
+  steps: number;
+  step_budget: number;
+  tool_calls: number;
+  tool_calls_by_name: Record<string, number>;
+  writes_attempted: number;
+  writes_applied: number;
+  caused_events: number;
+  model_calls: number;
+  escalations: number;
+  plan_size: number;
+  eligible_items: number;
+  ineligible_items: number;
+}
+
+/**
+ * `EXPLORATORY` runtime telemetry, derived from the trace by the API.
+ *
+ * Not a benchmark metric and never comparable to one: nothing here is on
+ * `PREREGISTRATION.md §8`'s list, and `scope` carries the label the
+ * specification requires so a surface cannot render it unlabelled.
+ */
+export interface ControllerTelemetry {
+  scope: "EXPLORATORY";
+  trace_id: string;
+  run_id: string;
+  terminal: string;
+  stop_reason: string | null;
+  halt_reason: string | null;
+  checks: TelemetryCheck[];
+  checks_passed: number;
+  checks_total: number;
+  all_passed: boolean;
+  counters: TelemetryCounters;
+}
+
 /** `GET /api/runs/:id/controller` and `POST .../controller/start`'s body. */
 export interface ControllerTrace {
   trace_id: string;
@@ -543,6 +596,7 @@ export interface ControllerTrace {
   writes_applied: number;
   financial_write_performed: boolean;
   awaiting_human_review: boolean;
+  telemetry: ControllerTelemetry;
 }
 
 /**

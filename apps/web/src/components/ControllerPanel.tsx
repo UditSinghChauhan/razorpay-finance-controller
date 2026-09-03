@@ -5,7 +5,9 @@ import { formatCount, formatPaise } from "../lib/format.js";
 import {
   useController,
   type ControllerStep,
+  type ControllerTelemetry,
   type ControllerTrace,
+  type TelemetryGroup,
 } from "../hooks/useAssayApi.js";
 
 /**
@@ -161,6 +163,313 @@ function ResultSummary({ trace }: { trace: ControllerTrace }): React.ReactElemen
 }
 
 /**
+ * The run, as six sentences &mdash; what a reviewer reads before anything else
+ * on this panel.
+ *
+ * The strip above is the state machine's own vocabulary (`OBSERVE_CLOSE`,
+ * `TRIAGE`, `ACT`) and a reviewer who has not read
+ * `packages/controller/src/state.ts` cannot tell from it what the run actually
+ * did. This is the same chain in plain language: what it looked at, what it
+ * found, what it planned, what it read in full, what it refused to decide, and
+ * who is holding the outcome now.
+ *
+ * **Reachedness is the strip's own, not a second derivation.** A stage is
+ * marked reached exactly when the trace contains a step in the corresponding
+ * state &mdash; the identical `visitedStates` set the nodes above are drawn
+ * from &mdash; so the narrative and the strip cannot disagree about what
+ * happened. The detail lines read structured fields only (`plan`,
+ * `residual_trajectory`, the telemetry counters); no `observation_summary`
+ * string is parsed and no figure is computed, summed or inferred here.
+ */
+interface NarrativeStage {
+  readonly key: string;
+  readonly state: string;
+  readonly label: string;
+  readonly detail: string;
+}
+
+function narrativeStages(trace: ControllerTrace): NarrativeStage[] {
+  const point = trace.residual_trajectory.at(0) ?? null;
+  const plan = trace.plan;
+  const c = trace.telemetry.counters;
+  const inspections = c.tool_calls_by_name["decision_evidence"] ?? 0;
+
+  const observed = point
+    ? `the close gate reports the period ${point.period_status} on ` +
+      `${formatPaise(point.unresolved_value_paise)} unresolved against a close threshold of ` +
+      `${formatPaise(point.close_threshold_paise)}.`
+    : "the close gate was never read; the loop stopped before it could observe anything.";
+
+  // Whether the queue was read is a tool-call fact; the two counts beside it
+  // are the PLAN's split of it. When the loop read the queue but stopped
+  // before planning, both counters are legitimately zero — reporting them as
+  // "0 eligible" there would state a finding the run never made.
+  const queueReads = c.tool_calls_by_name["exception_queue"] ?? 0;
+  let triaged: string;
+  if (queueReads === 0) {
+    triaged = "the exception queue was never read.";
+  } else if (plan === null) {
+    triaged = "the exception queue was read, but the loop stopped before the plan that ranks it was formed.";
+  } else {
+    triaged =
+      `the exception queue was read and value-ranked: ${formatCount(c.eligible_items)} item(s) ` +
+      `whose clearing could move the residual, ${formatCount(c.ineligible_items)} open with no ` +
+      `Suspense item and so outside the close arithmetic.`;
+  }
+
+  let planned: string;
+  if (plan === null) {
+    planned = "no plan was formed.";
+  } else if (plan.already_under_threshold) {
+    planned = "the residual was already under the close threshold; no closing set was needed.";
+  } else if (plan.ids.length === 0) {
+    planned = "nothing on the queue was eligible, so no closing set exists to work.";
+  } else {
+    planned =
+      `a closing set of ${formatCount(plan.ids.length)} was chosen \u2014 ` +
+      (plan.covers_residual
+        ? "clearing it would bring the residual under the close threshold."
+        : "clearing every item on it would still leave the residual above the threshold.");
+  }
+
+  const inspected =
+    inspections === 0
+      ? "no decision's evidence was opened."
+      : `${formatCount(inspections)} decision(s) were read in full \u2014 the Ambiguity ` +
+        `Certificate, the candidates it left open, and the ledger event behind them.`;
+
+  let escalated: string;
+  if (trace.escalations.length > 0) {
+    escalated =
+      `${formatCount(trace.escalations.length)} item(s) were routed to a person: ASSAY abstained ` +
+      `and the controller has no authority to choose between the allocations it left open.`;
+  } else if (trace.stop_reason === "CLOSED") {
+    escalated = "nothing needed escalating \u2014 the period was already within its close threshold.";
+  } else if (trace.stop_reason === "NO_ELIGIBLE_ITEM") {
+    escalated = "nothing was eligible to escalate.";
+  } else {
+    escalated = "nothing was escalated.";
+  }
+
+  const review = trace.awaiting_human_review
+    ? `${formatCount(trace.escalations.length)} item(s) are waiting on a person. No financial ` +
+      `write is available in this phase: the controller's terminal state is a human, not a posting.`
+    : "no handoff was made. Nothing was written either way \u2014 this phase performs no " +
+      "financial write on any path.";
+
+  return [
+    { key: "observed", state: "OBSERVE_CLOSE", label: "Observed the close gate", detail: observed },
+    { key: "triaged", state: "TRIAGE", label: "Triaged the queue", detail: triaged },
+    { key: "planned", state: "PLAN", label: "Planned the closing set", detail: planned },
+    { key: "inspected", state: "ACT", label: "Inspected the evidence", detail: inspected },
+    { key: "escalated", state: "ESCALATE", label: "Escalated what it may not decide", detail: escalated },
+    { key: "review", state: "AWAIT_HUMAN", label: "Handed to human review", detail: review },
+  ];
+}
+
+/**
+ * Renders {@link narrativeStages}.
+ *
+ * A stage the run did not reach is shown greyed and struck through rather than
+ * hidden: a reviewer needs to see that the loop stopped at triage, not be left
+ * to infer it from an absence. The label and its separator are one string so
+ * the markup carries no element boundary a substring assertion could catch by
+ * accident.
+ */
+function RunNarrative({ trace }: { trace: ControllerTrace }): React.ReactElement {
+  const visited = new Set(trace.steps.map((s) => s.state));
+  const stages = narrativeStages(trace);
+  return (
+    <div className="card" style={{ padding: "var(--space-md)", marginBottom: "var(--space-lg)" }}>
+      <p className="font-label-caps text-muted" style={{ marginBottom: "var(--space-sm)" }}>
+        What this run did
+      </p>
+      <ol style={{ listStyle: "none", margin: 0, padding: 0 }}>
+        {stages.map((stage, i) => {
+          const reached = visited.has(stage.state);
+          return (
+            <li
+              key={stage.key}
+              style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: i === stages.length - 1 ? 0 : 6 }}
+            >
+              <span
+                className="material-symbols-outlined"
+                aria-hidden="true"
+                style={{
+                  fontSize: 14, lineHeight: "18px", flexShrink: 0,
+                  color: reached ? "var(--color-secondary)" : "var(--color-outline)",
+                }}
+              >
+                {reached ? "check_circle" : "radio_button_unchecked"}
+              </span>
+              <p
+                className="font-body-sm"
+                style={{ marginBottom: 0, lineHeight: 1.6, opacity: reached ? 1 : 0.55 }}
+              >
+                <span className="font-label-caps" style={{ color: reached ? "var(--color-secondary)" : "var(--color-outline)" }}>
+                  {`${stage.label} — `}
+                </span>
+                <span className="text-muted">{stage.detail}</span>
+              </p>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
+/** The five questions the runtime checks answer, in the order they are shown. */
+const TELEMETRY_GROUP_LABEL: Record<string, string> = {
+  terminal: "Terminal correctness",
+  policy: "Policy compliance",
+  containment: "Containment — no financial write",
+  grounding: "Evidence grounding & reproducibility",
+  escalation: "Escalation correctness",
+};
+
+const TELEMETRY_GROUP_ORDER = [
+  "terminal",
+  "policy",
+  "containment",
+  "grounding",
+  "escalation",
+] as const;
+
+/**
+ * The runtime telemetry block &mdash; what makes "it ran a bounded agentic
+ * workflow" checkable rather than asserted.
+ *
+ * Every row is a property `@assay/controller` derived from the trace in the
+ * same response, so a reviewer who distrusts the summary can expand the step
+ * log beside it and recompute. The `EXPLORATORY` label is rendered, not
+ * implied: `DECISION_BRIEF.md §L.4` requires it of any metric outside
+ * `PREREGISTRATION.md §8`, and none of these is on that list &mdash; they are
+ * properties of one execution, not scores, and they are not comparable to a
+ * benchmark figure.
+ */
+function TelemetryBlock({ telemetry }: { telemetry: ControllerTelemetry }): React.ReactElement {
+  const c = telemetry.counters;
+  const ok = telemetry.all_passed;
+  return (
+    <div style={{ marginBottom: "var(--space-lg)" }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-sm)", marginBottom: "var(--space-sm)", flexWrap: "wrap" }}>
+        <p className="font-label-caps text-muted" style={{ marginBottom: 0 }}>Runtime checks</p>
+        <span className="badge badge-open" style={{ fontSize: 9 }}>{telemetry.scope}</span>
+        <span
+          className="font-body-sm"
+          style={{ color: ok ? "var(--color-reconciled)" : "var(--color-exception)", fontWeight: 600 }}
+        >
+          {formatCount(telemetry.checks_passed)} / {formatCount(telemetry.checks_total)} passed
+        </span>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "var(--space-md)" }}>
+        {TELEMETRY_GROUP_ORDER.map((group) => {
+          const rows = telemetry.checks.filter((k) => k.group === (group as TelemetryGroup));
+          if (rows.length === 0) return null;
+          return (
+            <div key={group} className="card" style={{ padding: "var(--space-md)" }}>
+              <p className="font-label-caps text-muted" style={{ marginBottom: 6, fontSize: 9 }}>
+                {TELEMETRY_GROUP_LABEL[group] ?? group}
+              </p>
+              {rows.map((k) => (
+                <div key={k.id} style={{ display: "flex", gap: 6, alignItems: "flex-start", marginBottom: 4 }}>
+                  <span
+                    className="material-symbols-outlined"
+                    aria-hidden="true"
+                    style={{
+                      fontSize: 13, lineHeight: "16px", flexShrink: 0,
+                      color: k.passed ? "var(--color-reconciled)" : "var(--color-exception)",
+                    }}
+                  >
+                    {k.passed ? "check_circle" : "cancel"}
+                  </span>
+                  <span className="font-body-sm" style={{ fontSize: 11, lineHeight: "16px" }}>
+                    <span className="cell-id" style={{ fontSize: 10 }}>{k.id}</span>
+                    <span className="text-muted"> &mdash; {k.detail}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Counters. Counts of what happened in this one execution — not rates,
+          not scores, and not comparable across runs or against a benchmark. */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-md)", marginTop: "var(--space-md)" }}>
+        {[
+          ["steps", `${formatCount(c.steps)} / ${formatCount(c.step_budget)} budget`],
+          ["tool calls", formatCount(c.tool_calls)],
+          ["writes attempted", formatCount(c.writes_attempted)],
+          ["writes applied", formatCount(c.writes_applied)],
+          ["ledger events caused", formatCount(c.caused_events)],
+          ["model calls", formatCount(c.model_calls)],
+          ["escalations", formatCount(c.escalations)],
+          ["eligible / ineligible", `${formatCount(c.eligible_items)} / ${formatCount(c.ineligible_items)}`],
+        ].map(([label, value]) => (
+          <div key={label}>
+            <p className="font-label-caps text-muted" style={{ fontSize: 9, marginBottom: 2 }}>{label}</p>
+            <p className="font-numeric-mono" style={{ fontSize: 12 }}>{value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-md)", marginTop: "var(--space-sm)" }}>
+        {Object.entries(c.tool_calls_by_name).map(([name, n]) => (
+          <span key={name} className="cell-id" style={{ fontSize: 10 }}>
+            {name} &times;{formatCount(n)}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Why one item reached a person, composed from the escalation record's own
+ * fields.
+ *
+ * A reviewer should not have to know what `AMBIGUOUS_CERTIFICATE` means, nor
+ * hold `\u03b5` and `\u03c4` in their head, to see the reasoning: ASSAY found two
+ * allocations it could not separate on the evidence, the gap between them sat
+ * inside the tolerance, the amount at stake was above the materiality floor,
+ * and the controller has no authority to pick one. Every quantity below is the
+ * certificate's, formatted; none is computed here.
+ */
+function escalationWhy(e: ControllerTrace["escalations"][number]): string {
+  if (e.reason !== "AMBIGUOUS_CERTIFICATE") {
+    return (
+      "ASSAY opened a Suspense item here and no deterministic rule can clear it: " +
+      "the correct posting is the thing that is not known. A person decides."
+    );
+  }
+  const gap = e.evidence_score_gap_bps;
+  const eps = e.epsilon_bps;
+  const parts: string[] = [];
+  parts.push(
+    `ASSAY abstained (${e.certificate_reason ?? "certificate"}): two allocations satisfy every ` +
+      `hard constraint and the evidence does not separate them`,
+  );
+  if (gap !== null && eps !== null) {
+    parts.push(`they differ by ${String(gap)} bps, inside the \u03b5 tolerance of ${String(eps)} bps`);
+  }
+  if (e.materiality_paise !== null && e.tau_paise !== null) {
+    parts.push(
+      `the amount at stake (${formatPaise(e.materiality_paise)}) is above the materiality floor ` +
+        `\u03c4 of ${formatPaise(e.tau_paise)}, so it is not too small to matter`,
+    );
+  }
+  parts.push(
+    e.probes_attempted.length === 0
+      ? "no admissible probe could break the tie"
+      : `${String(e.probes_attempted.length)} probe(s) were tried and none broke the tie`,
+  );
+  return `${parts.join("; ")}. The controller may not choose between them, so it escalated.`;
+}
+
+/**
  * Renders one `ControllerTrace` in full: state strip, result summary,
  * escalation cards, halt notice and the (collapsible) step log.
  *
@@ -196,7 +505,11 @@ export function ControllerTraceView({
         />
       </div>
 
+      <RunNarrative trace={trace} />
+
       <ResultSummary trace={trace} />
+
+      <TelemetryBlock telemetry={trace.telemetry} />
 
       {/* Escalations */}
       {trace.escalations.length > 0 && (
@@ -224,6 +537,13 @@ export function ControllerTraceView({
                 </div>
                 <span className="font-numeric-mono">{formatPaise(e.value_paise)}</span>
               </div>
+              {/* Why this reached a person, as a chain rather than a code:
+                  what ASSAY decided, on what evidence, and why the controller
+                  is not permitted to resolve it. Every figure is the
+                  certificate's own. */}
+              <p className="font-body-sm text-muted" style={{ marginTop: 6, fontSize: 11, lineHeight: 1.6 }}>
+                {escalationWhy(e)}
+              </p>
               {e.closes_alone && (
                 <p className="font-body-sm text-muted" style={{ marginTop: 4, fontSize: 11 }}>
                   Clearing this item alone would bring the residual under the close threshold.

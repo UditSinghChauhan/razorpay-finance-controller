@@ -26,6 +26,7 @@ export {
   type CertificateAllocation,
 } from "./allocation.js";
 export { RunRegistry, type RegistryOptions, type StoredRun } from "./registry.js";
+export { controllerRoutes, type ControllerRouteOptions } from "./routes/controller.js";
 export { explainRoutes, type ExplainRouteOptions } from "./routes/explain.js";
 export {
   EXPLAIN_PROMPTS,
