@@ -5,6 +5,7 @@ import {
   type ExplanationResponse,
   type GroundingCheckOutcome,
 } from "../hooks/useAssayApi.js";
+import { EXPLANATION_AUTHORITY_LINE, resolvedModelLine } from "../lib/copy.js";
 
 /**
  * "Explain with AI" - the grounded explanation panel.
@@ -87,6 +88,13 @@ function Shell({ children }: { children: React.ReactNode }): React.ReactElement 
       <p className="font-body-sm text-muted" style={{ marginBottom: "var(--space-md)", fontSize: 12 }}>
         Grounded in ASSAY evidence
       </p>
+      {/* The authority ordering, stated inside the panel that could otherwise
+          be mistaken for the decision. It is the same sentence on every branch
+          — success, refusal, unavailability — because the ordering does not
+          depend on whether the provider answered. */}
+      <p className="font-body-sm" style={{ marginBottom: "var(--space-md)", fontSize: 12, fontWeight: 600 }}>
+        {EXPLANATION_AUTHORITY_LINE}
+      </p>
       <div
         style={{
           border: "1px solid var(--color-outline-variant)",
@@ -145,13 +153,15 @@ function EvidenceSummaryBlock({ fallback }: { fallback: EvidenceSummary }): Reac
           </li>
         ))}
       </ul>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-lg)" }}>
+      <div className="grid grid-2" style={{ gap: "var(--space-lg)" }}>
         <div>
           <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Risk while unresolved</p>
           <p className="font-body-sm" style={{ lineHeight: 1.6 }}>{fallback.risk}</p>
         </div>
         <div>
-          <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Suggested next step</p>
+          <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>
+            Suggested next step &mdash; for a person
+          </p>
           <p className="font-body-sm" style={{ lineHeight: 1.6 }}>{fallback.next_step}</p>
         </div>
       </div>
@@ -168,7 +178,8 @@ export function AiExplanationPrompt({
       <p className="font-body-sm text-muted" style={{ marginBottom: "var(--space-md)", maxWidth: 620 }}>
         ASSAY has already made this decision. An AI explanation reads the verified evidence
         on this page and puts it in plain language. It has no authority over the outcome and
-        cannot change the certificate, the ledger or any amount.
+        cannot change the certificate, the ledger or any amount. Resolving the allocation is a
+        human action, not one this panel can take.
       </p>
       <button
         className="btn btn-secondary"
@@ -262,13 +273,19 @@ export function AiExplanationResult({
             ))}
           </ul>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-lg)" }}>
+          <div className="grid grid-2" style={{ gap: "var(--space-lg)" }}>
             <div>
               <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Risk while unresolved</p>
               <p className="font-body-sm" style={{ lineHeight: 1.6 }}>{explanation.risk}</p>
             </div>
             <div>
-              <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Suggested next step</p>
+              {/* A suggestion to a person, and labelled as one. The panel has
+                  no authority to take it, and the resolution actions it would
+                  imply do not exist in this phase — the controller's terminal
+                  state is a human, not a posting. */}
+              <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>
+                Suggested next step &mdash; for a person
+              </p>
               <p className="font-body-sm" style={{ lineHeight: 1.6 }}>{explanation.next_step}</p>
             </div>
           </div>
@@ -349,7 +366,7 @@ export function AiExplanationResult({
           )}
           {provider !== null && (
             <>
-              {" "}Model {provider.model_id} via {provider.provider}, grounded against{" "}
+              {" "}{resolvedModelLine(provider.model_id, provider.provider)}, grounded against{" "}
               {String(grounding.evidence_item_count)} verified evidence items.
             </>
           )}

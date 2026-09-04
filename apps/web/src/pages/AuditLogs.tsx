@@ -1,16 +1,19 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { CopyButton } from "../components/CopyId.js";
+import { ApiErrorNotice, useRunGate } from "../components/RunGate.js";
 import { useRun } from "../context/RunContext.js";
 import {
   useLedgerVerify,
   type ApiState,
   type LedgerVerification,
 } from "../hooks/useAssayApi.js";
+import { AUDIT_SCOPE, VERIFY_LEDGER_TITLE } from "../lib/copy.js";
 import { formatCount, formatPaise } from "../lib/format.js";
 
 /**
- * Audit Logs &mdash; `ARCHITECTURE.md §9`'s `GET /runs/:id/ledger/verify`, in
+ * Verify Ledger &mdash; `ARCHITECTURE.md §9`'s `GET /runs/:id/ledger/verify`, in
  * front of a reviewer.
  *
  * > *"Recomputes the hash chain from genesis, re-projects balances, re-checks
@@ -132,11 +135,18 @@ function HashLine({
   label, value, expanded,
 }: { label: string; value: string; expanded: boolean }): React.ReactElement {
   return (
-    <div>
+    <div style={{ minWidth: 0 }}>
       <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>{label}</p>
-      <p className="cell-id" style={{ fontSize: 11, wordBreak: "break-all", lineHeight: 1.6 }}>
-        {expanded ? value : `${value.slice(0, HASH_PREFIX)}…`}
-      </p>
+      <div className="id-line">
+        <p className="cell-id" style={{ fontSize: 11, lineHeight: 1.6 }}>
+          {expanded ? value : `${value.slice(0, HASH_PREFIX)}…`}
+        </p>
+        {/* The copy control carries the WHOLE hash even while the display is
+            abbreviated, and carries it in a click handler rather than in an
+            attribute — so an abbreviated hash costs the reviewer nothing and
+            the document still contains only what is on screen. */}
+        <CopyButton value={value} label={label} />
+      </div>
     </div>
   );
 }
@@ -163,7 +173,7 @@ function RootComparison({ verification }: { verification: LedgerVerification }):
         Recomputed root vs. stored root
       </h2>
       <div className="card" style={{ padding: "var(--space-lg)" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-lg)" }}>
+        <div className="grid grid-2" style={{ gap: "var(--space-lg)" }}>
           <HashLine label="Recomputed from genesis" value={verification.recomputed_root_hash} expanded={expanded} />
           <HashLine label="Stored on the run" value={verification.stored_root_hash} expanded={expanded} />
         </div>
@@ -208,7 +218,7 @@ function TrialBalance({ verification }: { verification: LedgerVerification }): R
         Trial balance, re-projected from the event log
       </h2>
       <div className="card" style={{ padding: "var(--space-lg)" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--space-lg)", alignItems: "start" }}>
+        <div className="grid grid-3" style={{ gap: "var(--space-lg)", alignItems: "start" }}>
           <div>
             <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Total debit</p>
             <p className="font-numeric-mono" style={{ fontSize: 18, fontWeight: 600 }}>
@@ -303,20 +313,31 @@ export function VerificationResult({
   verification, onEvidenceClick,
 }: { verification: LedgerVerification; onEvidenceClick: () => void }): React.ReactElement {
   const passed = allPassed(verification);
+  // Named here rather than left for a reviewer to find by scanning three rows:
+  // a failed check is the most important thing this page can say, and it must
+  // be readable without scrolling. Read off the response's own `passed` flags.
+  const failing = verification.checks.filter((c) => !c.passed);
   return (
     <>
       <div
         className="card"
         style={{
           padding: "var(--space-lg)", marginBottom: "var(--space-xl)",
-          borderLeft: `4px solid ${passed ? "var(--color-reconciled)" : "var(--color-exception)"}`,
+          borderLeft: `6px solid ${passed ? "var(--color-reconciled)" : "var(--color-exception)"}`,
+          background: passed ? "var(--color-surface-container-lowest)" : "var(--color-exception-bg)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", marginBottom: "var(--space-xs)" }}>
-          <CheckIcon passed={passed} />
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", marginBottom: "var(--space-xs)", flexWrap: "wrap" }}>
+          <span
+            className="material-symbols-outlined"
+            aria-hidden="true"
+            style={{ fontSize: 28, color: passed ? "var(--color-reconciled)" : "var(--color-exception)" }}
+          >
+            {passed ? "verified" : "gpp_bad"}
+          </span>
           <p
-            className="font-headline-sm"
-            style={{ color: passed ? "var(--color-reconciled)" : "var(--color-exception)" }}
+            className="font-display-metric"
+            style={{ fontSize: 24, lineHeight: "30px", color: passed ? "var(--color-reconciled)" : "var(--color-exception)" }}
           >
             {passed ? "Chain verified" : "Verification failed"}
           </p>
@@ -326,6 +347,21 @@ export function VerificationResult({
             ? "Every named check below passed on this recomputation."
             : "At least one named check below failed. The engine's sealed decisions and the stored event log are unchanged by this check — verification reads the chain, it does not repair it."}
         </p>
+        {failing.length > 0 && (
+          <ul style={{ margin: "var(--space-sm) 0 0", padding: 0 }}>
+            {failing.map((c) => (
+              <li
+                key={c.name}
+                className="font-body-md"
+                style={{ listStyle: "none", display: "flex", alignItems: "center", gap: 6, fontWeight: 600, color: "var(--color-exception)" }}
+              >
+                <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 16 }}>cancel</span>
+                <span className="cell-id" style={{ fontSize: 12, color: "inherit" }}>{c.name}</span>
+                <span>failed</span>
+              </li>
+            ))}
+          </ul>
+        )}
         {/* The run the RESPONSE names, kept beside the run this page was
             pointed at rather than assumed to be the same one. They should
             always agree; if they ever did not, a reviewer would be reading a
@@ -335,7 +371,7 @@ export function VerificationResult({
         </p>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-md)", marginBottom: "var(--space-xl)" }}>
+      <div className="grid grid-4" style={{ marginBottom: "var(--space-xl)" }}>
         <div className="card" style={{ padding: "var(--space-md)" }}>
           <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Chain integrity</p>
           <p
@@ -461,23 +497,28 @@ export function ChainVerification({
       </div>
 
       {state.loading && (
-        <div style={{ padding: "var(--space-xl)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "var(--space-md)" }}>
+        <div className="page" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "var(--space-md)" }}>
           <div className="loading-spinner" />
           <p className="font-body-md text-muted">Recomputing the chain from genesis&hellip;</p>
         </div>
       )}
 
       {state.error !== null && !state.loading && (
-        <div className="card" style={{ padding: "var(--space-lg)", borderLeft: "4px solid var(--color-exception)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", marginBottom: "var(--space-xs)" }}>
-            <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 18, color: "var(--color-exception)" }}>error</span>
-            <p className="font-headline-sm text-error">Verification could not be run</p>
-          </div>
-          {/* The server's own sentence, not a status code and not a verdict.
-              A request that never completed has established nothing about the
-              chain, and this must not be mistaken for a failed check. */}
-          <p className="font-body-sm text-muted" style={{ lineHeight: 1.6 }}>{state.error}</p>
-          <p className="font-body-sm text-muted" style={{ marginTop: "var(--space-sm)", fontSize: 11 }}>
+        <div>
+          {/* Classified, not printed: a rejected fetch is the API process not
+              being there and gets the operator's fix; a status the server
+              answered keeps its own sentence, because that sentence is the
+              only information the response carried. Retry re-runs THIS check
+              and nothing else — no run is started and no decision is remade. */}
+          <ApiErrorNotice
+            error={state.error}
+            title="Verification could not be run"
+            onRetry={onVerify}
+          />
+          {/* Said once, under whichever of the two branches rendered: a request
+              that never completed has established nothing about the chain, and
+              must not be mistaken for a failed check. */}
+          <p className="font-body-sm text-muted" style={{ textAlign: "center", lineHeight: 1.6 }}>
             No check ran, so nothing is known either way about this chain.
           </p>
         </div>
@@ -508,12 +549,18 @@ export function AuditLogs(): React.ReactElement {
   const navigate = useNavigate();
   const { run, startDemo } = useRun();
   const { verify, state } = useLedgerVerify();
+  const gate = useRunGate();
+
+  // Restoring / not-found / API-unreachable, before "No active run": on a
+  // reload the pointer is still being resolved, and telling a reviewer there
+  // is nothing to verify over a run that is about to arrive is false.
+  if (gate !== null) return gate;
 
   if (!run) {
     return (
-      <div style={{ padding: "var(--space-xl)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "60vh", gap: "var(--space-lg)" }}>
+      <div className="page" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "60vh", gap: "var(--space-lg)" }}>
         <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 48, color: "var(--color-outline)" }}>history_edu</span>
-        <h1 className="page-title">Audit Logs</h1>
+        <h1 className="page-title">{VERIFY_LEDGER_TITLE}</h1>
         <p className="page-subtitle" style={{ textAlign: "center", maxWidth: 460 }}>
           No active run. A chain is verified against the run that produced it, so there is
           nothing to recompute until one has been started.
@@ -524,11 +571,11 @@ export function AuditLogs(): React.ReactElement {
   }
 
   return (
-    <div style={{ padding: "var(--space-lg)" }}>
+    <div className="page">
       <div className="page-header" style={{ padding: 0, marginBottom: "var(--space-lg)" }}>
         <div>
-          <h1 className="page-title">Audit Logs</h1>
-          <p className="page-subtitle">Hash-chain verification for the current run</p>
+          <h1 className="page-title">{VERIFY_LEDGER_TITLE}</h1>
+          <p className="page-subtitle" style={{ maxWidth: 780, lineHeight: 1.6 }}>{AUDIT_SCOPE}</p>
         </div>
       </div>
 

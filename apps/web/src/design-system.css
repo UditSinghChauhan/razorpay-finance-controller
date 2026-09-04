@@ -580,3 +580,459 @@ html, body, #root {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE SHELL — added in the reviewer-experience pass.
+
+   The shell was fixed at a 288px sidebar with the topbar and the content
+   region both offset by that constant. Below roughly 1200px that constant is
+   most of the readable width, and the two-column pages (Evidence Trail,
+   Ambiguity Certificate) lost a whole column off the right edge of the
+   viewport — content a reviewer could not reach and had no way to know was
+   there.
+
+   Three shell modes, keyed on width and nothing else:
+
+     ≥ 1201px   full sidebar, labels beside icons          (verified at 1440)
+     901–1200px compact rail: icon above a short label     (verified at 1200,
+                                                            1024)
+     ≤ 900px    off-canvas drawer behind a menu button     (verified at 900,
+                                                            768, 480)
+
+   `--sidebar-width` is the only thing the topbar and the content region read,
+   so each mode sets that one variable and the offsets follow. The drawer sets
+   it to 0 and takes the sidebar out of flow entirely.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Width of the compact rail, and the drawer's own width when it is open. */
+  --sidebar-rail-width: 88px;
+  --sidebar-drawer-width: 272px;
+  /* The widest a page's content may grow. Long measures are unreadable, and a
+     4K monitor should not stretch a table of hashes across a metre of glass. */
+  --page-max-width: 1440px;
+}
+
+/* The sidebar is a scroll container of its own so a long nav never pushes the
+   logo off screen, and `min-width: 0` on the main column is what lets a wide
+   child (a table, a hash) shrink instead of forcing the shell wider. */
+.app-main { min-width: 0; }
+.app-content { overflow-x: auto; }
+
+/* Everything inside a page participates in the shrink. Without this a grid
+   child's default `min-width: auto` makes an overflowing cell widen its track,
+   which is how a table ends up pushing the whole page sideways. */
+.app-content :where(section, article, div, table) { min-width: 0; }
+
+/* The menu button exists only where the drawer does. */
+.app-menu-button {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-right: var(--space-sm);
+  border: 1px solid var(--color-outline-variant);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-container-lowest);
+  color: var(--color-on-surface);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* The scrim behind an open drawer. Absent in the other two modes. */
+.app-scrim {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(25, 28, 30, 0.44);
+  z-index: 45;
+  border: none;
+  padding: 0;
+}
+
+/* The two nav label variants. The full one is the default; the rail swaps to
+   the short one. Both are in the document at every width — the swap is CSS, so
+   a reviewer searching the page finds the section either way. */
+.sidebar-nav-label-short { display: none; }
+
+/* A step number down the left of the nav, so the reviewer journey is legible
+   as a journey rather than as five unrelated destinations. */
+.sidebar-step {
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-on-surface-variant);
+  background: var(--color-surface-container);
+  border-radius: var(--radius-sm);
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.sidebar-nav-link.active .sidebar-step {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+/* A journey step that exists but is not reachable yet — Evidence Trail and
+   Ambiguity Certificate before a decision has been selected. Rendered rather
+   than hidden: the reviewer needs to see the shape of the journey, and that
+   these two are reached by drilling into a decision. */
+.sidebar-nav-link[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* ── Medium: the compact rail ──────────────────────────────────────────── */
+@media (max-width: 1200px) {
+  :root { --sidebar-width: var(--sidebar-rail-width); }
+
+  .sidebar-logo { padding: 0 var(--space-sm); justify-content: center; }
+  .sidebar-wordmark { display: none; }
+
+  .sidebar-nav-section-label { padding: 0 var(--space-xs); text-align: center; font-size: 9px; }
+
+  .sidebar-nav-link {
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--space-sm) var(--space-xs);
+    text-align: center;
+    border-right-width: 2px;
+  }
+  .sidebar-nav-label-full { display: none; }
+  .sidebar-nav-label-short {
+    display: block;
+    font-size: 10px;
+    line-height: 13px;
+    font-weight: 600;
+  }
+  .sidebar-step { display: none; }
+}
+
+/* ── Narrow: the drawer ────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  :root { --sidebar-width: 0px; }
+
+  /* A closed drawer is off-canvas AND out of reach.
+     `transform: translateX(-100%)` moves it out of sight and nothing else: the
+     five nav links stay in the tab order, so a keyboard reviewer tabbed through
+     an invisible menu before reaching the page, and a screen reader read a
+     navigation the page does not currently offer. `visibility: hidden` is the
+     property that removes an element from BOTH the tab order and the
+     accessibility tree, which is the correct semantics here rather than an
+     over-reach: when the drawer is closed the menu button is the affordance,
+     and it is announced (`aria-expanded`) in its place. Scoped to this
+     breakpoint only, so the compact rail and the full sidebar — which are
+     always on screen — are untouched.
+
+     `visibility` is transitioned alongside `transform` so it flips to `hidden`
+     at the END of the slide-out rather than blanking the drawer mid-animation. */
+  .app-sidebar {
+    width: var(--sidebar-drawer-width);
+    max-width: 86vw;
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition: transform 180ms ease-out, visibility 180ms ease-out;
+    box-shadow: 2px 0 24px rgba(0, 0, 0, 0.12);
+  }
+  .app-sidebar[data-open="true"] { transform: translateX(0); visibility: visible; }
+
+  /* The drawer is the full-label layout again — there is room for it, and a
+     rail inside a drawer would be the worst of both. */
+  .sidebar-logo { padding: 0 var(--space-lg); justify-content: flex-start; }
+  .sidebar-wordmark { display: inline; }
+  .sidebar-nav-section-label { padding: 0 var(--space-lg); text-align: left; font-size: var(--font-label-caps-size); }
+  .sidebar-nav-link {
+    flex-direction: row;
+    gap: var(--space-md);
+    padding: var(--space-sm) var(--space-lg);
+    text-align: left;
+  }
+  .sidebar-nav-label-full { display: inline; }
+  .sidebar-nav-label-short { display: none; }
+  .sidebar-step { display: inline-flex; }
+
+  .app-menu-button { display: inline-flex; }
+  .app-scrim[data-open="true"] { display: block; }
+
+  .app-topbar { padding: 0 var(--space-md); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PAGE LAYOUT PRIMITIVES
+
+   The pages carried their column counts as inline `gridTemplateColumns`
+   strings — `repeat(4, 1fr)`, `1.2fr 1fr` — which a media query cannot reach.
+   These classes are the same layouts expressed where the breakpoints can see
+   them. `minmax(0, 1fr)` rather than `1fr` throughout, because `1fr` floors at
+   the content's intrinsic width and a long hash in one cell will otherwise
+   widen the whole grid.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.page {
+  padding: var(--space-lg);
+  max-width: var(--page-max-width);
+  margin: 0 auto;
+}
+
+.grid { display: grid; gap: var(--space-md); }
+.grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+/* The evidence layout: decision on the left, its accounting consequence and
+   verification metadata on the right. One column as soon as two would make
+   either side narrower than a hash. */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: var(--space-xl);
+  align-items: start;
+}
+
+/* Intentional LOCAL horizontal scrolling for a table that genuinely cannot
+   reflow — never a viewport-level overflow, and never a clipped edge. */
+.scroll-x {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+@media (max-width: 1200px) {
+  .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 1100px) {
+  .split { grid-template-columns: minmax(0, 1fr); gap: var(--space-lg); }
+}
+
+@media (max-width: 900px) {
+  .grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 768px) {
+  .page { padding: var(--space-md); }
+  .grid-2, .grid-3 { grid-template-columns: minmax(0, 1fr); }
+  .page-header { flex-direction: column; align-items: flex-start; gap: var(--space-md); }
+}
+
+@media (max-width: 560px) {
+  .grid-4 { grid-template-columns: minmax(0, 1fr); }
+  .page { padding: var(--space-sm); }
+  .page-title { font-size: 20px; line-height: 28px; }
+  :root { --font-display-metric-size: 26px; --font-display-metric-line-height: 34px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   IDENTIFIERS AND HASHES
+
+   A 64-hex hash in a narrow column is the single most common way this app
+   pushed content off screen. Every identifier surface now wraps at any
+   character rather than at a word boundary, and the ones that are shown
+   abbreviated carry a copy control so the abbreviation costs the reviewer
+   nothing.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.cell-id { overflow-wrap: anywhere; word-break: break-word; }
+
+/* …except inside a data table, where the column is the wrong place to wrap.
+   `overflow-wrap: anywhere` is right for a hash in a card: the card is as wide
+   as it is, and a 64-hex string has to go somewhere. In a table it is wrong,
+   because the browser answers a squeezed column by breaking the value instead
+   of by narrowing something else — at 1024px the queue rendered
+   `setl_AMBIG0000000` over `00`, and at 480px the same id came apart over three
+   lines. An identifier broken across lines is not a legible identifier, and the
+   queue is ranked by value precisely so it can be scanned.
+
+   Every `.data-table` in this app already sits in a `.scroll-x` container with
+   a `min-width` floor, so an id that needs more room than the viewport has
+   scrolls the table locally rather than being mangled — the behaviour the
+   tables were already declaring for their other columns. */
+.data-table .cell-id { white-space: nowrap; overflow-wrap: normal; word-break: normal; }
+
+.id-line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+.id-line > .cell-id { min-width: 0; flex: 1; }
+
+.copy-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border: 1px solid var(--color-outline-variant);
+  background: var(--color-surface-container-lowest);
+  color: var(--color-on-surface-variant);
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+  font-size: 10px;
+  line-height: 14px;
+  cursor: pointer;
+  font-family: var(--font-family-base);
+}
+.copy-btn:hover { color: var(--color-on-surface); border-color: var(--color-outline); }
+.copy-btn .material-symbols-outlined { font-size: 12px; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   REVIEWER-FACING STRUCTURE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* The workflow chain — six stages with arrows between them, wrapping rather
+   than scrolling because each stage is two or three words. */
+.chain {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}
+.chain-node {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-outline-variant);
+  background: var(--color-surface-container-lowest);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  white-space: nowrap;
+}
+.chain-node[data-reached="true"] {
+  border-color: var(--color-secondary);
+  color: var(--color-secondary);
+}
+.chain-arrow { color: var(--color-outline); font-size: 14px; line-height: 16px; }
+
+/* A question-and-answer block: the reviewer's question as a small caps label,
+   the answer in body type beneath it. Used where a page has to stop being a
+   collection of fields and start being an argument. */
+.qa { margin-bottom: var(--space-md); }
+.qa:last-child { margin-bottom: 0; }
+.qa-q {
+  font-size: var(--font-label-caps-size);
+  font-weight: var(--font-label-caps-weight);
+  letter-spacing: var(--font-label-caps-letter-spacing);
+  text-transform: uppercase;
+  color: var(--color-on-surface-variant);
+  margin-bottom: 3px;
+}
+.qa-a { font-size: var(--font-body-md-size); line-height: 1.65; }
+
+/* The side panel over the investigation table. Fixed and 400px wide on a
+   desktop; the full viewport width, below the topbar, once 400px would cover
+   the table it is describing. */
+.detail-panel {
+  position: fixed;
+  top: var(--topbar-height);
+  right: 0;
+  bottom: 0;
+  width: 400px;
+  max-width: 100vw;
+  background: var(--color-surface-container-lowest);
+  border-left: 1px solid var(--color-outline-variant);
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.06);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+@media (max-width: 768px) {
+  .detail-panel { width: 100vw; left: 0; border-left: none; }
+}
+
+/* Cards stop lifting on a touch-sized viewport: a transform on tap reads as a
+   glitch rather than as feedback. */
+@media (hover: none) {
+  .card:hover { transform: none; }
+}
+
+/* A group of controls that must stay reachable. Wrapping is the whole point —
+   a button pushed off the right edge is a button that does not exist. */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: center;
+}
+.actions .btn { flex-shrink: 0; }
+
+/* ---------------------------------------------------------------------------
+   The controller's safety claim, and the counters it sits beside.
+
+   `writes applied — 0` is the one figure on the controller panel that decides
+   what this product is, and it was rendered at 12px in a row of eight counters
+   where `eligible / ineligible` had the same weight. On a projected screen it
+   was unreadable and, worse, unremarkable. It is promoted here rather than in
+   the component's inline styles so the responsive floor is declared once.
+
+   Nothing about the VALUE changes: `ControllerPanel` renders `writes_applied`
+   exactly as the trace reported it, and `[data-clean="false"]` is what a
+   non-zero count would look like.
+   --------------------------------------------------------------------------- */
+.counter-label {
+  font-size: 11px;
+  line-height: 15px;
+  font-weight: var(--font-label-caps-weight);
+  letter-spacing: var(--font-label-caps-letter-spacing);
+  text-transform: uppercase;
+  color: var(--color-on-surface-variant);
+}
+
+.counter-value {
+  font-size: 15px;
+  line-height: 20px;
+}
+
+.safety-claim {
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-reconciled);
+  background: var(--color-reconciled-bg);
+  min-width: 190px;
+}
+
+.safety-claim[data-clean="false"] {
+  border-color: var(--color-exception);
+  background: var(--color-exception-bg);
+}
+
+.safety-claim-label {
+  font-size: 11px;
+  line-height: 15px;
+  font-weight: var(--font-label-caps-weight);
+  letter-spacing: var(--font-label-caps-letter-spacing);
+  text-transform: uppercase;
+  color: var(--color-on-surface-variant);
+}
+
+.safety-claim-value {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 30px;
+  line-height: 36px;
+  font-weight: 700;
+  color: var(--color-reconciled);
+}
+
+.safety-claim[data-clean="false"] .safety-claim-value { color: var(--color-exception); }
+
+.safety-claim-note {
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--color-on-surface-variant);
+}
+
+/* The floor the finding asks for is 22px; 30px is what fits at full width and
+   24px is what still fits once the panel is a single column. Neither drops
+   below the floor, so the claim stays readable at every width the shell has. */
+@media (max-width: 560px) {
+  .safety-claim { min-width: 0; width: 100%; }
+  .safety-claim-value { font-size: 24px; line-height: 30px; }
+}

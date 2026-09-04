@@ -1,8 +1,16 @@
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { formatCount, formatPaise } from "../lib/format.js";
-import { periodStatusMeaning } from "../lib/copy.js";
+import {
+  periodStatusMeaning,
+  probeEscalationClause,
+  RUNTIME_ASSERTIONS_BASIS,
+  RUNTIME_ASSERTIONS_LABEL,
+  stepBudgetBasis,
+  stepBudgetCounterBasis,
+  stepBudgetLabel,
+} from "../lib/copy.js";
 import {
   useController,
   type ControllerStep,
@@ -117,6 +125,58 @@ const OUTCOME_ICON: Record<string, string> = {
 };
 
 /**
+ * Why the loop stopped, in one clause &mdash; the headline over
+ * {@link outcomeSummary}'s paragraph, and the line the Command Center's status
+ * ribbon shows beside the outcome word.
+ *
+ * Keyed on `stop_reason` and `terminal` only, like every other reading of the
+ * outcome on this panel, so the ribbon at the top of the page and the banner
+ * at the top of the panel cannot disagree about what happened. It states no
+ * figure: the counts are the banner's, one line below.
+ */
+function stopHeadline(trace: ControllerTrace): string {
+  if (trace.terminal === "HALT") return "A guard stopped the loop before it could continue.";
+  switch (trace.stop_reason) {
+    case "CLOSED":
+      return "The period was already inside its close threshold, so there was nothing to work.";
+    case "ESCALATED":
+      return "It reached items it may not decide, and handed them to human review.";
+    case "BUDGET_EXHAUSTED":
+      return "The step bound was reached before the closing set was finished — a bounded partial result.";
+    case "NO_ELIGIBLE_ITEM":
+      return "Nothing on the queue opens a Suspense item, so no closing set exists to work.";
+    case "NO_PROGRESS":
+      return "No remaining step could move the residual any further.";
+    default:
+      return "The loop reached a terminal state.";
+  }
+}
+
+/**
+ * The outcome as the rest of the app needs to read it.
+ *
+ * Exported so `CommandCenter`'s status ribbon can report the controller's
+ * result at the top of the page without deriving a second opinion of it: the
+ * word, the reason code, the tone colour and the one-clause why are all the
+ * same functions the banner below uses. A page that computed its own summary
+ * of a trace would be a second place the outcome could be decided.
+ */
+export function controllerOutcome(trace: ControllerTrace): {
+  label: string;
+  reason: string | null;
+  color: string;
+  headline: string;
+} {
+  const tone = outcomeTone(trace);
+  return {
+    label: terminalLabel(trace),
+    reason: trace.terminal === "HALT" ? trace.halt_reason : trace.stop_reason,
+    color: OUTCOME_COLOR[tone] ?? "var(--color-outline)",
+    headline: stopHeadline(trace),
+  };
+}
+
+/**
  * The outcome in one paragraph — the first thing a reviewer reads, and the
  * only place on the panel that answers "so what happened?" without requiring
  * the state strip, the narrative or the telemetry to be read first.
@@ -222,25 +282,67 @@ function OutcomeBanner({ trace }: { trace: ControllerTrace }): React.ReactElemen
           </span>
         )}
       </div>
-      <p
-        className="font-body-sm text-muted"
-        style={{ lineHeight: 1.6, marginBottom: "var(--space-sm)", maxWidth: 780 }}
-      >
-        {outcomeSummary(trace)}
+      <p className="font-body-md" style={{ fontWeight: 600, lineHeight: 1.6, marginBottom: "var(--space-sm)", maxWidth: 780 }}>
+        {stopHeadline(trace)}
       </p>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-lg)" }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-lg)", alignItems: "flex-start" }}>
         {[
-          ["Steps", `${formatCount(c.steps)} / ${formatCount(c.step_budget)}`],
+          ["Steps", stepBudgetLabel(c.steps, c.step_budget)],
           ["Tool calls", formatCount(c.tool_calls)],
           ["Escalations", formatCount(c.escalations)],
-          ["Writes applied", formatCount(c.writes_applied)],
         ].map(([label, value]) => (
           <div key={label}>
-            <p className="font-label-caps text-muted" style={{ fontSize: 9, marginBottom: 2 }}>{label}</p>
-            <p className="font-numeric-mono" style={{ fontSize: 13 }}>{value}</p>
+            <p className="counter-label" style={{ marginBottom: 2 }}>{label}</p>
+            <p className="font-numeric-mono counter-value">{value}</p>
           </div>
         ))}
+        {/* The safety claim is not a counter like the three beside it. It is
+            the one figure on this panel that a reviewer watching a projected
+            screen has to be able to read, and the one whose value being
+            anything other than zero would change what this product is. It gets
+            its own weight for that reason and no other — the number is
+            `writes_applied` exactly as the trace reported it. */}
+        <WritesAppliedClaim applied={c.writes_applied} attempted={c.writes_attempted} />
       </div>
+      {/* Why `65 / 64` is a bound reached rather than a bound broken. Rendered
+          only when the two differ, because on a run that finished early there
+          is nothing to explain. */}
+      {c.steps > c.step_budget && (
+        <p className="font-body-sm text-muted" style={{ marginTop: "var(--space-sm)", lineHeight: 1.6, maxWidth: 780 }}>
+          {stepBudgetBasis(c.steps, c.step_budget)}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * `writes applied — 0`, at a size that survives a projector.
+ *
+ * This is the product's central safety statement and it was previously a 12px
+ * figure in an eight-item row, indistinguishable from `eligible / ineligible`.
+ * The number is the trace's `writes_applied` and nothing here derives, clamps
+ * or defaults it: if the controller ever applied a write, this renders that
+ * count in the exception colour and says so, because a safety claim that cannot
+ * report its own violation is decoration.
+ *
+ * `writes_attempted` travels beside it, because "applied 0 of 0 attempted" and
+ * "applied 0 of 3 attempted" are different facts and only the second one shows
+ * a refusal doing work.
+ */
+function WritesAppliedClaim({
+  applied, attempted,
+}: { applied: number; attempted: number }): React.ReactElement {
+  const clean = applied === 0;
+  return (
+    <div className="safety-claim" data-clean={clean ? "true" : "false"}>
+      <p className="safety-claim-label">Writes applied</p>
+      <p className="safety-claim-value">{formatCount(applied)}</p>
+      <p className="safety-claim-note">
+        {clean
+          ? `no ledger write on any path — ${formatCount(attempted)} attempted`
+          : `${formatCount(applied)} applied of ${formatCount(attempted)} attempted`}
+      </p>
     </div>
   );
 }
@@ -270,6 +372,91 @@ function StateNode({
   );
 }
 
+/**
+ * Why the loop stopped, at length &mdash; the second thing on the panel, after
+ * the outcome and before the trace that produced it.
+ *
+ * It is {@link outcomeSummary}'s paragraph, promoted out of the banner into a
+ * section of its own. The banner answers *what happened*; a reviewer's next
+ * question is *why*, and burying the answer as a caption under the result made
+ * it the thing people skipped.
+ *
+ * `BUDGET_EXHAUSTED` is the branch this section exists for. It is neither a
+ * close nor a failure, and neither of the other two readings may be applied to
+ * it: what the bound produced is a real, partial result, and the paragraph
+ * says how much of the closing set was actually worked.
+ */
+function WhyItStopped({ trace }: { trace: ControllerTrace }): React.ReactElement {
+  return (
+    <div className="card" style={{ padding: "var(--space-md)", marginBottom: "var(--space-lg)" }}>
+      <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>
+        Why it stopped
+      </p>
+      <p className="font-body-sm text-muted" style={{ lineHeight: 1.6, maxWidth: 780 }}>
+        {outcomeSummary(trace)}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The workflow, as the chain a reviewer can read in one glance.
+ *
+ * **This is the reviewer-facing proof that the system is agentic**, and it is
+ * the reason the chain is spelled out in words rather than left as the state
+ * machine's own vocabulary: `OBSERVE_CLOSE → TRIAGE → PLAN → ACT → ESCALATE →
+ * AWAIT_HUMAN` is legible to someone who has read
+ * `packages/controller/src/state.ts` and to nobody else.
+ *
+ * **Reachedness is the trace's own.** A node is marked reached exactly when
+ * `trace.steps` contains a step in that state &mdash; the identical set the
+ * state strip and the run narrative are drawn from, so all three cannot
+ * disagree. Nothing is inferred from the escalation count or the stop reason.
+ *
+ * That is what makes the last node honest on a budget-exhausted run: the loop
+ * recorded real escalations and then stopped on its own bound without ever
+ * entering `AWAIT_HUMAN`, so *"Escalated to human review"* renders as not
+ * reached. A chain that lit it from `escalations.length > 0` would report a
+ * partial pass as a completed handoff.
+ */
+const ESCALATION_CHAIN = [
+  { state: "OBSERVE_CLOSE", label: "Observed close gate" },
+  { state: "TRIAGE", label: "Triaged queue" },
+  { state: "PLAN", label: "Planned candidate work" },
+  { state: "ACT", label: "Inspected evidence" },
+  { state: "ESCALATE", label: "Could not safely decide" },
+  { state: "AWAIT_HUMAN", label: "Escalated to human review" },
+] as const;
+
+function WorkflowChain({ visited }: { visited: ReadonlySet<string> }): React.ReactElement {
+  return (
+    <div className="chain">
+      {ESCALATION_CHAIN.map((node, i) => {
+        const reached = visited.has(node.state);
+        return (
+          <Fragment key={node.state}>
+            {i > 0 && (
+              <span className="material-symbols-outlined chain-arrow" aria-hidden="true">
+                arrow_forward
+              </span>
+            )}
+            <span className="chain-node" data-reached={reached ? "true" : "false"}>
+              <span
+                className="material-symbols-outlined"
+                aria-hidden="true"
+                style={{ fontSize: 13, lineHeight: "16px" }}
+              >
+                {reached ? "check_circle" : "radio_button_unchecked"}
+              </span>
+              {node.label}
+            </span>
+          </Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
 /** One row of the step log &mdash; the audit record's own unit. */
 function StepRow({ step }: { step: ControllerStep }): React.ReactElement {
   return (
@@ -287,7 +474,7 @@ function StepRow({ step }: { step: ControllerStep }): React.ReactElement {
 function ResultSummary({ trace }: { trace: ControllerTrace }): React.ReactElement {
   const point = trace.residual_trajectory.at(0) ?? null;
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "var(--space-md)", marginBottom: "var(--space-lg)" }}>
+    <div className="grid grid-4" style={{ marginBottom: "var(--space-lg)" }}>
       <div className="card" style={{ padding: "var(--space-md)" }}>
         <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Escalated for review</p>
         <p className="font-display-metric" style={{ color: trace.escalations.length > 0 ? "var(--color-abstained)" : "var(--color-reconciled)" }}>
@@ -588,7 +775,7 @@ function TelemetrySummary({ checks }: { checks: readonly TelemetryCheck[] }): Re
   return (
     <div
       style={{
-        display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+        display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 210px), 1fr))",
         gap: "var(--space-sm)", marginBottom: "var(--space-md)",
       }}
     >
@@ -673,8 +860,8 @@ function TelemetryBlock({ telemetry }: { telemetry: ControllerTelemetry }): Reac
   return (
     <div style={{ marginBottom: "var(--space-lg)" }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-sm)", marginBottom: "var(--space-sm)", flexWrap: "wrap" }}>
-        <p className="font-label-caps text-muted" style={{ marginBottom: 0 }}>Runtime checks</p>
-        <span className="badge badge-open" style={{ fontSize: 9 }}>{telemetry.scope}</span>
+        <p className="font-label-caps text-muted" style={{ marginBottom: 0 }}>{RUNTIME_ASSERTIONS_LABEL}</p>
+        <span className="badge badge-open" style={{ fontSize: 10 }}>{telemetry.scope}</span>
         <span
           className="font-body-sm"
           style={{ color: ok ? "var(--color-reconciled)" : "var(--color-exception)", fontWeight: 600 }}
@@ -682,6 +869,11 @@ function TelemetryBlock({ telemetry }: { telemetry: ControllerTelemetry }): Reac
           {formatCount(telemetry.checks_passed)} / {formatCount(telemetry.checks_total)} passed
         </span>
       </div>
+
+      {/* What these are, before the count is read as an attestation. */}
+      <p className="font-body-sm text-muted" style={{ marginBottom: "var(--space-sm)", lineHeight: 1.6, maxWidth: 780 }}>
+        {RUNTIME_ASSERTIONS_BASIS}
+      </p>
 
       {/* The six-line read, first. */}
       <TelemetrySummary checks={telemetry.checks} />
@@ -701,7 +893,7 @@ function TelemetryBlock({ telemetry }: { telemetry: ControllerTelemetry }): Reac
           Show all {formatCount(telemetry.checks_total)} checks and the counters they were derived from
         </summary>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "var(--space-md)" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))", gap: "var(--space-md)" }}>
         {TELEMETRY_GROUP_ORDER.map((group) => {
           const rows = telemetry.checks.filter((k) => k.group === (group as TelemetryGroup));
           if (rows.length === 0) return null;
@@ -737,7 +929,7 @@ function TelemetryBlock({ telemetry }: { telemetry: ControllerTelemetry }): Reac
           not scores, and not comparable across runs or against a benchmark. */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-md)", marginTop: "var(--space-md)" }}>
         {[
-          ["steps", `${formatCount(c.steps)} / ${formatCount(c.step_budget)} budget`],
+          ["steps", stepBudgetLabel(c.steps, c.step_budget)],
           ["tool calls", formatCount(c.tool_calls)],
           ["writes attempted", formatCount(c.writes_attempted)],
           ["writes applied", formatCount(c.writes_applied)],
@@ -752,6 +944,15 @@ function TelemetryBlock({ telemetry }: { telemetry: ControllerTelemetry }): Reac
           </div>
         ))}
       </div>
+
+      {/* The `steps` counter above is `stepBudgetLabel`'s reading, not the
+          trace's raw `steps` — so the raw value is named here, in the block
+          that claims every figure in it is recomputable from the trace. */}
+      {stepBudgetCounterBasis(c.steps, c.step_budget) !== null && (
+        <p className="font-body-sm text-muted" style={{ marginTop: "var(--space-xs)", lineHeight: 1.6, maxWidth: 780 }}>
+          {stepBudgetCounterBasis(c.steps, c.step_budget)}
+        </p>
+      )}
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-md)", marginTop: "var(--space-sm)" }}>
         {Object.entries(c.tool_calls_by_name).map(([name, n]) => (
@@ -799,24 +1000,26 @@ function escalationWhy(e: ControllerTrace["escalations"][number]): string {
         `\u03c4 of ${formatPaise(e.tau_paise)}, so it is not too small to matter`,
     );
   }
-  parts.push(
-    e.probes_attempted.length === 0
-      ? "no admissible probe could break the tie"
-      : `${String(e.probes_attempted.length)} probe(s) were tried and none broke the tie`,
-  );
+  parts.push(probeEscalationClause(e.probes_attempted.length));
   return `${parts.join("; ")}. The controller may not choose between them, so it escalated.`;
 }
 
 /**
- * Renders one `ControllerTrace` in full: outcome banner, state strip, run
- * narrative, result summary, telemetry, escalation cards, halt notice, the
- * (collapsible) step log and the next steps.
+ * Renders one `ControllerTrace` in full.
  *
- * **The order is the reading order and it is deliberate:** decision, then why,
- * then the controller's own trace, then the evaluation of it, then the
- * evidence, then how to verify the whole thing independently. A reviewer who
- * stops after the first block still has the answer; a reviewer who reads on
- * gets progressively more of the working.
+ * **The order is the reading order and it is deliberate:**
+ *
+ *   1. the outcome, as a word and four counts &mdash; {@link OutcomeBanner}
+ *   2. why it stopped, in a paragraph &mdash; {@link WhyItStopped}
+ *   3. the workflow trace: the chain in words over the state machine's strip
+ *   4. the run narrative, six stages in plain language &mdash; {@link RunNarrative}
+ *   5. the runtime checks, six summary lines over seventeen &mdash; {@link TelemetryBlock}
+ *   6. the human-review item(s), each with the reasoning that sent it there
+ *   7. the supporting evidence: the standing facts, the step log, the next steps
+ *
+ * A reviewer who stops after the first block still has the answer; a reviewer
+ * who reads on gets progressively more of the working, and the last third is
+ * what they check the first third against.
  *
  * Pure and hook-light &mdash; `useState` for the step-log toggle only, no
  * data fetch. The three callbacks are injected rather than calling
@@ -843,28 +1046,39 @@ export function ControllerTraceView({
     <>
       <OutcomeBanner trace={trace} />
 
-      {/* State strip */}
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 0, marginBottom: "var(--space-lg)", overflowX: "auto" }}>
-        {REACHABLE_STATES.map((s, i) => (
-          <Fragment key={s}>
-            <StateNode label={STATE_LABEL[s] ?? s} visited={visitedStates.has(s)} />
-            {i < REACHABLE_STATES.length - 1 && (
-              <div style={{ height: 2, width: 24, background: "var(--color-outline-variant)", marginTop: 15 }} />
-            )}
-          </Fragment>
-        ))}
-        <div style={{ height: 2, width: 24, background: "var(--color-outline-variant)", marginTop: 15 }} />
-        <StateNode
-          label={terminalLabel(trace)}
-          visited={false}
-          isTerminal
-          terminalKind={trace.terminal === "HALT" ? "halt" : "ok"}
-        />
+      <WhyItStopped trace={trace} />
+
+      {/* Workflow trace: the chain in words, then the state machine's own
+          strip beneath it. The strip is the audit artefact and stays; the
+          chain is what a reviewer reads. Both are drawn from `visitedStates`,
+          so neither can claim a stage the other denies. */}
+      <div className="card" style={{ padding: "var(--space-md)", marginBottom: "var(--space-lg)" }}>
+        <p className="font-label-caps text-muted" style={{ marginBottom: "var(--space-sm)" }}>
+          Workflow trace
+        </p>
+        <WorkflowChain visited={visitedStates} />
+        <div className="scroll-x" style={{ marginTop: "var(--space-md)" }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 0, minWidth: 620 }}>
+            {REACHABLE_STATES.map((s, i) => (
+              <Fragment key={s}>
+                <StateNode label={STATE_LABEL[s] ?? s} visited={visitedStates.has(s)} />
+                {i < REACHABLE_STATES.length - 1 && (
+                  <div style={{ height: 2, width: 24, background: "var(--color-outline-variant)", marginTop: 15 }} />
+                )}
+              </Fragment>
+            ))}
+            <div style={{ height: 2, width: 24, background: "var(--color-outline-variant)", marginTop: 15 }} />
+            <StateNode
+              label={terminalLabel(trace)}
+              visited={false}
+              isTerminal
+              terminalKind={trace.terminal === "HALT" ? "halt" : "ok"}
+            />
+          </div>
+        </div>
       </div>
 
       <RunNarrative trace={trace} />
-
-      <ResultSummary trace={trace} />
 
       <TelemetryBlock telemetry={trace.telemetry} />
 
@@ -892,7 +1106,7 @@ export function ControllerTraceView({
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "var(--space-sm)" }}>
-                <div>
+                <div style={{ minWidth: 0 }}>
                   <span className="cell-id">{e.entity_id}</span>
                   <span className="font-body-sm text-muted" style={{ marginLeft: 8 }}>
                     {e.reason === "AMBIGUOUS_CERTIFICATE"
@@ -934,6 +1148,16 @@ export function ControllerTraceView({
         </p>
       )}
 
+      {/* Supporting evidence — the four standing facts about the run, and the
+          step-by-step record beneath them. Below the human-review section
+          rather than above it: these are what a reviewer checks the story
+          against, not the story. */}
+      <p className="font-label-caps text-muted" style={{ marginBottom: "var(--space-sm)" }}>
+        Supporting evidence
+      </p>
+
+      <ResultSummary trace={trace} />
+
       {/* Step log */}
       <button
         className="btn btn-ghost"
@@ -947,8 +1171,8 @@ export function ControllerTraceView({
       </button>
 
       {expanded && (
-        <div style={{ overflowX: "auto", marginBottom: "var(--space-sm)" }}>
-          <table className="data-table">
+        <div className="scroll-x" style={{ marginBottom: "var(--space-sm)" }}>
+          <table className="data-table" style={{ minWidth: 680 }}>
             <thead>
               <tr>
                 <th>#</th>
@@ -1001,7 +1225,7 @@ export function ControllerTraceView({
           Try another scenario
         </button>
         <span className="font-body-sm text-muted" style={{ fontSize: 11, lineHeight: 1.6, maxWidth: 460 }}>
-          Audit Logs recomputes this run&apos;s hash chain from genesis. Another period runs the
+          Verify Ledger recomputes this run&apos;s hash chain from genesis. Another period runs the
           same controller over different evidence and produces its own trace.
         </span>
       </div>
@@ -1023,16 +1247,63 @@ export function ControllerTraceView({
  */
 export const SCENARIO_LAB_ANCHOR_ID = "scenario-lab";
 
-/** The panel, wired to one run: owns the hook, the button, and the idle/loading/error states. */
-export function ControllerPanel({ runId }: { runId: string }): React.ReactElement {
+/**
+ * The panel, wired to one run: owns the hook, the button, and the
+ * idle/loading/error states.
+ *
+ * `onTrace` reports what the hook got back, so the Command Center's status
+ * ribbon can lead with the controller's outcome instead of leaving a reviewer
+ * to scroll for it. It is a report, not a handover: the fetch, the button and
+ * every rendered figure stay here, and the ribbon renders
+ * {@link controllerOutcome}'s reading of the same trace rather than a summary
+ * of its own. The effect fires on mount with `null`, which is what clears a
+ * previous period's outcome when `CommandCenter` remounts this panel on a new
+ * `run_id`.
+ */
+export function ControllerPanel({
+  runId, onTrace, autoStart = false,
+}: {
+  runId: string;
+  onTrace?: ((trace: ControllerTrace | null) => void) | undefined;
+  /**
+   * Drive the controller once, as soon as the run exists.
+   *
+   * The controller is the agentic half of this product and it was behind a
+   * second button most of a page below the first one, so a reviewer who ran the
+   * demo saw the deterministic half and stopped. Running it automatically
+   * removes that barrier and changes nothing about what runs:
+   * `POST /controller/start` is the same call the button makes, over the same
+   * sealed run, through the same four read-only tools.
+   *
+   * **Exactly one trace per run.** `CommandCenter` keys this component on
+   * `run_id`, so a new period remounts it and the ref below is fresh; within one
+   * mount the ref makes the effect fire once, which also absorbs React's
+   * development double-invoke. The button stays, because re-running the same
+   * controller over the same run and getting the same trace is how a reviewer
+   * checks that it is deterministic.
+   */
+  autoStart?: boolean;
+}): React.ReactElement {
   const { start, state } = useController();
   const navigate = useNavigate();
   const trace = state.data;
+  const autoStarted = useRef(false);
+
+  useEffect(() => { onTrace?.(trace); }, [trace, onTrace]);
+
+  useEffect(() => {
+    if (!autoStart || autoStarted.current) return;
+    autoStarted.current = true;
+    void start(runId);
+  }, [autoStart, runId, start]);
 
   return (
     <div className="card" style={{ padding: "var(--space-lg)", marginBottom: "var(--space-xl)" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "var(--space-md)" }}>
-        <div>
+      <div style={{
+        display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+        gap: "var(--space-md)", flexWrap: "wrap", marginBottom: "var(--space-md)",
+      }}>
+        <div style={{ minWidth: 0 }}>
           {/* "Close controller" named the loop; a reviewer read it as the
               control that closes the period. It does not close anything and
               has no authority to: it reads, plans and escalates, and the
@@ -1055,7 +1326,7 @@ export function ControllerPanel({ runId }: { runId: string }): React.ReactElemen
           <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 18 }}>
             {state.loading ? "hourglass_top" : "play_circle"}
           </span>
-          {state.loading ? "Running…" : trace ? "Run Finance Controller again" : "Run Finance Controller"}
+          {state.loading ? "Running…" : trace ? "Run again — same run, same trace" : "Run Finance Controller"}
         </button>
       </div>
 
@@ -1070,6 +1341,13 @@ export function ControllerPanel({ runId }: { runId: string }): React.ReactElemen
           Not yet run. The controller reads the close gate, the exception queue and one
           decision&apos;s evidence, then escalates what it may not decide. Its tool surface
           is four reads, so it writes nothing on any path.
+        </p>
+      )}
+
+      {state.loading && trace === null && (
+        <p className="font-body-sm text-muted" style={{ lineHeight: 1.6 }}>
+          Running the Finance Controller over this period — observing the close gate, triaging
+          the queue, planning a bounded inspection.
         </p>
       )}
 

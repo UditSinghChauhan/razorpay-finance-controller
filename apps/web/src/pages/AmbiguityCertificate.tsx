@@ -1,5 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { AiExplanation } from "../components/AiExplanation.js";
+import { CopyButton, CopyId } from "../components/CopyId.js";
+import { ApiErrorNotice, useRunGate } from "../components/RunGate.js";
 import { useRun } from "../context/RunContext.js";
 import {
   useDecisionDetail,
@@ -7,7 +9,14 @@ import {
   type AllocationSolution,
   type CertificateSolution,
 } from "../hooks/useAssayApi.js";
-import { probeSummary } from "../lib/copy.js";
+import {
+  CERTIFICATE_RELATIONSHIP,
+  CERTIFICATE_VERIFY_HOW,
+  CERTIFICATE_VERIFY_IDS,
+  probeSectionHeading,
+  probeSummary,
+  VERIFY_LEDGER_TITLE,
+} from "../lib/copy.js";
 import { formatPaise } from "../lib/format.js";
 
 /**
@@ -22,6 +31,14 @@ import { formatPaise } from "../lib/format.js";
  * All values come from the certificate object: solution_a, solution_b,
  * shared_hard_constraints, evidence_score_gap_bps, epsilon_bps,
  * materiality_paise, tau_paise, probes_attempted, reason.
+ *
+ * **{@link CertificateStory} answers the four questions the page used to make
+ * a reviewer assemble themselves.** What happened, why ASSAY stopped, what
+ * evidence proves it, and what happens to the money were spread across six
+ * sections; the story states each in one line from the same fields those
+ * sections render, and the sections below remain as the working. Nothing in it
+ * is computed: it is the certificate's own reason, constraint count, gap,
+ * epsilon and the close gate's period status and Suspense balance.
  *
  * Member amounts come from that same response's `certificate_allocation`, the
  * product read model apps/api derives from the run's own observations. The
@@ -50,7 +67,7 @@ function TechnicalId({ label, value }: { label: string; value: string }): React.
   return (
     <div style={{ marginBottom: "var(--space-md)" }}>
       <p className="font-label-caps text-muted" style={{ marginBottom: 2, fontSize: 10 }}>{label}</p>
-      <p className="cell-id text-muted" style={{ fontSize: 10, wordBreak: "break-all", lineHeight: 1.5 }}>
+      <p className="cell-id text-muted" style={{ fontSize: 10, lineHeight: 1.5 }}>
         {value}
       </p>
     </div>
@@ -94,7 +111,7 @@ export function SolutionCard({
 
   return (
     <div style={{
-      flex: 1,
+      minWidth: 0,
       border: `1px solid var(--color-outline-variant)`,
       borderTop: `3px solid ${color}`,
       borderRadius: "var(--radius-lg)",
@@ -111,6 +128,9 @@ export function SolutionCard({
             {label.slice(-1)}
           </div>
           <span className="font-headline-sm">{label}</span>
+          <span className="font-body-sm text-muted" style={{ marginLeft: "auto", fontSize: 11 }}>
+            {rows.length} member{rows.length === 1 ? "" : "s"}
+          </span>
         </div>
 
         <TechnicalId label="Candidate ID" value={solution.candidate_id} />
@@ -143,7 +163,7 @@ export function SolutionCard({
             <span className="font-numeric-mono" style={{ fontWeight: 500, whiteSpace: "nowrap" }}>
               {row.member?.allocation_paise != null
                 ? formatPaise(row.member.allocation_paise)
-                : "\u2014"}
+                : "—"}
             </span>
           </div>
         ))}
@@ -152,16 +172,16 @@ export function SolutionCard({
           marginTop: "var(--space-md)", paddingTop: "var(--space-sm)",
           borderTop: "2px solid var(--color-outline-variant)",
         }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "var(--space-sm)" }}>
             <span className="font-body-sm" style={{ fontWeight: 600 }}>Total allocated</span>
-            <span className="font-numeric-mono" style={{ fontWeight: 700 }}>
-              {total !== null ? formatPaise(total) : "\u2014"}
+            <span className="font-numeric-mono" style={{ fontWeight: 700, whiteSpace: "nowrap" }}>
+              {total !== null ? formatPaise(total) : "—"}
             </span>
           </div>
           {targetPaise !== null && (
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 2 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "var(--space-sm)", marginTop: 2 }}>
               <span className="font-body-sm text-muted">Target</span>
-              <span className="font-numeric-mono text-muted">{formatPaise(targetPaise)}</span>
+              <span className="font-numeric-mono text-muted" style={{ whiteSpace: "nowrap" }}>{formatPaise(targetPaise)}</span>
             </div>
           )}
           {tiesOut && (
@@ -184,15 +204,101 @@ export function SolutionCard({
   );
 }
 
+/** One question a reviewer arrives with, and its answer from the record. */
+function QA({ question, children }: { question: string; children: React.ReactNode }): React.ReactElement {
+  return (
+    <div className="qa">
+      <p className="qa-q">{question}</p>
+      <div className="qa-a">{children}</div>
+    </div>
+  );
+}
+
+/**
+ * The certificate in four questions, above the six sections that evidence it.
+ *
+ * **Every clause is a field.** The candidate count is §13's own shape (a
+ * certificate carries exactly `solution_a` and `solution_b`); the constraint
+ * count is `shared_hard_constraints.length`; the gap and ε are the
+ * certificate's; the amount is `decision.value_paise`; the period status and
+ * the balance verdict are the close gate's. Nothing is compared, summed or
+ * concluded here that is not already stated by one of those.
+ *
+ * Exported so each answer is assertable without a live API.
+ */
+export function CertificateStory({
+  reason, candidateCount, constraintCount, gapBps, epsilonBps,
+  valuePaise, periodStatus, trialBalanceOk, suspenseBalancePaise,
+}: {
+  reason: string;
+  candidateCount: number;
+  constraintCount: number;
+  gapBps: number;
+  epsilonBps: number;
+  valuePaise: number;
+  periodStatus: string | null;
+  trialBalanceOk: boolean | null;
+  suspenseBalancePaise: number | null;
+}): React.ReactElement {
+  return (
+    <section
+      className="card"
+      style={{ padding: "var(--space-lg)", marginBottom: "var(--space-xl)", borderLeft: "4px solid var(--color-abstained)" }}
+      aria-labelledby="certificate-story-heading"
+    >
+      <h2 id="certificate-story-heading" className="font-label-caps text-muted" style={{ marginBottom: "var(--space-md)" }}>
+        What this certificate says
+      </h2>
+
+      <QA question="What happened?">
+        {candidateCount} valid allocation hypotheses remain, and ASSAY declined to choose between them.
+      </QA>
+
+      <QA question="Why did ASSAY stop?">
+        Because the evidence does not distinguish them sufficiently &mdash; terminal reason{" "}
+        <code style={{ fontSize: 12 }}>{reason}</code>.
+      </QA>
+
+      <QA question="What evidence proves that?">
+        Both candidates satisfy all {constraintCount} shared hard constraints, and the evidence
+        gap between them is {gapBps} bps against a tolerance ε of {epsilonBps} bps. The candidate
+        comparison, the constraints and the scores are all below.
+      </QA>
+
+      <QA question="What happens financially?">
+        {formatPaise(valuePaise)} remains unresolved and is held in Suspense
+        {suspenseBalancePaise !== null && (
+          <> &mdash; the account carries {formatPaise(suspenseBalancePaise)} for this period</>
+        )}
+        . {trialBalanceOk === null
+          ? "The close report's balance verdict is not loaded on this page."
+          : trialBalanceOk
+            ? "The ledger remains balanced."
+            : "The close report reports the ledger NOT balanced, which is a finding in its own right."}{" "}
+        {periodStatus === null
+          ? "The period status is not loaded on this page."
+          : `The period remains ${periodStatus}.`}{" "}
+        No value is written off, suppressed or guessed.
+      </QA>
+    </section>
+  );
+}
+
 export function AmbiguityCertificate(): React.ReactElement {
   const navigate = useNavigate();
   const { run, close, selectedDecisionId } = useRun();
+  const gate = useRunGate();
   const detail = useDecisionDetail(run?.run_id ?? null, selectedDecisionId);
+
+  // Restoring / not-found / API-unreachable, before "select a decision", for
+  // the same reason as the Evidence Trail: a reload must not answer with an
+  // empty state over a run the API is about to hand back.
+  if (gate !== null) return gate;
 
   // No decision selected
   if (!selectedDecisionId || !run) {
     return (
-      <div style={{ padding: "var(--space-xl)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "60vh", gap: "var(--space-lg)" }}>
+      <div className="page" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "60vh", gap: "var(--space-lg)" }}>
         <span className="material-symbols-outlined" style={{ fontSize: 48, color: "var(--color-abstained)" }}>workspace_premium</span>
         <h1 className="page-title">Ambiguity Certificate</h1>
         <p className="page-subtitle">Select an abstained decision from the Investigation Queue to view its certificate.</p>
@@ -206,18 +312,22 @@ export function AmbiguityCertificate(): React.ReactElement {
 
   if (detail.loading) {
     return (
-      <div style={{ padding: "var(--space-xl)", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
+      <div className="page" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
         <div className="loading-spinner" />
       </div>
     );
   }
 
-  if (detail.error || !detail.data) {
+  if (detail.error !== null || !detail.data) {
     return (
-      <div style={{ padding: "var(--space-xl)", textAlign: "center" }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 48, color: "var(--color-exception)" }}>error</span>
-        <p className="font-body-md text-error" style={{ marginTop: "var(--space-md)" }}>{detail.error ?? "Decision not found"}</p>
-      </div>
+      <ApiErrorNotice
+        error={detail.error ?? "Decision not found"}
+        title="This certificate could not be loaded"
+      >
+        <button className="btn btn-secondary" onClick={() => void navigate("/investigation-queue")}>
+          Back to Queue
+        </button>
+      </ApiErrorNotice>
     );
   }
 
@@ -229,7 +339,7 @@ export function AmbiguityCertificate(): React.ReactElement {
 
   if (!cert) {
     return (
-      <div style={{ padding: "var(--space-xl)", textAlign: "center" }}>
+      <div className="page" style={{ textAlign: "center" }}>
         <span className="material-symbols-outlined" style={{ fontSize: 48, color: "var(--color-outline)" }}>workspace_premium</span>
         <h1 className="page-title" style={{ marginTop: "var(--space-md)" }}>No Certificate</h1>
         <p className="page-subtitle">This decision does not have an ambiguity certificate.</p>
@@ -241,7 +351,7 @@ export function AmbiguityCertificate(): React.ReactElement {
   }
 
   return (
-    <div style={{ padding: "var(--space-lg)", maxWidth: 1200, margin: "0 auto" }}>
+    <div className="page" style={{ maxWidth: 1200 }}>
 
       {/* Back nav */}
       <button
@@ -253,32 +363,31 @@ export function AmbiguityCertificate(): React.ReactElement {
         Evidence Trail
       </button>
 
-      {/* Hero header */}
+      {/* Hero header. Flat rather than a gradient: this is a formal record, and
+          the amber left rule carries the state without the decoration. */}
       <div style={{
-        background: "linear-gradient(135deg, var(--color-surface-container-lowest) 0%, var(--color-abstained-bg) 100%)",
-        border: "1px solid var(--color-abstained)",
+        background: "var(--color-surface-container-lowest)",
+        border: "1px solid var(--color-outline-variant)",
+        borderLeft: "4px solid var(--color-abstained)",
         borderRadius: "var(--radius-lg)",
         padding: "var(--space-xl)",
-        marginBottom: "var(--space-xl)",
-        position: "relative",
-        overflow: "hidden",
+        marginBottom: "var(--space-lg)",
       }}>
-        <div style={{
-          position: "absolute", top: -20, right: -20,
-          opacity: 0.06, pointerEvents: "none",
-        }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 200, color: "var(--color-abstained)" }}>workspace_premium</span>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", marginBottom: "var(--space-lg)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", marginBottom: "var(--space-xs)" }}>
           <span className="material-symbols-outlined" style={{ color: "var(--color-abstained)", fontSize: 24 }}>workspace_premium</span>
           <span className="font-label-caps" style={{ color: "var(--color-abstained)", fontSize: 13 }}>AMBIGUITY CERTIFICATE</span>
         </div>
+        {/* What this page IS, relative to the one before it. A reviewer
+            arriving from a queue row had no way to know these two screens are
+            one decision seen twice. */}
+        <p className="font-body-sm text-muted" style={{ marginBottom: "var(--space-lg)", lineHeight: 1.6, maxWidth: 720 }}>
+          {CERTIFICATE_RELATIONSHIP}
+        </p>
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-          <div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: "var(--space-md)", flexWrap: "wrap" }}>
+          <div style={{ minWidth: 0 }}>
             <p className="font-display-metric" style={{ fontSize: 36, marginBottom: "var(--space-xs)" }}>{formatPaise(decision.value_paise)}</p>
-            <p className="font-body-md" style={{ color: "var(--color-on-surface-variant)" }}>{decision.entity_id}</p>
+            <p className="font-body-md" style={{ color: "var(--color-on-surface-variant)", overflowWrap: "anywhere" }}>{decision.entity_id}</p>
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{
@@ -299,13 +408,28 @@ export function AmbiguityCertificate(): React.ReactElement {
         </div>
       </div>
 
+      {/* The four questions, before the six sections that evidence them. */}
+      <CertificateStory
+        reason={cert.reason}
+        candidateCount={2}
+        constraintCount={cert.shared_hard_constraints.length}
+        gapBps={cert.evidence_score_gap_bps}
+        epsilonBps={cert.epsilon_bps}
+        valuePaise={decision.value_paise}
+        periodStatus={close?.period_status ?? null}
+        trialBalanceOk={close?.trial_balance_ok ?? null}
+        suspenseBalancePaise={close?.suspense_balance_paise ?? null}
+      />
+
       {/* Hypothesis comparison */}
       <section style={{ marginBottom: "var(--space-xl)" }}>
         <h2 className="font-headline-sm" style={{ marginBottom: "var(--space-md)" }}>
           <span className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: "middle", marginRight: "var(--space-sm)" }}>compare</span>
           Hypothesis Comparison - All Constraints Satisfied
         </h2>
-        <div style={{ display: "flex", gap: "var(--space-md)" }}>
+        {/* Side by side while there is room to compare them, stacked once
+            there is not — two 160px columns are not a comparison. */}
+        <div className="grid grid-2">
           <SolutionCard
             label="Solution A"
             solution={cert.solution_a}
@@ -329,31 +453,49 @@ export function AmbiguityCertificate(): React.ReactElement {
         </p>
       </section>
 
-      {/* Shared constraints */}
+      {/* Shared constraints. The verdict is the headline and the eight rows are
+          one disclosure below it: "8 / 8 satisfied, by both" is the fact, and
+          C1–C8 are what a reviewer opens when they are checking it rather than
+          reading it. None of the rows is removed. */}
       <section style={{ marginBottom: "var(--space-xl)" }}>
         <h2 className="font-headline-sm" style={{ marginBottom: "var(--space-md)" }}>
           <span className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: "middle", marginRight: "var(--space-sm)" }}>rule</span>
           Shared Hard Constraints ({cert.shared_hard_constraints.length})
         </h2>
-        <div className="card" style={{ padding: 0 }}>
-          {cert.shared_hard_constraints.map((c, i) => (
-            <div
-              key={c}
-              style={{
-                display: "flex", alignItems: "center", gap: "var(--space-md)",
-                padding: "var(--space-sm) var(--space-md)",
-                borderBottom: i < cert.shared_hard_constraints.length - 1 ? "1px solid var(--color-outline-variant)" : "none",
-              }}
-            >
-              <span className="constraint-id">{c}</span>
-              <span className="font-body-sm" style={{ flex: 1 }}>{c}</span>
-              <span style={{
-                display: "inline-flex", alignItems: "center", gap: 4,
-                padding: "2px 8px", borderRadius: 3, fontSize: 11, fontWeight: 600,
-                color: "var(--color-reconciled)", background: "var(--color-reconciled-bg)",
-              }}>Both satisfy</span>
+        <div className="card" style={{ padding: "var(--space-md)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", flexWrap: "wrap" }}>
+            <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 18, color: "var(--color-reconciled)" }}>check_circle</span>
+            <span className="font-headline-sm">
+              {cert.shared_hard_constraints.length} / {cert.shared_hard_constraints.length} hard constraints satisfied
+            </span>
+            <span className="font-body-sm text-muted">&mdash; by both Solution A and Solution B</span>
+          </div>
+          <details style={{ marginTop: "var(--space-sm)" }}>
+            <summary className="font-body-sm text-muted" style={{ cursor: "pointer" }}>
+              Show each constraint
+            </summary>
+            <div style={{ marginTop: "var(--space-sm)" }}>
+              {cert.shared_hard_constraints.map((c, i) => (
+                <div
+                  key={c}
+                  style={{
+                    display: "flex", alignItems: "center", gap: "var(--space-md)",
+                    padding: "var(--space-sm) 0",
+                    borderBottom: i < cert.shared_hard_constraints.length - 1 ? "1px solid var(--color-outline-variant)" : "none",
+                  }}
+                >
+                  <span className="constraint-id">{c}</span>
+                  <span className="font-body-sm" style={{ flex: 1 }}>{c}</span>
+                  <span style={{
+                    display: "inline-flex", alignItems: "center", gap: 4,
+                    padding: "2px 8px", borderRadius: 3, fontSize: 11, fontWeight: 600,
+                    whiteSpace: "nowrap",
+                    color: "var(--color-reconciled)", background: "var(--color-reconciled-bg)",
+                  }}>Both satisfy</span>
+                </div>
+              ))}
             </div>
-          ))}
+          </details>
         </div>
       </section>
 
@@ -383,7 +525,7 @@ export function AmbiguityCertificate(): React.ReactElement {
                 position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -50%)",
                 background: "var(--color-surface-container-lowest)", padding: "4px 12px",
                 borderRadius: 4, border: "1px solid var(--color-outline-variant)",
-                fontWeight: 700, fontSize: 13,
+                fontWeight: 700, fontSize: 13, whiteSpace: "nowrap",
               }}>
                 Gap: {cert.evidence_score_gap_bps} bps
               </div>
@@ -391,7 +533,7 @@ export function AmbiguityCertificate(): React.ReactElement {
           </div>
 
           {/* Metrics grid */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "var(--space-lg)" }}>
+          <div className="grid grid-4">
             <div>
               <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Evidence Gap</p>
               <p className="font-numeric-mono" style={{ fontSize: 20, fontWeight: 600 }}>{cert.evidence_score_gap_bps} bps</p>
@@ -432,7 +574,7 @@ export function AmbiguityCertificate(): React.ReactElement {
       <section style={{ marginBottom: "var(--space-xl)" }}>
         <h2 className="font-headline-sm" style={{ marginBottom: "var(--space-md)" }}>
           <span className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: "middle", marginRight: "var(--space-sm)" }}>search</span>
-          Probes Attempted ({cert.probes_attempted.length})
+          {probeSectionHeading(cert.probes_attempted.length)}
         </h2>
         <div className="card" style={{ padding: "var(--space-lg)" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-md)" }}>
@@ -441,7 +583,7 @@ export function AmbiguityCertificate(): React.ReactElement {
                 key={probeId}
                 style={{
                   display: "flex", gap: "var(--space-md)", alignItems: "center",
-                  padding: "var(--space-md)",
+                  padding: "var(--space-md)", flexWrap: "wrap",
                   background: "var(--color-surface-container-low)",
                   borderRadius: "var(--radius-md)",
                   border: "1px solid var(--color-outline-variant)",
@@ -454,12 +596,12 @@ export function AmbiguityCertificate(): React.ReactElement {
                 }}>
                   <span className="material-symbols-outlined" style={{ fontSize: 14, color: "var(--color-exception)" }}>close</span>
                 </div>
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 700 }}>Probe {i + 1}</span>
                   <p className="cell-id" style={{ fontSize: 11, marginTop: 2 }}>{probeId}</p>
                 </div>
                 <span style={{
-                  flexShrink: 0, fontSize: 11, fontWeight: 600,
+                  flexShrink: 0, fontSize: 11, fontWeight: 600, whiteSpace: "nowrap",
                   color: "var(--color-exception)", background: "var(--color-exception-bg)",
                   padding: "2px 8px", borderRadius: 999,
                 }}>NO DISCRIMINATOR</span>
@@ -500,69 +642,57 @@ export function AmbiguityCertificate(): React.ReactElement {
           Cryptographic Attestation
         </h2>
         <div className="certificate-block">
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-lg)", marginBottom: "var(--space-lg)" }}>
+          <div className="grid grid-2" style={{ marginBottom: "var(--space-lg)" }}>
+            <CopyId label="Run ID" value={run.run_id} head={20} tail={8} fontSize={12} />
+            <CopyId label="Ledger Root Hash" value={close?.ledger_root_hash ?? "--"} head={20} tail={8} fontSize={12} />
+            <CopyId label="Component ID" value={cert.comp_id} head={20} tail={8} fontSize={12} />
             <div>
-              <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Run ID</p>
-              <p className="cell-id" style={{ fontSize: 12, wordBreak: "break-all" }}>{run.run_id}</p>
-            </div>
-            <div>
-              <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Ledger Root Hash</p>
-              <p className="cell-id" style={{ fontSize: 12, wordBreak: "break-all" }}>{close?.ledger_root_hash ?? "--"}</p>
-            </div>
-            <div>
-              <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Component ID</p>
-              <p className="cell-id" style={{ fontSize: 12 }}>{cert.comp_id}</p>
-            </div>
-            <div>
-              <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>LLM Mode</p>
+              <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Engine model use</p>
               <p className="cell-id" style={{ fontSize: 12 }}>{run.llm_provider}</p>
             </div>
           </div>
           {event && (
             <div>
-              <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Event Hash</p>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-sm)", marginBottom: 4 }}>
+                <p className="font-label-caps text-muted">Event Hash</p>
+                <CopyButton value={event.hash} label="event hash" />
+              </div>
               <div className="certificate-seal">{event.hash}</div>
             </div>
           )}
-          <p className="font-body-sm text-muted" style={{ marginTop: "var(--space-md)" }}>
-            Verify with: <code style={{ fontSize: 12 }}>assay verify --run {run.run_id.substring(0, 16)}</code>
-          </p>
-        </div>
-      </section>
-
-      {/* Suspense disposition */}
-      <section>
-        <h2 className="font-headline-sm" style={{ marginBottom: "var(--space-md)" }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: "middle", marginRight: "var(--space-sm)" }}>account_balance</span>
-          Suspense Disposition
-        </h2>
-        <div style={{
-          background: "var(--color-surface-container-lowest)",
-          border: "1px solid var(--color-outline-variant)",
-          borderLeft: "4px solid var(--color-abstained)",
-          borderRadius: "var(--radius-lg)",
-          padding: "var(--space-lg)",
-        }}>
-          <p className="font-body-md" style={{ marginBottom: "var(--space-sm)" }}>
-            This record is posted to <strong>Suspense</strong> with the full value of <strong>{formatPaise(decision.value_paise)}</strong>.
-            The period will end <code style={{ fontSize: 13 }}>{close?.period_status ?? "--"}</code> if no resolution is reached before the close gate (G3).
-          </p>
-          <p className="font-body-sm text-muted">
-            Unresolved value is quantified in the close report. The Suspense balance is published and the
-            trial balance = 0 invariant is maintained. No value is suppressed.
-          </p>
-          <div style={{ marginTop: "var(--space-lg)", display: "flex", gap: "var(--space-md)" }}>
-            <button className="btn btn-secondary" onClick={() => void navigate("/evidence-trail")}>
-              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>receipt_long</span>
-              Evidence Trail
-            </button>
-            <button className="btn btn-secondary" onClick={() => void navigate("/investigation-queue")}>
-              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>queue</span>
-              Back to Queue
+          <div style={{ marginTop: "var(--space-md)" }}>
+            <p className="font-body-sm">{CERTIFICATE_VERIFY_HOW}</p>
+            <p className="font-body-sm text-muted" style={{ marginTop: 4, lineHeight: 1.6 }}>
+              {CERTIFICATE_VERIFY_IDS}
+            </p>
+            <button
+              className="btn btn-secondary"
+              style={{ marginTop: "var(--space-sm)" }}
+              onClick={() => void navigate("/audit-logs")}
+            >
+              <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 18 }}>verified_user</span>
+              {VERIFY_LEDGER_TITLE}
             </button>
           </div>
         </div>
       </section>
+
+      {/* Where a reviewer goes next. The financial consequence is answered in
+          the story above; this is the navigation, not a second telling of it.
+          Verify Ledger is deliberately NOT repeated here: it lives one section
+          up, directly under the sentence that names it as the way to check
+          these identifiers, and a second identical control would make the page
+          look like it offered two different verifications. */}
+      <div className="actions">
+        <button className="btn btn-secondary" onClick={() => void navigate("/evidence-trail")}>
+          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>receipt_long</span>
+          Evidence Trail
+        </button>
+        <button className="btn btn-secondary" onClick={() => void navigate("/investigation-queue")}>
+          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>queue</span>
+          Back to Queue
+        </button>
+      </div>
     </div>
   );
 }

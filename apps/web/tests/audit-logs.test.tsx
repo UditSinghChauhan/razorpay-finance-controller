@@ -288,7 +288,7 @@ describe("the page with no active run", () => {
   );
 
   it("says there is nothing to verify, and offers to start a run", () => {
-    expect(html).toContain("Audit Logs");
+    expect(html).toContain("Verify Ledger");
     expect(html).toContain("No active run");
     expect(html).toContain("Run Demo");
   });

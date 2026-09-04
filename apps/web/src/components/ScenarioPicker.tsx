@@ -80,7 +80,7 @@ export function ScenarioPicker({
             style={{
               flexDirection: "column", alignItems: "flex-start", gap: 2,
               padding: "var(--space-sm) var(--space-md)", fontSize: 12,
-              textAlign: "left", maxWidth: 210, minWidth: 150,
+              textAlign: "left", flex: "1 1 150px", maxWidth: 210, minWidth: 0,
             }}
             aria-pressed={s.id === selected}
             disabled={disabled}
