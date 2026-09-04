@@ -484,6 +484,28 @@ export function isApiUnreachable(message: string): boolean {
 }
 
 /**
+ * What this certificate is, and is not, evidence of.
+ *
+ * The certificate on screen is a real abstention: the machinery ran, the two
+ * hypotheses tied inside ε, and the record is the one `RECONCILIATION_SPEC.md`
+ * specifies. What it is not is a measurement of how often ASSAY abstains
+ * correctly, because the sealed corpus never posed the question — `V35`
+ * records `truly_ambiguous`, `abstentions` and `probes_spent` as `0` on all 50
+ * scored units, so the TEST population contains no truly ambiguous target and
+ * the benchmark reports no abstention rate, precision or probe figure.
+ *
+ * One sentence, next to the result, because a reviewer reading a certificate
+ * is exactly the reader who would otherwise take it for the benchmark's
+ * verdict on abstention. It states the boundary and points at the disclosures;
+ * it does not restate them, and it weakens nothing about the record beside it —
+ * every field on this page is still the certificate's own.
+ */
+export const CERTIFICATE_BENCHMARK_BOUNDARY =
+  "Benchmark boundary: the sealed TEST corpus contains zero truly ambiguous targets, so " +
+  "abstention is demonstrated here rather than quantitatively measured by the benchmark. " +
+  "See the README benchmark disclosures.";
+
+/**
  * A run id that outlived the process holding it.
  *
  * `apps/api/src/registry.ts` keeps runs in an in-process `Map`, so a restart
@@ -499,6 +521,33 @@ export const RUN_NOT_FOUND_BODY =
   "Runs live in the API process's memory for the life of the server, so a run started before " +
   "a restart is gone. Nothing financial was cached in this browser — only the run id and the " +
   "period name — so there is no stale figure to show. Run the period again to get a fresh one.";
+
+/**
+ * A `404` that is about the route, not about the run.
+ *
+ * `apps/api` answers `404` twice over, and the two are unrelated events.
+ * `apps/api/src/routes/runs.ts` answers `{"error": "unknown_run"}` when the
+ * registry does not hold the id — the state {@link RUN_NOT_FOUND_HEADLINE}
+ * describes — while `apps/api/src/app.ts`'s fallback answers
+ * `{"error": "not_found"}` when nothing matched the request at all. The second
+ * is what a frontend built against `GET /runs/:id` gets from an API process
+ * that predates the route, which is a live possibility precisely because the
+ * API does not hot-reload: `pnpm run dev` starts a Node process that keeps
+ * serving the build it started with until it is restarted.
+ *
+ * Reported as a version mismatch and never as a missing run, because the
+ * server never looked the run up. Saying *"that run is gone"* on this branch
+ * would be a statement about financial state that no response supports — and
+ * saying *"the API is not reachable"* would contradict the API that answered.
+ */
+export const API_MISMATCH_HEADLINE = "This API build does not support run rehydration";
+
+export const API_MISMATCH_BODY =
+  "The API answered, and has no GET /runs/:id route — so this frontend is newer than the " +
+  "process it is talking to. Restart the API with `pnpm run dev:api` (or `pnpm run dev` for " +
+  "both), then retry: the API does not hot-reload, so a process started before this revision " +
+  "keeps serving the build it launched with. Nothing about the run itself was reported — the " +
+  "server never looked it up — so no figure and no verdict is shown for it here.";
 
 /**
  * The controller's runtime checks, named for what they actually are.

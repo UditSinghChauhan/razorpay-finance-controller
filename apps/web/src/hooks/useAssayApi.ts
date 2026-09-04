@@ -362,14 +362,21 @@ export function useCreateRun(): {
 /**
  * What a rehydration attempt **concluded** about a persisted run id.
  *
- * Three outcomes, because a completed fetch has exactly three answers. The
+ * Four outcomes, because a completed fetch has exactly four answers. The
  * *pending* and *never-attempted* states are not here: they are states of the
  * caller, not conclusions of this call, and they live on `RunContext`'s
  * `RehydrateState` where a page can render them.
+ *
+ * `api_mismatch` is a member rather than a shade of `unreachable` because the
+ * two are opposite facts about the server: `unreachable` is a process that did
+ * not answer, `api_mismatch` is a process that answered and does not have the
+ * route. Folding the second into the first would put *"the API is not
+ * answering"* on screen underneath an API that just did.
  */
 export type RehydrateOutcome =
   | { readonly kind: "found"; readonly run: RunSummary }
   | { readonly kind: "not_found" }
+  | { readonly kind: "api_mismatch" }
   | { readonly kind: "unreachable"; readonly message: string };
 
 /**
@@ -381,16 +388,33 @@ export type RehydrateOutcome =
  * name, never a figure, so every rupee value on screen after a rehydration came
  * from this call and not from storage.
  *
- * The three outcomes are kept apart because they need different words on
- * screen. `404` is a run the process has dropped — `apps/api`'s registry is an
- * in-process `Map` and a restart empties it — and is a normal state, not an
- * error. A rejected `fetch` is the API being absent, which is an operator
- * problem with an operator's fix. Anything else is reported as it came.
+ * The outcomes are kept apart because they need different words on screen. A
+ * rejected `fetch` is the API being absent, which is an operator problem with
+ * an operator's fix. Anything else is reported as it came.
+ *
+ * **A `404` is read from the body, not from the status.** `apps/api` answers
+ * `404` for two unrelated reasons and only one of them is about this run:
+ * `apps/api/src/routes/runs.ts` answers `{"error": "unknown_run"}` for a run
+ * the process no longer holds — its registry is an in-process `Map` and a
+ * restart empties it, which is a normal state rather than an error — while
+ * `apps/api/src/app.ts`'s fallback answers `{"error": "not_found"}` for a
+ * request that matched no route at all. The second one happens when the
+ * frontend has been rebuilt against an API that predates `GET /runs/:id`, and
+ * telling that reviewer *"the run is gone"* would be a fabricated history for
+ * a run the server was never asked about. So the code decides, and a `404`
+ * whose body cannot be read or names neither code is reported as it came
+ * rather than assigned to either.
  */
 export async function fetchRun(runId: string): Promise<RehydrateOutcome> {
   try {
     const res = await fetch(`/api/runs/${encodeURIComponent(runId)}`);
-    if (res.status === 404) return { kind: "not_found" };
+    if (res.status === 404) {
+      const body = (await res.json().catch(() => null)) as { error?: unknown } | null;
+      const code = typeof body?.error === "string" ? body.error : null;
+      if (code === "unknown_run") return { kind: "not_found" };
+      if (code === "not_found") return { kind: "api_mismatch" };
+      return { kind: "unreachable", message: `404: ${code ?? "no error code in body"}` };
+    }
     if (!res.ok) {
       const body = await res.text().catch(() => "");
       return { kind: "unreachable", message: `${String(res.status)}: ${body}` };
