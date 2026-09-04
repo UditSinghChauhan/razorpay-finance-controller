@@ -1,6 +1,8 @@
 import { ScenarioPicker } from "./ScenarioPicker.js";
 import { useRun } from "../context/RunContext.js";
 import {
+  API_MISMATCH_BODY,
+  API_MISMATCH_HEADLINE,
   API_UNAVAILABLE_BODY,
   API_UNAVAILABLE_DETAIL_LABEL,
   API_UNAVAILABLE_HEADLINE,
@@ -93,6 +95,50 @@ export function RunNotFound(): React.ReactElement {
         <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 18 }}>play_arrow</span>
         Run this period
       </button>
+    </GateShell>
+  );
+}
+
+/**
+ * The API answered, and does not have the route this frontend needs.
+ *
+ * **Kept apart from {@link RunNotFound} on purpose, and the separation is made
+ * on the response body rather than the status code.** Both arrive as `404`:
+ * `{"error": "unknown_run"}` is the registry saying it does not hold this run,
+ * and `{"error": "not_found"}` is the router saying nothing matched the
+ * request. Rendering the second as the first would tell a reviewer that their
+ * run is gone on the evidence of a server that never looked it up.
+ *
+ * It is not {@link ApiUnavailable} either: that screen says the API is not
+ * answering, and here it answered. What is stale is the process, which is a
+ * state this setup can genuinely reach because `apps/api` does not hot-reload.
+ *
+ * The pointer is kept and the retry stays, because a restarted API of the
+ * right build may still hold the run. No figure is shown, and none exists to
+ * show: nothing about the run was reported.
+ */
+export function ApiVersionMismatch({
+  onRetry, children,
+}: {
+  onRetry?: (() => void) | undefined;
+  /** A page's own way out, beside the retry. */
+  children?: React.ReactNode;
+}): React.ReactElement {
+  return (
+    <GateShell>
+      <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 44, color: "var(--color-abstained)" }}>
+        sync_problem
+      </span>
+      <p className="font-body-md" style={{ fontWeight: 600 }}>{API_MISMATCH_HEADLINE}</p>
+      <p className="font-body-sm" style={{ maxWidth: 600, textAlign: "center", lineHeight: 1.7 }}>
+        {API_MISMATCH_BODY}
+      </p>
+      <div className="actions" style={{ justifyContent: "center" }}>
+        {onRetry !== undefined && (
+          <button className="btn btn-secondary" onClick={onRetry}>Retry</button>
+        )}
+        {children}
+      </div>
     </GateShell>
   );
 }
@@ -204,6 +250,11 @@ export function ApiErrorNotice({
  * `restored` are the two kinds that let a page through, and both do so because
  * the pointer has stopped being the thing that decides what is on screen — on
  * `idle` there was never one, on `restored` the run it named is installed.
+ *
+ * The three blocking kinds render three different sentences, because they are
+ * three different facts about the server: `not_found` is a run the API says it
+ * does not hold, `api_mismatch` is an API without the route to ask, and
+ * `unreachable` is an API that did not answer.
  */
 export function useRunGate(): React.ReactElement | null {
   const { rehydrate, retryRehydrate } = useRun();
@@ -212,6 +263,8 @@ export function useRunGate(): React.ReactElement | null {
       return <RestoringRun />;
     case "not_found":
       return <RunNotFound />;
+    case "api_mismatch":
+      return <ApiVersionMismatch onRetry={retryRehydrate} />;
     case "unreachable":
       return <ApiUnavailable message={rehydrate.message} onRetry={retryRehydrate} />;
     case "idle":

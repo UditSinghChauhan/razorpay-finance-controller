@@ -12,6 +12,7 @@ import { DecisionVerdict } from "../src/pages/EvidenceTrail.js";
 import { InvestigationQueue } from "../src/pages/InvestigationQueue.js";
 import {
   AUTHORITY_ONE_LINE,
+  CERTIFICATE_BENCHMARK_BOUNDARY,
   LEDGER_EVENT_HEADING,
   NO_MODEL_WRITES,
   PRODUCT_AGENTIC,
@@ -296,6 +297,71 @@ describe("the workflow chain is the reviewer-facing proof that the loop ran", ()
   });
 });
 
+/**
+ * F-10 — the state strip and the two badges beside the safety workflow.
+ *
+ * The panel's smallest inline text was `9px`, which is legible on a laptop at
+ * arm's length and not on a projector at the back of a room. Four values were
+ * involved — the state-machine strip's node labels, the bounded-result badge in
+ * the outcome banner, the telemetry group headings and the counter labels —
+ * and each is a label a reviewer has to read to follow what the controller did.
+ *
+ * They are raised to `11px`, which is already this file's floor for its other
+ * small text. This is a typographic minimum and nothing else: no figure, label
+ * or layout rule moves with it, and the strip keeps scrolling horizontally at
+ * narrow widths rather than reflowing.
+ */
+describe("F-10: the panel's smallest labels are legible at a distance", () => {
+  const html = view(TRACE);
+
+  it("renders no 9px text anywhere on the panel", () => {
+    expect(html).not.toContain("font-size:9px");
+  });
+
+  it("raises every node label in the state strip, including the terminal one", () => {
+    // Each strip node renders `<p class="font-label-caps" style="color:…;
+    // font-size:…;margin-bottom:0">Label</p>`, so the label and its size are
+    // asserted together rather than the size being asserted anywhere on
+    // the page.
+    const labels = [...html.matchAll(
+      /class="font-label-caps" style="color:[^"]*?;font-size:(\d+)px;margin-bottom:0">([^<]+)</g,
+    )];
+    expect(labels.length).toBeGreaterThan(0);
+    for (const [, size, label] of labels) expect(size, label).toBe("11");
+    // The strip runs from the first reachable state to the terminal one.
+    expect(labels.map(([, , label]) => label)).toContain("Init");
+    expect(labels.map(([, , label]) => label)).toContain("Escalated");
+  });
+
+  it("raises the bounded-result badge and the telemetry labels too", () => {
+    const exhausted: ControllerTrace = {
+      ...TRACE,
+      stop_reason: "BUDGET_EXHAUSTED",
+      telemetry: { ...TRACE.telemetry, stop_reason: "BUDGET_EXHAUSTED" },
+    };
+    const partial = view(exhausted);
+    expect(partial).toContain("Bounded partial result");
+    expect(partial).not.toContain("font-size:9px");
+    // The telemetry group headings and the counter labels, both behind the
+    // disclosure and both previously 9px.
+    expect(partial).toContain('style="margin-bottom:6px;font-size:11px"');
+    expect(partial).toContain('style="font-size:11px;margin-bottom:2px"');
+  });
+
+  it("keeps the strip scrolling rather than reflowing at narrow widths", () => {
+    // `.scroll-x` is the overflow container and `min-width:620px` is the
+    // strip's own floor; raising the label size must not have removed either.
+    expect(html).toContain('class="scroll-x"');
+    expect(html).toContain("min-width:620px");
+  });
+
+  it("leaves the 10px identifier chips as they were", () => {
+    // F-10 is four values, not a typography rewrite: the monospace id chips
+    // are a different class of text and keep their size.
+    expect(html).toContain("font-size:10px");
+  });
+});
+
 describe("a budget-exhausted run is reported as partial, never as a completed handoff", () => {
   const exhausted: ControllerTrace = {
     ...TRACE,
@@ -490,6 +556,31 @@ describe("the certificate answers the four questions a reviewer arrives with", (
     );
     expect(partial).toContain("is not loaded on this page");
     expect(partial).not.toContain("The ledger remains balanced.");
+  });
+
+  // F-03 — what the certificate beside it is, and is not, evidence of.
+  it("bounds what the benchmark measured, beside the abstention it shows", () => {
+    // V35: `truly_ambiguous`, `abstentions` and `probes_spent` are 0 on all 50
+    // scored units, so the sealed corpus posed the question this certificate
+    // answers exactly zero times. The record on screen is a demonstration of
+    // the mechanism and the benchmark reports no abstention rate at all.
+    expect(html).toContain("Benchmark boundary");
+    expect(html).toContain("zero truly ambiguous targets");
+    expect(html).toContain("demonstrated here rather than quantitatively measured");
+  });
+
+  it("states that boundary once, and does not turn into a disclaimer", () => {
+    expect(CERTIFICATE_BENCHMARK_BOUNDARY.length).toBeLessThan(260);
+    expect(html.split("Benchmark boundary").length - 1).toBe(1);
+  });
+
+  it("leaves the certificate's own financial and evidence answers untouched", () => {
+    // The boundary is about the benchmark's coverage of abstention, never
+    // about this record: every field the four answers render is still stated.
+    expect(html).toContain("2 valid allocation hypotheses remain");
+    expect(html).toContain("all 8 shared hard constraints");
+    expect(html).toContain("₹1,00,000 remains unresolved and is held in Suspense");
+    expect(html).toContain("No value is written off, suppressed or guessed.");
   });
 });
 

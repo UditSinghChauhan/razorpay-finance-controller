@@ -10,6 +10,7 @@ import {
   type CertificateSolution,
 } from "../hooks/useAssayApi.js";
 import {
+  CERTIFICATE_BENCHMARK_BOUNDARY,
   CERTIFICATE_RELATIONSHIP,
   CERTIFICATE_VERIFY_HOW,
   CERTIFICATE_VERIFY_IDS,
@@ -280,6 +281,13 @@ export function CertificateStory({
           : `The period remains ${periodStatus}.`}{" "}
         No value is written off, suppressed or guessed.
       </QA>
+
+      {/* What the record beside it is evidence of. Placed inside the story
+          rather than at the foot of the page, because the claim it bounds is
+          the abstention stated three lines above — not the page as a whole. */}
+      <p className="font-body-sm text-muted" style={{ marginTop: "var(--space-md)", marginBottom: 0, lineHeight: 1.6, maxWidth: 780 }}>
+        {CERTIFICATE_BENCHMARK_BOUNDARY}
+      </p>
     </section>
   );
 }

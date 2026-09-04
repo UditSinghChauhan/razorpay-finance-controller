@@ -277,7 +277,7 @@ function OutcomeBanner({ trace }: { trace: ControllerTrace }): React.ReactElemen
           <span className="cell-id" style={{ fontSize: 10 }}>reason {reason}</span>
         )}
         {trace.stop_reason === "BUDGET_EXHAUSTED" && (
-          <span className="badge badge-abstained" style={{ fontSize: 9 }}>
+          <span className="badge badge-abstained" style={{ fontSize: 11 }}>
             Bounded partial result
           </span>
         )}
@@ -367,7 +367,7 @@ function StateNode({
           {isTerminal === true ? (terminalKind === "halt" ? "block" : "flag") : visited ? "check" : "circle"}
         </span>
       </div>
-      <p className="font-label-caps" style={{ color, fontSize: 9, marginBottom: 0 }}>{label}</p>
+      <p className="font-label-caps" style={{ color, fontSize: 11, marginBottom: 0 }}>{label}</p>
     </div>
   );
 }
@@ -899,7 +899,7 @@ function TelemetryBlock({ telemetry }: { telemetry: ControllerTelemetry }): Reac
           if (rows.length === 0) return null;
           return (
             <div key={group} className="card" style={{ padding: "var(--space-md)" }}>
-              <p className="font-label-caps text-muted" style={{ marginBottom: 6, fontSize: 9 }}>
+              <p className="font-label-caps text-muted" style={{ marginBottom: 6, fontSize: 11 }}>
                 {TELEMETRY_GROUP_LABEL[group] ?? group}
               </p>
               {rows.map((k) => (
@@ -939,7 +939,7 @@ function TelemetryBlock({ telemetry }: { telemetry: ControllerTelemetry }): Reac
           ["eligible / ineligible", `${formatCount(c.eligible_items)} / ${formatCount(c.ineligible_items)}`],
         ].map(([label, value]) => (
           <div key={label}>
-            <p className="font-label-caps text-muted" style={{ fontSize: 9, marginBottom: 2 }}>{label}</p>
+            <p className="font-label-caps text-muted" style={{ fontSize: 11, marginBottom: 2 }}>{label}</p>
             <p className="font-numeric-mono" style={{ fontSize: 12 }}>{value}</p>
           </div>
         ))}
