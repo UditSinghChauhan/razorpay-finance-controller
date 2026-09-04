@@ -173,7 +173,7 @@ function GateStatusRow({ label, passed }: { label: string; passed: boolean }): R
 function ReviewerBrief(): React.ReactElement {
   return (
     <div className="card" style={{ padding: "var(--space-md)", marginBottom: "var(--space-lg)" }}>
-      <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>What this is</p>
+      <p className="font-label-caps font-label-section" style={{ marginBottom: 4 }}>What this is</p>
       <p className="font-body-md" style={{ fontWeight: 600, marginBottom: 4, lineHeight: 1.5 }}>
         {PRODUCT_WHAT}
       </p>
@@ -627,7 +627,7 @@ export function CommandCenter(): React.ReactElement {
           own container below it — six nodes squashed to 40px each are six
           nodes nobody can read. */}
       <div className="card" style={{ marginBottom: "var(--space-xl)", padding: "var(--space-lg)" }}>
-        <p className="font-label-caps text-muted" style={{ marginBottom: "var(--space-lg)" }}>Reconciliation Pipeline</p>
+        <p className="font-label-caps font-label-section" style={{ marginBottom: "var(--space-lg)" }}>Reconciliation Pipeline</p>
         <div className="scroll-x">
           <div style={{ display: "flex", alignItems: "flex-start", gap: 0, minWidth: 620 }}>
             <PipelineStage label="Ingest" status="done" count={obsCount} />
@@ -669,7 +669,7 @@ export function CommandCenter(): React.ReactElement {
       {close && (
         <div className="grid grid-2" style={{ marginBottom: "var(--space-xl)" }}>
           <div className="card" style={{ padding: "var(--space-lg)" }}>
-            <p className="font-label-caps text-muted" style={{ marginBottom: "var(--space-md)" }}>Close Gates</p>
+            <p className="font-label-caps font-label-section" style={{ marginBottom: "var(--space-md)" }}>Close Gates</p>
             {/* The outcome, stated where the gates are — unconditionally.
                 It previously appeared only inside the abstention alert, so a
                 period with no abstention on it (every gate passing, residual
@@ -699,7 +699,7 @@ export function CommandCenter(): React.ReactElement {
             <GateStatusRow label="G5 No Failed Invariant Posted" passed={close.gate.g5_no_failed_invariant_posted} />
           </div>
           <div className="card" style={{ padding: "var(--space-lg)" }}>
-            <p className="font-label-caps text-muted" style={{ marginBottom: "var(--space-md)" }}>Ledger Summary</p>
+            <p className="font-label-caps font-label-section" style={{ marginBottom: "var(--space-md)" }}>Ledger Summary</p>
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span className="font-body-sm text-muted">Trial Balance</span>

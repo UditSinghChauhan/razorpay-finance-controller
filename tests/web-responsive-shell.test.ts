@@ -23,10 +23,18 @@ import { describe, expect, it } from "vitest";
  * `apps/web/tsconfig.json` declares `"types": []`, so `node:fs` does not
  * typecheck there.
  *
- * **The six widths are the ones the shell was verified at**: 1440, 1200, 1024,
- * 900, 768 and 480. For each, this file resolves which `@media (max-width: N)`
- * blocks apply and asserts the mode that results, so a breakpoint moved or
- * deleted fails here rather than on someone's laptop.
+ * **The eight widths are the ones the shell is verified at**: 1440, 1280, 1200,
+ * 1024, 900, 768, 480 and 390. For each, this file resolves which
+ * `@media (max-width: N)` blocks apply and asserts the mode that results, so a
+ * breakpoint moved or deleted fails here rather than on someone's laptop.
+ *
+ * Six of the eight are the shell's own breakpoint neighbourhood. The other two
+ * are the ones a reviewer actually opens this on and the stylesheet had no
+ * assertion for: **1280**, the standard laptop width, which must resolve to the
+ * full sidebar rather than the rail one breakpoint below it, and **390**, a
+ * phone, which must resolve to the drawer. Both were correct already; neither
+ * was pinned, and a breakpoint edited to 1300 or a drawer rule scoped to 400
+ * would have moved them without failing anything.
  */
 
 const ROOT = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
@@ -34,7 +42,7 @@ const WEB_SRC = join(ROOT, "apps", "web", "src");
 const CSS = readFileSync(join(WEB_SRC, "design-system.css"), "utf8");
 
 /** The widths the shell is verified at, widest first. */
-const VERIFIED_WIDTHS = [1440, 1200, 1024, 900, 768, 480] as const;
+const VERIFIED_WIDTHS = [1440, 1280, 1200, 1024, 900, 768, 480, 390] as const;
 
 /**
  * Every `@media (max-width: N)` block in the stylesheet, as `[N, body]`.

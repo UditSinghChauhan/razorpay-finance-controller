@@ -103,7 +103,7 @@ function PopulationStrip({
       className="card"
       style={{ padding: "var(--space-md)", marginBottom: "var(--space-md)", borderLeft: "3px solid var(--color-abstained)" }}
     >
-      <p className="font-label-caps text-muted" style={{ marginBottom: "var(--space-sm)" }}>
+      <p className="font-label-caps font-label-section" style={{ marginBottom: "var(--space-sm)" }}>
         What is on this queue
       </p>
 
@@ -166,7 +166,7 @@ function InvestigationPanel({
     <aside className="detail-panel" aria-label="Investigation detail">
       {/* Panel header */}
       <div style={{ padding: "var(--space-md) var(--space-lg)", borderBottom: "1px solid var(--color-outline-variant)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "var(--space-sm)" }}>
-        <span className="font-label-caps text-muted">Investigation Detail</span>
+        <span className="font-label-caps font-label-section">Investigation Detail</span>
         <button className="btn-ghost" onClick={onClose} aria-label="Close panel" style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
           <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
         </button>

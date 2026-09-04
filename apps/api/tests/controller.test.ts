@@ -25,6 +25,21 @@ import { RunRegistry, controllerRoutes, createApp } from "../src/index.js";
 const registry = new RunRegistry();
 const app = createApp({ registry });
 
+/**
+ * `POST /runs` names its period.
+ *
+ * The dataset is a required field, not a default: `apps/api/src/routes/runs.ts`
+ * answers `400 missing_dataset` to a request that names none, so a body whose
+ * `dataset` went missing can no longer come back as a real run over a period
+ * nobody asked for. Every creation below therefore says which period it wants.
+ */
+const START_DEMO_500 = {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ dataset: "demo-500" }),
+} as const;
+
+
 interface RunCreated {
   readonly run_id: string;
 }
@@ -66,7 +81,7 @@ interface TraceBody {
 let runId: string;
 
 beforeAll(async () => {
-  const response = await app.request("/runs", { method: "POST" });
+  const response = await app.request("/runs", START_DEMO_500);
   expect(response.status).toBe(201);
   ({ run_id: runId } = (await response.json()) as RunCreated);
 }, 60_000);
