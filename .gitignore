@@ -12,6 +12,13 @@ secrets/
 bench/test/**/ground_truth.jsonl
 bench/test/**/*.sealed
 
+# The DEV corpus is regenerated locally from a seed and is never committed:
+# §6.1's split table names the seeds, `assay bench gen` reproduces the files
+# from them, and a wildcard `git add` must not be able to sweep a local
+# generation into the tree. The directory itself is untouched by this rule --
+# it stays exactly where it is, ignored rather than removed.
+bench/dev/
+
 # --- Build / runtime ---
 node_modules/
 dist/

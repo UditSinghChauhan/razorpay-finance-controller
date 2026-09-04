@@ -41,19 +41,24 @@ describe("the authority legend distinguishes the three layers", () => {
     expect(legend).toContain("would be a fifth LLM role the spec forbids");
   });
 
-  it("names Gemini as explanation only, after the fact, and removable", () => {
-    expect(legend).toContain("Gemini — explanation only");
+  it("names the explanation model as explanation only, after the fact, and removable", () => {
+    expect(legend).toContain("Explanation model — explanation only");
+    // F-13: no provider brand in standing copy. `apps/api` resolves the
+    // provider at request time, so a name here would be a claim about a server
+    // this component never saw.
+    expect(legend).not.toContain("Gemini");
+    expect(legend).not.toContain("Anthropic");
     expect(legend).toContain("Describes a decision already made. No authority.");
     expect(legend).toContain("after the outcome is sealed");
     expect(legend).toContain("Cannot express an amount");
     expect(legend).toContain("the close loop runs unchanged without it");
   });
 
-  it("orders them by authority: ASSAY, then controller, then Gemini", () => {
+  it("orders them by authority: ASSAY, then controller, then the explanation model", () => {
     const positions = [
       legend.indexOf("ASSAY — deterministic financial authority"),
       legend.indexOf("Controller — bounded orchestration"),
-      legend.indexOf("Gemini — explanation only"),
+      legend.indexOf("Explanation model — explanation only"),
     ];
     for (const p of positions) expect(p).toBeGreaterThan(-1);
     expect(positions).toEqual([...positions].sort((a, b) => a - b));

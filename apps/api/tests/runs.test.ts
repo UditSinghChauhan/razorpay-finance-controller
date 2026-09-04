@@ -111,6 +111,76 @@ describe("POST /runs", () => {
   });
 });
 
+describe("GET /runs/:id", () => {
+  /**
+   * The summary `POST /runs` returned, re-read for a run the process still
+   * holds.
+   *
+   * **It exists so a browser can stop keeping a copy of financial state.**
+   * `apps/web` persists a run id and a period name across a reload — nothing
+   * monetary — and hands the id back here; every figure on screen afterwards is
+   * this response's rather than a cached one. The property that makes that safe
+   * is the third test below: the two routes must serve the *same object*, so a
+   * restored page and a freshly-run page cannot show different numbers for the
+   * same run.
+   *
+   * **It is a read.** No test here creates anything, and the fourth asserts it:
+   * asking for an id the registry does not hold answers `404` and leaves the
+   * registry exactly as it was, rather than reviving a run from an id.
+   */
+  it("returns the run for an id the process still holds", async () => {
+    const response = await app.request(`/runs/${created.run_id}`);
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as RunCreated;
+    expect(body.run_id).toBe(created.run_id);
+    expect(body.dataset).toBe("demo-500");
+    expect(body.agent_id).toBe("ASSAY");
+    expect(body.llm_provider).toBe("offline");
+    expect(body.observation_count).toBe(500);
+  });
+
+  it("404s on an unknown run, with the standing unknown_run shape", async () => {
+    const response = await app.request("/runs/run_nope");
+    expect(response.status).toBe(404);
+    const body = (await response.json()) as { error: string; message: string; run_id: string };
+    expect(body.error).toBe("unknown_run");
+    expect(body.run_id).toBe("run_nope");
+    // The message names the cause a client must render rather than paper over.
+    expect(body.message).toContain("Runs live in memory for the life of the");
+  });
+
+  it("serves byte-identical JSON to what POST /runs returned", async () => {
+    // The one property `apps/web`'s reload path rests on. `summaryBody` is the
+    // POST handler's own body, lifted so the two cannot drift; this is the
+    // assertion that would fail if they ever did.
+    const posted = await app.request("/runs", { method: "POST" });
+    expect(posted.status).toBe(201);
+    const postedText = await posted.text();
+
+    const got = await app.request(`/runs/${created.run_id}`);
+    expect(got.status).toBe(200);
+    expect(await got.text()).toBe(postedText);
+  }, 60_000);
+
+  it("creates nothing on an unknown id", async () => {
+    // A GET that minted a run would make a bookmarked URL able to start work.
+    const missing = "run_this_id_was_never_created";
+    expect((await app.request(`/runs/${missing}`)).status).toBe(404);
+    // Still absent afterwards, and still absent to every other route on it.
+    expect((await app.request(`/runs/${missing}`)).status).toBe(404);
+    expect((await app.request(`/runs/${missing}/close`)).status).toBe(404);
+    expect((await app.request(`/runs/${missing}/exceptions`)).status).toBe(404);
+  });
+
+  it("is unchanged by being read: repeated GETs are identical", async () => {
+    const first = await (await app.request(`/runs/${created.run_id}`)).text();
+    const second = await (await app.request(`/runs/${created.run_id}`)).text();
+    const third = await (await app.request(`/runs/${created.run_id}`)).text();
+    expect(second).toBe(first);
+    expect(third).toBe(first);
+  });
+});
+
 describe("GET /runs/:id/close", () => {
   it("reports OPEN with unresolved value and every gate named", async () => {
     const response = await app.request(`/runs/${created.run_id}/close`);

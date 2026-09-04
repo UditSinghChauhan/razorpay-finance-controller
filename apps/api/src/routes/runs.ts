@@ -103,6 +103,49 @@ export function queueRow(stored: StoredRun, decisionId: string): unknown {
   };
 }
 
+/**
+ * The run summary, built once and served by two routes.
+ *
+ * `POST /runs` has always returned this shape; `GET /runs/:id` returns the same
+ * object for a run the registry already holds, so a reloaded browser can
+ * re-read authoritative state instead of keeping a copy of it. **Nothing is
+ * computed here that was not computed before** — this is the `POST` handler's
+ * own body, lifted so the two cannot drift, and no field is added, removed or
+ * recomputed. The registry is unchanged: runs still live in memory for the life
+ * of the process, and a run it does not hold is a 404 rather than a revival.
+ */
+export function summaryBody(stored: StoredRun): unknown {
+  const { run, evidence } = stored.result;
+
+  // Terminal-state counts, over §L.1 rule 5's four states. Counted from the
+  // run's own outcomes, which is where the states were decided.
+  const states: Record<string, number> = {};
+  for (const outcome of run.outcomes) {
+    states[outcome.state] = (states[outcome.state] ?? 0) + 1;
+  }
+
+  return {
+    run_id: stored.run_id,
+    dataset: stored.dataset,
+    agent_id: stored.agent_id,
+    llm_provider: stored.llm_provider,
+    observation_count: stored.observation_count,
+    summary: {
+      observation_states: states,
+      decisions: evidence.decisions.length,
+      abstentions: run.abstentions.length,
+      open_exceptions: run.open_exceptions.length,
+      certificates: evidence.certificates.length,
+      probes_spent: run.probes_spent,
+      period_status: evidence.close.period_status,
+      unresolved_value_paise: evidence.close.gate.unresolved_value_paise,
+      batch_value_paise: evidence.close.report?.batch_value_paise ?? null,
+      ledger_root_hash: evidence.chain.root_hash,
+      event_count: evidence.chain.events.length,
+    },
+  };
+}
+
 export function runRoutes(registry: RunRegistry): Hono {
   const app = new Hono();
 
@@ -160,38 +203,7 @@ export function runRoutes(registry: RunRegistry): Hono {
     }
 
     const stored = await registry.create(dataset);
-    const { run, evidence } = stored.result;
-
-    // Terminal-state counts, over §L.1 rule 5's four states. Counted from the
-    // run's own outcomes, which is where the states were decided.
-    const states: Record<string, number> = {};
-    for (const outcome of run.outcomes) {
-      states[outcome.state] = (states[outcome.state] ?? 0) + 1;
-    }
-
-    return c.json(
-      {
-        run_id: stored.run_id,
-        dataset: stored.dataset,
-        agent_id: stored.agent_id,
-        llm_provider: stored.llm_provider,
-        observation_count: stored.observation_count,
-        summary: {
-          observation_states: states,
-          decisions: evidence.decisions.length,
-          abstentions: run.abstentions.length,
-          open_exceptions: run.open_exceptions.length,
-          certificates: evidence.certificates.length,
-          probes_spent: run.probes_spent,
-          period_status: evidence.close.period_status,
-          unresolved_value_paise: evidence.close.gate.unresolved_value_paise,
-          batch_value_paise: evidence.close.report?.batch_value_paise ?? null,
-          ledger_root_hash: evidence.chain.root_hash,
-          event_count: evidence.chain.events.length,
-        },
-      },
-      201,
-    );
+    return c.json(summaryBody(stored), 201);
   });
 
   /** Resolve `:id`, or answer `404` with the id that was asked for. */
@@ -209,6 +221,22 @@ export function runRoutes(registry: RunRegistry): Hono {
       `server (ARCHITECTURE.md §8's SQLite store is not built), so a run started before a ` +
       `restart is gone. POST /runs to start one.`,
     run_id: id,
+  });
+
+  /**
+   * `GET /runs/:id` — the summary `POST /runs` returned, for a run still held.
+   *
+   * Added so a reloaded or deep-linked browser can recover authoritative state
+   * from the server rather than from its own storage. It is a **read**: it runs
+   * nothing, creates nothing and mutates nothing, and it serves
+   * {@link summaryBody} over a `StoredRun` the registry already has. A run the
+   * process no longer holds answers `404` with the standing `unknown_run`
+   * message, which is the state a client must render rather than paper over.
+   */
+  app.get("/runs/:id", (c) => {
+    const found = require_(c);
+    if (typeof found === "string") return c.json(notFound(found), 404);
+    return c.json(summaryBody(found));
   });
 
   /** `GET /runs/:id/close` — the close report `§10.4` produced. */

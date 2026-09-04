@@ -505,8 +505,11 @@ describe("the telemetry block — runtime checks, on screen", () => {
   );
 
   it("labels the block EXPLORATORY, as §L.4 requires of any metric outside §8", () => {
-    expect(html).toContain("Runtime checks");
+    // F-15: named for what they are — assertions the controller derives from
+    // its own trace — so the tally cannot read as an independent attestation.
+    expect(html).toContain("Runtime policy assertions");
     expect(html).toContain("EXPLORATORY");
+    expect(html).toContain("not an independent audit");
   });
 
   it("reports the passed/total tally the API computed", () => {
@@ -535,7 +538,9 @@ describe("the telemetry block — runtime checks, on screen", () => {
     ]) {
       expect(html, label).toContain(label);
     }
-    expect(html).toContain("10 / 64 budget");
+    // Under budget, so the ratio is shown plainly with no "bound reached".
+    expect(html).toContain("10 / 64");
+    expect(html).not.toContain("bound reached");
   });
 
   it("names the read tools the run actually called", () => {
@@ -594,7 +599,13 @@ describe("the escalation explains itself in words, from its own fields", () => {
   });
 
   it("reports the probe attempts rather than implying a search happened", () => {
-    expect(html).toContain("no admissible probe could break the tie");
+    // F-05: with `probes_attempted: []` no probe ran, so the sentence must not
+    // assert that one was tried and failed. What happened is that the frozen
+    // probe policy offered nothing to run and the tie stood.
+    expect(html).toContain(
+      "no probe was required or available under the frozen probe policy, so the evidence stayed tied",
+    );
+    expect(html).not.toContain("no admissible probe could break the tie");
   });
 
   it("ends on the authority boundary — the controller may not choose", () => {

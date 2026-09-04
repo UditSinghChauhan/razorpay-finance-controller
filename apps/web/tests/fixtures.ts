@@ -357,6 +357,11 @@ export function runContext(overrides: Partial<RunContextValue> = {}): RunContext
     startDemo: () => Promise.resolve(),
     selectDataset: () => undefined,
     selectDecision: () => undefined,
+    // The default is a first visit: no pointer was stored, so nothing is
+    // being restored and no page is gated. A test that wants the restoring,
+    // not-found or unreachable screen overrides this one field.
+    rehydrate: { kind: "idle" },
+    retryRehydrate: () => undefined,
     ...overrides,
   };
 }

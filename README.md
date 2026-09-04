@@ -9,7 +9,7 @@ Razorpay AI Buildathon 2026 — **Track 04: AI Finance Controller**.
 >
 > Ten packages and three apps are committed — `money`, `domain`, `ledger`,
 > `engine`, `probe`, `oracle`, `generator`, `eval`, `llm`, `controller`, and
-> `apps/cli`, `apps/api`, `apps/web`. The suite is **3,377 tests across 145
+> `apps/cli`, `apps/api`, `apps/web`. The suite is **3,552 tests across 150
 > files**, with no type errors.
 >
 > **Spec version 1.4.38 · Benchmark version 1.0.13 · sealed, signed tag
@@ -30,6 +30,62 @@ Razorpay AI Buildathon 2026 — **Track 04: AI Finance Controller**.
 > rather than met** — a weaker statement than a negative result, and the honest
 > one. The only material separation anywhere in the run is `ASSAY` against
 > `B0-IDONLY` on seeds `9100`–`9104`, and V35 reports its direction both ways.
+> What the sealed corpus therefore cannot measure about abstention is stated in
+> full below, with the figures it was read from.
+>
+> **V36 — `docs/PROJECT_SPEC.md §7` S3 is not met on the frozen TEST corpus, and
+> the cause is structural rather than an ASSAY posting-rule defect.** `ASSAY`'s
+> `balance_harm_paise` is **1.23×–1.50× `batch_value_paise`** across the ten seeds,
+> against S3's bar of 0.05%. `docs/EVALUATION_SPEC.md §4.4(a)`'s `proj_truth`
+> joins truth's journal to the covered set on `source_entity_id` alone, and truth
+> posts both the `P1` capture leg and the `P2` bank leg of a payment under the same
+> `pay_…` key — while `docs/DATA_MODEL.md §17.1.1` correctly withholds `P2`/`P4`
+> unless `AN2` bank evidence exists, and `§4.2` freezes `bank_ref` quality at *"30%
+> a clean UTR, 70% absent or non-UTR"*. A conforming agent is therefore charged, in
+> full, the bank leg the specification forbids it to post. ASSAY's posting
+> behaviour is conformant and the `P2` path demonstrably fires wherever `AN2`
+> holds; on this corpus `balance_harm_inr` measures the benchmark's
+> bank-attribution rate, not ASSAY's accounting accuracy. **Metrics 2
+> `net_cost_inr`, 3 `aurc_paise` and 8 `gap_to_oracle` all take `balance_harm_inr`
+> as an input and inherit that limitation in full; none of them may be presented as
+> independent evidence of accounting accuracy on this corpus.** Nothing was
+> changed to accommodate this: no benchmark data, threshold, metric formula,
+> posting rule or engine behaviour moved, and no re-run or re-score was performed.
+> A repair belongs to a future `BENCHMARK_VERSION` with fresh seeds. V36 records
+> the measurement, the reproduction and the rejected alternatives.
+>
+> **Coverage, all four published views, `ASSAY` across the ten sealed TEST
+> seeds.** `docs/EVALUATION_SPEC.md §4.1` defines four and `§5.2` requires them
+> shown together, because a run can reconcile almost all gateway-side value while
+> the bank statement is largely untied. Each is a per-seed range read from the
+> committed `runs/seal-v1.0.13/test/<seed>/ASSAY/offline/metrics.json`; none is
+> averaged, and no figure here is recomputed.
+>
+> | View | Numerator ÷ denominator | Range over the ten seeds |
+> |---|---|---|
+> | `coverage_by_value` — the headline | `Σ recon_line.amount` RECONCILED ÷ `Σ recon_line.amount` | **0.9639 – 1.0000** |
+> | `coverage_by_value_all_observations` | RECONCILED value ÷ value of **all** observations | 0.5437 – 0.5965 |
+> | `coverage_by_value_bank` | `Σ bank_line.amount` RECONCILED ÷ `Σ bank_line.amount` | 0.2090 – 0.3763 |
+> | `coverage_by_value_ledger` | `Σ ledger_entry.gross_paise` RECONCILED ÷ same | **0.0000** on every seed |
+>
+> The headline is a **recon-view** figure and is not total financial coverage.
+> The bank view is bounded by `AN2` alone (`§10` **V18**) and the ledger view is
+> `0.0000` **by construction** because anchor `AN5` is retired (`§4.1`, `§10`
+> **V12**) — a scope statement, not a performance result. The audit line
+> `coverage_by_value_all_observations` is `EXPLORATORY` and supports no claim.
+> The same `AN2` bound is what **V36** above identifies as the cause of the S3
+> harm figure.
+>
+> **The sealed corpus does not measure abstention, and the mechanism is shown
+> elsewhere.** `truly_ambiguous`, `abstentions` and `probes_spent` are `0` on all
+> 50 scored units, so the oracle marked **no** target ambiguous on any TEST seed
+> and the abstention path was never entered. There is therefore **no abstention
+> rate, no abstention precision and no probe figure** this benchmark can report,
+> and none is claimed. The ambiguity and abstention machinery is demonstrated
+> instead in the controlled scenario lab under [`demo/`](demo) — a
+> **demonstration, not a measurement**, whose five boundaries `demo/README.md`
+> states in full: outside `bench/`, no seed, no ground truth, never scored, and
+> never usable to support a claim about coverage, accuracy or harm.
 >
 > **No aggregates exist.** `docs/EVALUATION_SPEC.md §5.2`'s bootstrap is not
 > implemented at this checkpoint, so there is no cross-seed mean, no ± 95% CI and
@@ -110,9 +166,15 @@ The demo is the web product, not the CLI. `docs/PROJECT_SPEC.md §10`'s script i
 written against `assay run` / `assay verify` / `assay bench`, and the first two
 refuse for the reason the status block gives — so the working path is:
 
-    pnpm run dev         # apps/api on 127.0.0.1:8787, apps/web on :5173
+    pnpm run dev         # apps/api on 127.0.0.1:8787; apps/web on the port Vite prints
 
-Open <http://localhost:5173>, pick one of the four demo periods, and run it.
+**Open the URL Vite prints, not a remembered one.** `apps/web/vite.config.ts`
+asks for `5173`, but Vite does not hold that port: with `strictPort` unset it
+takes the next free one — `5174`, `5175` and so on — when something already has
+`5173`, and prints the URL it actually bound. The API address is fixed at
+`127.0.0.1:8787`, because the frontend proxies `/api` there and that target is
+configured rather than negotiated. Then pick one of the four demo periods and
+run it.
 Everything is `--llm=offline` and needs no credential; the AI explanation panel
 is the one surface that calls a metered provider, and every other panel answers
 identically whether it is configured or absent.
@@ -141,8 +203,7 @@ Submission: **5 September**.
 ## Credentials
 
 API keys live in `.env`, which is gitignored. They are never written into source,
-documentation, prompts, fixtures, or commit history. This repository stays
-private.
+documentation, prompts, fixtures, or commit history.
 
 `.env.example` is the documented template: copy it to `.env` at the repository
 root and fill in the values there. The API reads the file through Node's own
@@ -151,11 +212,13 @@ dotenv dependency and no loader. That script is the single definition of how the
 server starts, so every command below launches an API with the same environment;
 `if-exists` is what keeps a clean checkout with no `.env` starting normally.
 
-    pnpm run check:env   # provider / model / GEMINI_API_KEY=set|missing
+    pnpm run check:env   # provider / model / <selected provider's key>=set|missing
     pnpm run dev:api     # start apps/api alone, with .env loaded
     pnpm run dev         # start apps/api and apps/web together
 
-`check:env` reports whether the credential is present and never prints it. The
+`check:env` reports whether the credential **the selected provider actually
+reads** is present, and never prints it — `ANTHROPIC_API_KEY` on the default
+`anthropic` path, `GEMINI_API_KEY` when `ASSAY_EXPLAIN_PROVIDER=gemini`. The
 API itself prints the provider and model it resolved as its second startup line,
 so a `.env` that did not reach the server is visible before any request is made.
 

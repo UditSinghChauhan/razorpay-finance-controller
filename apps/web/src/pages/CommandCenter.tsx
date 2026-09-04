@@ -1,19 +1,36 @@
+import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AuthorityLegend } from "../components/AuthorityLegend.js";
-import { ControllerPanel, SCENARIO_LAB_ANCHOR_ID } from "../components/ControllerPanel.js";
+import {
+  controllerOutcome,
+  ControllerPanel,
+  SCENARIO_LAB_ANCHOR_ID,
+} from "../components/ControllerPanel.js";
+import { CopyId } from "../components/CopyId.js";
+import { ApiErrorNotice, useRunGate } from "../components/RunGate.js";
 import { ScenarioPicker } from "../components/ScenarioPicker.js";
 import { useRun } from "../context/RunContext.js";
+import type { ControllerTrace } from "../hooks/useAssayApi.js";
 import {
   ABSTAINED_VALUE_BASIS,
   ABSTAINED_VALUE_LABEL,
   abstentionDecisionLabel,
   affectedObservationsLabel,
+  AUTHORITY_ONE_LINE,
+  CONTROLLER_NOT_RUN,
   ENGINE_MODEL_USE,
+  NO_MODEL_WRITES,
   periodStatusMeaning,
+  PRODUCT_AGENTIC,
+  PRODUCT_WHAT,
   RECONCILIATION_BASIS,
   RECONCILIATION_LABEL,
+  RECONCILIATION_SCOPE,
+  S5_COUNT_BASIS,
+  VERIFY_LEDGER_TITLE,
 } from "../lib/copy.js";
 import { formatPaise, formatCount } from "../lib/format.js";
+import { scenarioLabel } from "../lib/scenarios.js";
 
 /**
  * Command Center - ASSAY Reconciliation Intelligence.
@@ -23,6 +40,11 @@ import { formatPaise, formatCount } from "../lib/format.js";
  *
  * All data sourced from POST /runs summary and GET /runs/:id/close.
  * No mock financial values - every number comes from the API.
+ *
+ * **The page tells one story, in one order:** financial state, then the
+ * controller's outcome over it, then why it stopped, then the evidence, then
+ * the next action. {@link RunStatusRibbon} is that story compressed into the
+ * first screenful; everything below it is the working.
  *
  * Two counts on this page are deliberately different and both are the API's:
  * `summary.abstentions` is how many abstention DECISIONS the run made, and
@@ -48,7 +70,7 @@ function MetricCard({ label, value, icon, trend, trendDir = "neutral", accentCol
       className="card card-metric"
       style={isAlert ? { borderLeft: `4px solid ${accentColor ?? "var(--color-exception)"}` } : {}}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 4 }}>
         <span className="font-label-caps text-muted">{label}</span>
         <span
           className="material-symbols-outlined"
@@ -130,7 +152,68 @@ function GateStatusRow({ label, passed }: { label: string; passed: boolean }): R
 }
 
 /**
- * The period's own outcome, at the top of the page and in words.
+ * What this product is, before any figure is shown.
+ *
+ * A reviewer who has never seen ASSAY meets three actors on this page — ASSAY,
+ * the Controller and the explanation model — and every rupee figure below is
+ * meaningless until they know which of the three produced it. Four sentences, all
+ * constants from {@link ../lib/copy.js}, none of them reading a run: what this
+ * is, what is agentic about it, who decides, and why no model can move money.
+ *
+ * The three-card legend further down says the same thing at more length and is
+ * where the bounds are argued. This is the version that fits above the fold.
+ */
+function ReviewerBrief(): React.ReactElement {
+  return (
+    <div className="card" style={{ padding: "var(--space-md)", marginBottom: "var(--space-lg)" }}>
+      <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>What this is</p>
+      <p className="font-body-md" style={{ fontWeight: 600, marginBottom: 4, lineHeight: 1.5 }}>
+        {PRODUCT_WHAT}
+      </p>
+      <p className="font-body-sm text-muted" style={{ lineHeight: 1.6, marginBottom: 6, maxWidth: 780 }}>
+        {PRODUCT_AGENTIC}
+      </p>
+      <p className="font-body-sm" style={{ lineHeight: 1.6, fontWeight: 600, marginBottom: 2 }}>
+        {AUTHORITY_ONE_LINE}
+      </p>
+      <p className="font-body-sm text-muted" style={{ lineHeight: 1.6, fontSize: 11 }}>
+        {NO_MODEL_WRITES}
+      </p>
+    </div>
+  );
+}
+
+/** One labelled fact in the status ribbon. */
+function RibbonCell({
+  label, value, accent, code, detail,
+}: {
+  label: string;
+  value: string;
+  accent?: string | undefined;
+  /** The record's own reason code, beside the word it was rendered from. */
+  code?: string | null | undefined;
+  detail?: string | undefined;
+}): React.ReactElement {
+  return (
+    <div style={{ minWidth: 0 }}>
+      <p className="font-label-caps text-muted" style={{ marginBottom: 2 }}>{label}</p>
+      <p className="font-headline-sm" style={accent !== undefined ? { color: accent } : {}}>
+        {value}
+        {code !== undefined && code !== null && (
+          <span className="cell-id" style={{ fontSize: 10, marginLeft: 6 }}>{code}</span>
+        )}
+      </p>
+      {detail !== undefined && (
+        <p className="font-body-sm text-muted" style={{ fontSize: 11, marginTop: 3, lineHeight: 1.5 }}>
+          {detail}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The run's whole outcome, in one strip, above everything that explains it.
  *
  * **Why it is here at all.** `period_status` was on the page twice — as a word
  * under the pipeline's Close node and as a value inside the Close Gates card —
@@ -140,62 +223,144 @@ function GateStatusRow({ label, passed }: { label: string; passed: boolean }): R
  * rather than the statement that value is still sitting in Suspense and the
  * period cannot close.
  *
- * **It reads `period_status` and adds nothing.** The status is the close
- * gate's; the sentence beside it is {@link periodStatusMeaning}'s gloss on
- * that same value, keyed on it and on nothing else. No state is inferred, no
- * figure is computed, and a status the gloss does not know renders as the bare
- * enum rather than as a guess.
+ * **It reads fields and adds nothing.** The period and the residual are the
+ * close gate's; the sentence beside the status is {@link periodStatusMeaning}'s
+ * gloss on that same value, keyed on it and on nothing else; the controller
+ * column is {@link controllerOutcome}'s reading of the trace the panel below
+ * actually ran, and says *"not yet run"* rather than anything about an outcome
+ * until one exists. No state is inferred, no figure is computed, and a status
+ * the gloss does not know renders as the bare enum rather than as a guess.
  *
- * The verification control belongs here rather than in a nav item because this
- * is the claim it checks: the page says the period closed, and Audit Logs is
- * where that stops being this page's word for it.
+ * The two controls are the two next actions: the verification that stops this
+ * page being its own witness, and the queue where the unresolved rows are
+ * worked. Both are also reachable from the panels they belong to; they are
+ * here because this is where a reviewer decides which one they want.
  */
-function PeriodOutcome({
-  status, onVerify,
-}: { status: "CLOSED" | "OPEN" | "BLOCKED"; onVerify: () => void }): React.ReactElement {
+function RunStatusRibbon({
+  status, dataset, unresolvedPaise, thresholdPaise, trace, onVerify, onInvestigate,
+}: {
+  status: "CLOSED" | "OPEN" | "BLOCKED";
+  dataset: string;
+  unresolvedPaise: number;
+  thresholdPaise: number | null;
+  trace: ControllerTrace | null;
+  onVerify: () => void;
+  onInvestigate: () => void;
+}): React.ReactElement {
   const color =
     status === "CLOSED" ? "var(--color-reconciled)"
       : status === "BLOCKED" ? "var(--color-exception)"
         : "var(--color-abstained)";
   const icon =
     status === "CLOSED" ? "task_alt" : status === "BLOCKED" ? "block" : "pending_actions";
+  const outcome = trace === null ? null : controllerOutcome(trace);
+
   return (
     <div
       className="card"
       style={{
         padding: "var(--space-md)", marginBottom: "var(--space-lg)",
         borderLeft: `4px solid ${color}`,
-        display: "flex", justifyContent: "space-between", alignItems: "center",
-        gap: "var(--space-md)", flexWrap: "wrap",
       }}
     >
-      <div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-          <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 22, color }}>
-            {icon}
-          </span>
-          <span className="font-label-caps text-muted">Period status</span>
-          <span className="font-headline-sm" style={{ color }}>{status}</span>
-        </div>
-        <p className="font-body-sm text-muted" style={{ lineHeight: 1.6, maxWidth: 620, marginBottom: 0 }}>
-          {periodStatusMeaning(status)}
-        </p>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+        <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 22, color }}>
+          {icon}
+        </span>
+        <span className="font-label-caps text-muted">Period status</span>
+        <span className="font-headline-sm" style={{ color }}>{status}</span>
       </div>
-      <button
-        className="btn btn-secondary"
-        style={{ fontSize: 12, padding: "var(--space-xs) var(--space-md)" }}
-        onClick={onVerify}
-      >
-        <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 16 }}>verified_user</span>
-        Verify ledger integrity
-      </button>
+      <p className="font-body-sm text-muted" style={{ lineHeight: 1.6, marginBottom: "var(--space-md)", maxWidth: 780 }}>
+        {periodStatusMeaning(status)}
+      </p>
+
+      <div className="grid grid-3" style={{ marginBottom: "var(--space-md)" }}>
+        <RibbonCell
+          label="Period under review"
+          value={scenarioLabel(dataset)}
+          detail={`Demo period ${dataset} — a product fixture, never benchmark evidence.`}
+        />
+        <RibbonCell
+          label="Unresolved vs. close threshold"
+          value={
+            thresholdPaise === null
+              ? formatPaise(unresolvedPaise)
+              : `${formatPaise(unresolvedPaise)} / ${formatPaise(thresholdPaise)}`
+          }
+          detail={
+            unresolvedPaise > 0
+              ? "Held in Suspense. The ledger stays balanced; the period cannot close while it is there."
+              : "Nothing is held in Suspense against this period."
+          }
+        />
+        {/* The agentic half. Availability before a run, the trace's own
+            outcome after one — never a prediction, and never a claim about a
+            handoff the loop did not reach. */}
+        {outcome === null ? (
+          <RibbonCell
+            label="Finance Controller"
+            value="Available"
+            detail={CONTROLLER_NOT_RUN}
+          />
+        ) : (
+          <RibbonCell
+            label="Finance Controller"
+            value={outcome.label}
+            accent={outcome.color}
+            code={outcome.reason}
+            detail={outcome.headline}
+          />
+        )}
+      </div>
+
+      <div className="actions">
+        <button
+          className="btn btn-secondary"
+          style={{ fontSize: 12, padding: "var(--space-xs) var(--space-md)" }}
+          onClick={onVerify}
+        >
+          <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 16 }}>verified_user</span>
+          {VERIFY_LEDGER_TITLE}
+        </button>
+        {unresolvedPaise > 0 && (
+          <button
+            className="btn btn-secondary"
+            style={{ fontSize: 12, padding: "var(--space-xs) var(--space-md)" }}
+            onClick={onInvestigate}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 16 }}>search_check</span>
+            Work the unresolved items
+          </button>
+        )}
+      </div>
     </div>
   );
 }
 
 export function CommandCenter(): React.ReactElement {
   const navigate = useNavigate();
-  const { run, close, loading, error, startDemo, dataset, selectDataset } = useRun();
+  const {
+    run, close, loading, error, startDemo, dataset, selectDataset,
+  } = useRun();
+
+  // Restoring / not-found / API-unreachable, decided once for every
+  // run-dependent page. It must come before the start screen below: a reload
+  // resolves a persisted pointer asynchronously, and "Run Demo" rendered over
+  // a run that is about to arrive is an instruction to redo finished work.
+  const gate = useRunGate();
+
+  /**
+   * The controller's trace, lifted so the ribbon at the top can report the
+   * outcome the panel at the bottom produced.
+   *
+   * The panel still owns the fetch and the button; this is a read of what it
+   * got, reported upward through {@link ControllerPanel}'s `onTrace`. The
+   * panel is keyed on `run_id`, so a change of period remounts it and its
+   * first effect reports `null` — which is what keeps a previous period's
+   * outcome from surviving into the new period's ribbon.
+   */
+  const [trace, setTrace] = useState<ControllerTrace | null>(null);
+  const onTrace = useCallback((t: ControllerTrace | null) => { setTrace(t); }, []);
 
   const s = run?.summary;
   const bvp = s?.batch_value_paise ?? 0;
@@ -213,16 +378,32 @@ export function CommandCenter(): React.ReactElement {
   // count-weighted figure over the same run is a different number.
   const reconciledPct = bvp > 0 ? ((bvp - unresolvedPaise) / bvp) : 0;
 
-  // If no run yet, show the start screen
+  if (gate !== null) return gate;
+
+  // If no run yet, show the start screen. The gate above has already held this
+  // back while a persisted run id was being re-read, so reaching here means
+  // there is no run and none is coming.
   if (!run && !loading) {
     return (
-      <div style={{ padding: "var(--space-lg)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "70vh", gap: "var(--space-xl)" }}>
-        <div style={{ textAlign: "center" }}>
+      <div className="page" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "70vh", gap: "var(--space-xl)" }}>
+        <div style={{ textAlign: "center", maxWidth: 620 }}>
           <span className="material-symbols-outlined" style={{ fontSize: 72, color: "var(--color-primary)", marginBottom: "var(--space-md)", display: "block" }}>monitoring</span>
           <h1 className="page-title">ASSAY Command Center</h1>
-          <p className="page-subtitle" style={{ marginTop: "var(--space-sm)", maxWidth: 480 }}>
-            Settlement reconciliation intelligence for Razorpay-shaped payment data.
-            Start a demo run to process one period through the ASSAY engine.
+          <p className="page-subtitle" style={{ marginTop: "var(--space-sm)" }}>
+            {PRODUCT_WHAT}
+          </p>
+          <p className="font-body-sm text-muted" style={{ marginTop: "var(--space-sm)", lineHeight: 1.6 }}>
+            {PRODUCT_AGENTIC}
+          </p>
+          <p className="font-body-sm" style={{ marginTop: "var(--space-sm)", lineHeight: 1.6, fontWeight: 600 }}>
+            {AUTHORITY_ONE_LINE}
+          </p>
+          {/* The safety claim belongs on the first screen too. It was on the
+              reviewer brief, which only renders once a run exists — so the one
+              screen a reviewer sees before deciding whether to press anything
+              was the one screen that did not carry it. */}
+          <p className="font-body-sm text-muted" style={{ marginTop: "var(--space-sm)", lineHeight: 1.6 }}>
+            {NO_MODEL_WRITES}
           </p>
         </div>
         <ScenarioPicker selected={dataset} disabled={loading} onSelect={selectDataset} />
@@ -244,41 +425,49 @@ export function CommandCenter(): React.ReactElement {
 
   if (loading && !run) {
     return (
-      <div style={{ padding: "var(--space-xl)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "60vh", gap: "var(--space-lg)" }}>
+      <div className="page" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "60vh", gap: "var(--space-lg)" }}>
         <div className="loading-spinner" />
         <p className="font-body-md text-muted">Running ASSAY engine over {dataset}...</p>
-        <p className="font-body-sm text-muted">Processing observations through S0-S5 pipeline</p>
+        <p className="font-body-sm text-muted">
+          Processing observations through the S0&ndash;S5 pipeline, then the close gate
+        </p>
       </div>
     );
   }
 
   if (error) {
+    // Two different failures with two different fixes, classified once in
+    // `ApiErrorNotice`: a rejected fetch means the API process is not there,
+    // which a reviewer can act on; anything the server itself answered already
+    // carries its own reason, and replacing that with "start the server" would
+    // be worse than the raw string. Both keep the underlying message on screen.
     return (
-      <div style={{ padding: "var(--space-xl)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "60vh", gap: "var(--space-lg)" }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 48, color: "var(--color-exception)" }}>error</span>
-        <p className="font-body-md text-error">Failed to start run</p>
-        <p className="font-body-sm text-muted" style={{ maxWidth: 400, textAlign: "center" }}>{error}</p>
-        <button className="btn btn-secondary" onClick={() => void startDemo()}>Retry</button>
-      </div>
+      <ApiErrorNotice
+        error={error}
+        title="The run could not be started"
+        onRetry={() => void startDemo()}
+      />
     );
   }
 
   return (
-    <div style={{ padding: "var(--space-lg)" }}>
+    <div className="page">
 
       {/* Page header */}
       <div className="page-header" style={{ padding: 0, marginBottom: "var(--space-lg)" }}>
         <div>
           <h1 className="page-title">Command Center</h1>
-          <p className="page-subtitle">System Health &amp; Reconciliation Overview</p>
+          <p className="page-subtitle">Settlement reconciliation &mdash; one period, end to end</p>
         </div>
-        <div style={{ display: "flex", gap: "var(--space-md)" }}>
+        <div className="actions">
           <button className="btn btn-primary" onClick={() => void startDemo()} aria-label="Run batch job">
             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>play_arrow</span>
             {dataset === run?.dataset ? "Re-Run Demo" : "Run this period"}
           </button>
         </div>
       </div>
+
+      <ReviewerBrief />
 
       {/* The period this run read, and the three others the same engine can be
           pointed at. Selecting one changes the evidence; nothing else about the
@@ -302,12 +491,20 @@ export function CommandCenter(): React.ReactElement {
       </div>
 
       {/* The outcome, before the figures that led to it. */}
-      {periodStatus !== null && (
-        <PeriodOutcome status={periodStatus} onVerify={() => void navigate("/audit-logs")} />
+      {periodStatus !== null && run !== null && (
+        <RunStatusRibbon
+          status={periodStatus}
+          dataset={run.dataset}
+          unresolvedPaise={unresolvedPaise}
+          thresholdPaise={close?.close_threshold_paise ?? null}
+          trace={trace}
+          onVerify={() => void navigate("/audit-logs")}
+          onInvestigate={() => void navigate("/investigation-queue")}
+        />
       )}
 
       {/* Metric cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "var(--space-md)", marginBottom: "var(--space-xl)" }}>
+      <div className="grid grid-4" style={{ marginBottom: "var(--space-md)" }}>
         <MetricCard
           label="Total Processed"
           value={formatPaise(bvp, true)}
@@ -347,19 +544,16 @@ export function CommandCenter(): React.ReactElement {
         />
       </div>
 
-      <p className="font-body-sm text-muted" style={{ marginTop: "calc(-1 * var(--space-md))", marginBottom: "var(--space-xl)" }}>
-        {RECONCILIATION_BASIS}
-      </p>
+      <div style={{ marginBottom: "var(--space-xl)" }}>
+        <p className="font-body-sm text-muted">{RECONCILIATION_BASIS}</p>
+        <p className="font-body-sm text-muted" style={{ marginTop: 2, lineHeight: 1.6, maxWidth: 820 }}>
+          {RECONCILIATION_SCOPE}
+        </p>
+      </div>
 
       {/* Critical Focus Alert - the high-value abstention */}
       {abstentionDecisions > 0 && (
         <div className="alert-critical" style={{ marginBottom: "var(--space-xl)", position: "relative" }}>
-          <div style={{
-            position: "absolute", top: 0, right: 0, padding: "var(--space-lg)",
-            opacity: 0.08, pointerEvents: "none",
-          }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 120, color: "var(--color-abstained)" }}>workspace_premium</span>
-          </div>
           <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", marginBottom: "var(--space-md)" }}>
             <span className="material-symbols-outlined" style={{ color: "var(--color-abstained)", fontSize: 20 }}>pause_circle</span>
             <span className="font-label-caps" style={{ color: "var(--color-abstained)" }}>Ambiguity Detected</span>
@@ -367,13 +561,13 @@ export function CommandCenter(): React.ReactElement {
           <h2 className="font-headline-sm" style={{ marginBottom: "var(--space-xs)" }}>
             High-Value Abstention &mdash; Ambiguity Certificate Issued
           </h2>
-          <p className="font-body-sm text-muted" style={{ marginBottom: "var(--space-md)" }}>
+          <p className="font-body-sm text-muted" style={{ marginBottom: "var(--space-md)", maxWidth: 780 }}>
             ASSAY recorded {abstentionDecisionLabel(abstentionDecisions)}, with{" "}
             {affectedObservationsLabel(abstainedObservations)}, where multiple hypotheses satisfy
             all hard constraints. The system abstained as a deliberate safety decision. The
             Investigation Queue lists the affected observations one row each.
           </p>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-lg)", marginBottom: "var(--space-md)" }}>
+          <div className="grid grid-2" style={{ marginBottom: "var(--space-md)" }}>
             {/* The ABSTENTION half of §20's split, not the residual. This panel
                 is headed "Ambiguity Detected", and the residual on a period
                 that also carries unattributed bank credits includes money no
@@ -404,39 +598,51 @@ export function CommandCenter(): React.ReactElement {
         </div>
       )}
 
-      {/* Pipeline status */}
+      {/* Pipeline status. The strip has a floor width and scrolls inside its
+          own container below it — six nodes squashed to 40px each are six
+          nodes nobody can read. */}
       <div className="card" style={{ marginBottom: "var(--space-xl)", padding: "var(--space-lg)" }}>
         <p className="font-label-caps text-muted" style={{ marginBottom: "var(--space-lg)" }}>Reconciliation Pipeline</p>
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 0 }}>
-          <PipelineStage label="Ingest" status="done" count={obsCount} />
-          <div style={{ height: 2, flex: 1, background: "var(--color-reconciled)", marginTop: 18 }} />
-          <PipelineStage label="Anchor S1" status="done" count={obsCount} />
-          <div style={{ height: 2, flex: 1, background: "var(--color-reconciled)", marginTop: 18 }} />
-          <PipelineStage label="Candidates S2" status="done" count={decisions} />
-          <div style={{ height: 2, flex: 1, background: "var(--color-reconciled)", marginTop: 18 }} />
-          <PipelineStage label="Solve S4" status="done" count={decisions} />
-          <div style={{ height: 2, flex: 1, background: "var(--color-reconciled)", marginTop: 18 }} />
-          <PipelineStage label="Validate S5" status="done" count={decisions + exceptions} />
-          <div style={{ height: 2, flex: 1, background: "var(--color-reconciled)", marginTop: 18 }} />
-          {/* The three outcomes are three different states and the node shows
-              which one. `done` for CLOSED only: an OPEN period passed all five
-              gates and is a legitimate business state, but it is not a closed
-              one, and rendering it with the same green tick made a period that
-              closed and a period that did not look identical at a glance.
-              §10.2's BLOCKED stays the error state. */}
-          <PipelineStage
-            label="Close"
-            status={
-              periodStatus === "BLOCKED" ? "error" : periodStatus === "CLOSED" ? "done" : "pending"
-            }
-            note={periodStatus ?? undefined}
-          />
+        <div className="scroll-x">
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 0, minWidth: 620 }}>
+            <PipelineStage label="Ingest" status="done" count={obsCount} />
+            <div style={{ height: 2, flex: 1, background: "var(--color-reconciled)", marginTop: 18 }} />
+            <PipelineStage label="Anchor S1" status="done" count={obsCount} />
+            <div style={{ height: 2, flex: 1, background: "var(--color-reconciled)", marginTop: 18 }} />
+            <PipelineStage label="Candidates S2" status="done" count={decisions} />
+            <div style={{ height: 2, flex: 1, background: "var(--color-reconciled)", marginTop: 18 }} />
+            <PipelineStage label="Solve S4" status="done" count={decisions} />
+            <div style={{ height: 2, flex: 1, background: "var(--color-reconciled)", marginTop: 18 }} />
+            <PipelineStage
+              label="Validate S5"
+              status="done"
+              count={decisions + exceptions}
+              note="decisions + exceptions"
+            />
+            <div style={{ height: 2, flex: 1, background: "var(--color-reconciled)", marginTop: 18 }} />
+            {/* The three outcomes are three different states and the node shows
+                which one. `done` for CLOSED only: an OPEN period passed all five
+                gates and is a legitimate business state, but it is not a closed
+                one, and rendering it with the same green tick made a period that
+                closed and a period that did not look identical at a glance.
+                §10.2's BLOCKED stays the error state. */}
+            <PipelineStage
+              label="Close"
+              status={
+                periodStatus === "BLOCKED" ? "error" : periodStatus === "CLOSED" ? "done" : "pending"
+              }
+              note={periodStatus ?? undefined}
+            />
+          </div>
         </div>
+        <p className="font-body-sm text-muted" style={{ marginTop: "var(--space-md)", lineHeight: 1.6, maxWidth: 820 }}>
+          {S5_COUNT_BASIS}
+        </p>
       </div>
 
       {/* Close gate results */}
       {close && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-md)", marginBottom: "var(--space-xl)" }}>
+        <div className="grid grid-2" style={{ marginBottom: "var(--space-xl)" }}>
           <div className="card" style={{ padding: "var(--space-lg)" }}>
             <p className="font-label-caps text-muted" style={{ marginBottom: "var(--space-md)" }}>Close Gates</p>
             {/* The outcome, stated where the gates are — unconditionally.
@@ -455,9 +661,9 @@ export function CommandCenter(): React.ReactElement {
                     : "var(--color-abstained)",
               }}>{close.period_status}</span>
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "var(--space-sm)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-sm)", marginBottom: "var(--space-sm)" }}>
               <span className="font-body-sm text-muted">Unresolved vs. threshold</span>
-              <span className="font-numeric-mono">
+              <span className="font-numeric-mono" style={{ textAlign: "right" }}>
                 {formatPaise(close.unresolved_value_paise)} / {formatPaise(close.close_threshold_paise)}
               </span>
             </div>
@@ -489,8 +695,7 @@ export function CommandCenter(): React.ReactElement {
                 <span className="font-numeric-mono">{formatPaise(close.suspense_balance_paise)}</span>
               </div>
               <div style={{ marginTop: "var(--space-sm)", paddingTop: "var(--space-sm)", borderTop: "1px solid var(--color-outline-variant)" }}>
-                <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Ledger Root Hash</p>
-                <p className="cell-id" style={{ fontSize: 11, wordBreak: "break-all" }}>{close.ledger_root_hash}</p>
+                <CopyId label="Ledger Root Hash" value={close.ledger_root_hash} />
               </div>
             </div>
           </div>
@@ -513,7 +718,9 @@ export function CommandCenter(): React.ReactElement {
           leaving the PREVIOUS period's trace on screen beside the new period's
           figures until someone presses the button again. A trace is about
           exactly one run, so the panel's identity is that run. */}
-      {run && <ControllerPanel key={run.run_id} runId={run.run_id} />}
+      {run && (
+        <ControllerPanel key={run.run_id} runId={run.run_id} onTrace={onTrace} autoStart />
+      )}
 
       {/* Live data indicator.
 

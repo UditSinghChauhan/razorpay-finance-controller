@@ -97,7 +97,7 @@ describe("verification is offered where the claim is made", () => {
   const html = render(runContext({ close: CLOSE_500 }));
 
   it("offers to verify the ledger from the Command Center", () => {
-    expect(html).toContain("Verify ledger integrity");
+    expect(html).toContain("Verify Ledger");
   });
 
   it("does not restate the Audit Logs page's own findings here", () => {
@@ -151,13 +151,15 @@ describe("the authority model is legible on the page itself", () => {
   it("names the three layers and what each may do", () => {
     expect(html).toContain("ASSAY — deterministic financial authority");
     expect(html).toContain("Controller — bounded orchestration");
-    expect(html).toContain("Gemini — explanation only");
+    expect(html).toContain("Explanation model — explanation only");
     expect(html).toContain("ASSAY decides and is the only financial authority");
   });
 
-  it("says the controller writes nothing and Gemini decides nothing", () => {
+  it("says the controller writes nothing and the explanation model decides nothing", () => {
     expect(html).toContain("The Controller orchestrates within bounds and writes nothing");
-    expect(html).toContain("Gemini explains an outcome already sealed and decides nothing");
+    expect(html).toContain(
+      "The explanation model describes an outcome already sealed and decides nothing",
+    );
   });
 
   it("never suggests the model touches reconciliation", () => {

@@ -359,6 +359,48 @@ export function useCreateRun(): {
   return { create, state };
 }
 
+/**
+ * What a rehydration attempt **concluded** about a persisted run id.
+ *
+ * Three outcomes, because a completed fetch has exactly three answers. The
+ * *pending* and *never-attempted* states are not here: they are states of the
+ * caller, not conclusions of this call, and they live on `RunContext`'s
+ * `RehydrateState` where a page can render them.
+ */
+export type RehydrateOutcome =
+  | { readonly kind: "found"; readonly run: RunSummary }
+  | { readonly kind: "not_found" }
+  | { readonly kind: "unreachable"; readonly message: string };
+
+/**
+ * Re-read a run the browser only knows the **id** of.
+ *
+ * `GET /runs/:id` returns the same summary `POST /runs` did, for a run the API
+ * process still holds. This exists so a reload or a deep link can recover
+ * authoritative state from the server: the browser persists an id and a period
+ * name, never a figure, so every rupee value on screen after a rehydration came
+ * from this call and not from storage.
+ *
+ * The three outcomes are kept apart because they need different words on
+ * screen. `404` is a run the process has dropped — `apps/api`'s registry is an
+ * in-process `Map` and a restart empties it — and is a normal state, not an
+ * error. A rejected `fetch` is the API being absent, which is an operator
+ * problem with an operator's fix. Anything else is reported as it came.
+ */
+export async function fetchRun(runId: string): Promise<RehydrateOutcome> {
+  try {
+    const res = await fetch(`/api/runs/${encodeURIComponent(runId)}`);
+    if (res.status === 404) return { kind: "not_found" };
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      return { kind: "unreachable", message: `${String(res.status)}: ${body}` };
+    }
+    return { kind: "found", run: (await res.json()) as RunSummary };
+  } catch (e) {
+    return { kind: "unreachable", message: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 /** GET /api/runs/:id/close */
 export function useCloseReport(runId: string | null): ApiState<CloseReport> {
   const [state, setState] = useState<ApiState<CloseReport>>({

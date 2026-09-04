@@ -13,7 +13,11 @@
  * that confusion is someone believing the AI moved money.
  *
  * The ordering is deliberate and is the authority ordering: ASSAY first and
- * widest, the controller second and bounded, Gemini last and removable.
+ * widest, the controller second and bounded, the explanation model last and
+ * removable. The model is named generically because `apps/api` resolves the
+ * provider at request time (`ASSAY_EXPLAIN_PROVIDER`, default `anthropic`); the
+ * concrete provider and model id are printed by the explanation panel that
+ * actually made the call, from the response that named them.
  */
 
 interface LayerProps {
@@ -66,15 +70,14 @@ export function AuthorityLegend(): React.ReactElement {
         style={{ fontSize: 11, lineHeight: 1.6, marginBottom: "var(--space-sm)", maxWidth: 720 }}
       >
         ASSAY decides and is the only financial authority. The Controller orchestrates within
-        bounds and writes nothing. Gemini explains an outcome already sealed and decides nothing.
+        bounds and writes nothing. The explanation model describes an outcome already sealed and
+        decides nothing.
       </p>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
-          gap: "var(--space-md)",
-        }}
-      >
+      {/* `.grid-3` rather than a fixed `repeat(3, 1fr)`: three columns of
+          argument at 200px each is three columns nobody reads, and the
+          ordering the cards encode survives stacking — top to bottom is the
+          same authority ranking as left to right. */}
+      <div className="grid grid-3">
         <Layer
           accent="var(--color-reconciled)"
           icon="gavel"
@@ -94,7 +97,7 @@ export function AuthorityLegend(): React.ReactElement {
         <Layer
           accent="var(--color-abstained)"
           icon="auto_awesome"
-          name="Gemini — explanation only"
+          name="Explanation model — explanation only"
           role="Describes a decision already made. No authority."
           authority="Puts the verified evidence into plain language on request, after the outcome is sealed. Its output is checked against that evidence and discarded if it invents a figure or an identifier."
           bounds="Cannot express an amount, name an entity that does not exist, or commit a decision. Removable entirely — the close loop runs unchanged without it."
