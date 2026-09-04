@@ -265,3 +265,72 @@ describe("a period's page carries nothing from another period", () => {
     expect(html).not.toContain("Abstained Value");
   });
 });
+
+/**
+ * The four KPI values sit on one baseline, because the slots above them are
+ * fixed rather than distributed.
+ *
+ * **The defect this pins.** The tile was two flex children under
+ * `justify-content: space-between`: a label row, and a block holding the value
+ * and its trend. The value's position was therefore measured from the BOTTOM of
+ * the tile and moved with everything around it — and the four labels in this
+ * row do not wrap alike (`Value-Weighted Reconciliation` takes two lines at
+ * laptop widths where `Exceptions` takes one). The audit measured roughly a
+ * 26px spread across the four value tops: a row of KPIs that reads as four
+ * unrelated cards rather than one measurement.
+ *
+ * The tile is now three pinned slots — a fixed-height label slot, the value
+ * directly beneath it, and the trend held to the floor by an auto margin — so
+ * the value starts at the same offset in every tile regardless of what the
+ * label did. `design-system.css` holds the geometry and
+ * `tests/web-label-hierarchy.test.ts` asserts it; what is asserted here is that
+ * the markup actually uses it, on all four tiles.
+ *
+ * **No figure is asserted.** This is structure only: the values themselves are
+ * the API's and are covered by the suites that own them.
+ */
+describe("the metric row puts its four values on one baseline", () => {
+  const html = render();
+
+  it("gives every tile the fixed label slot", () => {
+    expect([...html.matchAll(/class="card-metric-label"/g)]).toHaveLength(4);
+  });
+
+  it("puts the value directly after that slot, as its sibling", () => {
+    // The structural half of the fix. While the value lived INSIDE a block the
+    // tile pushed to its bottom edge, no label-slot height could align it.
+    expect(
+      [...html.matchAll(/<\/div><div class="font-display-metric">/g)],
+    ).toHaveLength(4);
+  });
+
+  it("holds every trend to the floor of its tile", () => {
+    expect([...html.matchAll(/card-metric-trend/g)]).toHaveLength(4);
+  });
+
+  it("sets no inline margin-top on the trend, which would beat the auto margin", () => {
+    // An inline style wins over a class rule, so `marginTop: 4` here would
+    // silently disable `margin-top: auto` and un-pin every trend. The 4px gap
+    // is padding for exactly that reason.
+    for (const [tile] of html.matchAll(/<div class="font-numeric-mono font-body-sm card-metric-trend"[^>]*>/g)) {
+      expect(tile).not.toContain("margin-top");
+      expect(tile).toContain("padding-top:4px");
+    }
+  });
+
+  it("keeps the four metrics, in order, at their existing rank", () => {
+    // The fix is geometry. Nothing about which metrics appear, what they are
+    // called, or the order they appear in may move with it.
+    const labels = [
+      ...html.matchAll(
+        /<div class="card-metric-label"><span class="font-label-caps text-muted">([^<]+)<\/span>/g,
+      ),
+    ].map((m) => m[1]);
+    expect(labels).toEqual([
+      "Total Processed",
+      "Value-Weighted Reconciliation",
+      "Exceptions",
+      "Abstention Decisions",
+    ]);
+  });
+});

@@ -43,6 +43,36 @@ const picker = (selected: string, disabled = false): string =>
 describe("ScenarioPicker", () => {
   const html = picker(DEFAULT_SCENARIO_ID);
 
+  /**
+   * The lab's own heading, at the rank the rest of the page's headings use.
+   *
+   * **What this asserts, and why it is not enough to check the stylesheet.**
+   * `tests/web-label-hierarchy.test.ts` asserts that `.font-label-section`
+   * exists and outranks the field label. That is a statement about CSS and it
+   * stayed true while this label — structurally a section heading, sitting over
+   * the whole scenario lab exactly as "Reconciliation Pipeline" sits over the
+   * pipeline — went on rendering at the field rank. The check that catches that
+   * is this one: the rendered node, by its class attribute.
+   */
+  it("renders its section heading at the section rank, not the field rank", () => {
+    expect(html).toContain('class="font-label-caps font-label-section"');
+    // The heading itself carries it — not merely some node in the subtree.
+    const heading = /<p class="([^"]*)"[^>]*>Scenario lab \u2014 demo period<\/p>/.exec(html);
+    expect(heading, "the scenario lab heading is in the markup").not.toBeNull();
+    expect(heading?.[1]).toContain("font-label-caps");
+    expect(heading?.[1]).toContain("font-label-section");
+    // The section rank supplies its own colour; `text-muted` would take it back.
+    expect(heading?.[1]).not.toContain("text-muted");
+  });
+
+  it("leaves the lab's supporting copy below that rank", () => {
+    // A hierarchy needs both halves: the headline and the subhead under the
+    // heading stay body copy, so promoting the heading actually separates them.
+    expect(html).toContain(SCENARIO_LAB_HEADLINE);
+    expect(html).toContain(SCENARIO_LAB_SUBHEAD);
+    expect(html).not.toContain(`font-label-section">${SCENARIO_LAB_HEADLINE}`);
+  });
+
   it("offers every period, by label", () => {
     expect(DEMO_SCENARIOS.length).toBeGreaterThan(1);
     for (const scenario of DEMO_SCENARIOS) {

@@ -60,7 +60,7 @@ where the system stops, not a fallback it takes when a heuristic is unsure.
 - **Ten packages and three apps**, committed — `money`, `domain`, `ledger`,
   `engine`, `probe`, `oracle`, `generator`, `eval`, `llm`, `controller`, and
   `apps/cli`, `apps/api`, `apps/web`.
-- **3,660 tests across 151 files**, with no type errors.
+- **3,673 tests across 151 files**, with no type errors.
 - **A sealed, signed benchmark** — spec version 1.4.38, benchmark version
   1.0.13, tag `bench-v1.0.13`. `docs/PREREGISTRATION.md §9`'s eight steps were
   executed in order; step 7 wrote **50 conforming `metrics.json`** — five agents
