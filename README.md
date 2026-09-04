@@ -21,16 +21,13 @@ full and `§4` states what each one prevents.
 ```mermaid
 flowchart TD
     OBS["Three independent views of the same money<br/>PG recon report · bank statement · merchant ledger"]
-    ASSAY["ASSAY"]
-    ENGINE["Reconciliation Engine — packages/engine<br/>DECIDES<br/>deterministic decision authority<br/>S1 anchor → S5 validate"]
-    LEDGER["Shadow Ledger — packages/ledger<br/>BOOKS<br/>booking authority<br/>hash-chained, double-entry"]
-    CTRL["Close Controller — packages/controller<br/>ORCHESTRATES<br/>NO financial write authority<br/>bounded at 64 steps"]
-    LLM["Explanation Model — packages/llm, R1–R4<br/>EXPLAINS<br/>NO financial authority<br/>no numeral it emits is ever persisted"]
-    HUMAN["Human Review<br/>RESOLVES<br/>required boundary for every<br/>unresolved decision"]
+    ENGINE["Reconciliation Engine — packages/engine<br/><b>DECIDES</b><br/>deterministic decision authority<br/>S1 anchor → S5 validate"]
+    LEDGER["Shadow Ledger — packages/ledger<br/><b>BOOKS</b><br/>booking authority<br/>hash-chained, double-entry"]
+    CTRL["Close Controller — packages/controller<br/><b>ORCHESTRATES</b><br/><b>Controller ≠ financial write authority</b><br/>read-only tools, bounded at 64 steps"]
+    LLM["Explanation Model — packages/llm, R1–R4<br/><b>EXPLAINS</b><br/><b>LLM ≠ financial authority</b><br/>no numeral it emits is ever persisted"]
+    HUMAN["Human Review<br/><b>RESOLVES</b><br/>required boundary for every<br/>unresolved decision"]
 
     OBS --> ENGINE
-    ASSAY --> ENGINE
-    ASSAY --> CTRL
 
     ENGINE -->|"validated decisions — S5 is the only gate that may post"| LEDGER
     ENGINE -->|"abstained + exceptions, ranked by rupee value"| HUMAN
@@ -41,7 +38,22 @@ flowchart TD
     CTRL -->|"escalate — the controller's terminal state"| HUMAN
 
     LLM -->|"post-hoc prose, numeral-grounded, id-allowlisted"| HUMAN
+
+    classDef decides fill:#e8eaf6,stroke:#3949ab,stroke-width:3px,color:#1a237e;
+    classDef books   fill:#e0f2f1,stroke:#00796b,stroke-width:3px,color:#004d40;
+    classDef bounded fill:#fff8e1,stroke:#ef6c00,stroke-width:2px,color:#e65100;
+    classDef noauth  fill:#fafafa,stroke:#9e9e9e,stroke-width:2px,color:#424242;
+    classDef source  fill:#ffffff,stroke:#bdbdbd,stroke-width:1px,color:#424242;
+
+    class ENGINE decides;
+    class LEDGER books;
+    class CTRL,HUMAN bounded;
+    class LLM noauth;
+    class OBS source;
 ```
+
+Two of those boxes carry the whole safety argument: **the language model decides
+nothing and the controller books nothing.** Everything below is the working.
 
 | Component | Authority it has | Authority it does not have |
 |---|---|---|
@@ -105,24 +117,115 @@ be assumed:**
 three metrics derived from it measure this corpus's bank-attribution rate, **not**
 ASSAY's accounting accuracy. Both disclosures are below, in full.
 
+## See it
+
+Two screens carry this submission, both from `demo-500`, both captured from the
+running product rather than drawn.
+
+### 1. The Ambiguity Certificate — the machine declining to guess
+
+![The ASSAY Ambiguity Certificate for settlement setl_AMBIG000000000: Solution A allocating three recon lines and Solution B allocating two, both totalling ₹1,00,000.00 against the same ₹1,00,000.00 target, 8 of 8 shared hard constraints satisfied by both, an evidence gap of 0 bps against an epsilon of 1500 bps, and an amber callout reading "Evidence gap (0 bps) is within epsilon (1500 bps). No hypothesis has a decisive advantage. Abstention is the correct safety response."](docs/assets/ambiguity-certificate.png)
+
+Two allocations of the same ₹1,00,000.00 settlement. Both tie out to the target,
+both satisfy all 8 hard constraints, and the evidence separating them is **`0`
+bps against an ε of `1500` bps** — so ASSAY declines to pick one and says why in
+a record a reviewer can check. This is the product's whole argument: the
+interesting output of a finance system is the case it refuses to decide.
+
+**What this image is and is not.** `demo-500` is a product fixture, not benchmark
+data. The sealed TEST corpus contains **zero truly ambiguous targets**, so
+abstention is **demonstrated by the product here and not quantitatively measured
+by that benchmark** — the `V35` disclosure below states this in full, and the
+certificate page carries the same boundary on screen.
+
+### 2. The controller outcome — a bounded agent that wrote nothing
+
+![The ASSAY Finance Controller panel: outcome ESCALATED, STEPS 10 / 64, TOOL CALLS 4, ESCALATIONS 1, WRITES APPLIED 0 with the note "no ledger write on any path — 0 attempted", and a workflow trace strip running INIT, OBSERVE CLOSE, TRIAGE, PLAN, ACT, ESCALATE, AWAIT HUMAN and terminating in ESCALATED.](docs/assets/controller-outcome.png)
+
+`ESCALATED` after `10` of its `64` permitted steps: it read four times through
+read-only tools, escalated the one item it may not decide, and applied **`0`
+writes** — the count is `0` because no write path exists in this phase, not
+because none happened to fire. `apps/api/tests/controller.test.ts` and
+`apps/api/tests/scenarios.test.ts` pin all five figures, so a capture
+disagreeing with them is a stale API rather than a new result.
+
+<details>
+<summary>How these two images were produced, and how to reproduce them</summary>
+
+Both are unretouched page regions from a real Chromium session driving the real
+`apps/web` against the real `apps/api` on `demo-500` — clipped in page
+coordinates rather than cropped from a window, which is why neither carries
+browser chrome. Nothing in either image is drawn, mocked or composited.
+
+To reproduce them by hand: start the app as *Run the demo* below describes, pick
+**`demo-500`**, and press **Run Demo**.
+
+- **The certificate.** Investigation Queue → click the `setl_AMBIG000000000`
+  row (the settlement; its five `pay_AMB…` members carry the same certificate
+  badge and open the same one) → **View Certificate** in the detail panel. The
+  frame runs from *Hypothesis Comparison* to the foot of *Evidence Score
+  Comparison*. The AI explanation panel sits below that and is deliberately out
+  of shot — it is a button until pressed, and pressing it is the only surface in
+  this app that spends a metered call.
+- **The controller.** Stay on the Command Center and scroll to *Finance
+  Controller*. It has already run — the period's run drives it — so the button
+  reads *Run again — same run, same trace*. The frame stops at the workflow
+  trace strip, above *What this run did*.
+
+Candidate ids are 69 characters and render truncated through `CopyId`; a full
+`cand_…` string in a frame means a copied value is on screen rather than the
+page.
+
+</details>
+
 ## Run the demo
 
-The demo is the web product, not the CLI. `docs/PROJECT_SPEC.md §10`'s script is
-written against `assay run` / `assay verify` / `assay bench`, and the first two
-refuse for the reason the disclosures below give — so the working path is:
+Node ≥ 22 and pnpm ≥ 11, then:
 
+    git clone https://github.com/UditSinghChauhan/razorpay-finance-controller.git
+    cd razorpay-finance-controller
+    pnpm install
     pnpm run dev         # apps/api on 127.0.0.1:8787; apps/web on the port Vite prints
+
+`pnpm run dev` starts both processes together; `pnpm run dev:api` starts the API
+alone. **The demo is the web product, not the CLI** — `docs/PROJECT_SPEC.md
+§10`'s script is written against `assay run`, `assay close`, `assay report` and
+`assay verify` without `--events`, and those four refuse with an
+`UnavailableStageError` naming the dependency they are missing. That is the
+`T0-11` scope limitation disclosed below, not a setup problem; the path above is
+the supported one.
+
+**Everything below runs `--llm=offline` and needs no credential.** The AI
+explanation panel is the one surface that calls a metered provider, and every
+other panel answers identically whether one is configured or absent.
 
 **Open the URL Vite prints, not a remembered one.** `apps/web/vite.config.ts`
 asks for `5173`, but Vite does not hold that port: with `strictPort` unset it
 takes the next free one — `5174`, `5175` and so on — when something already has
 `5173`, and prints the URL it actually bound. The API address is fixed at
 `127.0.0.1:8787`, because the frontend proxies `/api` there and that target is
-configured rather than negotiated. Then pick one of the four demo periods and
-run it.
-Everything is `--llm=offline` and needs no credential; the AI explanation panel
-is the one surface that calls a metered provider, and every other panel answers
-identically whether it is configured or absent.
+configured rather than negotiated.
+
+### The five-minute reviewer path
+
+1. **Run a period.** The Command Center opens on the **Scenario lab**; leave it
+   on **Ambiguity** (`demo-500`) and press **Run Demo**. It reconciles 500
+   observations and the page fills in with the result.
+2. **Read the outcome.** The Finance Controller panel below runs itself off that
+   run — `ESCALATED`, `STEPS 10 / 64`, `TOOL CALLS 4`, `ESCALATIONS 1`,
+   `WRITES APPLIED 0`. This is the second image above.
+3. **Open the certificate.** **Investigation Queue** (sidebar 2) → click the
+   `setl_AMBIG000000000` row → **View Certificate** in the detail panel. This is
+   the first image above. *Investigate* on the same row opens the Evidence Trail
+   instead — the sealed decision and its journal lines.
+4. **Verify the ledger.** **Verify Ledger** (sidebar 5) recomputes the run's
+   hash chain from its events and shows the recomputed root against the stored
+   one, the trial balance, and the Suspense identity. It is the one page that
+   checks ASSAY's own arithmetic rather than reporting it.
+5. **Switch the evidence.** Return to the Command Center and run the other three
+   periods from the same Scenario lab. Nothing is configured differently between
+   them — same engine, same close gate, same controller policy — so every
+   difference in the table below is a difference the evidence produced.
 
 **The API does not hot-reload — restart it after pulling a new revision.**
 `apps/web` is served by Vite and picks up a change immediately; `apps/api` is a
@@ -130,7 +233,10 @@ plain Node process started by `pnpm run dev` and keeps serving the build it
 started with, so a frontend talking to a stale API is the one confusing state
 this setup can reach. Stop it and run `pnpm run dev` (or `pnpm run dev:api`)
 again after every pull. Runs live in that process's memory, so a restart also
-drops every run started before it.
+drops every run started before it. A Vite process left running across a config
+change goes stale the same way.
+
+### The four demo periods
 
 | Period | What it holds | What the close controller does with it |
 |---|---|---|
@@ -147,73 +253,25 @@ and `apps/api/tests/scenarios.test.ts` pins these outcomes.
 full: outside `bench/`, no seed, no ground truth, never scored, and never usable
 to support a claim about coverage, accuracy or harm.
 
-### The two screens this submission is judged on
+### Verify the build
 
-Both are reached from `demo-500` in under a minute, and both are stated here as
-what to look at rather than shown, because **no screenshot has been captured in
-this repository and none is fabricated.** The environment that produced this
-checkpoint cannot render a browser — its Chromium fails to load
-`libasound.so.2` — so the capture is the one remaining operator-side step, and
-the runbook below is exact rather than approximate.
+    pnpm run verify                  # typecheck, lint, and the full test suite
+    pnpm --filter @assay/web build   # production bundle for apps/web
+    pnpm run check:env               # provider / model / key present — never prints the key
 
-1. **The Ambiguity Certificate.** Solution A and Solution B side by side with
-   their allocations tied out, an **evidence gap of `0` bps against an ε of
-   `1500` bps**, and the abstention stated as the consequence of that
-   comparison. This is the product's whole argument: two hypotheses the
-   evidence cannot separate, and a machine-checkable record of declining to
-   pick one.
-2. **The controller outcome.** `ESCALATED`, with `STEPS 10 / 64`,
-   `TOOL CALLS 4`, `ESCALATIONS 1` and `WRITES APPLIED 0` — a bounded agent
-   that read four times, wrote nothing, and stopped at a human.
+### Where it runs
 
-<details>
-<summary>How to capture them</summary>
-
-    pnpm run dev       # restart it — apps/api does not hot-reload
-
-Open the URL Vite prints, select **`demo-500`**, and press **Run this period**.
-
-**Screenshot 1 — Ambiguity Certificate.** Investigation Queue → the `ABSTAINED`
-row (the only one carrying a certificate) → **Ambiguity Certificate**. Frame it
-from the certificate seal down to the abstention callout, so that *Hypothesis
-Comparison* (Solution A / Solution B, allocations aligned against the same
-target) and *Evidence Score Comparison* (`0 bps` / `1500 bps`) are both in
-shot. The AI panel sits below the callout and stays out of frame; it is a
-button until it is pressed, and pressing it is the only surface in this app
-that spends a metered call. Candidate ids are 69 characters and render
-truncated through `CopyId` — if a full `cand_…` string is visible, the frame is
-showing a copied value rather than the page. Capture the page region, not the
-window: no browser chrome.
-
-**Screenshot 2 — Controller outcome.** Stay on the Command Center and scroll to
-**Finance Controller**; it runs itself once the period has run, so there is no
-second button to press. Frame the outcome strip and the counters — `ESCALATED`,
-`STEPS 10 / 64`, `TOOL CALLS 4`, `ESCALATIONS 1`, `WRITES APPLIED 0` — and stop
-above *Supporting evidence*; the step-by-step trace below it is detail, not the
-result. `apps/api/tests/controller.test.ts` and `apps/api/tests/scenarios.test.ts`
-pin every one of those five figures, so a capture disagreeing with them is a
-stale API rather than a new result.
-
-Save them as `docs/screenshots/01-ambiguity-certificate.png` and
-`docs/screenshots/02-controller-outcome.png`, then link them here. **Until they
-exist, this section names them and shows nothing** — a placeholder image in a
-finance repository is the one thing worse than no image.
-
-</details>
-
-## Read the specification in this order
-
-| # | Document | What it settles |
-|---|----------|-----------------|
-| 0 | [`docs/DECISION_BRIEF.md`](docs/DECISION_BRIEF.md) | Verdict, locked scope, risks, build order. **Start here.** |
-| 1 | [`docs/PROJECT_SPEC.md`](docs/PROJECT_SPEC.md) | Product, users, workflow, non-goals, track alignment |
-| 2 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Components, data flow, trust boundaries |
-| 3 | [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) | Every entity and its exact schema |
-| 4 | [`docs/RECONCILIATION_SPEC.md`](docs/RECONCILIATION_SPEC.md) | The matching algorithm and abstention rules |
-| 5 | [`docs/PREREGISTRATION.md`](docs/PREREGISTRATION.md) | Frozen benchmark methodology. **Signed before results exist.** |
-| 6 | [`docs/EVALUATION_SPEC.md`](docs/EVALUATION_SPEC.md) | Metrics, baselines, ablations, reporting |
-| 7 | [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) | Attacker model and mitigations |
-| 8 | [`docs/RELATED_WORK.md`](docs/RELATED_WORK.md) | Prior art and where ASSAY actually differs |
+**There is no hosted deployment, and none is claimed.** ASSAY runs locally, and
+that is a property of the design rather than a step left undone:
+`docs/ARCHITECTURE.md §9` specifies `apps/api` as a **local-bind** server, it
+binds `127.0.0.1` accordingly, and it holds every run in its own process memory
+with no database behind it. There is no authentication layer, no tenancy and no
+persistence, because a submission that exposed an unauthenticated financial API
+to the internet to earn the word "deployed" would be making the opposite of this
+repository's argument. `pnpm --filter @assay/web build` produces a real
+production bundle, but that bundle is a frontend for an API that is meant to be
+reached over loopback — hosting it alone would render a shell with nothing
+behind it.
 
 ## Benchmark disclosures
 
@@ -334,6 +392,20 @@ corpus and its 50 artifacts. The close controller performs **no financial
 write** on any path — its tool surface is four reads.
 
 </details>
+
+## Read the specification in this order
+
+| # | Document | What it settles |
+|---|----------|-----------------|
+| 0 | [`docs/DECISION_BRIEF.md`](docs/DECISION_BRIEF.md) | Verdict, locked scope, risks, build order. **Start here.** |
+| 1 | [`docs/PROJECT_SPEC.md`](docs/PROJECT_SPEC.md) | Product, users, workflow, non-goals, track alignment |
+| 2 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Components, data flow, trust boundaries |
+| 3 | [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) | Every entity and its exact schema |
+| 4 | [`docs/RECONCILIATION_SPEC.md`](docs/RECONCILIATION_SPEC.md) | The matching algorithm and abstention rules |
+| 5 | [`docs/PREREGISTRATION.md`](docs/PREREGISTRATION.md) | Frozen benchmark methodology. **Signed before results exist.** |
+| 6 | [`docs/EVALUATION_SPEC.md`](docs/EVALUATION_SPEC.md) | Metrics, baselines, ablations, reporting |
+| 7 | [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) | Attacker model and mitigations |
+| 8 | [`docs/RELATED_WORK.md`](docs/RELATED_WORK.md) | Prior art and where ASSAY actually differs |
 
 ## Data provenance
 
