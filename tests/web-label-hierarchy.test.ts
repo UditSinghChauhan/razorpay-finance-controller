@@ -142,6 +142,12 @@ describe("a section label and a field label are told apart in the markup", () =>
       "pages/EvidenceTrail.tsx",
       "pages/AuditLogs.tsx",
       "components/ControllerPanel.tsx",
+      // The scenario lab's own heading, which titles a card exactly as the
+      // pipeline and close-gate headings title theirs and was the one
+      // structurally-equivalent label left at the field rank after the first
+      // pass. `apps/web/tests/scenario-picker.test.tsx` asserts the rendered
+      // node; this asserts the file was reached at all.
+      "components/ScenarioPicker.tsx",
     ]) {
       expect(promoted).toContain(page);
     }
@@ -163,5 +169,71 @@ describe("a section label and a field label are told apart in the markup", () =>
     // would otherwise have shrunk them. A hierarchy change must not reach them.
     const controller = body(join(WEB_SRC, "components", "ControllerPanel.tsx"));
     expect([...controller.matchAll(/fontSize:\s*11\b/g)].length).toBeGreaterThanOrEqual(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A label slot with a fixed height, so the values under it share a baseline
+// ---------------------------------------------------------------------------
+
+/**
+ * The KPI tile's geometry, which is a label problem wearing a layout costume.
+ *
+ * **The defect this pins.** `.card-metric` distributed two children with
+ * `justify-content: space-between`, so a tile's value was positioned from the
+ * BOTTOM edge and its top moved with the label above it and the trend below.
+ * The four labels in that row do not wrap alike — `Value-Weighted
+ * Reconciliation` takes two caps lines at laptop widths where `Exceptions`
+ * takes one — and the audit measured roughly a 26px spread across the four
+ * value tops.
+ *
+ * The tile is now three pinned slots: a label slot with a fixed floor, the
+ * value directly beneath it, and the trend held to the foot of the tile by an
+ * auto margin. The value therefore starts at the same offset in every tile
+ * whatever the label did.
+ *
+ * **The floor is expressed in the caps line-height token**, so a label slot and
+ * the labels in it cannot drift apart, and it is a `min-height` rather than a
+ * `height` — a third line must push the tile rather than be clipped.
+ */
+describe("the KPI label slot is fixed, so the values under it align", () => {
+  it("declares the three slots", () => {
+    expect(rule(".card-metric")).toContain("justify-content: flex-start");
+    expect(rule(".card-metric-label")).toContain("min-height");
+    expect(rule(".card-metric-trend")).toContain("margin-top: auto");
+  });
+
+  it("does not position the value from the bottom of the tile any more", () => {
+    // The single declaration that made a KPI's baseline depend on everything
+    // around it.
+    expect(rule(".card-metric")).not.toContain("space-between");
+  });
+
+  it("sizes the slot from the caps line-height token, not from a magic number", () => {
+    // Two lines of the label that sits in it. A literal would silently stop
+    // being two lines the moment the token moved.
+    expect(rule(".card-metric-label")).toContain(
+      "calc(var(--font-label-caps-line-height) * 2)",
+    );
+  });
+
+  it("floors the slot rather than fixing it, so a third line is not clipped", () => {
+    const body = rule(".card-metric-label");
+    expect(body).toContain("min-height");
+    expect(body).not.toMatch(/[^-]height:/);
+  });
+
+  it("leaves the tile height and the metric grid alone", () => {
+    // The fix is inside the tile. Its height and the row it sits in are the
+    // responsive shell's, and `web-responsive-shell.test.ts` owns them.
+    expect(rule(".card-metric")).toContain("height: 128px");
+    expect(CSS).toContain(".grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }");
+  });
+
+  it("changes no type token", () => {
+    // Alignment bought by making labels bigger would be the other failure.
+    expect(token("--font-label-caps-size")).toBe("11px");
+    expect(token("--font-display-metric-size")).toBe("32px");
+    expect(token("--font-display-metric-line-height")).toBe("40px");
   });
 });

@@ -393,11 +393,49 @@ html, body, #root {
 }
 .card:hover { transform: translateY(-2px); }
 
+/**
+ * A KPI tile, and the reason its three slots are pinned rather than distributed.
+ *
+ * **The defect this fixes.** The tile was `justify-content: space-between` over
+ * two children — a label row and a value-plus-trend block — so the value's
+ * position was measured from the BOTTOM of the tile. Its top therefore moved
+ * with whatever was underneath it and with how many lines the label above it
+ * took: `Value-Weighted Reconciliation` wraps to two lines at laptop widths
+ * where `Exceptions` takes one, and the four values in a row consequently sat
+ * on four different baselines. A row of KPIs whose numbers do not line up reads
+ * as four unrelated cards rather than one measurement.
+ *
+ * **The fix is geometric, not typographic.** The label slot is a fixed two
+ * lines high, so the value starts at the same offset in every tile whether the
+ * label wrapped or not; the trend keeps the bottom of the tile through an auto
+ * margin, which is where it already sat. No font size, weight, colour or value
+ * changes, the tile keeps its height, and the grid above it is untouched.
+ */
 .card-metric {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-start;
   height: 128px;
+}
+
+/**
+ * The label slot — two caps lines, always.
+ *
+ * `--font-label-caps-line-height` is 16px, so 32px is exactly two lines and
+ * also clears the 22px icon beside it. It is a floor rather than a fixed
+ * height: a third line must push the tile rather than be clipped.
+ */
+.card-metric-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  min-height: calc(var(--font-label-caps-line-height) * 2);
+}
+
+/** Keeps the trend at the foot of the tile, where `space-between` used to put it. */
+.card-metric-trend {
+  margin-top: auto;
 }
 
 /* ─── Data table ─────────────────────────────────────────────────────────── */

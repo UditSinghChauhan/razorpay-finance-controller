@@ -55,7 +55,12 @@ export function ScenarioPicker({
   const switching = ranDataset !== undefined && ranDataset !== selected;
   return (
     <div>
-      <p className="font-label-caps text-muted" style={{ marginBottom: 2 }}>
+      {/* The section rank, not the field rank. This label titles the whole
+          scenario lab exactly as "Reconciliation Pipeline" and "Close Gates"
+          title theirs, and it was the one structurally-equivalent heading left
+          rendering as a field label after the hierarchy pass. The text, the
+          size and the typeface are unchanged. */}
+      <p className="font-label-caps font-label-section" style={{ marginBottom: 2 }}>
         Scenario lab &mdash; demo period
       </p>
       <p className="font-body-sm" style={{ fontWeight: 600, marginBottom: 2 }}>

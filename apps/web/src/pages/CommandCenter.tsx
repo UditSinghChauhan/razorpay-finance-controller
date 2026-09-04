@@ -70,7 +70,14 @@ function MetricCard({ label, value, icon, trend, trendDir = "neutral", accentCol
       className="card card-metric"
       style={isAlert ? { borderLeft: `4px solid ${accentColor ?? "var(--color-exception)"}` } : {}}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 4 }}>
+      {/* Three slots, not two. The value used to live inside a block the tile
+          pushed to its bottom edge, so its top was whatever the label above and
+          the trend below left it — and the four labels in this row do not wrap
+          the same way. `card-metric-label` fixes the slot the label sits in and
+          `card-metric-trend` keeps the trend on the floor of the tile, so every
+          value in the row starts at the same offset. `design-system.css` states
+          the geometry; nothing here changes a figure, a size or a colour. */}
+      <div className="card-metric-label">
         <span className="font-label-caps text-muted">{label}</span>
         <span
           className="material-symbols-outlined"
@@ -80,24 +87,22 @@ function MetricCard({ label, value, icon, trend, trendDir = "neutral", accentCol
           {icon}
         </span>
       </div>
-      <div>
-        <div className="font-display-metric">{value}</div>
-        {trend && (
-          <div
-            className="font-numeric-mono font-body-sm"
-            style={{
-              display: "flex", alignItems: "center", gap: 2, marginTop: 4,
-              color: trendDir === "up" ? "var(--color-reconciled)" :
-                     trendDir === "down" ? "var(--color-exception)" :
-                     "var(--color-on-surface-variant)",
-            }}
-          >
-            {trendDir === "up" && <span className="material-symbols-outlined" style={{ fontSize: 14 }}>trending_up</span>}
-            {trendDir === "down" && <span className="material-symbols-outlined" style={{ fontSize: 14 }}>trending_down</span>}
-            {trend}
-          </div>
-        )}
-      </div>
+      <div className="font-display-metric">{value}</div>
+      {trend && (
+        <div
+          className="font-numeric-mono font-body-sm card-metric-trend"
+          style={{
+            display: "flex", alignItems: "center", gap: 2, paddingTop: 4,
+            color: trendDir === "up" ? "var(--color-reconciled)" :
+                   trendDir === "down" ? "var(--color-exception)" :
+                   "var(--color-on-surface-variant)",
+          }}
+        >
+          {trendDir === "up" && <span className="material-symbols-outlined" style={{ fontSize: 14 }}>trending_up</span>}
+          {trendDir === "down" && <span className="material-symbols-outlined" style={{ fontSize: 14 }}>trending_down</span>}
+          {trend}
+        </div>
+      )}
     </div>
   );
 }
