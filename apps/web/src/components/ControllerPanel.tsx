@@ -675,7 +675,7 @@ function RunNarrative({ trace }: { trace: ControllerTrace }): React.ReactElement
   const stages = narrativeStages(trace);
   return (
     <div className="card" style={{ padding: "var(--space-md)", marginBottom: "var(--space-lg)" }}>
-      <p className="font-label-caps text-muted" style={{ marginBottom: "var(--space-sm)" }}>
+      <p className="font-label-caps font-label-section" style={{ marginBottom: "var(--space-sm)" }}>
         What this run did
       </p>
       <ol style={{ listStyle: "none", margin: 0, padding: 0 }}>
@@ -847,7 +847,7 @@ function TelemetryBlock({ telemetry }: { telemetry: ControllerTelemetry }): Reac
   return (
     <div style={{ marginBottom: "var(--space-lg)" }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-sm)", marginBottom: "var(--space-sm)", flexWrap: "wrap" }}>
-        <p className="font-label-caps text-muted" style={{ marginBottom: 0 }}>{RUNTIME_ASSERTIONS_LABEL}</p>
+        <p className="font-label-caps font-label-section" style={{ marginBottom: 0 }}>{RUNTIME_ASSERTIONS_LABEL}</p>
         <span className="badge badge-open" style={{ fontSize: 10 }}>{telemetry.scope}</span>
         <span
           className="font-body-sm"
@@ -1041,7 +1041,7 @@ export function ControllerTraceView({
           figures each stage produced — so this is the sequence and that is what
           happened in it, rather than the sequence three times over. */}
       <div className="card" style={{ padding: "var(--space-md)", marginBottom: "var(--space-lg)" }}>
-        <p className="font-label-caps text-muted" style={{ marginBottom: "var(--space-sm)" }}>
+        <p className="font-label-caps font-label-section" style={{ marginBottom: "var(--space-sm)" }}>
           Workflow trace
         </p>
         <div className="scroll-x" style={{ marginTop: "var(--space-sm)" }}>
@@ -1174,7 +1174,7 @@ export function ControllerTraceView({
           step-by-step record beneath them. Below the human-review section
           rather than above it: these are what a reviewer checks the story
           against, not the story. */}
-      <p className="font-label-caps text-muted" style={{ marginBottom: "var(--space-sm)" }}>
+      <p className="font-label-caps font-label-section" style={{ marginBottom: "var(--space-sm)" }}>
         Supporting evidence
       </p>
 
@@ -1330,7 +1330,7 @@ export function ControllerPanel({
               control that closes the period. It does not close anything and
               has no authority to: it reads, plans and escalates, and the
               subtitle now says so in the same breath as the name. */}
-          <p className="font-label-caps text-muted" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <p className="font-label-caps font-label-section" style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 16, color: "var(--color-secondary)" }}>route</span>
             Finance Controller &mdash; bounded orchestration
           </p>

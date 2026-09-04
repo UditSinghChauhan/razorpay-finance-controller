@@ -150,14 +150,27 @@ export function runRoutes(registry: RunRegistry): Hono {
   const app = new Hono();
 
   /**
-   * `POST /runs` — *"start a run over a named dataset. Body includes
+   * `POST /runs` — *"start a run over a **named** dataset. Body includes
    * `llm_provider`. Returns `run_id`."*
    *
-   * The body is optional in full: `dataset` defaults to the one allowlisted
-   * demo fixture and `llm_provider` to `offline`, which is the only mode
-   * `PROJECT_SPEC.md §10`'s demo path uses. Both are still **validated** when
-   * supplied, because a request that names something unsupported should be told
-   * so rather than quietly run something else.
+   * **The dataset must be named.** `ARCHITECTURE.md §9` calls it a named
+   * dataset and this handler now requires the name: a request carrying no body,
+   * or a body with no `dataset`, is a `400` rather than a silent `demo-500`.
+   * The default it replaces looked harmless and was not — the four demo periods
+   * reach different terminal outcomes, so a request whose `dataset` was dropped
+   * in transit (a proxy that ate the body, a client that forgot the
+   * `content-type`) was answered with a **real run over a different period**,
+   * `201`, and a `run_id` the caller had no reason to distrust. Refusing costs
+   * the caller one field and removes an entire class of wrong-period evidence.
+   *
+   * `llm_provider` stays optional and defaults to `offline`, which is the only
+   * mode `PROJECT_SPEC.md §10`'s demo path uses and the only one this API
+   * supports; a supplied value is still validated rather than ignored.
+   *
+   * **Nothing about a valid request changed.** The same body produces the same
+   * run, the same content-addressed `run_id`, the same evidence and the same
+   * `201`. Only the invalid empty request moved, and it moved from a run to a
+   * refusal.
    */
   app.post("/runs", async (c) => {
     let body: Record<string, unknown> = {};
@@ -167,12 +180,30 @@ export function runRoutes(registry: RunRegistry): Hono {
         body = parsed as Record<string, unknown>;
       }
     } catch {
-      // An absent or unparseable body is the documented default request, not an
-      // error: `POST /runs` with no arguments starts the demo run.
+      // An absent or unparseable body carries no dataset, which the check below
+      // refuses. It is not turned into an error of its own: "you sent no
+      // dataset" is the same fact whether the body was missing, empty or
+      // unreadable, and one message a caller can act on beats three.
       body = {};
     }
 
-    const dataset = body["dataset"] ?? "demo-500";
+    const dataset = body["dataset"];
+    if (dataset === undefined || dataset === null) {
+      return c.json(
+        {
+          error: "missing_dataset",
+          message:
+            `POST /runs starts a run over a NAMED demo period and has no default. Send ` +
+            `{"dataset": "demo-500"} with content-type: application/json. There is no ` +
+            `default because the four periods reach different outcomes, so a request whose ` +
+            `dataset went missing would otherwise be answered with a real run over a ` +
+            `period nobody asked for. Supported: ${DEMO_DATASET_IDS.join(", ")}.`,
+          received: null,
+          supported: DEMO_DATASET_IDS,
+        },
+        400,
+      );
+    }
     if (typeof dataset !== "string" || !isDemoDatasetId(dataset)) {
       return c.json(
         {

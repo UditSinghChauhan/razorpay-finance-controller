@@ -122,6 +122,11 @@
   --font-label-caps-line-height: 16px;
   --font-label-caps-letter-spacing: 0.05em;
 
+  /* The section rank of the same caps label. Weight and tracking only: the
+     size, the line height and the typeface are the caps token's, unchanged. */
+  --font-label-section-weight:         700;
+  --font-label-section-letter-spacing: 0.08em;
+
   /* numeric-mono: tabular figures for data tables */
   --font-numeric-mono-size:        14px;
   --font-numeric-mono-weight:      500;
@@ -193,6 +198,36 @@ html, body, #root {
   line-height: var(--font-label-caps-line-height);
   letter-spacing: var(--font-label-caps-letter-spacing);
   text-transform: uppercase;
+}
+/**
+ * The section rank of a caps label — a modifier on `.font-label-caps`, never a
+ * replacement for it.
+ *
+ * **The problem it solves.** One class titled a whole card and labelled the
+ * fields inside it. "CLOSE GATES" and "STATE", "WORKFLOW TRACE" and "EVIDENCE
+ * GAP" rendered at the same size, weight, colour and tracking, so a page
+ * offered no way to tell a heading from a row label except by reading both —
+ * every caps string on screen carried the same rank, which is the same as
+ * carrying none.
+ *
+ * **What it changes, and what it deliberately does not.** Weight, colour and
+ * tracking. Not the size — 11px stays 11px everywhere, and the earlier fixes
+ * that pinned specific labels at 11px are untouched by this. Not the typeface.
+ * Not the type scale. The four ranks a page now reads in are:
+ *
+ *   SECTION      `.page-title` / `h2.font-headline-sm`   18–24px
+ *   SUBSECTION   `.font-label-caps .font-label-section`  11px caps, on-surface, 700
+ *   FIELD LABEL  `.font-label-caps .text-muted`          11px caps, variant, 600
+ *   VALUE        `.font-headline-sm` / `.font-numeric-mono` / `.font-body-*`
+ *
+ * The section rank supplies its own colour, so it is used INSTEAD of
+ * `.text-muted` rather than beside it — a label carrying both reverts to the
+ * field rank, which is the one distinction this class exists to make.
+ */
+.font-label-section {
+  font-weight: var(--font-label-section-weight);
+  letter-spacing: var(--font-label-section-letter-spacing);
+  color: var(--color-on-surface);
 }
 .font-numeric-mono {
   font-size: var(--font-numeric-mono-size);

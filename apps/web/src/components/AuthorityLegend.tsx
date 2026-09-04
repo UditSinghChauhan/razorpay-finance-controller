@@ -58,7 +58,7 @@ function Layer({ accent, icon, name, role, authority, bounds }: LayerProps): Rea
 export function AuthorityLegend(): React.ReactElement {
   return (
     <div style={{ marginBottom: "var(--space-xl)" }}>
-      <p className="font-label-caps text-muted" style={{ marginBottom: 2 }}>
+      <p className="font-label-caps font-label-section" style={{ marginBottom: 2 }}>
         Who decides what
       </p>
       {/* The ladder in one line, because the three cards below are only

@@ -20,6 +20,21 @@ import { createApp } from "../src/index.js";
 
 const app = createApp();
 
+/**
+ * `POST /runs` names its period.
+ *
+ * The dataset is a required field, not a default: `apps/api/src/routes/runs.ts`
+ * answers `400 missing_dataset` to a request that names none, so a body whose
+ * `dataset` went missing can no longer come back as a real run over a period
+ * nobody asked for. Every creation below therefore says which period it wants.
+ */
+const START_DEMO_500 = {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ dataset: "demo-500" }),
+} as const;
+
+
 interface RunCreated {
   readonly run_id: string;
   readonly dataset: string;
@@ -55,7 +70,7 @@ interface QueueRow {
 let created: RunCreated;
 
 beforeAll(async () => {
-  const response = await app.request("/runs", { method: "POST" });
+  const response = await app.request("/runs", START_DEMO_500);
   expect(response.status).toBe(201);
   created = (await response.json()) as RunCreated;
 }, 60_000);
@@ -78,7 +93,7 @@ describe("POST /runs", () => {
   });
 
   it("is deterministic: a second run returns the same id and root hash", async () => {
-    const again = (await (await app.request("/runs", { method: "POST" })).json()) as RunCreated;
+    const again = (await (await app.request("/runs", START_DEMO_500)).json()) as RunCreated;
     // I9 / metric 23: two runs over identical inputs agree byte for byte. The
     // run id is content-addressed, so the registry replaces rather than duplicates.
     expect(again.run_id).toBe(created.run_id);
@@ -99,16 +114,127 @@ describe("POST /runs", () => {
   });
 
   it("refuses a provider other than offline", async () => {
+    // The dataset is named because it is now required; the provider is what is
+    // under test, and naming the period keeps it the only thing wrong.
     const response = await app.request("/runs", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ llm_provider: "anthropic" }),
+      body: JSON.stringify({ dataset: "demo-500", llm_provider: "anthropic" }),
     });
     expect(response.status).toBe(400);
     expect(((await response.json()) as { error: string }).error).toBe(
       "unsupported_llm_provider",
     );
   });
+});
+
+/**
+ * A run must name the period it runs.
+ *
+ * **What changed and why.** `POST /runs` used to answer a request with no body
+ * — and a request with `{}` — by defaulting to `demo-500` and returning `201`.
+ * That is a silent substitution on a financial surface: the four allowlisted
+ * periods reach different terminal outcomes (`scenarios.test.ts` pins all
+ * four), so a client whose `dataset` was dropped between it and this process
+ * got a real run over a period it never asked for, with a `run_id` it had no
+ * reason to distrust. The dataset is now required, and its absence is refused
+ * in the same typed shape an unsupported dataset already used.
+ *
+ * **Nothing about a valid request moved**, and the last test here is the one
+ * that says so: the same body produces the same content-addressed `run_id`, the
+ * same root hash and the same `201` it produced before.
+ */
+describe("POST /runs requires the dataset to be named", () => {
+  const errorShape = async (response: Response): Promise<{
+    error: string;
+    message: string;
+    supported: string[];
+  }> => (await response.json()) as { error: string; message: string; supported: string[] };
+
+  it("refuses a request with no body at all", async () => {
+    const response = await app.request("/runs", { method: "POST" });
+    expect(response.status).toBe(400);
+    const body = await errorShape(response);
+    expect(body.error).toBe("missing_dataset");
+    // The refusal must be actionable: it names the field and the allowlist.
+    expect(body.message).toContain("dataset");
+    expect(body.supported).toEqual(["demo-500", "demo-close", "demo-multi", "demo-backlog"]);
+  });
+
+  it("refuses an empty JSON object", async () => {
+    const response = await app.request("/runs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    expect(response.status).toBe(400);
+    expect((await errorShape(response)).error).toBe("missing_dataset");
+  });
+
+  it("refuses a body that names everything except the dataset", async () => {
+    // The realistic version of the bug: a caller that sent the provider and
+    // lost the period. Answering `201` here is what put a wrong-period run
+    // behind a trusted `run_id`.
+    const response = await app.request("/runs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ llm_provider: "offline" }),
+    });
+    expect(response.status).toBe(400);
+    expect((await errorShape(response)).error).toBe("missing_dataset");
+  });
+
+  it("answers a missing dataset in the same shape as an unknown one", async () => {
+    // One error contract for one field: a client branches on `error` and reads
+    // `supported`, whichever way the dataset was wrong.
+    const missing = await errorShape(await app.request("/runs", { method: "POST" }));
+    const unknown = await errorShape(
+      await app.request("/runs", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ dataset: "demo-501" }),
+      }),
+    );
+    expect(unknown.error).toBe("unknown_dataset");
+    expect(Object.keys(missing).sort()).toEqual(Object.keys(unknown).sort());
+    expect(missing.supported).toEqual(unknown.supported);
+  });
+
+  it("creates nothing when it refuses", async () => {
+    // A refusal that had started a run would leave the substitution in place
+    // and merely stop reporting it.
+    const before = await app.request(`/runs/${created.run_id}`);
+    expect(before.status).toBe(200);
+    const beforeText = await before.text();
+
+    expect((await app.request("/runs", { method: "POST" })).status).toBe(400);
+    expect(
+      (
+        await app.request("/runs", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({}),
+        })
+      ).status,
+    ).toBe(400);
+
+    expect(await (await app.request(`/runs/${created.run_id}`)).text()).toBe(beforeText);
+  });
+
+  it("leaves a valid demo request byte-identical to what it always returned", async () => {
+    // The regression this whole change must not cause. `run_id` is
+    // content-addressed, so an identical id and root hash is the strongest
+    // available statement that the run itself did not move.
+    const response = await app.request("/runs", START_DEMO_500);
+    expect(response.status).toBe(201);
+    const body = (await response.json()) as RunCreated;
+    expect(body.run_id).toBe(created.run_id);
+    expect(body.dataset).toBe("demo-500");
+    expect(body.llm_provider).toBe("offline");
+    expect(body.observation_count).toBe(500);
+    expect(body.summary.ledger_root_hash).toBe(created.summary.ledger_root_hash);
+    expect(body.summary.event_count).toBe(created.summary.event_count);
+  }, 60_000);
 });
 
 describe("GET /runs/:id", () => {
@@ -153,7 +279,7 @@ describe("GET /runs/:id", () => {
     // The one property `apps/web`'s reload path rests on. `summaryBody` is the
     // POST handler's own body, lifted so the two cannot drift; this is the
     // assertion that would fail if they ever did.
-    const posted = await app.request("/runs", { method: "POST" });
+    const posted = await app.request("/runs", START_DEMO_500);
     expect(posted.status).toBe(201);
     const postedText = await posted.text();
 

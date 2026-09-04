@@ -133,7 +133,7 @@ export function DecisionVerdict({
       style={{ padding: "var(--space-lg)", marginBottom: "var(--space-xl)", borderLeft: `4px solid ${accent}` }}
       aria-labelledby="decision-verdict-heading"
     >
-      <h2 id="decision-verdict-heading" className="font-label-caps text-muted" style={{ marginBottom: "var(--space-sm)" }}>
+      <h2 id="decision-verdict-heading" className="font-label-caps font-label-section" style={{ marginBottom: "var(--space-sm)" }}>
         {heading}
       </h2>
 
@@ -477,7 +477,7 @@ export function EvidenceTrail(): React.ReactElement {
                     </div>
                   </div>
                   <div style={{ background: "var(--color-surface-container-low)", borderRadius: "var(--radius-md)", padding: "var(--space-md)" }}>
-                    <p className="font-label-caps text-muted" style={{ marginBottom: "var(--space-sm)" }}>
+                    <p className="font-label-caps font-label-section" style={{ marginBottom: "var(--space-sm)" }}>
                       Verification metadata
                     </p>
                     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>

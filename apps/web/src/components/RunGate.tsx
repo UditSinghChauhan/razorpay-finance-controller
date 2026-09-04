@@ -6,6 +6,9 @@ import {
   API_UNAVAILABLE_BODY,
   API_UNAVAILABLE_DETAIL_LABEL,
   API_UNAVAILABLE_HEADLINE,
+  API_UNEXPECTED_BODY,
+  API_UNEXPECTED_DETAIL_LABEL,
+  API_UNEXPECTED_HEADLINE,
   isApiUnreachable,
   RUN_NOT_FOUND_BODY,
   RUN_NOT_FOUND_HEADLINE,
@@ -144,6 +147,52 @@ export function ApiVersionMismatch({
 }
 
 /**
+ * The API answered, and the answer is one this build cannot interpret.
+ *
+ * **The third `404`, and every other status the server can send.** Two `404`s
+ * already have screens of their own — {@link RunNotFound} for `unknown_run`
+ * and {@link ApiVersionMismatch} for `not_found` — and everything else used to
+ * render {@link ApiUnavailable}, which says the API is not reachable. It was
+ * reachable: it answered. A reviewer sitting in front of a running server was
+ * told to start one, and the actual response — the only thing that could have
+ * told them what was really wrong — was labelled as the underlying cause of an
+ * outage that was not happening.
+ *
+ * This screen claims nothing about the run, because nothing was established
+ * about it, and puts the response where the reviewer can read it. The pointer
+ * is kept and the retry stays for the same reason.
+ */
+export function UnexpectedApiResponse({
+  message, onRetry, children,
+}: {
+  message: string;
+  onRetry?: (() => void) | undefined;
+  /** A page's own way out, beside the retry. */
+  children?: React.ReactNode;
+}): React.ReactElement {
+  return (
+    <GateShell>
+      <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 44, color: "var(--color-abstained)" }}>
+        help_center
+      </span>
+      <p className="font-body-md" style={{ fontWeight: 600 }}>{API_UNEXPECTED_HEADLINE}</p>
+      <p className="font-body-sm" style={{ maxWidth: 600, textAlign: "center", lineHeight: 1.7 }}>
+        {API_UNEXPECTED_BODY}
+      </p>
+      <p className="font-body-sm text-muted" style={{ maxWidth: 600, textAlign: "center" }}>
+        {API_UNEXPECTED_DETAIL_LABEL}: <code style={{ fontSize: 12 }}>{message}</code>
+      </p>
+      <div className="actions" style={{ justifyContent: "center" }}>
+        {onRetry !== undefined && (
+          <button className="btn btn-secondary" onClick={onRetry}>Retry</button>
+        )}
+        {children}
+      </div>
+    </GateShell>
+  );
+}
+
+/**
  * The engine API is not answering.
  *
  * **The raw message is kept, and moved.** `TypeError: Failed to fetch` names no
@@ -251,10 +300,11 @@ export function ApiErrorNotice({
  * the pointer has stopped being the thing that decides what is on screen — on
  * `idle` there was never one, on `restored` the run it named is installed.
  *
- * The three blocking kinds render three different sentences, because they are
- * three different facts about the server: `not_found` is a run the API says it
- * does not hold, `api_mismatch` is an API without the route to ask, and
- * `unreachable` is an API that did not answer.
+ * The four blocking kinds render four different sentences, because they are
+ * four different facts about the server: `not_found` is a run the API says it
+ * does not hold, `api_mismatch` is an API without the route to ask,
+ * `unexpected_response` is an API that answered something this build cannot
+ * read, and `unreachable` is an API that did not answer at all.
  */
 export function useRunGate(): React.ReactElement | null {
   const { rehydrate, retryRehydrate } = useRun();
@@ -265,6 +315,8 @@ export function useRunGate(): React.ReactElement | null {
       return <RunNotFound />;
     case "api_mismatch":
       return <ApiVersionMismatch onRetry={retryRehydrate} />;
+    case "unexpected_response":
+      return <UnexpectedApiResponse message={rehydrate.message} onRetry={retryRehydrate} />;
     case "unreachable":
       return <ApiUnavailable message={rehydrate.message} onRetry={retryRehydrate} />;
     case "idle":

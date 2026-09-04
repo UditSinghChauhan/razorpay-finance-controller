@@ -550,6 +550,36 @@ export const API_MISMATCH_BODY =
   "server never looked it up — so no figure and no verdict is shown for it here.";
 
 /**
+ * The API answered, and this client cannot read the answer.
+ *
+ * **The state that used to be reported as an outage.** `fetchRun` classifies a
+ * `404` from its body — `unknown_run` is this run's absence, `not_found` is
+ * this route's — and everything else the server said fell through to
+ * *"ASSAY's API is not reachable"*, under an instruction to start a process
+ * that had just replied. That is a fabricated diagnosis: a proxy answering on
+ * the API's behalf, a `500` out of the run registry and a `404` carrying an
+ * unfamiliar code are three different problems, and none of them is a server
+ * that is not running.
+ *
+ * So this screen states exactly what is known — the API answered, the answer
+ * was not one this build understands — and hands the reviewer the response
+ * itself, which is the only thing that can tell them which of the three it
+ * was. The pointer is kept and the retry stays: nothing here established that
+ * the run is gone.
+ */
+export const API_UNEXPECTED_HEADLINE = "ASSAY's API answered with an unexpected response";
+
+export const API_UNEXPECTED_BODY =
+  "The API is running and replied to GET /runs/:id, but with a status this frontend cannot " +
+  "interpret — so nothing has been established about the run itself, and none is claimed " +
+  "here. The response is below. If it is a 404, the request reached something other than " +
+  "this run's route; check that /api proxies to 127.0.0.1:8787 and that the API was " +
+  "restarted after the last pull, then retry.";
+
+/** The response line, labelled. Same treatment the unreachable screen gives it. */
+export const API_UNEXPECTED_DETAIL_LABEL = "What the API answered";
+
+/**
  * The controller's runtime checks, named for what they actually are.
  *
  * *"Runtime checks — 12/12 passed"* reads as an external certification. It is

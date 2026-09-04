@@ -144,7 +144,7 @@ export function SolutionCard({
           <CopyId label="Candidate ID" value={solution.candidate_id} head={14} tail={8} fontSize={11} />
         </div>
 
-        <p className="font-label-caps text-muted" style={{ marginBottom: "var(--space-sm)" }}>
+        <p className="font-label-caps font-label-section" style={{ marginBottom: "var(--space-sm)" }}>
           Member Allocation
         </p>
         <div style={{ flex: 1 }}>
@@ -257,7 +257,7 @@ export function CertificateStory({
       style={{ padding: "var(--space-lg)", marginBottom: "var(--space-xl)", borderLeft: "4px solid var(--color-abstained)" }}
       aria-labelledby="certificate-story-heading"
     >
-      <h2 id="certificate-story-heading" className="font-label-caps text-muted" style={{ marginBottom: "var(--space-md)" }}>
+      <h2 id="certificate-story-heading" className="font-label-caps font-label-section" style={{ marginBottom: "var(--space-md)" }}>
         What this certificate says
       </h2>
 

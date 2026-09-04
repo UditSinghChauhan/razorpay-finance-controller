@@ -64,7 +64,7 @@ function writePointer(pointer: RunPointer | null): void {
 /**
  * Where the attempt to recover a persisted run has got to.
  *
- * **One value, five states, no silent branch.** The first version of this
+ * **One value, seven states, no silent branch.** The first version of this
  * carried two booleans — `rehydrating` and `notFound` — and a third outcome
  * that neither of them could express: an API that never answered. That third
  * outcome was computed by {@link fetchRun}, dropped on the floor, and rendered
@@ -73,20 +73,25 @@ function writePointer(pointer: RunPointer | null): void {
  * kind below is rendered by {@link ../components/RunGate.js useRunGate}, and a
  * kind with no branch is a type error rather than a blank screen.
  *
- * - `idle`         no pointer was stored; this is a genuine first visit
- * - `restoring`    a pointer was stored and `GET /runs/:id` is outstanding
- * - `restored`     the API returned the run, and every figure on screen is its
- * - `not_found`    the API answered `unknown_run`; the pointer is dropped
- * - `api_mismatch` the API answered, and does not have the route; the pointer
- *                  is KEPT, because the run is not what is missing
- * - `unreachable`  the API did not answer at all; the pointer is KEPT, because
- *                  the run may well still be there once the server is started
+ * - `idle`                no pointer was stored; a genuine first visit
+ * - `restoring`           a pointer was stored and `GET /runs/:id` is outstanding
+ * - `restored`            the API returned the run, and every figure on screen is its
+ * - `not_found`           the API answered `unknown_run`; the pointer is dropped
+ * - `api_mismatch`        the API answered, and does not have the route; the pointer
+ *                         is KEPT, because the run is not what is missing
+ * - `unexpected_response` the API answered with a status this client cannot
+ *                         interpret; the pointer is KEPT, and what the server
+ *                         said is shown rather than translated
+ * - `unreachable`         nothing answered at all; the pointer is KEPT, because
+ *                         the run may well still be there once the server is started
  *
- * **`not_found` and `api_mismatch` are both a `404` and are not the same
- * event.** The first is this run's absence and the second is this route's, and
- * the response body is what separates them — see {@link fetchRun}. Deciding
- * either one from the status code alone would state a history the server never
- * reported.
+ * **`not_found`, `api_mismatch` and `unexpected_response` can all be a `404`
+ * and are not the same event.** The first is this run's absence, the second is
+ * this route's, and the third is a `404` naming neither — the response body is
+ * what separates them, see {@link fetchRun}. Deciding any of them from the
+ * status code alone would state a history the server never reported, and
+ * calling the third `unreachable` would say nothing answered underneath a
+ * server that just did.
  */
 export type RehydrateState =
   | { readonly kind: "idle" }
@@ -94,6 +99,7 @@ export type RehydrateState =
   | { readonly kind: "restored" }
   | { readonly kind: "not_found" }
   | { readonly kind: "api_mismatch" }
+  | { readonly kind: "unexpected_response"; readonly message: string }
   | { readonly kind: "unreachable"; readonly message: string };
 
 // ---------------------------------------------------------------------------
@@ -139,9 +145,10 @@ export interface RunContextValue {
   /**
    * Try the persisted pointer again.
    *
-   * Only meaningful in the `unreachable` state — that is the one branch where
-   * the pointer is still on disk and a retry can succeed without re-running
-   * anything. A no-op when no pointer is stored.
+   * Meaningful in the three branches that keep the pointer — `unreachable`,
+   * `api_mismatch` and `unexpected_response` — where the id is still on disk
+   * and a retry can succeed without re-running anything. A no-op when no
+   * pointer is stored.
    */
   retryRehydrate: () => void;
 }
@@ -183,9 +190,9 @@ export function RunProvider({ children }: { children: ReactNode }): React.ReactE
    * **Every outcome is recorded; none is swallowed.** `found` installs the
    * run; `not_found` drops the pointer, because the process that held that
    * run is gone and an id that will 404 forever is worse than no id;
-   * `unreachable` and `api_mismatch` KEEP the pointer and report what
-   * happened, because on both branches the run may well still be there once
-   * the right server is running and
+   * `unreachable`, `api_mismatch` and `unexpected_response` KEEP the pointer
+   * and report what happened, because on all three the run may well still be
+   * there once the right server is running and
    * {@link RunContextValue.retryRehydrate} should be able to find it. Nothing
    * financial is written on any of them: the pointer is a run id and a period
    * name, and a branch that failed installs no run at all.
@@ -215,6 +222,12 @@ export function RunProvider({ children }: { children: ReactNode }): React.ReactE
           // absence has not been established and dropping the id would throw
           // away a run that a correctly built API would still hand back.
           setRehydrate({ kind: "api_mismatch" });
+          break;
+        case "unexpected_response":
+          // KEPT for the same reason, and more strongly: this answer does not
+          // even say what the server did with the id, so nothing about the
+          // run's existence has been established either way.
+          setRehydrate({ kind: "unexpected_response", message: outcome.message });
           break;
         case "unreachable":
           setRehydrate({ kind: "unreachable", message: outcome.message });

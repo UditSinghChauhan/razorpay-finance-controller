@@ -58,6 +58,10 @@ const RESTORING: RehydrateState = { kind: "restoring" };
 const NOT_FOUND: RehydrateState = { kind: "not_found" };
 const UNREACHABLE: RehydrateState = { kind: "unreachable", message: "Failed to fetch" };
 const API_MISMATCH: RehydrateState = { kind: "api_mismatch" };
+const UNEXPECTED: RehydrateState = {
+  kind: "unexpected_response",
+  message: "404: no error code in body",
+};
 
 // ---------------------------------------------------------------------------
 // restoring — no page may answer "start over" while the answer is in flight
@@ -243,16 +247,49 @@ describe("N-01: a 404 is read from the error code, not from the status", () => {
     // A 404 with no readable body is most likely not this API at all — a proxy
     // or a static server. Calling it a missing run would state a history no
     // response reported.
+    //
+    // **This assertion changed, and the change is the fix.** It used to expect
+    // `unreachable`, which is what put *"ASSAY's API is not reachable"* on
+    // screen underneath a server that had just answered — a diagnosis no
+    // response supported, with an instruction to start a running process. The
+    // outcome is now `unexpected_response`: the API answered, the answer was
+    // not one this build understands, and nothing about the run is claimed.
     stubFetch(404, "<!doctype html><title>404</title>");
     const outcome = await fetchRun("run_x");
-    expect(outcome.kind).toBe("unreachable");
+    expect(outcome.kind).toBe("unexpected_response");
+    // The evidence line survives verbatim, including the fact that the body
+    // carried no error code at all.
+    if (outcome.kind === "unexpected_response") {
+      expect(outcome.message).toBe("404: no error code in body");
+    }
   });
 
-  it("leaves every other HTTP failure exactly as it was", async () => {
+  it("keeps an unfamiliar 404 error code in the evidence line", async () => {
+    // A 404 from this API carrying a code neither branch knows — a route added
+    // later, a gateway inventing its own vocabulary. The code is the one thing
+    // that can tell an operator which, so it is reported rather than replaced.
+    stubFetch(404, { error: "run_expired", message: "…" });
+    const outcome = await fetchRun("run_x");
+    expect(outcome.kind).toBe("unexpected_response");
+    if (outcome.kind === "unexpected_response") {
+      expect(outcome.message).toBe("404: run_expired");
+    }
+  });
+
+  it("reads any other HTTP failure as an answer too, not as silence", async () => {
+    // Same correction, one status up: a 500 is a server that answered and
+    // failed. `unreachable` now means exactly one thing — nothing answered.
     stubFetch(500, { error: "internal", message: "boom" });
     const outcome = await fetchRun("run_x");
+    expect(outcome.kind).toBe("unexpected_response");
+    if (outcome.kind === "unexpected_response") expect(outcome.message).toContain("500");
+  });
+
+  it("still reports a rejected fetch as unreachable, which is the one case that is", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => Promise.reject(new TypeError("Failed to fetch"))));
+    const outcome = await fetchRun("run_x");
     expect(outcome.kind).toBe("unreachable");
-    if (outcome.kind === "unreachable") expect(outcome.message).toContain("500");
+    if (outcome.kind === "unreachable") expect(outcome.message).toContain("Failed to fetch");
   });
 
   it("caches and fabricates no financial state on either 404 branch", async () => {
@@ -308,5 +345,60 @@ describe("N-01: an API without the rehydration route is not a missing run", () =
     expect(mismatch).not.toEqual(gone);
     expect(gone).toContain("no longer held by the API");
     expect(gone).not.toContain("This API build does not support run rehydration");
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// An unclassifiable answer is an answer, and says so on every page
+// ---------------------------------------------------------------------------
+
+/**
+ * **The defect this section pins.** `fetchRun` classified two `404`s from the
+ * response body and sent everything else — a `404` naming an unfamiliar code,
+ * a `404` with no readable body at all, a `500` — down the `unreachable`
+ * branch. That branch renders *"ASSAY's API is not reachable"* over
+ * `pnpm run dev:api`, so the one reviewer guaranteed to be looking at a
+ * running API was the one told to start it, and the response that would have
+ * identified the real problem was labelled the underlying cause of an outage
+ * that was not happening.
+ *
+ * `unexpected_response` is now its own state on every page: it says the API
+ * answered, it does not say what happened to the run, and it puts the response
+ * on screen unedited.
+ */
+describe("an API answer this build cannot read is not an API that is down", () => {
+  it.each(PAGES)("%s says the API answered, unexpectedly", (_name, Page) => {
+    const html = renderPage(Page, { rehydrate: UNEXPECTED });
+    expect(html).toContain("ASSAY&#x27;s API answered with an unexpected response");
+  });
+
+  it.each(PAGES)("%s does not claim the API is unreachable", (_name, Page) => {
+    const html = renderPage(Page, { rehydrate: UNEXPECTED });
+    // The sentence this whole state exists to stop being shown.
+    expect(html).not.toContain("ASSAY&#x27;s API is not reachable");
+    expect(html).not.toContain("is not answering");
+  });
+
+  it.each(PAGES)("%s does not claim the run is gone", (_name, Page) => {
+    const html = renderPage(Page, { rehydrate: UNEXPECTED });
+    // Nothing in an unreadable answer established the run's absence.
+    expect(html).not.toContain("no longer held by the API");
+  });
+
+  it("keeps the status and error code on screen", () => {
+    const html = renderPage(CommandCenter, { rehydrate: UNEXPECTED });
+    expect(html).toContain("What the API answered");
+    expect(html).toContain("404: no error code in body");
+  });
+
+  it("offers the retry the kept pointer allows", () => {
+    const html = renderPage(CommandCenter, { rehydrate: UNEXPECTED });
+    expect(html).toContain("Retry");
+  });
+
+  it("shows no figure for a run nothing was reported about", () => {
+    const html = renderPage(CommandCenter, { rehydrate: UNEXPECTED });
+    expect(html).not.toContain("₹");
   });
 });

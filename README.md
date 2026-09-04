@@ -11,12 +11,56 @@ hash-chained double-entry shadow ledger, and **abstains with a machine-checkable
 certificate** whenever the available evidence does not uniquely determine the
 correct allocation.
 
+## Who decides what
+
+Five things act on a settlement here, and **only one of them may decide, only
+one may book, and neither of those is a language model.** The diagram is the
+whole control argument; `docs/ARCHITECTURE.md §2` draws the same boundaries in
+full and `§4` states what each one prevents.
+
+```mermaid
+flowchart TD
+    OBS["Three independent views of the same money<br/>PG recon report · bank statement · merchant ledger"]
+    ASSAY["ASSAY"]
+    ENGINE["Reconciliation Engine — packages/engine<br/>DECIDES<br/>deterministic decision authority<br/>S1 anchor → S5 validate"]
+    LEDGER["Shadow Ledger — packages/ledger<br/>BOOKS<br/>booking authority<br/>hash-chained, double-entry"]
+    CTRL["Close Controller — packages/controller<br/>ORCHESTRATES<br/>NO financial write authority<br/>bounded at 64 steps"]
+    LLM["Explanation Model — packages/llm, R1–R4<br/>EXPLAINS<br/>NO financial authority<br/>no numeral it emits is ever persisted"]
+    HUMAN["Human Review<br/>RESOLVES<br/>required boundary for every<br/>unresolved decision"]
+
+    OBS --> ENGINE
+    ASSAY --> ENGINE
+    ASSAY --> CTRL
+
+    ENGINE -->|"validated decisions — S5 is the only gate that may post"| LEDGER
+    ENGINE -->|"abstained + exceptions, ranked by rupee value"| HUMAN
+    ENGINE -->|"sealed decision evidence"| LLM
+
+    CTRL -->|"read-only tools"| ENGINE
+    CTRL -->|"ledger_verify — recomputes, never writes"| LEDGER
+    CTRL -->|"escalate — the controller's terminal state"| HUMAN
+
+    LLM -->|"post-hoc prose, numeral-grounded, id-allowlisted"| HUMAN
+```
+
+| Component | Authority it has | Authority it does not have |
+|---|---|---|
+| **Reconciliation Engine** | The only component that decides an allocation, and `S5` is the only gate that may post | — |
+| **Shadow Ledger** | The only component that books; every entry is hash-chained and replayable | Cannot be written except through a `ValidatedDecision` `S5` constructed |
+| **Close Controller** | Reads, plans, escalates, within a step bound | **No financial write.** Its tool surface is four reads; its terminal state is human review, never a ledger event |
+| **Explanation Model** | Explains a decision that has already been made and sealed | **Not a financial authority.** It decides nothing, emits no number that is persisted, and every id it names must already exist |
+| **Human Review** | Resolves what the evidence could not | — |
+
+**Unresolved decisions do not clear themselves.** An abstention or an exception
+leaves the machine at a human, by construction — the escalation boundary is
+where the system stops, not a fallback it takes when a heuristic is unsure.
+
 ## What is built
 
 - **Ten packages and three apps**, committed — `money`, `domain`, `ledger`,
   `engine`, `probe`, `oracle`, `generator`, `eval`, `llm`, `controller`, and
   `apps/cli`, `apps/api`, `apps/web`.
-- **3,584 tests across 150 files**, with no type errors.
+- **3,660 tests across 151 files**, with no type errors.
 - **A sealed, signed benchmark** — spec version 1.4.38, benchmark version
   1.0.13, tag `bench-v1.0.13`. `docs/PREREGISTRATION.md §9`'s eight steps were
   executed in order; step 7 wrote **50 conforming `metrics.json`** — five agents
@@ -30,6 +74,36 @@ correct allocation.
 **Three of `docs/DECISION_BRIEF.md §C`'s thirteen Tier-0 rows are not complete.**
 They are named — not counted as done — in the disclosures below, alongside what
 the sealed run does and does not support.
+
+### Track 04's three asks, and the evidence for each
+
+| Ask | The figure | Read from | Kind |
+|---|---|---|---|
+| **Throughput** | **15,726 observations per run** — TEST seeds `9000`–`9004`; 10,486 on the five adversarial seeds `9100`–`9104` | [`bench/test/<seed>/observations.jsonl`](bench/test), run end to end into [`runs/seal-v1.0.13/test/`](runs/seal-v1.0.13/test) | **Measured** — corpus volume per run, **not a rate** |
+| **Measured accuracy** | `coverage_by_value` **0.9639 – 1.0000** per seed, published beside three lower coverage views | [`metrics.json`](runs/seal-v1.0.13/test) per seed; all four views, with numerators, under *Benchmark disclosures* | **Measured**, with the limitations below |
+| **Honest exception list** | **3,770 – 3,787** open exceptions per seed (2,466 – 2,473 on `9100`–`9104`), each a value-ranked **Investigation Queue** row classed by `docs/DATA_MODEL.md §15`'s 14-member closed taxonomy | Same `metrics.json` for the counts; [`demo/README.md`](demo/README.md) names every exception the demo periods hold | **Measured** counts; the queue is a **demonstration** |
+
+Every figure is a per-seed value read from a committed artifact. **None is
+averaged and no aggregate exists** — `docs/EVALUATION_SPEC.md §5.5` admits only
+numbers that are already in a run artifact, and the bootstrap that would produce
+an interval is not built.
+
+**Three things this benchmark does not measure, stated here rather than left to
+be assumed:**
+
+- **No aggregate accuracy metric.** There is no single accuracy number, and none
+  is constructed for this table.
+- **Not abstention accuracy.** `truly_ambiguous`, `abstentions` and
+  `probes_spent` are `0` on all 50 scored units, so the corpus never posed the
+  question — `V35`. The mechanism is shown on `demo/` fixtures, which are a
+  demonstration and never evidence.
+- **Not exception-class accuracy.** `exception_class_confusion` is
+  `NOT COMPUTABLE` on the frozen population. The *list* is honest; its
+  classification is unscored.
+
+`V36` adds the one further caveat that matters here: `balance_harm_inr` and the
+three metrics derived from it measure this corpus's bank-attribution rate, **not**
+ASSAY's accounting accuracy. Both disclosures are below, in full.
 
 ## Run the demo
 
@@ -72,6 +146,60 @@ and `apps/api/tests/scenarios.test.ts` pins these outcomes.
 **All four are `demo/` fixtures.** `demo/README.md` states the five boundaries in
 full: outside `bench/`, no seed, no ground truth, never scored, and never usable
 to support a claim about coverage, accuracy or harm.
+
+### The two screens this submission is judged on
+
+Both are reached from `demo-500` in under a minute, and both are stated here as
+what to look at rather than shown, because **no screenshot has been captured in
+this repository and none is fabricated.** The environment that produced this
+checkpoint cannot render a browser — its Chromium fails to load
+`libasound.so.2` — so the capture is the one remaining operator-side step, and
+the runbook below is exact rather than approximate.
+
+1. **The Ambiguity Certificate.** Solution A and Solution B side by side with
+   their allocations tied out, an **evidence gap of `0` bps against an ε of
+   `1500` bps**, and the abstention stated as the consequence of that
+   comparison. This is the product's whole argument: two hypotheses the
+   evidence cannot separate, and a machine-checkable record of declining to
+   pick one.
+2. **The controller outcome.** `ESCALATED`, with `STEPS 10 / 64`,
+   `TOOL CALLS 4`, `ESCALATIONS 1` and `WRITES APPLIED 0` — a bounded agent
+   that read four times, wrote nothing, and stopped at a human.
+
+<details>
+<summary>How to capture them</summary>
+
+    pnpm run dev       # restart it — apps/api does not hot-reload
+
+Open the URL Vite prints, select **`demo-500`**, and press **Run this period**.
+
+**Screenshot 1 — Ambiguity Certificate.** Investigation Queue → the `ABSTAINED`
+row (the only one carrying a certificate) → **Ambiguity Certificate**. Frame it
+from the certificate seal down to the abstention callout, so that *Hypothesis
+Comparison* (Solution A / Solution B, allocations aligned against the same
+target) and *Evidence Score Comparison* (`0 bps` / `1500 bps`) are both in
+shot. The AI panel sits below the callout and stays out of frame; it is a
+button until it is pressed, and pressing it is the only surface in this app
+that spends a metered call. Candidate ids are 69 characters and render
+truncated through `CopyId` — if a full `cand_…` string is visible, the frame is
+showing a copied value rather than the page. Capture the page region, not the
+window: no browser chrome.
+
+**Screenshot 2 — Controller outcome.** Stay on the Command Center and scroll to
+**Finance Controller**; it runs itself once the period has run, so there is no
+second button to press. Frame the outcome strip and the counters — `ESCALATED`,
+`STEPS 10 / 64`, `TOOL CALLS 4`, `ESCALATIONS 1`, `WRITES APPLIED 0` — and stop
+above *Supporting evidence*; the step-by-step trace below it is detail, not the
+result. `apps/api/tests/controller.test.ts` and `apps/api/tests/scenarios.test.ts`
+pin every one of those five figures, so a capture disagreeing with them is a
+stale API rather than a new result.
+
+Save them as `docs/screenshots/01-ambiguity-certificate.png` and
+`docs/screenshots/02-controller-outcome.png`, then link them here. **Until they
+exist, this section names them and shows nothing** — a placeholder image in a
+finance repository is the one thing worse than no image.
+
+</details>
 
 ## Read the specification in this order
 

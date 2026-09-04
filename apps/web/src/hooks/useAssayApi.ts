@@ -362,7 +362,7 @@ export function useCreateRun(): {
 /**
  * What a rehydration attempt **concluded** about a persisted run id.
  *
- * Four outcomes, because a completed fetch has exactly four answers. The
+ * Five outcomes, because a completed fetch has exactly five answers. The
  * *pending* and *never-attempted* states are not here: they are states of the
  * caller, not conclusions of this call, and they live on `RunContext`'s
  * `RehydrateState` where a page can render them.
@@ -372,11 +372,21 @@ export function useCreateRun(): {
  * not answer, `api_mismatch` is a process that answered and does not have the
  * route. Folding the second into the first would put *"the API is not
  * answering"* on screen underneath an API that just did.
+ *
+ * `unexpected_response` exists for the same reason and closes the last hole in
+ * it. A `404` whose body names neither known code, and any other non-`2xx`,
+ * used to be reported as `unreachable` — so a server that answered, with a
+ * status this client cannot interpret, was described to the reviewer as a
+ * server that is not running, under an instruction to start a process that is
+ * already up. **`unreachable` now means exactly one thing: the request never
+ * got an answer.** Everything the server did say is carried on `message` and
+ * stays on screen.
  */
 export type RehydrateOutcome =
   | { readonly kind: "found"; readonly run: RunSummary }
   | { readonly kind: "not_found" }
   | { readonly kind: "api_mismatch" }
+  | { readonly kind: "unexpected_response"; readonly message: string }
   | { readonly kind: "unreachable"; readonly message: string };
 
 /**
@@ -403,7 +413,13 @@ export type RehydrateOutcome =
  * telling that reviewer *"the run is gone"* would be a fabricated history for
  * a run the server was never asked about. So the code decides, and a `404`
  * whose body cannot be read or names neither code is reported as it came
- * rather than assigned to either.
+ * rather than assigned to either — as `unexpected_response`, which says the
+ * API answered and this client could not read the answer, and **not** as
+ * `unreachable`, which would state that nothing answered at all.
+ *
+ * The same reading applies to every other non-`2xx`: a `500` is a server that
+ * answered. `unreachable` is reserved for the one case that earns it — a
+ * `fetch` that rejected, which is the only outcome here carrying no status.
  */
 export async function fetchRun(runId: string): Promise<RehydrateOutcome> {
   try {
@@ -413,11 +429,16 @@ export async function fetchRun(runId: string): Promise<RehydrateOutcome> {
       const code = typeof body?.error === "string" ? body.error : null;
       if (code === "unknown_run") return { kind: "not_found" };
       if (code === "not_found") return { kind: "api_mismatch" };
-      return { kind: "unreachable", message: `404: ${code ?? "no error code in body"}` };
+      // The evidence line is unchanged: the status and whatever error code the
+      // body carried, or the fact that it carried none.
+      return {
+        kind: "unexpected_response",
+        message: `404: ${code ?? "no error code in body"}`,
+      };
     }
     if (!res.ok) {
       const body = await res.text().catch(() => "");
-      return { kind: "unreachable", message: `${String(res.status)}: ${body}` };
+      return { kind: "unexpected_response", message: `${String(res.status)}: ${body}` };
     }
     return { kind: "found", run: (await res.json()) as RunSummary };
   } catch (e) {

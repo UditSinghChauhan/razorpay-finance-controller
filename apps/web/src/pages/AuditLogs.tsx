@@ -418,7 +418,7 @@ export function VerificationResult({
           events; the events themselves — actor, timestamp, prev_hash — are on
           the Evidence Trail, reached through the decision that caused them. */}
       <div className="card" style={{ padding: "var(--space-md)" }}>
-        <p className="font-label-caps text-muted" style={{ marginBottom: "var(--space-xs)" }}>
+        <p className="font-label-caps font-label-section" style={{ marginBottom: "var(--space-xs)" }}>
           Where the individual events are
         </p>
         <p className="font-body-sm text-muted" style={{ lineHeight: 1.6 }}>
@@ -461,7 +461,7 @@ export function ChainVerification({
       <div className="card" style={{ padding: "var(--space-lg)", marginBottom: "var(--space-xl)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-md)", flexWrap: "wrap" }}>
           <div style={{ maxWidth: 640 }}>
-            <p className="font-label-caps text-muted" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <p className="font-label-caps font-label-section" style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 16, color: "var(--color-secondary)" }}>verified_user</span>
               Tamper-evidence, checked live
             </p>
