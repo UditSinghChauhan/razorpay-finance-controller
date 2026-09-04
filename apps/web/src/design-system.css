@@ -1023,6 +1023,32 @@ html, body, #root {
 
 .safety-claim[data-clean="false"] .safety-claim-value { color: var(--color-exception); }
 
+/* The same tile in the palette's ATTENTION tone, for the escalation figure.
+
+   `writes applied — 0` and `escalations — 1` are the two numbers on the
+   controller panel that decide what a reviewer does next, and only the first
+   of them had any weight: the safety claim was 30px in a reconciled green box
+   while the count of items a PERSON has to work sat at 15px in the counter row
+   beside it. The panel therefore led with "nothing was written" and buried
+   "this is what needs you".
+
+   Amber is `--color-abstained`, the tone this app already uses for abstention
+   and for anything awaiting a human; no colour is introduced here. The tone is
+   a function of the count: `none` renders the same tile in the neutral surface,
+   because a run that escalated nothing has nothing to draw the eye to and an
+   amber zero would be a false alarm. */
+.safety-claim[data-tone="attention"] {
+  border-color: var(--color-abstained);
+  background: var(--color-abstained-bg);
+}
+.safety-claim[data-tone="attention"] .safety-claim-value { color: var(--color-abstained); }
+
+.safety-claim[data-tone="none"] {
+  border-color: var(--color-outline-variant);
+  background: var(--color-surface-container-lowest);
+}
+.safety-claim[data-tone="none"] .safety-claim-value { color: var(--color-on-surface-variant); }
+
 .safety-claim-note {
   font-size: 11px;
   line-height: 15px;

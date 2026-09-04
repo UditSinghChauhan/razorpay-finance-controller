@@ -426,13 +426,26 @@ export function InvestigationQueue(): React.ReactElement {
                       <span className="material-symbols-outlined" style={{ fontSize: 18, color: "var(--color-abstained)" }} title="Certificate issued">workspace_premium</span>
                     )}
                   </td>
+                  {/* The row's own action, quietly. Twenty-six identical
+                      filled buttons down the right-hand edge gave every row the
+                      same visual weight as the amount it carries, on a queue
+                      that is ranked by that amount — the page read as a generic
+                      dashboard rather than as a worklist. This is the same
+                      control with the same handler and the same words: still a
+                      real <button>, so it keeps its place in the tab order and
+                      its keyboard activation, and still stopping propagation so
+                      it never fires the row's own drawer. */}
                   <td>
                     <button
-                      className="btn btn-secondary"
-                      style={{ padding: "2px 8px", fontSize: 11, borderRadius: 3, whiteSpace: "nowrap" }}
+                      className="btn btn-ghost"
+                      style={{ padding: "2px 4px", fontSize: 11, gap: 2, whiteSpace: "nowrap", color: "var(--color-primary)" }}
+                      aria-label={`Investigate ${item.entity_id}`}
                       onClick={(e) => { e.stopPropagation(); selectDecision(item.decision_id); void navigate("/evidence-trail"); }}
                     >
                       Investigate
+                      <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: 14 }}>
+                        chevron_right
+                      </span>
                     </button>
                   </td>
                 </tr>

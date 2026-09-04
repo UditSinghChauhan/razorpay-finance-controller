@@ -1,4 +1,23 @@
-/** Format paise (integer) as Indian Rupee string. */
+/**
+ * Format paise (integer) as an Indian Rupee string.
+ *
+ * **The precise form always carries both paise digits.** It used to omit the
+ * decimals when they were zero, which is how one money column came to read
+ * `\u20b91,00,000` on one row and `\u20b96,747.19` on the next \u2014 the same quantity in
+ * two shapes, in a product whose whole claim is that the arithmetic is exact.
+ * Nothing about the VALUE changes: the paise are integers on the way in and
+ * every digit of them is on the way out. What changes is that a column of
+ * amounts now lines up as one.
+ *
+ * `compact` is the deliberate exception and is passed at exactly one call site
+ * \u2014 a headline tile whose job is magnitude, not tie-out. Every operational
+ * figure (a table cell, a residual against its threshold, a ledger balance)
+ * takes the precise form.
+ *
+ * The grouping and the paise are computed on the integer, not on `paise / 100`:
+ * a float remainder is what made a negative amount render its decimals from the
+ * wrong side of zero.
+ */
 export function formatPaise(paise: number, compact = false): string {
   const rupees = paise / 100;
   if (compact) {
@@ -6,9 +25,9 @@ export function formatPaise(paise: number, compact = false): string {
     if (rupees >= 1_00_000)    return `\u20b9${(rupees / 1_00_000).toFixed(1)}L`;
     if (rupees >= 1_000)       return `\u20b9${(rupees / 1_000).toFixed(1)}K`;
   }
+  const abs = Math.round(Math.abs(paise));
+  const intPart = Math.floor(abs / 100);
   // Indian number formatting: XX,XX,XXX
-  const intPart = Math.floor(Math.abs(rupees));
-  const decPart = Math.abs(rupees - intPart);
   const s = intPart.toString();
   let formatted: string;
   if (s.length <= 3) {
@@ -22,8 +41,8 @@ export function formatPaise(paise: number, compact = false): string {
     }
     formatted = groups.join(',') + ',' + last3;
   }
-  const dec = decPart > 0 ? `.${Math.round(decPart * 100).toString().padStart(2, '0')}` : '';
-  return `\u20b9${rupees < 0 ? '-' : ''}${formatted}${dec}`;
+  const dec = (abs % 100).toString().padStart(2, '0');
+  return `\u20b9${paise < 0 ? '-' : ''}${formatted}.${dec}`;
 }
 
 /** Format a coverage ratio as percentage with 1 decimal. */

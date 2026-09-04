@@ -174,22 +174,44 @@ describe("the authority model is legible on the page itself", () => {
 /**
  * The reading order the page is arranged in.
  *
- * Decision → why → controller trace → evaluation → evidence → verification.
- * Asserted by position rather than by screenshot, so a reordering that broke
- * the story fails here.
+ * State → figures → what this is → which period → pipeline → authority →
+ * controller. Asserted by position rather than by screenshot, so a reordering
+ * that broke the story fails here.
+ *
+ * **The first two entries are the ones that moved.** The page used to open on
+ * the reviewer brief and the scenario lab, which put `Period status` around
+ * y=644 on a laptop and roughly three screens down at 390px: an operator met
+ * two explanations of the product before it reported anything about the period
+ * they came to close. The explanations are not gone — they sit below the
+ * figures they contextualise, which is where a reviewer who has just read
+ * `OPEN` wants them.
  */
 describe("the page is ordered the way it is meant to be read", () => {
-  it("puts the scenario lab, the outcome, the authority model and the controller in that order", () => {
+  it("leads with the period's state, and puts the product's account of itself below the figures", () => {
     const html = render(runContext({ close: CLOSE_500 }));
     const positions = [
-      html.indexOf("Same Finance Controller. Different evidence."),
       html.indexOf("Period status"),
+      html.indexOf("Total Processed"),
+      html.indexOf("What this is"),
+      html.indexOf("Same Finance Controller. Different evidence."),
       html.indexOf("Reconciliation Pipeline"),
       html.indexOf("Who decides what"),
       html.indexOf("Finance Controller — bounded orchestration"),
     ];
     for (const p of positions) expect(p).toBeGreaterThan(-1);
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
+  });
+
+  it("puts nothing between the page title and the period's status", () => {
+    // The acceptance criterion behind the reorder: the first thing under the
+    // header is the state of the period, not a description of the product.
+    const html = render(runContext({ close: CLOSE_500 }));
+    const between = html.slice(
+      html.indexOf("Settlement reconciliation"),
+      html.indexOf("Period status"),
+    );
+    expect(between).not.toContain("What this is");
+    expect(between).not.toContain("Scenario lab");
   });
 
   it("anchors the scenario lab so the controller panel can send a reviewer back to it", () => {

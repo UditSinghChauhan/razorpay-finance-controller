@@ -89,9 +89,10 @@ describe("Investigation Queue — the record count is not the suspense total", (
 
   it("still shows the API's own figures, unadjusted", () => {
     // The zero stays on screen: the label changed, the number did not.
-    // `formatPaise` omits a zero paise part, so whole rupees render bare.
-    expect(html).toContain(">₹0</p>");
-    expect(html).toContain(">₹1,00,000</p>");
+    // `formatPaise` renders both paise digits on every operational figure, so
+    // a whole-rupee amount and one with paise line up in the same column.
+    expect(html).toContain(">₹0.00</p>");
+    expect(html).toContain(">₹1,00,000.00</p>");
     expect(LEDGER_ONLY.value_exceptions_paise).toBe(0);
     expect(LEDGER_ONLY.value_abstained_paise).toBe(10_000_000);
   });
