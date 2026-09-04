@@ -146,9 +146,19 @@ describe("ControllerTraceView — the escalated outcome", () => {
     <ControllerTraceView trace={ESCALATED_TRACE} onReviewClick={() => undefined} onTryAnother={() => undefined} onVerifyLedger={() => undefined} />,
   );
 
-  it("shows exactly one item escalated for review", () => {
-    expect(html).toContain("Escalated for review");
-    expect(html).toContain(">1<");
+  it("shows exactly one item escalated, as a claim in the attention tone", () => {
+    // The count moved out of the "Supporting evidence" tile row, which
+    // repeated it below three other figures, and into the outcome banner at
+    // the weight of the safety claim beside it: it is the one number on this
+    // panel a person has to act on. It is still
+    // `telemetry.counters.escalations` and still nothing else.
+    expect(html).toContain('data-tone="attention"');
+    const claim = html.slice(html.indexOf('data-tone="attention"'));
+    expect(claim).toContain('<p class="safety-claim-label">Escalations</p>');
+    expect(claim).toContain('<p class="safety-claim-value">1</p>');
+    expect(claim).toContain("with a person now");
+    // ...and the item itself is still headed as the handoff it is.
+    expect(html).toContain("Awaiting human review");
   });
 
   it("states no financial write was performed, and why it could not be", () => {
@@ -421,7 +431,7 @@ describe("the run narrative — the six stages, in words", () => {
 
   it("reads the observed stage off residual_trajectory, not off a summary string", () => {
     expect(html).toContain(
-      "the close gate reports the period OPEN on ₹1,00,000 unresolved against a close threshold of ₹6,747.19.",
+      "the close gate reports the period OPEN on ₹1,00,000.00 unresolved against a close threshold of ₹6,747.19.",
     );
   });
 
@@ -594,7 +604,7 @@ describe("the escalation explains itself in words, from its own fields", () => {
   });
 
   it("places the amount at stake against the materiality floor, both from the record", () => {
-    expect(html).toContain("the amount at stake (₹590)");
+    expect(html).toContain("the amount at stake (₹590.00)");
     expect(html).toContain("above the materiality floor τ of ₹204.13");
   });
 

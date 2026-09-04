@@ -152,16 +152,23 @@ function GateStatusRow({ label, passed }: { label: string; passed: boolean }): R
 }
 
 /**
- * What this product is, before any figure is shown.
+ * What this product is, beneath the figures it produced.
  *
  * A reviewer who has never seen ASSAY meets three actors on this page — ASSAY,
- * the Controller and the explanation model — and every rupee figure below is
- * meaningless until they know which of the three produced it. Four sentences, all
- * constants from {@link ../lib/copy.js}, none of them reading a run: what this
- * is, what is agentic about it, who decides, and why no model can move money.
+ * the Controller and the explanation model — and needs to know which of the
+ * three produced the rupee figures above. Four sentences, all constants from
+ * {@link ../lib/copy.js}, none of them reading a run: what this is, what is
+ * agentic about it, who decides, and why no model can move money.
+ *
+ * **It used to be the first thing on the page, and that was the wrong trade.**
+ * An operator opening a close does not need the product explained before the
+ * period reports its state; they need `OPEN`, the residual and the two next
+ * actions, and *then* the account of who is entitled to act on them. Nothing
+ * here was cut to move it — every sentence and every disclosure is the same.
  *
  * The three-card legend further down says the same thing at more length and is
- * where the bounds are argued. This is the version that fits above the fold.
+ * where the bounds are argued. The start screen, where there is no run to
+ * report, still leads with these same four sentences.
  */
 function ReviewerBrief(): React.ReactElement {
   return (
@@ -467,30 +474,16 @@ export function CommandCenter(): React.ReactElement {
         </div>
       </div>
 
-      <ReviewerBrief />
+      {/* The state of the period, first — above the product's account of
+          itself and above the lab that chooses which period is loaded.
 
-      {/* The period this run read, and the three others the same engine can be
-          pointed at. Selecting one changes the evidence; nothing else about the
-          pipeline changes, which is why the controller panel below can behave
-          differently without anything having been configured. */}
-      <div
-        id={SCENARIO_LAB_ANCHOR_ID}
-        className="card"
-        style={{ padding: "var(--space-md)", marginBottom: "var(--space-lg)" }}
-      >
-        {/* `ranDataset` is what the figures below belong to, not what is
-            selected. Passing it is what lets the picker say, while a reviewer
-            is mid-switch, that the page has not changed yet and that running
-            the new period produces a new trace rather than updating this one. */}
-        <ScenarioPicker
-          selected={dataset}
-          disabled={loading}
-          onSelect={selectDataset}
-          ranDataset={run?.dataset}
-        />
-      </div>
-
-      {/* The outcome, before the figures that led to it. */}
+          The order used to be brief → scenario lab → status, which put the
+          single fact an operator opens this page for below two blocks that
+          explain what the page is. `Period status` measured around y=644 on a
+          laptop and roughly three screens down at 390px: the product described
+          itself before it reported anything. The narrative is not cut — it
+          moves below the figures it contextualises, which is where a reviewer
+          who has just read `OPEN` actually wants it. */}
       {periodStatus !== null && run !== null && (
         <RunStatusRibbon
           status={periodStatus}
@@ -597,6 +590,38 @@ export function CommandCenter(): React.ReactElement {
           </button>
         </div>
       )}
+
+      {/* What this is, after what it says. A reviewer who has read the period
+          status and the four figures above now has the question this answers:
+          who produced those numbers, and who is allowed to act on them. The
+          block is unchanged — the same four constants, the same disclosures. */}
+      <ReviewerBrief />
+
+      {/* The period this run read, and the three others the same engine can be
+          pointed at. Selecting one changes the evidence; nothing else about the
+          pipeline changes, which is why the controller panel below can behave
+          differently without anything having been configured.
+
+          It sits beside the brief rather than above the status because it is a
+          lab control, not a reading: the figures above belong to the period
+          that ran, and this is where a reviewer comes to run a different one.
+          The anchor is unchanged, so "Try another scenario" still lands here. */}
+      <div
+        id={SCENARIO_LAB_ANCHOR_ID}
+        className="card"
+        style={{ padding: "var(--space-md)", marginBottom: "var(--space-lg)" }}
+      >
+        {/* `ranDataset` is what the figures below belong to, not what is
+            selected. Passing it is what lets the picker say, while a reviewer
+            is mid-switch, that the page has not changed yet and that running
+            the new period produces a new trace rather than updating this one. */}
+        <ScenarioPicker
+          selected={dataset}
+          disabled={loading}
+          onSelect={selectDataset}
+          ranDataset={run?.dataset}
+        />
+      </div>
 
       {/* Pipeline status. The strip has a floor width and scrolls inside its
           own container below it — six nodes squashed to 40px each are six

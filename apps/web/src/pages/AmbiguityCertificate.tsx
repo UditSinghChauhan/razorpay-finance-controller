@@ -63,18 +63,6 @@ import { formatPaise } from "../lib/format.js";
  * components/AiExplanation.tsx.
  */
 
-/** A technical identifier, rendered subordinate to the content it labels. */
-function TechnicalId({ label, value }: { label: string; value: string }): React.ReactElement {
-  return (
-    <div style={{ marginBottom: "var(--space-md)" }}>
-      <p className="font-label-caps text-muted" style={{ marginBottom: 2, fontSize: 10 }}>{label}</p>
-      <p className="cell-id text-muted" style={{ fontSize: 10, lineHeight: 1.5 }}>
-        {value}
-      </p>
-    </div>
-  );
-}
-
 /**
  * One of DATA_MODEL.md §13's two allocations.
  *
@@ -111,15 +99,25 @@ export function SolutionCard({
   const tiesOut = total !== null && targetPaise !== null && total === targetPaise;
 
   return (
+    // Two candidates with a different number of members are two cards of a
+    // different natural height, and "Total allocated" — the line the whole
+    // comparison turns on — then sat at two different heights on the same row.
+    // The grid already stretches both cards; this makes the card's own body
+    // fill that height and pushes the totals block to the bottom of it, so the
+    // two totals and the two targets line up horizontally. Layout only: no row,
+    // amount or ordering changes.
     <div style={{
       minWidth: 0,
+      display: "flex",
+      flexDirection: "column",
+      height: "100%",
       border: `1px solid var(--color-outline-variant)`,
       borderTop: `3px solid ${color}`,
       borderRadius: "var(--radius-lg)",
       background: "var(--color-surface-container-lowest)",
       overflow: "hidden",
     }}>
-      <div style={{ padding: "var(--space-lg)" }}>
+      <div style={{ padding: "var(--space-lg)", flex: 1, display: "flex", flexDirection: "column" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", marginBottom: "var(--space-md)" }}>
           <div style={{
             width: 28, height: 28, borderRadius: "50%",
@@ -134,40 +132,52 @@ export function SolutionCard({
           </span>
         </div>
 
-        <TechnicalId label="Candidate ID" value={solution.candidate_id} />
+        {/* The sealed candidate id, on the affordance every other long
+            identifier in this app already uses. `cand_` + 64 hex is 69
+            characters; at 10px, unbroken and untruncated, it ran the full width
+            of the card and was the first thing the eye landed on — above the
+            member amounts the card exists to compare. Middle-truncated with the
+            whole value one click away, on {@link CopyId}'s own terms: the two
+            ends are what distinguishes two candidate hashes, and the full
+            string lives in the copy handler rather than in an attribute. */}
+        <div style={{ marginBottom: "var(--space-md)" }}>
+          <CopyId label="Candidate ID" value={solution.candidate_id} head={14} tail={8} fontSize={11} />
+        </div>
 
         <p className="font-label-caps text-muted" style={{ marginBottom: "var(--space-sm)" }}>
           Member Allocation
         </p>
-        {rows.length === 0 && (
-          <p className="font-body-sm text-muted">This solution names no members.</p>
-        )}
-        {rows.map((row, i) => (
-          <div
-            key={row.obs_id}
-            style={{
-              display: "flex", justifyContent: "space-between", alignItems: "baseline",
-              gap: "var(--space-md)", padding: "var(--space-xs) 0",
-              borderBottom: i < rows.length - 1 ? "1px solid var(--color-outline-variant)" : "none",
-            }}
-          >
-            <div style={{ minWidth: 0 }}>
-              <span className="cell-id" style={{ fontSize: 11 }}>{row.obs_id}</span>
-              {row.member?.value_paise != null &&
-                row.member.allocation_paise != null &&
-                row.member.value_paise !== row.member.allocation_paise && (
-                  <p className="font-body-sm text-muted" style={{ fontSize: 10, marginTop: 2 }}>
-                    gross {formatPaise(row.member.value_paise)}
-                  </p>
-                )}
+        <div style={{ flex: 1 }}>
+          {rows.length === 0 && (
+            <p className="font-body-sm text-muted">This solution names no members.</p>
+          )}
+          {rows.map((row, i) => (
+            <div
+              key={row.obs_id}
+              style={{
+                display: "flex", justifyContent: "space-between", alignItems: "baseline",
+                gap: "var(--space-md)", padding: "var(--space-xs) 0",
+                borderBottom: i < rows.length - 1 ? "1px solid var(--color-outline-variant)" : "none",
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <span className="cell-id" style={{ fontSize: 11 }}>{row.obs_id}</span>
+                {row.member?.value_paise != null &&
+                  row.member.allocation_paise != null &&
+                  row.member.value_paise !== row.member.allocation_paise && (
+                    <p className="font-body-sm text-muted" style={{ fontSize: 10, marginTop: 2 }}>
+                      gross {formatPaise(row.member.value_paise)}
+                    </p>
+                  )}
+              </div>
+              <span className="font-numeric-mono" style={{ fontWeight: 500, whiteSpace: "nowrap" }}>
+                {row.member?.allocation_paise != null
+                  ? formatPaise(row.member.allocation_paise)
+                  : "—"}
+              </span>
             </div>
-            <span className="font-numeric-mono" style={{ fontWeight: 500, whiteSpace: "nowrap" }}>
-              {row.member?.allocation_paise != null
-                ? formatPaise(row.member.allocation_paise)
-                : "—"}
-            </span>
-          </div>
-        ))}
+          ))}
+        </div>
 
         <div style={{
           marginTop: "var(--space-md)", paddingTop: "var(--space-sm)",

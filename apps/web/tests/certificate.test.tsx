@@ -79,19 +79,44 @@ describe("member ids come from member_obs_ids", () => {
   });
 });
 
+/**
+ * The candidate id is the card's identity, not its content.
+ *
+ * `cand_` + 64 hex is 69 characters. Rendered whole at 10px it ran the width of
+ * the card, above the member amounts the card exists to compare — the longest
+ * and least readable thing in the comparison was also the most prominent. It
+ * now uses `CopyId`, the same middle-truncated affordance the Investigation
+ * Queue's Decision and Event ids already use: both ENDS on screen, because two
+ * candidate hashes are told apart by their ends, and the whole value one click
+ * away rather than in the document.
+ */
 describe("candidate_id is rendered, subordinate to the content", () => {
-  it("shows each solution's own candidate id", () => {
-    expect(cardA()).toContain(CANDIDATE_A_ID);
-    expect(cardB()).toContain(CANDIDATE_B_ID);
-    expect(cardA()).not.toContain(CANDIDATE_B_ID);
+  /** `CopyId`'s middle truncation as the card configures it: 14 head, 8 tail. */
+  const truncated = (id: string): string => `${id.slice(0, 14)}\u2026${id.slice(-8)}`;
+
+  it("shows each solution's own candidate id, by both of its ends", () => {
+    expect(cardA()).toContain(truncated(CANDIDATE_A_ID));
+    expect(cardB()).toContain(truncated(CANDIDATE_B_ID));
   });
 
-  it("labels it and gives it the technical-identifier treatment", () => {
+  it("renders no part of the other solution's candidate id", () => {
+    expect(cardA()).not.toContain(CANDIDATE_B_ID.slice(0, 14));
+    expect(cardB()).not.toContain(CANDIDATE_A_ID.slice(0, 14));
+  });
+
+  it("labels it and gives it the mono identifier treatment", () => {
     const a = cardA();
     expect(a).toContain("Candidate ID");
-    // `cell-id` is the design system's mono identifier style, and `text-muted`
-    // is what keeps it visually subordinate to the amounts beside it.
-    expect(a).toMatch(/class="cell-id text-muted"[^>]*>\s*cand_/);
+    // `cell-id` is the design system's mono identifier style.
+    expect(a).toMatch(/class="cell-id"[^>]*>cand_/);
+  });
+
+  it("keeps the whole value copyable, and out of the document", () => {
+    const a = cardA();
+    expect(a).toContain('aria-label="Copy Candidate ID"');
+    // `CopyId` carries the value in its click handler and in no attribute, so
+    // the untruncated id must not be recoverable from the markup.
+    expect(a).not.toContain(CANDIDATE_A_ID);
   });
 });
 

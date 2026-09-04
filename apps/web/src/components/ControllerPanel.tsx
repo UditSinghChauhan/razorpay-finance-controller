@@ -289,14 +289,19 @@ function OutcomeBanner({ trace }: { trace: ControllerTrace }): React.ReactElemen
         {[
           ["Steps", stepBudgetLabel(c.steps, c.step_budget)],
           ["Tool calls", formatCount(c.tool_calls)],
-          ["Escalations", formatCount(c.escalations)],
         ].map(([label, value]) => (
           <div key={label}>
             <p className="counter-label" style={{ marginBottom: 2 }}>{label}</p>
             <p className="font-numeric-mono counter-value">{value}</p>
           </div>
         ))}
-        {/* The safety claim is not a counter like the three beside it. It is
+        {/* Two claims, not two counters, and the human one comes first.
+            `escalations` is what a person has to work and `writes_applied` is
+            what the product refused to do; both are read straight off
+            `telemetry.counters` and neither is derived here. The order is the
+            order of the questions a reviewer asks. */}
+        <EscalationClaim count={c.escalations} awaiting={trace.awaiting_human_review} />
+        {/* The safety claim is not a counter like the two beside it. It is
             the one figure on this panel that a reviewer watching a projected
             screen has to be able to read, and the one whose value being
             anything other than zero would change what this product is. It gets
@@ -342,6 +347,45 @@ function WritesAppliedClaim({
         {clean
           ? `no ledger write on any path — ${formatCount(attempted)} attempted`
           : `${formatCount(applied)} applied of ${formatCount(attempted)} attempted`}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * `escalations — 1`, at the same weight as the safety claim beside it.
+ *
+ * **The hierarchy this fixes.** The panel's loudest figure was `WRITES APPLIED
+ * 0` — 30px, in its own bordered tile — while the number of items a PERSON now
+ * has to decide sat at 15px in the counter row, indistinguishable from `tool
+ * calls`. The panel therefore led with *"nothing was written"* and made the
+ * only actionable fact on the screen the quiet one. Both are claims about the
+ * run's outcome and both are now rendered as claims.
+ *
+ * **The tone is a function of the count, and the note is a function of the
+ * trace.** Amber (`--color-abstained`, this app's abstention/attention tone)
+ * only when something actually reached a person; a run that escalated nothing
+ * renders the same tile neutral rather than warning about a zero.
+ * `awaiting_human_review` is the trace's own field and it is what separates
+ * *"waiting on a person"* from a budget-exhausted run whose escalations are
+ * real but whose handoff never happened — the same distinction
+ * {@link narrativeStages}'s review stage and the escalation heading draw.
+ * Nothing here is computed: the number is `telemetry.counters.escalations`.
+ */
+function EscalationClaim({
+  count, awaiting,
+}: { count: number; awaiting: boolean }): React.ReactElement {
+  const needsAction = count > 0;
+  return (
+    <div className="safety-claim" data-tone={needsAction ? "attention" : "none"}>
+      <p className="safety-claim-label">Escalations</p>
+      <p className="safety-claim-value">{formatCount(count)}</p>
+      <p className="safety-claim-note">
+        {!needsAction
+          ? "nothing reached a person"
+          : awaiting
+            ? "with a person now — the controller may not decide them"
+            : "recorded before the loop stopped on its own bound"}
       </p>
     </div>
   );
@@ -399,64 +443,6 @@ function WhyItStopped({ trace }: { trace: ControllerTrace }): React.ReactElement
   );
 }
 
-/**
- * The workflow, as the chain a reviewer can read in one glance.
- *
- * **This is the reviewer-facing proof that the system is agentic**, and it is
- * the reason the chain is spelled out in words rather than left as the state
- * machine's own vocabulary: `OBSERVE_CLOSE → TRIAGE → PLAN → ACT → ESCALATE →
- * AWAIT_HUMAN` is legible to someone who has read
- * `packages/controller/src/state.ts` and to nobody else.
- *
- * **Reachedness is the trace's own.** A node is marked reached exactly when
- * `trace.steps` contains a step in that state &mdash; the identical set the
- * state strip and the run narrative are drawn from, so all three cannot
- * disagree. Nothing is inferred from the escalation count or the stop reason.
- *
- * That is what makes the last node honest on a budget-exhausted run: the loop
- * recorded real escalations and then stopped on its own bound without ever
- * entering `AWAIT_HUMAN`, so *"Escalated to human review"* renders as not
- * reached. A chain that lit it from `escalations.length > 0` would report a
- * partial pass as a completed handoff.
- */
-const ESCALATION_CHAIN = [
-  { state: "OBSERVE_CLOSE", label: "Observed close gate" },
-  { state: "TRIAGE", label: "Triaged queue" },
-  { state: "PLAN", label: "Planned candidate work" },
-  { state: "ACT", label: "Inspected evidence" },
-  { state: "ESCALATE", label: "Could not safely decide" },
-  { state: "AWAIT_HUMAN", label: "Escalated to human review" },
-] as const;
-
-function WorkflowChain({ visited }: { visited: ReadonlySet<string> }): React.ReactElement {
-  return (
-    <div className="chain">
-      {ESCALATION_CHAIN.map((node, i) => {
-        const reached = visited.has(node.state);
-        return (
-          <Fragment key={node.state}>
-            {i > 0 && (
-              <span className="material-symbols-outlined chain-arrow" aria-hidden="true">
-                arrow_forward
-              </span>
-            )}
-            <span className="chain-node" data-reached={reached ? "true" : "false"}>
-              <span
-                className="material-symbols-outlined"
-                aria-hidden="true"
-                style={{ fontSize: 13, lineHeight: "16px" }}
-              >
-                {reached ? "check_circle" : "radio_button_unchecked"}
-              </span>
-              {node.label}
-            </span>
-          </Fragment>
-        );
-      })}
-    </div>
-  );
-}
-
 /** One row of the step log &mdash; the audit record's own unit. */
 function StepRow({ step }: { step: ControllerStep }): React.ReactElement {
   return (
@@ -470,28 +456,29 @@ function StepRow({ step }: { step: ControllerStep }): React.ReactElement {
   );
 }
 
-/** The result summary &mdash; four stats, none computed here. */
+/**
+ * The two standing facts about the run that are stated nowhere else on the
+ * panel.
+ *
+ * **It used to be four tiles and two of them were already on the screen.**
+ * *"Escalated for review"* repeated the escalation count the outcome banner now
+ * renders as a claim at four times the size, and *"Unresolved vs. threshold"*
+ * repeated the residual the run narrative states in full a section above
+ * (`the close gate reports the period OPEN on ₹… unresolved against a close
+ * threshold of ₹…`) and the Command Center's status ribbon carries at the top
+ * of the same page. Both are gone from here and neither figure left the screen.
+ *
+ * What remains is what only this block says: the engine's own period status
+ * with its gloss, and the containment claim. Both are read verbatim off the
+ * trace — the status off the last close-gate reading, never inferred from the
+ * controller's terminal state or the escalation count (see
+ * {@link terminalLabel}'s docstring for why those must not be conflated), and
+ * the write verdict off `financial_write_performed`.
+ */
 function ResultSummary({ trace }: { trace: ControllerTrace }): React.ReactElement {
   const point = trace.residual_trajectory.at(0) ?? null;
   return (
-    <div className="grid grid-4" style={{ marginBottom: "var(--space-lg)" }}>
-      <div className="card" style={{ padding: "var(--space-md)" }}>
-        <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Escalated for review</p>
-        <p className="font-display-metric" style={{ color: trace.escalations.length > 0 ? "var(--color-abstained)" : "var(--color-reconciled)" }}>
-          {formatCount(trace.escalations.length)}
-        </p>
-      </div>
-      <div className="card" style={{ padding: "var(--space-md)" }}>
-        <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Unresolved vs. threshold</p>
-        <p className="font-numeric-mono">
-          {point ? `${formatPaise(point.unresolved_value_paise)} / ${formatPaise(point.close_threshold_paise)}` : "—"}
-        </p>
-      </div>
-      {/* The engine's own period status, read verbatim off the trace's last
-          close-gate reading — never inferred from the controller's terminal
-          state or the escalation count, which say something related but not
-          this. See terminalLabel()'s docstring for why the two must not be
-          conflated. */}
+    <div className="grid grid-2" style={{ marginBottom: "var(--space-lg)" }}>
       <div className="card" style={{ padding: "var(--space-md)" }}>
         <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Financial period</p>
         <p className="font-headline-sm">
@@ -1009,9 +996,9 @@ function escalationWhy(e: ControllerTrace["escalations"][number]): string {
  *
  * **The order is the reading order and it is deliberate:**
  *
- *   1. the outcome, as a word and four counts &mdash; {@link OutcomeBanner}
+ *   1. the outcome, as a word, two counters and two claims &mdash; {@link OutcomeBanner}
  *   2. why it stopped, in a paragraph &mdash; {@link WhyItStopped}
- *   3. the workflow trace: the chain in words over the state machine's strip
+ *   3. the workflow trace: the state machine's own strip
  *   4. the run narrative, six stages in plain language &mdash; {@link RunNarrative}
  *   5. the runtime checks, six summary lines over seventeen &mdash; {@link TelemetryBlock}
  *   6. the human-review item(s), each with the reasoning that sent it there
@@ -1048,16 +1035,16 @@ export function ControllerTraceView({
 
       <WhyItStopped trace={trace} />
 
-      {/* Workflow trace: the chain in words, then the state machine's own
-          strip beneath it. The strip is the audit artefact and stays; the
-          chain is what a reviewer reads. Both are drawn from `visitedStates`,
-          so neither can claim a stage the other denies. */}
+      {/* Workflow trace: the state machine's own strip, and only it. The
+          plain-language reading of the same sequence is the narrative directly
+          below, which draws from the identical `visitedStates` set and adds the
+          figures each stage produced — so this is the sequence and that is what
+          happened in it, rather than the sequence three times over. */}
       <div className="card" style={{ padding: "var(--space-md)", marginBottom: "var(--space-lg)" }}>
         <p className="font-label-caps text-muted" style={{ marginBottom: "var(--space-sm)" }}>
           Workflow trace
         </p>
-        <WorkflowChain visited={visitedStates} />
-        <div className="scroll-x" style={{ marginTop: "var(--space-md)" }}>
+        <div className="scroll-x" style={{ marginTop: "var(--space-sm)" }}>
           <div style={{ display: "flex", alignItems: "flex-start", gap: 0, minWidth: 620 }}>
             {REACHABLE_STATES.map((s, i) => (
               <Fragment key={s}>
@@ -1091,11 +1078,33 @@ export function ControllerTraceView({
               review" would report a partial pass as a completed handoff — the
               same distinction {@link narrativeStages}'s review stage draws.
               `awaiting_human_review` is the trace's own field for it. */}
-          <p className="font-label-caps text-muted" style={{ marginBottom: "var(--space-sm)" }}>
-            {trace.awaiting_human_review
-              ? "Awaiting human review"
-              : "Escalated — the loop stopped before the handoff"}
-          </p>
+          {/* The handoff, in the tone the palette already reserves for
+              anything waiting on a person. It was a muted grey caption over a
+              30px green "writes applied 0", so the panel's strongest signal
+              was the thing that did NOT happen. Amber is `--color-abstained`,
+              already this app's attention tone; the two headings and the
+              condition that chooses between them are unchanged. */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: "var(--space-sm)",
+            flexWrap: "wrap", marginBottom: "var(--space-sm)",
+          }}>
+            <span
+              className="material-symbols-outlined"
+              aria-hidden="true"
+              style={{ fontSize: 20, color: "var(--color-abstained)" }}
+            >
+              pending_actions
+            </span>
+            <span className="font-label-caps" style={{ color: "var(--color-abstained)" }}>
+              {trace.awaiting_human_review
+                ? "Awaiting human review"
+                : "Escalated — the loop stopped before the handoff"}
+            </span>
+            <span className="badge badge-abstained" style={{ fontSize: 11 }}>
+              {formatCount(trace.escalations.length)} item
+              {trace.escalations.length === 1 ? "" : "s"}
+            </span>
+          </div>
           {trace.escalations.map((e) => (
             <div
               key={e.decision_id}
@@ -1114,7 +1123,20 @@ export function ControllerTraceView({
                       : "no deterministic warrant"}
                   </span>
                 </div>
-                <span className="font-numeric-mono">{formatPaise(e.value_paise)}</span>
+                {/* The amount a person is being asked to decide, at the scale
+                    of the figures it has to be compared against. It was 14px
+                    beside a 30px "writes applied 0" — the wrong way round
+                    for the only line on the panel that asks for an action. The
+                    value is `value_paise`, formatted and nothing else. */}
+                <span
+                  className="font-numeric-mono"
+                  style={{
+                    fontSize: 20, lineHeight: "26px", fontWeight: 700,
+                    color: "var(--color-abstained)", whiteSpace: "nowrap",
+                  }}
+                >
+                  {formatPaise(e.value_paise)}
+                </span>
               </div>
               {/* Why this reached a person, as a chain rather than a code:
                   what ASSAY decided, on what evidence, and why the controller

@@ -43,7 +43,7 @@ function page(node: React.ReactElement, ctx = runContext()): string {
 // 1. The first minute — what this is, before any figure
 // ---------------------------------------------------------------------------
 
-describe("the Command Center answers 'what is this' before it shows a number", () => {
+describe("the Command Center answers 'what is this', beneath the numbers it reports", () => {
   const html = page(<CommandCenter />, runContext({ close: CLOSE_500 }));
 
   it("says what the product is, and what is agentic about it", () => {
@@ -64,11 +64,23 @@ describe("the Command Center answers 'what is this' before it shows a number", (
     expect(html).toContain("the explanation layer is removable");
   });
 
-  it("puts the brief above the first rupee figure", () => {
-    const briefAt = html.indexOf(PRODUCT_WHAT);
+  it("puts the period's state above the product's account of itself", () => {
+    // The brief used to be the first block on the page, which is why `Period
+    // status` sat around y=644 on a laptop: the product explained itself
+    // before it reported anything. An operator opening a close needs the state
+    // first and the explanation of who produced it immediately after.
+    const statusAt = html.indexOf("Period status");
     const metricAt = html.indexOf("Total Processed");
-    expect(briefAt).toBeGreaterThan(-1);
-    expect(metricAt).toBeGreaterThan(briefAt);
+    const briefAt = html.indexOf(PRODUCT_WHAT);
+    expect(statusAt).toBeGreaterThan(-1);
+    expect(metricAt).toBeGreaterThan(statusAt);
+    expect(briefAt).toBeGreaterThan(metricAt);
+  });
+
+  it("keeps the brief above the working, not at the foot of the page", () => {
+    // Moved below the figures, not demoted out of the reading: it still comes
+    // before the pipeline, the gates and the controller panel.
+    expect(html.indexOf("Reconciliation Pipeline")).toBeGreaterThan(html.indexOf(PRODUCT_WHAT));
   });
 
   it("says the same thing on the start screen, where there is no run to describe", () => {
@@ -261,24 +273,51 @@ describe("the controller panel is ordered outcome → why → trace → narrativ
   });
 });
 
-describe("the workflow chain is the reviewer-facing proof that the loop ran", () => {
-  it("names every stage of the escalation chain", () => {
+/**
+ * The strip and the narrative are the reviewer-facing proof that the loop ran.
+ *
+ * There were three renderings of one sequence: a chip row in words, the state
+ * machine's own strip, and the narrative. The chips have been removed as the
+ * least informative of the three — they carried the sequence and nothing else,
+ * and sat above both surfaces that carry the sequence AND what happened in it.
+ *
+ * What is asserted here is unchanged in substance: every stage is on the page,
+ * every stage is marked reached or not reached from the trace's own steps, and
+ * a stage the loop never entered is visibly absent rather than quietly missing.
+ * It is asserted against the two surviving surfaces instead of the chips.
+ */
+describe("the state strip and the narrative are the proof that the loop ran", () => {
+  it("names every state of the machine, and the outcome it stopped on", () => {
     const html = view(TRACE);
     for (const node of [
-      "Observed close gate",
-      "Triaged queue",
-      "Planned candidate work",
-      "Inspected evidence",
-      "Could not safely decide",
-      "Escalated to human review",
+      "Init", "Observe close", "Triage", "Plan", "Act", "Escalate", "Await human",
     ]) {
-      expect(html, node).toContain(node);
+      expect(html, node).toContain(`>${node}<`);
+    }
+    // The terminal node carries the stop reason, not "Complete".
+    expect(html).toContain(">Escalated<");
+  });
+
+  it("reads every stage back in plain language, with what it produced", () => {
+    const html = view(TRACE);
+    for (const stage of [
+      "Observed the close gate — ",
+      "Triaged the queue — ",
+      "Planned the closing set — ",
+      "Inspected the evidence — ",
+      "Escalated what it may not decide — ",
+      "Handed to human review — ",
+    ]) {
+      expect(html, stage).toContain(stage);
     }
   });
 
   it("marks each stage reached from the trace's own steps", () => {
     const html = view(TRACE);
-    expect(html).not.toContain('data-reached="false"');
+    // This trace visits all six states, so no stage of the narrative is dimmed
+    // and none carries the unreached marker.
+    expect(html).not.toContain("radio_button_unchecked");
+    expect(html).not.toContain("opacity:0.55");
   });
 
   it("marks the stages a stopped loop never entered", () => {
@@ -291,9 +330,21 @@ describe("the workflow chain is the reviewer-facing proof that the loop ran", ()
       plan: null,
     };
     const html = view(stopped);
-    // The chain still lists all six — a reviewer must see what did not happen.
-    expect(html).toContain("Escalated to human review");
-    expect(html).toContain('data-reached="false"');
+    // Both surfaces still list all six — a reviewer must see what did not happen.
+    expect(html).toContain(">Await human<");
+    expect(html).toContain("Handed to human review — ");
+    expect(html).toContain("radio_button_unchecked");
+    expect(html).toContain("opacity:0.55");
+  });
+
+  it("renders the sequence twice, not three times", () => {
+    // The chip row repeated the strip in words above the narrative that says
+    // the same thing with the figures attached. It is gone, and its labels
+    // with it; nothing else about the trace's rendering moved.
+    const html = view(TRACE);
+    expect(html).not.toContain('class="chain-node"');
+    expect(html).not.toContain("Could not safely decide");
+    expect(html).not.toContain("Escalated to human review");
   });
 });
 
@@ -384,10 +435,21 @@ describe("a budget-exhausted run is reported as partial, never as a completed ha
     expect(html).toContain("Escalated — the loop stopped before the handoff");
   });
 
-  it("does not light the human-review stage of the chain", () => {
-    const chain = html.slice(html.indexOf("Workflow trace"), html.indexOf("What this run did"));
-    const humanNode = chain.slice(chain.lastIndexOf("<span class=\"chain-node\"", chain.indexOf("Escalated to human review")));
-    expect(humanNode).toContain('data-reached="false"');
+  it("does not light the human-review stage, on either surface", () => {
+    // The strip's `Await human` node is drawn unvisited...
+    const strip = html.slice(html.indexOf("Workflow trace"), html.indexOf("What this run did"));
+    const at = strip.indexOf(">Await human<");
+    expect(at).toBeGreaterThan(-1);
+    const node = strip.slice(strip.lastIndexOf('<div style="text-align:center', at), at);
+    expect(node).toContain("background:transparent");
+
+    // ...and the narrative's handoff stage carries the unreached marker.
+    const narrative = html.slice(html.indexOf("What this run did"));
+    const label = narrative.indexOf("Handed to human review");
+    expect(label).toBeGreaterThan(-1);
+    expect(narrative.slice(narrative.lastIndexOf("<li", label), label)).toContain(
+      "radio_button_unchecked",
+    );
   });
 });
 
@@ -529,7 +591,7 @@ describe("the certificate answers the four questions a reviewer arrives with", (
 
   it("says what happens financially, in the ledger's own terms", () => {
     expect(html).toContain("What happens financially?");
-    expect(html).toContain("₹1,00,000 remains unresolved and is held in Suspense");
+    expect(html).toContain("₹1,00,000.00 remains unresolved and is held in Suspense");
     expect(html).toContain("The ledger remains balanced.");
     expect(html).toContain("The period remains OPEN.");
     expect(html).toContain("No value is written off, suppressed or guessed.");
@@ -579,7 +641,7 @@ describe("the certificate answers the four questions a reviewer arrives with", (
     // about this record: every field the four answers render is still stated.
     expect(html).toContain("2 valid allocation hypotheses remain");
     expect(html).toContain("all 8 shared hard constraints");
-    expect(html).toContain("₹1,00,000 remains unresolved and is held in Suspense");
+    expect(html).toContain("₹1,00,000.00 remains unresolved and is held in Suspense");
     expect(html).toContain("No value is written off, suppressed or guessed.");
   });
 });
