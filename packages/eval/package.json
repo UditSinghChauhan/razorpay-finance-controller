@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "description": "ASSAY measurement layer — the two hard gates, the agent interface, metric computation, bootstrap CIs and report generation",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "exports": {
     ".": {
       "types": "./src/index.ts",

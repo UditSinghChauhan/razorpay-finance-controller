@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Shared ASSAY domain: identifiers, control accounts, canonical JSON and the hard-constraint declaration",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "exports": {
     ".": {
       "types": "./src/index.ts",

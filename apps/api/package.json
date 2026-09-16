@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "description": "ASSAY internal HTTP — thin HTTP over engine + ledger, consumed only by apps/web, local bind only",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "bin": {
     "assay-api": "./bin/assay-api.mjs"
   },
