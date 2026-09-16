@@ -160,13 +160,22 @@ describe("the guard fails towards leaving the icons alone", () => {
 // ---------------------------------------------------------------------------
 
 describe("the guard decides once", () => {
-  it("settles from fonts.ready AND from a timer", () => {
+  it("settles from fonts.ready AND from a timer, after asking for the face", () => {
     // Two routes to one decision: a browser without the `fonts` API, or a
     // `ready` that never resolves, still gets one. A rejected `ready` is a
     // browser that has stopped waiting, so both arms settle.
     expect(GUARD_CODE).toContain("fonts.ready");
     expect(GUARD_CODE).toContain(".then(settle, settle)");
     expect(GUARD_CODE).toContain("setTimeout(settle, SETTLE_MS)");
+    // The load is requested before it is awaited. The guard runs before the
+    // first render, when nothing uses the family and `ready` would resolve at
+    // once — the first version measured the fallback face in that tick and hid
+    // every icon on a page whose font arrived 300ms later. `fonts.load` starts
+    // the request (it is not `fonts.check`, which only reports).
+    expect(GUARD_CODE).toContain("doc.fonts.load(");
+    // And an uncollapsed reading while a face is still in flight is an early
+    // reading, not a verdict: re-arm, do not commit.
+    expect(GUARD_CODE).toContain('doc.fonts.status === "loading"');
   });
 
   it("is monotonic — the first verdict is the only verdict", () => {
