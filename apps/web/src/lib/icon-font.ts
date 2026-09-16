@@ -53,14 +53,31 @@
  * status quo, a page that hid a real icon would be a regression this file
  * introduced.
  *
- * **When it decides.** Once, after `document.fonts.ready` resolves (the font
- * either arrived or the browser gave up), with a {@link SETTLE_MS} timer as a
- * second route to the same decision for a browser with no `fonts` API or a
- * `ready` promise that never settles. Whichever fires first wins and the
- * verdict is monotonic: `settle` runs its measurement once and never again, so
- * a late `ready` cannot flip a verdict the timer already gave, and a font that
- * arrives after the timer is a font the page was already told to hide — a
- * reload fixes that, an oscillating sidebar would not.
+ * **When it decides.** After `document.fonts.ready` resolves (the font either
+ * arrived or the browser gave up), with a {@link SETTLE_MS} timer as a second
+ * route to the same decision for a browser with no `fonts` API or a `ready`
+ * promise that never settles. The verdict is monotonic: once `settle` has
+ * written `data-icon-font` it never runs again, so a late `ready` cannot flip
+ * a verdict the timer already gave, and a font that arrives after the timer is
+ * a font the page was already told to hide — a reload fixes that, an
+ * oscillating sidebar would not.
+ *
+ * **The load has to be asked for before it can be waited on.** This guard
+ * runs before React's first render, so at that moment nothing on the page
+ * uses the icon family, no load is pending, and `fonts.ready` resolves at
+ * once. The probe is then the FIRST thing to request the font, and a
+ * measurement taken in the same tick reads the fallback face — 89px — while
+ * the woff2 is still in flight. The first version of this guard did exactly
+ * that and hid every icon on a page whose font arrived a few hundred
+ * milliseconds later; headless Chromium with the font allowed reported
+ * `unavailable`, `Material Symbols Outlined: loaded`, and a 20px probe, all
+ * at once. Two things prevent it now. `doc.fonts.load(...)` asks for the face
+ * explicitly before anything is awaited, so `fonts.ready` has a load to wait
+ * for (it is not `fonts.check`: `load` starts a request and resolves when it
+ * finishes; `check` only reports). And an uncollapsed reading taken while
+ * `doc.fonts.status` is still `"loading"` is treated as an early reading,
+ * not a verdict: `settle` re-arms on `fonts.ready` and measures again. Only a
+ * committed verdict sets the attribute and closes the guard.
  *
  * **Scope.** This is a presentation guard for one third-party asset. It reads
  * no run, names no dataset, and touches nothing the API returns.
@@ -145,18 +162,38 @@ function ligatureResolved(doc: Document): boolean {
 export function guardIconFont(doc: Document = document): void {
   let resolved = false;
 
+  const commit = (verdict: "ready" | "unavailable"): void => {
+    resolved = true;
+    doc.documentElement.dataset.iconFont = verdict;
+  };
+
   const settle = (): void => {
     // Monotonic: the first verdict is the only verdict.
     if (resolved) return;
-    resolved = true;
-    doc.documentElement.dataset.iconFont = ligatureResolved(doc) ? "ready" : "unavailable";
+    if (ligatureResolved(doc)) {
+      commit("ready");
+      return;
+    }
+    // Uncollapsed — but if a face is still in flight this is an early reading,
+    // not a verdict. The probe itself may be what just requested it. Wait for
+    // the load to finish, whichever way, and measure again.
+    if (doc.fonts && doc.fonts.status === "loading") {
+      Promise.resolve(doc.fonts.ready).then(settle, settle);
+      return;
+    }
+    commit("unavailable");
   };
 
-  // `fonts.ready` resolves when every pending load has finished, whichever way
-  // it finished. Both arms call `settle`: a rejected promise is still a
-  // browser that has stopped waiting.
   if (doc.fonts) {
-    Promise.resolve(doc.fonts.ready).then(settle, settle);
+    // Ask for the face first, so there is a load for `ready` to wait on. An
+    // undefined family resolves with no faces and a failed load rejects; both
+    // are "the browser has stopped waiting", so both arms go on to settle.
+    // `fonts.ready` resolves when every pending load has finished, whichever
+    // way it finished; a rejected promise is still a browser that has stopped
+    // waiting, so both arms there call `settle` too.
+    const requested = doc.fonts.load(`${String(PROBE_PX)}px 'Material Symbols Outlined'`);
+    const awaited = (): Promise<unknown> => Promise.resolve(doc.fonts.ready);
+    requested.then(awaited, awaited).then(settle, settle);
   }
   // The second route: a browser with no `fonts` API, or a `ready` that never
   // settles, still gets a decision.
