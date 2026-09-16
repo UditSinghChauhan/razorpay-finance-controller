@@ -165,6 +165,34 @@ ASSAY's accounting accuracy. Both disclosures are below, in full.
 
 ## See it
 
+![Animated walk through the ASSAY web product on demo-500: the Command Center start screen, Run Demo, the period status and Finance Controller outcome, the Investigation Queue, the Ambiguity Certificate and the ledger verification](docs/assets/demo.gif)
+
+The whole reviewer journey on `demo-500` in fifteen seconds: run, controller outcome, queue, certificate, verified chain.
+
+![The ASSAY Command Center before a run: the Scenario Lab with four demo periods, Ambiguity selected, and the Run Demo button](docs/assets/01-command-center-start.png)
+
+Before anything runs — the Scenario Lab offers four periods; `demo-500` (Ambiguity) is selected and nothing needs a credential.
+
+![The Command Center after Run Demo: period status OPEN, ₹1,00,000.00 unresolved against a ₹6,747.19 close threshold, Finance Controller Escalated, and four KPI cards](docs/assets/02-command-center-run.png)
+
+After **Run Demo** — look at *Period status* `OPEN`, `₹1,00,000.00` held in Suspense against a `₹6,747.19` close threshold, and the Finance Controller reading `Escalated`.
+
+![The Finance Controller panel: outcome ESCALATED, STEPS 10 / 64, TOOL CALLS 4, ESCALATIONS 1, WRITES APPLIED 0, and the workflow trace INIT through ESCALATED](docs/assets/03-controller-trace.png)
+
+The controller's trace — `ESCALATED` after `10 / 64` steps, `4` read-only tool calls, `1` escalation, `0` writes applied.
+
+![The Investigation Queue with the setl_AMBIG000000000 settlement row ABSTAINED at ₹1,00,000.00, its five pay_AMB member rows, and twenty EXCEPTION rows below](docs/assets/04-investigation-queue.png)
+
+The queue — the `setl_AMBIG000000000` row is the abstained settlement; the five `pay_AMB…` rows beneath it are its members, each carrying the same certificate badge.
+
+![The Ambiguity Certificate: Solution A and Solution B both reconciling to ₹1,00,000.00, 8 / 8 hard constraints satisfied, evidence gap 0 bps, epsilon 1500 bps, materiality ₹590.00, tau ₹204.13, and the callout that abstention is the correct safety response](docs/assets/05-ambiguity-certificate.png)
+
+The certificate — two allocations that both tie out, `8 / 8` hard constraints, an evidence gap of `0 bps` against ε `1500 bps`, materiality `₹590.00`, τ `₹204.13`: the machine declining to guess.
+
+![Verify Ledger: Chain verified, chain integrity Intact, root matches Yes, trial balance Balanced, 490 events re-hashed, and the recomputed root shown in full beside the stored root, identical](docs/assets/06-verify-ledger.png)
+
+Verify Ledger — the root recomputed from genesis beside the root stored on the run, character for character the same, over `490` re-hashed events.
+
 Two screens carry this submission, both from `demo-500`, both captured from the
 running product rather than drawn.
 
