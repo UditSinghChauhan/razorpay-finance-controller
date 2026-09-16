@@ -614,6 +614,16 @@ html, body, #root {
 ::-webkit-scrollbar-thumb { background: var(--color-outline-variant); border-radius: 3px; }
 
 /* ─── Material Symbols ───────────────────────────────────────────────────── */
+/* Fallback for a font that never arrived. Every icon below is a LIGATURE —
+   the span's text is "monitoring", "play_arrow", "receipt_long" — and when
+   fonts.googleapis.com is refused (proxy, offline, GDPR-blocked) the family
+   is undefined and that source text renders as a word. `lib/icon-font.ts`
+   measures whether the ligature collapsed and stamps the verdict on :root; an
+   unset attribute (undecided, or any uncertain path) matches nothing here.
+   `visibility: hidden`, NOT `display: none`: the glyph keeps its box, so the
+   two states are identical in layout — a button stays the same width, a KPI
+   label slot the same height — and only the leaked word disappears. */
+:root[data-icon-font="unavailable"] .material-symbols-outlined { visibility: hidden; }
 .material-symbols-outlined {
   font-family: 'Material Symbols Outlined';
   font-weight: normal;
