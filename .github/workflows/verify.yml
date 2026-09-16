@@ -1,0 +1,67 @@
+# `pnpm run verify`, run in public on every push.
+#
+# This workflow exists so that "3,691 tests across 152 files, no type errors,
+# lint clean" is a claim that checks itself rather than one a reader has to
+# take on trust from a commit message. The README's badge points here.
+#
+# The four checks are SEPARATE steps on purpose — typecheck, lint, test, build
+# — so that a red badge names the stage that failed instead of reporting that
+# "verify" failed somewhere. Together they are exactly `pnpm run verify` plus
+# the production build of apps/web, which `verify` does not include and which
+# the README's run instructions promise works.
+#
+# Nothing in this file touches the sealed benchmark. It installs, checks and
+# tests; it writes nothing under runs/, bench/, demo/ or docs/, and it has
+# read-only access to the repository contents. The frozen submission at tag
+# assay-buildathon-submission-2026 is not re-run, re-scored or re-sealed by CI.
+name: verify
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One run per ref. A push that supersedes a run still in flight cancels it —
+# the result of the older commit is not the result anyone is waiting for.
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    # The suite runs ~2,000-case property tests per invariant and takes a few
+    # minutes on a 2-vCPU runner. 25 minutes is a hang detector, not a budget.
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # No version pin here: pnpm/action-setup reads `packageManager` from
+      # package.json, so the runner uses the same pnpm the lockfile was made
+      # with and there is one place to bump it.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Test
+        run: pnpm run test
+
+      - name: Build apps/web
+        run: pnpm --filter @assay/web build
