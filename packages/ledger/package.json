@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "description": "ASSAY shadow ledger — Layer A: append-only hash-chained audit events",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "exports": {
     ".": {
       "types": "./src/index.ts",

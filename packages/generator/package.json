@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "description": "ASSAY benchmark generator \u2014 forward business simulation, ground truth by construction, declared degradation",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "exports": {
     ".": {
       "types": "./src/index.ts",

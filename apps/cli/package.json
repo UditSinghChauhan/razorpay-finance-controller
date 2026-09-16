@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "description": "ASSAY command line — the only package that touches the filesystem; acquires source data and drives the already-built pipeline",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "bin": {
     "assay": "./bin/assay.mjs"
   },

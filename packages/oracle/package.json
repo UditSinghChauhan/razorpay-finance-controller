@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "description": "ASSAY Ambiguity Oracle — exhaustive enumeration of evidence-admissible allocations from observations only",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "exports": {
     ".": {
       "types": "./src/index.ts",
