@@ -1,7 +1,11 @@
 # ASSAY
 
-**A settlement-reconciliation finance controller for Razorpay-shaped payment
-data.** Razorpay AI Buildathon 2026 — **Track 04: AI Finance Controller**.
+[![verify](https://github.com/UditSinghChauhan/razorpay-finance-controller/actions/workflows/verify.yml/badge.svg)](https://github.com/UditSinghChauhan/razorpay-finance-controller/actions/workflows/verify.yml)
+
+**A settlement-reconciliation finance controller that treats uncertainty as a
+first-class financial outcome.** Built for Razorpay-shaped payment data; it began
+as a Razorpay AI Buildathon 2026 entry, Track 04: AI Finance Controller (see
+[Provenance](#provenance-and-the-frozen-submission)).
 
 ASSAY decides **what can be reconciled from the evidence**, **what must remain
 unresolved**, and **when a case is routed to a human reviewer.** It reads three
@@ -66,6 +70,48 @@ nothing and the controller books nothing.** Everything below is the working.
 **Unresolved decisions do not clear themselves.** An abstention or an exception
 leaves the machine at a human, by construction — the escalation boundary is
 where the system stops, not a fallback it takes when a heuristic is unsure.
+
+## Verify it in sixty seconds
+
+Three commands, two terminals, nothing to configure:
+
+    pnpm install
+    pnpm run dev:api                 # terminal 1 — binds 127.0.0.1:8787
+    pnpm run verify:determinism      # terminal 2 — runs demo-500 twice and diffs
+
+The second command runs the same period through the API twice, verifies each
+ledger from genesis, and diffs the pair. This is the real output:
+
+    verify:determinism  api=http://127.0.0.1:8787  dataset=demo-500
+
+    run_id                  same       run_1aced16fd786c5c2ebb91b7a0a0274303316dc8b0ed14e762591a4550b228eb9
+    ledger_root_hash        same       f4c9c7a962be138423636b94c8c431ebf6bb9a30a76e1e56d70d5769e6a68124
+    recomputed_root_hash    same       f4c9c7a962be138423636b94c8c431ebf6bb9a30a76e1e56d70d5769e6a68124
+    event_count             same       490
+    total_dr_paise          same       259474718
+    unresolved_value_paise  same       10000000
+
+    run 1: chain recomputes genesis→root yes, trial balance ok (259474718 dr = 259474718 cr), period OPEN, 0.48s wall clock on this machine — not a throughput rate
+    run 2: chain recomputes genesis→root yes, trial balance ok (259474718 dr = 259474718 cr), period OPEN, 0.33s wall clock on this machine — not a throughput rate
+
+    PASS: 6 fields identical across two independent runs; both chains verify. The run id and root hash are functions of the input, not of a clock.
+    Note: demo-500 is a product fixture, not benchmark evidence (see demo/README.md).
+
+**Your machine prints the same two hashes.** The run id and the ledger root are
+functions of the **input** — the observations, the frozen thresholds, the posting
+rules — and not of a clock, a map-iteration order or a random seed. Two runs on
+two machines a week apart reach `run_1aced16f…` and `f4c9c7a9…` or one of them
+is wrong, and `GET /runs/:id/ledger/verify` recomputes the whole chain from
+genesis to say which. `259474718 dr = 259474718 cr` is the trial balance closing
+on the 490 events the run posted.
+
+**What this does and does not show.** The ~half-second wall clock is for this
+fixture on one laptop and is **not a throughput rate**; the benchmark's measured
+figures are in [Benchmark disclosures](#benchmark-disclosures) with their own
+limits. `demo-500` is a **product fixture**, placed outside `bench/` by
+[`demo/README.md`](demo/README.md), unscored, and **not benchmark evidence**.
+Determinism is the property a reviewer can check in a minute; accuracy is the
+property the sealed benchmark measures, and this section claims nothing about it.
 
 ## What is built
 
@@ -257,7 +303,13 @@ to support a claim about coverage, accuracy or harm.
 
     pnpm run verify                  # typecheck, lint, and the full test suite
     pnpm --filter @assay/web build   # production bundle for apps/web
+    pnpm run verify:determinism      # two runs of demo-500 against a live API, diffed (see above)
     pnpm run check:env               # provider / model / key present — never prints the key
+
+`pnpm run verify` is exactly what CI runs on every push —
+[`.github/workflows/verify.yml`](.github/workflows/verify.yml) executes the same
+typecheck, lint and test steps, plus the `apps/web` build, and the badge at the
+top of this file is its result.
 
 ### Where it runs
 
@@ -420,11 +472,31 @@ Every statement this specification makes about Razorpay behaviour is classified 
 **documented**, **an ASSAY modelling assumption**, or **explicitly not claimed**.
 The full register is `docs/DATA_MODEL.md §22`.
 
-## Schedule
+## Provenance, and the frozen submission
 
-Tier-0 scope (`docs/DECISION_BRIEF.md §C`) was frozen on **31 August 2026**.
-Benchmark seal and sealed run: **1 September** — done, tag `bench-v1.0.13`.
-Submission: **5 September**.
+ASSAY was built for the **Razorpay AI Buildathon 2026, Track 04: AI Finance
+Controller**. Tier-0 scope (`docs/DECISION_BRIEF.md §C`) was frozen on 31 August
+2026; the benchmark was sealed and run on 1 September (tag `bench-v1.0.13`); the
+submission went in on 5 September.
+
+**The submitted state is frozen and inspectable.** Commit
+`956575fc868e54472e4c9c9bdaec8ae3786ded10` is what the judges saw, and the tag
+`assay-buildathon-submission-2026` points at it and will not move:
+
+    git show assay-buildathon-submission-2026
+
+**It was not selected to advance.** No individual feedback was given, so no
+reason is claimed here and none is inferred; anything this file said about why
+would be a guess wearing the authority of a changelog.
+
+**What has not changed since.** The sealed benchmark — `bench/`, the artifacts
+under `runs/seal-v1.0.13/`, and every figure and disclosure they support in
+[Benchmark disclosures](#benchmark-disclosures) — is byte-identical to the frozen
+commit. Post-buildathon work lands on the branch `assay-post-buildathon` and is
+**additive**: it alters no financial semantic, threshold, posting rule,
+invariant, benchmark artifact or authority boundary. If a change ever does, it
+will be a new benchmark version with its own seal and its own disclosures, not
+an edit to this one.
 
 ## Credentials
 
