@@ -981,7 +981,12 @@ function escalationWhy(e: ControllerTrace["escalations"][number]): string {
   if (gap !== null && eps !== null) {
     parts.push(`they differ by ${String(gap)} bps, inside the \u03b5 tolerance of ${String(eps)} bps`);
   }
-  if (e.materiality_paise !== null && e.tau_paise !== null) {
+  if (e.certificate_reason === "MATERIALITY_UNDETERMINED") {
+    parts.push(
+      "the settlement has no matched bank line, so whether the difference is immaterial " +
+        "could not be established and the immateriality escape hatch was unavailable",
+    );
+  } else if (e.materiality_paise !== null && e.tau_paise !== null) {
     parts.push(
       `the amount at stake (${formatPaise(e.materiality_paise)}) is above the materiality floor ` +
         `\u03c4 of ${formatPaise(e.tau_paise)}, so it is not too small to matter`,

@@ -15,7 +15,10 @@ import {
   CERTIFICATE_VERIFY_HOW,
   CERTIFICATE_VERIFY_IDS,
   probeSectionHeading,
+  materialityIsMeasured,
+  materialityUnmeasuredLabel,
   probeSummary,
+  whyStoppedClause,
   VERIFY_LEDGER_TITLE,
 } from "../lib/copy.js";
 import { formatPaise } from "../lib/format.js";
@@ -266,7 +269,7 @@ export function CertificateStory({
       </QA>
 
       <QA question="Why did ASSAY stop?">
-        Because the evidence does not distinguish them sufficiently &mdash; terminal reason{" "}
+        {whyStoppedClause(reason)} Terminal reason{" "}
         <code style={{ fontSize: 12 }}>{reason}</code>.
       </QA>
 
@@ -562,7 +565,9 @@ export function AmbiguityCertificate(): React.ReactElement {
             </div>
             <div>
               <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Materiality</p>
-              <p className="font-numeric-mono" style={{ fontSize: 20, fontWeight: 600 }}>{formatPaise(cert.materiality_paise)}</p>
+              {materialityIsMeasured(cert.reason)
+                ? <p className="font-numeric-mono" style={{ fontSize: 20, fontWeight: 600 }}>{formatPaise(cert.materiality_paise)}</p>
+                : <p className="font-body-sm" style={{ fontWeight: 600 }}>{materialityUnmeasuredLabel(cert.reason)}</p>}
             </div>
             <div>
               <p className="font-label-caps text-muted" style={{ marginBottom: 4 }}>Tau (t)</p>

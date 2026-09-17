@@ -328,13 +328,59 @@ describe("S4 → S5 integration", () => {
     expect(r.valid).toBe(true);
   });
 
-  it("routes IMMATERIALLY_AMBIGUOUS's accepted best through the gate", () => {
+  // PINNED THE M61 DEFECT — retained verbatim, not run, pending the reviewer's
+  // decision (spec 1.4.39). `solveFixture` passes `bank_evidence: null`, so the
+  // IMMATERIALLY_AMBIGUOUS this test expected was reached only by reading an
+  // absent comparand as materiality 0. What it meant to pin — that an accepted
+  // immaterial best routes through the gate — is pinned by the test below it,
+  // which supplies the comparand.
+  it.skip("routes IMMATERIALLY_AMBIGUOUS's accepted best through the gate [PINNED M61 DEFECT — superseded]", () => {
     const m = [member(1), member(2)];
     const s4 = solveFixture(m, [[1], [2]]);
     expect(s4.outcome).toBe("IMMATERIALLY_AMBIGUOUS");
     const chosen = m.filter((x) => s4.best?.candidate.member_obs_ids.includes(x.obs_id));
     const r = validate(base({ members: chosen }));
     expect(r.valid).toBe(true);
+  });
+
+  it("routes IMMATERIALLY_AMBIGUOUS's accepted best through the gate (with a comparand)", () => {
+    const m = [member(1), member(2)];
+    const s4 = solve({
+      component: {
+        target_ids: [obsId(900)],
+        member_obs_ids: m.map((x) => x.obs_id),
+        size: m.length,
+        total_value_paise: 1_000_000,
+        exceeds_k_max: false,
+      },
+      target: { obs_id: obsId(900), kind: "settlement", amount: 98_000, bank_value_date: null, anchored_members: [] },
+      candidates: [[1], [2]].map((ns) => ({ member_obs_ids: ns.map(obsId) })),
+      members: m,
+      mode_days: 2,
+      target_entity_id: "setl_aaaaaaaaaaaaaa",
+      recon_reports: [],
+      observationIdForEntityId: () => undefined,
+      probe_attempts: 0,
+      bank_evidence: {
+        settlement_id: "setl_aaaaaaaaaaaaaa",
+        bank_line_id: `bnk_${"b".repeat(14)}`,
+        an2_satisfied: true,
+        i5_satisfied: true,
+      },
+    });
+    // Identical members post identical totals: measured materiality 0 <= τ.
+    expect(s4.materiality_paise).toBe(0);
+    expect(s4.outcome).toBe("IMMATERIALLY_AMBIGUOUS");
+    const chosen = m.filter((x) => s4.best?.candidate.member_obs_ids.includes(x.obs_id));
+    const r = validate(base({ members: chosen }));
+    expect(r.valid).toBe(true);
+  });
+
+  it("does NOT route a MATERIALITY_UNDETERMINED component to an accept (M61)", () => {
+    const m = [member(1), member(2)];
+    const s4 = solveFixture(m, [[1], [2]]);
+    expect(s4.outcome).toBe("AMBIGUOUS");
+    expect(s4.certificate_reason).toBe("MATERIALITY_UNDETERMINED");
   });
 
   it("does not recompute or alter S4's ranking", () => {

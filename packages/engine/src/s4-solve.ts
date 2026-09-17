@@ -78,7 +78,17 @@ export interface SolveResult {
   readonly second: ScoredSolution | null;
   /** `§6`: `|evidence_score_bps(best) − evidence_score_bps(second)|`, integer bps. */
   readonly delta_s_bps: number | null;
-  /** `§6`: `max over AccountCode of |balance_best(acct) − balance_second(acct)|`. */
+  /**
+   * `§6`: `max over AccountCode of |balance_best(acct) − balance_second(acct)|`.
+   *
+   * `null` where no materiality was computed: `UNIQUE` and `INTRACTABLE` (no
+   * pair to compare) **and, from spec 1.4.39 (M61), every multi-candidate
+   * outcome reached with `bank_evidence === null`** — the comparand `§17.1.1`
+   * conditions `P2`/`P4` on is absent, so the measure is undefined rather than
+   * `0`, on `I5`'s own *"undefined — not satisfied"* rule. An `AMBIGUOUS`
+   * result with `null` here carries `certificate_reason:
+   * "MATERIALITY_UNDETERMINED"`.
+   */
   readonly materiality_paise: number | null;
   readonly tau_paise: number;
   /**
@@ -140,7 +150,9 @@ export interface SolveInput {
   /**
    * `AN2` evidence for the target, where `S1` established it. `null` puts
    * `§17.1.1`'s `P2`/`P4` out of reach, so neither allocation posts on the
-   * reconciled path and the materiality between them is `0`.
+   * reconciled path and the materiality between them is **undefined** — not
+   * `0` (spec 1.4.39, M61). A multi-candidate component then abstains with
+   * `MATERIALITY_UNDETERMINED`; a single candidate is still `UNIQUE`.
    */
   readonly bank_evidence: BankSideEvidence | null;
   /**
@@ -489,9 +501,15 @@ export function canonicalAllocationKey(
  *
  * `§17.1.1` conditions `P2`/`P4` on *"`AN2` satisfied against an actual
  * `bank_line`"*, so with `bank_evidence === null` neither allocation posts on
- * the reconciled path and the difference is `0`. Spec 1.4.21 withdrew `§11`'s
- * illustrative ₹1,00,000 for exactly this reason; `§6`'s formula is normative
- * and is what this computes.
+ * the reconciled path. **Through spec 1.4.38 this function then returned an
+ * empty projection and `materiality` computed the difference as `0`** — which
+ * `solve` read as `0 ≤ τ`, `IMMATERIALLY_AMBIGUOUS`, commit. That was the
+ * defect register row `DATA_MODEL.md §22.2` **M61** corrects at spec 1.4.39: an
+ * absent comparand is **undefined, not satisfied** — the rule `§17.1.1` states
+ * for `I5` and `s5-validate.ts` carries as `bank_tie_out: null ⇒ skip` — so
+ * `balances` now returns `null` and `materiality` propagates it. Spec 1.4.21
+ * withdrew `§11`'s illustrative ₹1,00,000 for exactly this reason; `§6`'s
+ * formula is normative and is what this computes **when it has a comparand**.
  *
  * **The allocation under evaluation is `§17.1.1`'s `allocated_to`, from spec
  * 1.4.30 (register row `DATA_MODEL.md §22.2` M49).** The trigger reads *"the
@@ -515,9 +533,11 @@ function balances(
   members: readonly Member[],
   bankEvidence: BankSideEvidence | null,
   allocatedTo: string,
-): Map<AccountCode, number> {
+): Map<AccountCode, number> | null {
+  // M61: no bank line, no `P2`/`P4` leg, no projection. `null` is the same
+  // representation `ValidationInput.bank_tie_out` gives I5's absent comparand.
+  if (bankEvidence === null) return null;
   const out = new Map<AccountCode, number>();
-  if (bankEvidence === null) return out;
   for (const m of members) {
     const decision = journalFor({
       occasion: "BANK_EVIDENCE",
@@ -535,14 +555,22 @@ function balances(
   return out;
 }
 
+/**
+ * `§6`'s materiality, or **`null` when it is undefined** (M61, spec 1.4.39).
+ *
+ * `null` here is not a value of the measure; it is the absence of one, and
+ * `solve` must not compare it against `τ`. The type makes a silent `0` a
+ * compile error rather than a policy.
+ */
 function materiality(
   a: readonly Member[],
   b: readonly Member[],
   bankEvidence: BankSideEvidence | null,
   allocatedTo: string,
-): number {
+): number | null {
   const ba = balances(a, bankEvidence, allocatedTo);
   const bb = balances(b, bankEvidence, allocatedTo);
+  if (ba === null || bb === null) return null;
   let max = 0;
   for (const account of new Set([...ba.keys(), ...bb.keys()])) {
     const delta = Math.abs((ba.get(account) ?? 0) - (bb.get(account) ?? 0));
@@ -690,7 +718,13 @@ export function solve(input: SolveInput): SolveResult {
   // §6's table, in its own order. `tau` and `epsilonBps` are the resolved
   // values from the top of this function -- the frozen `§7` pair unless the
   // caller supplied otherwise. NEITHER BRANCH READS A MODULE CONSTANT (M51).
-  if (materialityPaise <= tau) {
+  //
+  // M61 (spec 1.4.39): the immateriality branch is EVALUATED only when
+  // materiality is defined. With `materialityPaise === null` there is no
+  // right-hand side, the comparison has no truth value, and the branch is
+  // skipped -- never passed by default. `DISCRIMINATED` below needs no
+  // comparand: the evidence gap is its own licence.
+  if (materialityPaise !== null && materialityPaise <= tau) {
     return {
       outcome: "IMMATERIALLY_AMBIGUOUS",
       best,
@@ -723,7 +757,10 @@ export function solve(input: SolveInput): SolveResult {
     delta_s_bps: deltaS,
     materiality_paise: materialityPaise,
     tau_paise: tau,
-    certificate_reason: certificateReason(input.probe_attempts),
+    certificate_reason:
+      materialityPaise === null
+        ? "MATERIALITY_UNDETERMINED"
+        : certificateReason(input.probe_attempts),
     ranked: Object.freeze(ranked),
   };
 }
@@ -739,7 +776,10 @@ export function solve(input: SolveInput): SolveResult {
  *
  * `§4.3`'s `SEARCH_BOUND_EXCEEDED` is not produced here: it belongs to the
  * `INTRACTABLE` outcome, which never reaches a probe loop, and `solve` sets it on
- * that path.
+ * that path. Neither is `MATERIALITY_UNDETERMINED` (spec 1.4.39, M61): it is
+ * not a function of `attempts` but of whether `§6`'s materiality had a
+ * comparand, and `solve` sets it -- with precedence over the three above --
+ * whenever an `AMBIGUOUS` component's `materiality_paise` is `null`.
  *
  * **Why the middle case needs no extra argument.** `RECONCILIATION_SPEC.md §6.2`
  * maps it to *"the loop terminated because no usable probe remained"*, and that

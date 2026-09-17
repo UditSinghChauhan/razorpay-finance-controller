@@ -104,22 +104,32 @@ describe("the record transcribes DATA_MODEL.md §16", () => {
     ]);
   });
 
-  it("declares the four certificate reasons of §13", () => {
-    // NO_USEFUL_PROBE_AVAILABLE is the FOURTH AND FINAL member, added at spec
-    // 1.4.25 (register row M40) to close §6's A2 middle case. The union is
-    // closed: a fifth would be a new terminal reason, which §L.4 makes a spec
-    // amendment.
+  it("declares the five certificate reasons of §13", () => {
+    // NO_USEFUL_PROBE_AVAILABLE is the FOURTH member, added at spec 1.4.25
+    // (register row M40) to close §6's A2 middle case — the last on the
+    // search-failure axis. MATERIALITY_UNDETERMINED is the FIFTH, added at spec
+    // 1.4.39 (M61) on a different axis: the immateriality escape hatch had no
+    // comparand. The union is closed; each widening was a spec amendment, as
+    // §L.4 requires.
     expect([...CERTIFICATE_REASONS]).toEqual([
       "EVIDENCE_TIE",
       "SEARCH_BOUND_EXCEEDED",
       "PROBE_BUDGET_EXHAUSTED",
       "NO_USEFUL_PROBE_AVAILABLE",
+      "MATERIALITY_UNDETERMINED",
     ]);
   });
 
-  it("accepts the fourth reason on a sealed certificate, and no fifth", () => {
-    expect(CERTIFICATE_REASONS).toHaveLength(4);
+  it("accepts the fifth reason on a sealed certificate, and no sixth", () => {
+    expect(CERTIFICATE_REASONS).toHaveLength(5);
     expect(CERTIFICATE_REASONS).not.toContain("A2_MIDDLE_CASE_UNSPECIFIED");
+  });
+
+  it("admits MATERIALITY_UNDETERMINED in a certificate's hashed body (M61)", () => {
+    const sealed = sealDraft(
+      withField("certificate", { ...makeCertificate(), reason: "MATERIALITY_UNDETERMINED" }),
+    );
+    expect(sealed.certificate?.reason).toBe("MATERIALITY_UNDETERMINED");
   });
 
   it("uses the identifier prefixes @assay/domain registers, not its own", () => {

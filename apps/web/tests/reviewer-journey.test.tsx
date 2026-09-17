@@ -579,7 +579,11 @@ describe("the certificate answers the four questions a reviewer arrives with", (
 
   it("says why ASSAY stopped, with the terminal reason", () => {
     expect(html).toContain("Why did ASSAY stop?");
-    expect(html).toContain("the evidence does not distinguish them sufficiently");
+    // Spec 1.4.39 (M61): the sentence names admissibility and materiality, which
+    // is what the frozen engine abstains on, rather than an evidence
+    // separation it never measures pre-probe (`SE1`/`SE2`/`SE4` unimplemented,
+    // `SE5` post-probe only — `RECONCILIATION_SPEC.md §4.2`).
+    expect(html).toContain("more than one allocation is admissible, they differ materially");
     expect(html).toContain("EVIDENCE_TIE");
   });
 

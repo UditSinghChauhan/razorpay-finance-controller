@@ -730,5 +730,20 @@ export const LEGACY_MAX_UNRESOLVED_ABS_PAISE = 5_000_000;
  * result-driven revision are satisfied rather than merely not engaged. **`bench/` is NOT
  * regenerated and must not be**: a gate's `spec_version` stamp records the version the
  * gate RAN under, so the existing gates correctly continue to read `1.4.37`.
+ * **1.4.38 -> 1.4.39 (M61) -- required NOTHING of this package's logic.** `RECONCILIATION_SPEC.md
+ * §6`'s materiality is now UNDEFINED, not zero, on a target with no `AN2` bank line,
+ * the `IMMATERIALLY_AMBIGUOUS` branch is evaluated only when materiality is defined,
+ * and `DATA_MODEL.md §13`'s certificate `reason` gains a fifth member,
+ * `MATERIALITY_UNDETERMINED`. The change is `packages/engine`'s and `packages/ledger`'s;
+ * this package generates, labels or scores exactly as before. **Only this constant
+ * moves here**, because `apps/cli` stamps `engine_commit: SPEC_VERSION` into every
+ * run's genesis and a run of the corrected engine must be distinguishable from a
+ * sealed one by its own record. `BENCHMARK_VERSION` STAYS **1.0.13** and `GT_VERSION`
+ * stays **1.1.0**: the row changes what a conforming agent DECIDES (M49's ground for a
+ * bump), but a bump would name a sealed run that does not exist and the corrected
+ * engine's first sealed run is bench-v2's, under fresh seeds. Runs either side of M61
+ * are NOT comparable -- `PREREGISTRATION.md §10` V37 records that for the sealed run.
+ * **No threshold moves.** **`bench/` and `runs/seal-v1.0.13` are NOT regenerated and
+ * must not be.**
  */
-export const SPEC_VERSION = "1.4.38";
+export const SPEC_VERSION = "1.4.39";

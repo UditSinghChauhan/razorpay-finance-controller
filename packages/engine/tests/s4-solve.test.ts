@@ -236,13 +236,26 @@ describe("§6 AMBIGUOUS is reachable on an AN2 target with unanchored members (M
     expect(r.certificate_reason).toBe("EVIDENCE_TIE");
   });
 
-  it("is the branch the pre-M49 reading could not reach", () => {
+  // PINNED THE M61 DEFECT — retained verbatim, not run, pending the reviewer's
+  // decision (spec 1.4.39). This test asserted that two admissible allocations
+  // with NO AN2 comparand are IMMATERIALLY_AMBIGUOUS with materiality 0, i.e.
+  // that an absent comparand licenses a commit — the exact behaviour
+  // `DATA_MODEL.md §22.2` M61 corrects on I5's "undefined, not satisfied" rule.
+  // Superseded by `s4-materiality-undetermined.test.ts` test 1.
+  it.skip("is the branch the pre-M49 reading could not reach [PINNED M61 DEFECT — superseded]", () => {
     // Same fixture, no AN2: §17.1.1 conditions P2/P4 on "AN2 satisfied against
     // an actual bank_line", so neither allocation posts and the difference is 0.
     // This is the ONLY outcome the whole population could produce before M49.
     const withoutAn2 = solve(input({ members, candidates, bankEvidence: null }));
     expect(withoutAn2.materiality_paise).toBe(0);
     expect(withoutAn2.outcome).toBe("IMMATERIALLY_AMBIGUOUS");
+  });
+
+  it("is UNDEFINED, not zero, without AN2 — and abstains (spec 1.4.39, M61)", () => {
+    const withoutAn2 = solve(input({ members, candidates, bankEvidence: null }));
+    expect(withoutAn2.materiality_paise).toBeNull();
+    expect(withoutAn2.outcome).toBe("AMBIGUOUS");
+    expect(withoutAn2.certificate_reason).toBe("MATERIALITY_UNDETERMINED");
   });
 
   it("DISCRIMINATED is reachable on the same population", () => {
@@ -576,13 +589,37 @@ describe("§6's outcome table", () => {
     expect(r.certificate_reason).toBeNull();
   });
 
-  it("IMMATERIALLY_AMBIGUOUS when materiality <= τ", () => {
+  // PINNED THE M61 DEFECT — retained verbatim, not run, pending the reviewer's
+  // decision (spec 1.4.39). The fixture has no bank evidence; the assertion
+  // reads the absent comparand as materiality 0 and commits. Superseded by the
+  // test below it, which reaches IMMATERIALLY_AMBIGUOUS the only way §6 now
+  // admits: with a comparand, and a difference at or below τ.
+  it.skip("IMMATERIALLY_AMBIGUOUS when materiality <= τ [PINNED M61 DEFECT — superseded]", () => {
     // No bank evidence -> P2/P4 cannot fire -> both allocations post nothing
     // -> materiality 0 <= τ. §17.1.1 conditions P2/P4 on "AN2 satisfied".
     const m = [member(1), member(2)];
     const r = solve(input({ members: m, candidates: [cand([1]), cand([2])] }));
     expect(r.materiality_paise).toBe(0);
     expect(r.outcome).toBe("IMMATERIALLY_AMBIGUOUS");
+  });
+
+  it("IMMATERIALLY_AMBIGUOUS when materiality is DEFINED and <= τ", () => {
+    // Identical fee composition under AN2 evidence: both allocations post the
+    // same totals, so the measured difference is 0 <= τ and the accept stands.
+    const m = [member(1), member(2)];
+    const r = solve(
+      input({ members: m, candidates: [cand([1]), cand([2])], targetAmount: 50_000, bankEvidence: BANK_EVIDENCE }),
+    );
+    expect(r.materiality_paise).toBe(0);
+    expect(r.outcome).toBe("IMMATERIALLY_AMBIGUOUS");
+  });
+
+  it("AMBIGUOUS with MATERIALITY_UNDETERMINED when materiality is UNDEFINED (M61)", () => {
+    const m = [member(1), member(2)];
+    const r = solve(input({ members: m, candidates: [cand([1]), cand([2])] }));
+    expect(r.materiality_paise).toBeNull();
+    expect(r.outcome).toBe("AMBIGUOUS");
+    expect(r.certificate_reason).toBe("MATERIALITY_UNDETERMINED");
   });
 
   it("INTRACTABLE at §4.3's bound, with SEARCH_BOUND_EXCEEDED", () => {

@@ -175,12 +175,17 @@ describe("N1 — a rejected well-formed proposal ends the component", () => {
 });
 
 describe("the certificate reason the loop forwards (M40)", () => {
-  it("has exactly four members and no undecided seam", () => {
+  it("has exactly five members and no undecided seam", () => {
+    // Four on the search-failure axis (M40 closed it); a fifth,
+    // MATERIALITY_UNDETERMINED, on the materiality axis (spec 1.4.39, M61).
+    // The loop forwards whichever `solve` set, so the fifth reaches a STOP
+    // through `stopReason` without this package naming it.
     expect([...CERTIFICATE_REASONS]).toEqual([
       "EVIDENCE_TIE",
       "SEARCH_BOUND_EXCEEDED",
       "PROBE_BUDGET_EXHAUSTED",
       "NO_USEFUL_PROBE_AVAILABLE",
+      "MATERIALITY_UNDETERMINED",
     ]);
   });
 

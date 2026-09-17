@@ -1,8 +1,17 @@
 # RECONCILIATION_SPEC — ASSAY
 
-**Spec version:** 1.4.37 · **Date:** 2026-09-02
+**Spec version:** 1.4.39 · **Date:** 2026-09-17
 
-**At spec 1.4.37** this document is unchanged apart from the version header. Register
+**At spec 1.4.39** `§6`'s outcome table gains a row — *second solution exists,
+materiality UNDEFINED, Δs < ε → AMBIGUOUS, reason `MATERIALITY_UNDETERMINED`* — and the
+paragraph beneath it states why: on a target with no `AN2`-matched bank line the
+projection `§6` runs *"both allocations through"* has no bank leg on either side, so
+materiality has no comparand and the `IMMATERIALLY_AMBIGUOUS` row is evaluated only when
+materiality is defined, on the rule `DATA_MODEL.md §17.1.1` already states for `I5`.
+Register row `DATA_MODEL.md §22.2` **M61**; sealed-run disclosure `PREREGISTRATION.md §10`
+**V37**. No threshold, constraint, weight or population moves.
+
+**At spec 1.4.37** this document was unchanged apart from the version header. Register
 row `DATA_MODEL.md §22.2` **M59** records that `PREREGISTRATION.md §9` **step 0 has
 been taken**, returning `mean_bps = stddev_bps = 0` for all five `offline` Tier-0 keys,
 and transcribes those rows **unchanged** into `§7` and into
@@ -989,7 +998,41 @@ Within a component:
 
   second solution exists, materiality > τ, Δs < ε
       → AMBIGUOUS                    → ABSTAIN + certificate
+
+  second solution exists, materiality UNDEFINED, Δs < ε        (spec 1.4.39, M61)
+      → AMBIGUOUS                    → ABSTAIN + certificate,
+                                       reason MATERIALITY_UNDETERMINED
 ```
+
+**Materiality is undefined — not zero — when the target has no `AN2`-matched bank
+line, stated at spec 1.4.39 `[ASSAY-MODEL]`, register row `DATA_MODEL.md §22.2`
+M61.** `DATA_MODEL.md §17.1.1` conditions `P2`/`P4` on *"`AN2` satisfied against an
+actual `bank_line`"*, so on such a target **neither** allocation posts on the
+reconciled path and the projection this section runs *"both allocations through"*
+has no bank leg on either side: there is no right-hand side, and the comparison
+`materiality ≤ τ` has no truth value. This is the rule `§17.1.1` already states
+for `I5` — *"`I5` is undefined — not satisfied — when no bank-line mapping
+exists"* — applied to the measure that shares `I5`'s comparand. **The
+`IMMATERIALLY_AMBIGUOUS` row is therefore evaluated only when materiality is
+defined; it is skipped, never passed by default, when it is not.** `DISCRIMINATED`
+needs no comparand — the evidence gap is its own licence — and stays reachable
+either way; `UNIQUE` is untouched, because a single feasible solution has no pair
+to compare and commits as before.
+
+*Through spec 1.4.38 the implementation computed the absent projection as `0`,
+`0 ≤ τ` held, and every multi-candidate component on a settlement without a
+clean `bank_ref` — the majority of the population under `PREREGISTRATION.md
+§4.2`'s 30 % share — committed its top candidate as `IMMATERIALLY_AMBIGUOUS`
+while `PREREGISTRATION.md §5.4`'s oracle labelled the same target
+`TRULY_AMBIGUOUS`. That behaviour is recorded, not repaired, for the sealed run:
+`PREREGISTRATION.md §10` V37.* The abstention it now produces names its own
+axis: the four existing reasons say why the *search* failed to separate two
+allocations; `MATERIALITY_UNDETERMINED` says why the *immateriality escape
+hatch* was unavailable, and implies a different action — obtain the bank line —
+so it is not folded into `EVIDENCE_TIE`. It takes precedence over the
+attempts-derived reasons whenever the outcome is `AMBIGUOUS` and materiality is
+undefined. No threshold moves: `τ`, `ε`, `K_max`, `C_max`, `P_max` and the
+`SE1`–`SE5` weights are unchanged.
 
 Where:
 
