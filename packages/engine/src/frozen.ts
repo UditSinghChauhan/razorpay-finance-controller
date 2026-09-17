@@ -96,12 +96,23 @@ export const P_MAX = 3;
  * `§4.1`'s `C8` precedent requires:
  *
  * ```
- *   SE1  3500  INACTIVE                        spec 1.4.10
- *   SE2  2000  EXPECTED-NON-BINDING on v1.0.0  spec 1.4.20
- *   SE3  1500  LIVE / DEFINED                  spec 1.4.13
- *   SE4  1000  EXPECTED-NON-BINDING on v1.0.0  spec 1.4.11
- *   SE5  2000  LIVE / DEFINED                  spec 1.4.16 / 1.4.17
+ *   SE1  3500  INACTIVE                        spec 1.4.10   const 0 in s4-solve.ts
+ *   SE2  2000  EXPECTED-NON-BINDING on v1.0.0  spec 1.4.20   const 0 in s4-solve.ts
+ *   SE3  1500  LIVE / DEFINED                  spec 1.4.13   computed
+ *   SE4  1000  EXPECTED-NON-BINDING on v1.0.0  spec 1.4.11   const 0 in s4-solve.ts
+ *   SE5  2000  LIVE / DEFINED, POST-PROBE ONLY spec 1.4.16 / 1.4.17
+ *                                                            0 before any probe
  * ```
+ *
+ * **What this means for the score, stated at spec 1.4.39 (`RECONCILIATION_SPEC.md
+ * §4.2` "Implementation status"; `PREREGISTRATION.md §10` V38).** Three of the
+ * five are a design that is not implemented, and one is zero until a probe runs.
+ * Pre-probe `evidence_score_bps` is `SE3` alone, whose largest gap between two
+ * candidates is 469 bps against `EPSILON_BPS = 1500`, so `§6`'s `DISCRIMINATED`
+ * arm cannot fire before a probe — and no recorded run has spent a probe. The
+ * score ranks candidates; the abstention decision is admissibility and
+ * materiality (`s4-solve.ts`, `solve`). The weights stay as frozen: nothing is
+ * renormalised, retired or moved.
  */
 export const SE_WEIGHTS_BPS = Object.freeze({
   SE1: 3_500,

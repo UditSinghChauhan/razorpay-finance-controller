@@ -976,10 +976,14 @@ function escalationWhy(e: ControllerTrace["escalations"][number]): string {
   const parts: string[] = [];
   parts.push(
     `ASSAY abstained (${e.certificate_reason ?? "certificate"}): two allocations satisfy every ` +
-      `hard constraint and the evidence does not separate them`,
+      `hard constraint and both tie out to the target, so both are admissible`,
   );
   if (gap !== null && eps !== null) {
-    parts.push(`they differ by ${String(gap)} bps, inside the \u03b5 tolerance of ${String(eps)} bps`);
+    parts.push(
+      `their evidence scores differ by ${String(gap)} bps, inside the \u03b5 tolerance of ` +
+        `${String(eps)} bps — structurally so before a probe, since only one of the five ` +
+        `specified signals is computed`,
+    );
   }
   if (e.certificate_reason === "MATERIALITY_UNDETERMINED") {
     parts.push(

@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { SolutionCard } from "../src/pages/AmbiguityCertificate.js";
-import { probeSummary } from "../src/lib/copy.js";
+import { EVIDENCE_TIE_ZERO_PROBE_SUMMARY, probeSummary } from "../src/lib/copy.js";
 import { ALLOCATION, SOLUTION_A, SOLUTION_B, CANDIDATE_A_ID, CANDIDATE_B_ID } from "./fixtures.js";
 
 /**
@@ -153,7 +153,12 @@ describe("member amounts are the run's real allocation values", () => {
 describe("probe copy reflects what actually happened", () => {
   it("does not claim a probe failed when none was required", () => {
     const note = probeSummary(0, "EVIDENCE_TIE");
-    expect(note).toBe("0 probes required — the evidence scores were already tied.");
+    expect(note).toBe(EVIDENCE_TIE_ZERO_PROBE_SUMMARY);
+    expect(note).toContain("0 probes were run");
+    // Spec 1.4.39 / V38: the pre-probe tie is structural, and the sentence must
+    // not present it as a measurement.
+    expect(note).not.toContain("already tied");
+    expect(note).toContain("not on a measured tie");
     expect(note).not.toContain("No probe produced admissible evidence");
   });
 

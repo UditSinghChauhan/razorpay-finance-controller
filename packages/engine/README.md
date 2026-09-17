@@ -154,7 +154,21 @@ driven outside; `solve` is called again with more accumulated evidence.
 - **`τ`** from `Component.total_value_paise`, never the target amount.
 - **Materiality** via `packages/ledger`'s pure `journalFor` — `§L.2` places ledger
   Layer B between `engine S1-S3` and `engine S4-S5` for exactly this. No
-  persistence, no write path, no `ValidatedDecision`.
+  persistence, no write path, no `ValidatedDecision`. **Undefined — `null`, not
+  `0` — when the target has no `AN2` bank line** (spec 1.4.39, M61): the
+  `IMMATERIALLY_AMBIGUOUS` branch is then skipped, never passed, and a
+  multi-candidate component abstains with `MATERIALITY_UNDETERMINED`. Through
+  spec 1.4.38 it computed as `0` and the component **committed**; the regression
+  test is `tests/s4-materiality-undetermined.test.ts`.
+- **What decides the abstention** — admissibility and materiality: more than one
+  candidate survived `S2`, and the two best differ in the books by more than `τ`
+  (or that difference is undefined). The score above only orders candidates.
+  Pre-probe it is `SE3` alone — `SE1`/`SE2`/`SE4` are `const 0` (specified, not
+  implemented) and `SE5` is `0` until a `fetch_settlement_recon` result arrives
+  — with a gap bounded at 469 bps against `ε = 1500`, so `DISCRIMINATED` is
+  unreachable before a probe and has never fired on a recorded run
+  (`RECONCILIATION_SPEC.md §4.2` "Implementation status"; `PREREGISTRATION.md §10`
+  V38).
 - **Ranking** — highest `evidence_score_bps`; on **exact** equality the
   lexicographically smallest **canonical allocation key** (spec 1.4.21, M35).
 - **`§6`'s outcomes** — `UNIQUE` · `IMMATERIALLY_AMBIGUOUS` · `DISCRIMINATED` ·

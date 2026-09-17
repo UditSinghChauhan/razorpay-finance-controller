@@ -9,7 +9,11 @@ projection `§6` runs *"both allocations through"* has no bank leg on either sid
 materiality has no comparand and the `IMMATERIALLY_AMBIGUOUS` row is evaluated only when
 materiality is defined, on the rule `DATA_MODEL.md §17.1.1` already states for `I5`.
 Register row `DATA_MODEL.md §22.2` **M61**; sealed-run disclosure `PREREGISTRATION.md §10`
-**V37**. No threshold, constraint, weight or population moves.
+**V37**. `§4.2` additionally gains an **implementation-status** paragraph stating, from
+the code, which of `SE1`–`SE5` are live (`SE3`; `SE5` post-probe only), which are
+specified-but-not-implemented (`SE1`, `SE2`, `SE4`), and that `§6`'s evidence-gap arm
+is therefore inert pre-probe and has never fired (disclosure **V38**). No threshold,
+constraint, weight or population moves.
 
 **At spec 1.4.37** this document was unchanged apart from the version header. Register
 row `DATA_MODEL.md §22.2` **M59** records that `PREREGISTRATION.md §9` **step 0 has
@@ -600,6 +604,51 @@ tails, so `469` is the bound that actually holds. Every materially ambiguous com
 `§6.2`'s probe loop or abstain, which is the order `§6.2` already describes, and
 which makes `P_max = 3` and the *abstentions resolved per probe spent* metric
 load-bearing on every material case. Recorded at `PREREGISTRATION.md §10` V20.
+
+**Implementation status of `SE1`–`SE5`, stated at spec 1.4.39 `[ASSAY-MODEL]`
+(disclosure `PREREGISTRATION.md §10` V38).** The table above is a **design that
+is partly unimplemented**, and this paragraph is the one place that says which
+part, so that every other document can point here rather than restate it.
+Read directly from `packages/engine/src/s4-solve.ts`'s `scoreCandidate`:
+
+```
+  signal  weight  implementation                                   status
+  SE1     3500    const se1Unit = 0                                 INACTIVE (spec 1.4.10)
+  SE2     2000    const se2Unit = 0                                 SPECIFIED, NOT IMPLEMENTED
+                                                                    (expected-non-binding, 1.4.20)
+  SE3     1500    se3(members, mode_days)                           LIVE
+  SE4     1000    const se4Unit = 0                                 SPECIFIED, NOT IMPLEMENTED
+                                                                    (expected-non-binding, 1.4.11)
+  SE5     2000    se5(memberIds, input) -- Jaccard vs recon report  LIVE, POST-PROBE ONLY;
+                                                                    0 on every candidate
+                                                                    before a probe
+```
+
+Three consequences follow, and each is a statement about the code rather than
+about the specification:
+
+1. **Pre-probe, `evidence_score_bps` is `SE3` alone**, and by the derivation
+   above `Δs ≤ 469 < ε = 1500`. `§6`'s `DISCRIMINATED` branch — the
+   *evidence-gap arm* of the ladder — is therefore **structurally unreachable
+   before a probe runs**, and no probe has run on any recorded run
+   (`PREREGISTRATION.md §10` V35: `probes_spent = 0` on all 50 sealed units;
+   the agent's probe surface is empty by construction). **The gap arm has never
+   fired.** A certificate's `evidence_score_gap_bps` is `0` or a small `SE3`
+   difference, and it is small **because 6,500 bps of the weighted sum are
+   constants and 2,000 more are zero pre-probe** — not because a measured tie
+   was found between two informative scores.
+2. **What the engine actually abstains on is admissibility and materiality.**
+   A component abstains when more than one allocation is admissible under
+   `C1`–`C8` and co-settlement coherence, and the admissible allocations differ
+   materially in the books (or, from spec 1.4.39, materiality cannot be
+   established — M61). Evidence scoring decides only *which* admissible
+   allocation is `best`, never *whether* to abstain. That is the claim the
+   code supports, it is the claim `PREREGISTRATION.md §5.4`'s oracle
+   certifies, and it is what every document's thesis statement must say.
+3. **Nothing here is retired.** `SE1`, `SE2` and `SE4` keep their rows and their
+   weights under `AL3`, exactly as the `C8` precedent requires; `SE5` is live
+   the moment a probe runs. The register vocabulary is the project's own:
+   *inactive*, *expected-non-binding on v1.0.0 data*, *live / post-probe only*.
 
 **A dimensional error in the spec-1.4.10 wording, corrected at spec 1.4.13
 `[ASSAY-MODEL]`, register row M27.** That text defined `lag` in **elapsed

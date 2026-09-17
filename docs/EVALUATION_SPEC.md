@@ -1,8 +1,28 @@
 # EVALUATION_SPEC — ASSAY
 
-**Spec version:** 1.4.37 · **Date:** 2026-09-02
+**Spec version:** 1.4.39 · **Date:** 2026-09-17
 
-**At spec 1.4.37** this document adds **one reading paragraph** to `§4.10` and changes
+**At spec 1.4.39** this document is unchanged apart from the version header and this
+note. Two facts stated at `RECONCILIATION_SPEC.md §4.2` ("Implementation status") and
+`DATA_MODEL.md §22.2` **M61** bear on how three of `§4`'s definitions read on any run
+recorded to date: **(i)** of the five evidence signals only `SE3` is computed before a
+probe and `SE5` after one; `SE1`, `SE2` and `SE4` are specified and not implemented, so
+`RECONCILIATION_SPEC.md §6`'s `DISCRIMINATED` branch is unreachable pre-probe and has
+never fired — metric **7** `ece`'s population (`M57`) is therefore empty on every recorded
+run and its `null` with `N = 0` is the correct report, not a gap in the scorer; `§4.3`'s
+qualification that `silent_guess_value_inr` may contain correct `DISCRIMINATED` decisions
+has never applied in practice (`PREREGISTRATION.md §10` V38). **(ii)** Through spec 1.4.38
+the engine read an absent `AN2` comparand as materiality `0` and **committed** a
+multi-candidate settlement without a bank line as `IMMATERIALLY_AMBIGUOUS`; metric **4**'s
+`abstained` set on such a population would have been systematically smaller than the
+oracle's `truly_ambiguous` set on the ~70 % of settlements without a clean `bank_ref`.
+The sealed corpus had no such target (V35), so no sealed value of metric 4 is affected;
+the correction is `PREREGISTRATION.md §10` V37 and no formula here changes. **What the
+scorer measures is abstention on admissibility and materiality** — the oracle's `§5.4`
+definition — and nothing in this document asserts an evidence-score contribution to the
+abstention decision.
+
+**At spec 1.4.37** this document added **one reading paragraph** to `§4.10` and changed
 nothing else. Register row `DATA_MODEL.md §22.2` **M59** records that
 `PREREGISTRATION.md §9` **step 0** has been taken and returned
 `mean_bps = stddev_bps = 0` for all five `offline` Tier-0 keys, and ratifies that a

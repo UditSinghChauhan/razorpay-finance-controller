@@ -597,10 +597,13 @@ describe("the escalation explains itself in words, from its own fields", () => {
     <ControllerTraceView trace={ESCALATED_TRACE} onReviewClick={() => undefined} onTryAnother={() => undefined} onVerifyLedger={() => undefined} />,
   );
 
-  it("says what ASSAY decided and why the evidence did not separate the candidates", () => {
+  it("says what ASSAY decided — admissibility first, the gap as a structural fact", () => {
     expect(html).toContain("ASSAY abstained (EVIDENCE_TIE)");
-    expect(html).toContain("two allocations satisfy every hard constraint");
-    expect(html).toContain("they differ by 0 bps, inside the ε tolerance of 1500 bps");
+    expect(html).toContain("two allocations satisfy every hard constraint and both tie out to the target");
+    // Spec 1.4.39 / V38: pre-probe only SE3 is computed, so the sentence names
+    // the gap as structural rather than as a measured separation that failed.
+    expect(html).toContain("their evidence scores differ by 0 bps, inside the ε tolerance of 1500 bps");
+    expect(html).toContain("structurally so before a probe");
   });
 
   it("places the amount at stake against the materiality floor, both from the record", () => {

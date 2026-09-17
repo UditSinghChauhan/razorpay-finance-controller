@@ -15,6 +15,8 @@ import {
   CERTIFICATE_VERIFY_HOW,
   CERTIFICATE_VERIFY_IDS,
   probeSectionHeading,
+  EVIDENCE_SCORE_SECTION_NOTE,
+  gapInterpretation,
   materialityIsMeasured,
   materialityUnmeasuredLabel,
   probeSummary,
@@ -274,9 +276,12 @@ export function CertificateStory({
       </QA>
 
       <QA question="What evidence proves that?">
-        Both candidates satisfy all {constraintCount} shared hard constraints, and the evidence
-        gap between them is {gapBps} bps against a tolerance ε of {epsilonBps} bps. The candidate
-        comparison, the constraints and the scores are all below.
+        Both candidates satisfy all {constraintCount} shared hard constraints and both tie out to
+        the target — that is what makes them admissible. The evidence-score gap between them,{" "}
+        {gapBps} bps against a tolerance ε of {epsilonBps} bps, is shown for the record: before a
+        probe only one of the five specified signals is computed, so the gap cannot separate them
+        and does not decide the abstention. The candidate comparison, the constraints and the
+        scores are all below.
       </QA>
 
       <QA question="What happens financially?">
@@ -527,6 +532,9 @@ export function AmbiguityCertificate(): React.ReactElement {
           Evidence Score Comparison
         </h2>
         <div className="card" style={{ padding: "var(--space-lg)" }}>
+          <p className="font-body-sm text-muted" style={{ marginBottom: "var(--space-md)", lineHeight: 1.6 }}>
+            {EVIDENCE_SCORE_SECTION_NOTE}
+          </p>
           {/* Score bar visualization */}
           <div style={{ marginBottom: "var(--space-lg)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "var(--space-sm)" }}>
@@ -585,8 +593,7 @@ export function AmbiguityCertificate(): React.ReactElement {
             }}>
               <span className="material-symbols-outlined" style={{ color: "var(--color-abstained)", fontSize: 18, marginTop: 2, flexShrink: 0 }}>info</span>
               <p className="font-body-sm">
-                <strong>Evidence gap ({cert.evidence_score_gap_bps} bps) is within epsilon ({cert.epsilon_bps} bps).</strong>{" "}
-                No hypothesis has a decisive advantage. Abstention is the correct safety response.
+                <strong>{gapInterpretation(cert.evidence_score_gap_bps, cert.epsilon_bps)}</strong>
               </p>
             </div>
           )}

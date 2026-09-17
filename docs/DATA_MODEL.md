@@ -1113,6 +1113,17 @@ executions, and because the score reaches the hashed event body through
 integers only. The SE1–SE5 weighted sum is evaluated in integer basis points with
 `round_half_up` applied once, at the end.
 
+**What the sum contains on any run recorded to date, stated at spec 1.4.39.**
+`RECONCILIATION_SPEC.md §4.2` ("Implementation status") reads it from the engine:
+`SE3` is computed; `SE5` is computed only from `fetch_settlement_recon` results and
+is `0` before a probe; `SE1`, `SE2` and `SE4` are `const … = 0` — specified, not
+implemented, weights retained under `AL3`. Pre-probe the score **is `SE3`**, the
+gap between any two candidates is at most 469 bps against `ε = 1500`, and the
+ε-margin test has never selected `DISCRIMINATED`. This field ranks; the abstention
+it *"feeds"* is decided by admissibility and materiality (`§13`'s `uniqueness`,
+`RECONCILIATION_SPEC.md §6`), and `evidence_score_gap_bps` on a certificate is
+small by construction rather than by measurement (`PREREGISTRATION.md §10` V38).
+
 **`Component.member_obs_ids` and `Component.total_value_paise` `[ASSAY-MODEL]`,
 supplied at spec 1.4.6.** Both were declared without comment through spec 1.4.5,
 while `RECONCILIATION_SPEC.md §6` and `PREREGISTRATION.md §7` read the second as
@@ -1498,7 +1509,10 @@ interface AmbiguityCertificate {
   // Proof that no HARD evidence separates them: identical satisfaction vectors.
   shared_hard_constraints: ConstraintId[];
   evidence_score_gap_bps: number;  // integer |score_a − score_b| in basis points,
-                                   // 0..10_000; strictly below epsilon_bps
+                                   // 0..10_000; strictly below epsilon_bps.
+                                   // Pre-probe this is an SE3 difference bounded at
+                                   // 469 bps -- small by construction, not a
+                                   // measured tie (spec 1.4.39; §11 note; V38)
   materiality_paise: Paise;        // max |balance_a − balance_b| over accounts;
                                    // 0 with reason MATERIALITY_UNDETERMINED or
                                    // SEARCH_BOUND_EXCEEDED means NOT COMPUTED --
