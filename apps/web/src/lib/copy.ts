@@ -123,6 +123,52 @@ export function probeEscalationClause(probeCount: number): string {
     : `${String(probeCount)} probe(s) were run and none broke the tie`;
 }
 
+/**
+ * Whether a certificate's `materiality_paise` is a measurement at all.
+ *
+ * `DATA_MODEL.md §13` keeps the field non-nullable so the hashed body's shape
+ * does not move, and makes `reason` the discriminator (spec 1.4.39, M61):
+ * under `MATERIALITY_UNDETERMINED` the target had no `AN2` bank line, `§17.1.1`
+ * conditions `P2`/`P4` on that line, and the two projections had **no
+ * comparand** — the `0` on the wire is "not computed", not "₹0.00". Under
+ * `SEARCH_BOUND_EXCEEDED` no pair was ever compared. A page that prints the
+ * rupee figure on either reason states a measurement that was never made.
+ */
+export function materialityIsMeasured(reason: string): boolean {
+  return reason !== "MATERIALITY_UNDETERMINED" && reason !== "SEARCH_BOUND_EXCEEDED";
+}
+
+/** What the materiality tile shows when there is no measurement to show. */
+export function materialityUnmeasuredLabel(reason: string): string {
+  return reason === "MATERIALITY_UNDETERMINED"
+    ? "undetermined — no matched bank line"
+    : "not computed — search bound hit";
+}
+
+/**
+ * The certificate story's "why did ASSAY stop" sentence, by reason.
+ *
+ * Four reasons say why the search failed to separate two allocations; the
+ * fifth says why the immateriality escape hatch could not be used. They imply
+ * different human actions — adjudicate the evidence, or go and get the bank
+ * line — and the sentence must name the right one.
+ */
+export function whyStoppedClause(reason: string): string {
+  switch (reason) {
+    case "MATERIALITY_UNDETERMINED":
+      return (
+        "Because more than one allocation is admissible and ASSAY could not establish " +
+        "that the difference between them is immaterial: the settlement has no matched " +
+        "bank line, so the materiality test had no comparand. Obtaining the bank line " +
+        "is the resolution, not adjudicating the evidence."
+      );
+    case "SEARCH_BOUND_EXCEEDED":
+      return "Because the component exceeded the frozen search bound, so no exhaustive comparison was made.";
+    default:
+      return "Because more than one allocation is admissible, they differ materially, and the evidence does not distinguish them.";
+  }
+}
+
 /** The heading for the certificate's probe section, which is not always "attempted". */
 export function probeSectionHeading(probeCount: number): string {
   return probeCount === 0 ? "Probes — none required" : `Probes attempted (${String(probeCount)})`;

@@ -1,10 +1,17 @@
 # DECISION_BRIEF — ASSAY
 
 **Adversarial review, and the locked project definition after revision.**
-**Spec version:** 1.4.38 · **Date:** 2026-09-03
+**Spec version:** 1.4.39 · **Date:** 2026-09-17
 **Reviewer role:** principal architect / skeptical reviewer
 
-**At spec 1.4.38** `§A.45` records **one derivation and one ratification**, and it is a
+**At spec 1.4.39** `§A.46` records a **defect found after the seal and corrected
+post-submission**: `RECONCILIATION_SPEC.md §6`'s materiality computed as `0` where it was
+undefined, and the immateriality branch committed on the majority of any multi-candidate
+population. The correction applies `DATA_MODEL.md §17.1.1`'s own `I5` rule and adds a
+fifth certificate reason, `MATERIALITY_UNDETERMINED` (`§22.2` M61; `PREREGISTRATION.md
+§10` V37). No sealed artifact moves; no threshold moves.
+
+**At spec 1.4.38** `§A.45` recorded **one derivation and one ratification**, and it is a
 **transport declaration rather than a measurement row**: `PREREGISTRATION.md §6.2`
 **AL3** and `§L.4`'s bar on result-driven revision are satisfied rather than merely not
 engaged, because nothing here references an observed figure. Register row `DATA_MODEL.md
@@ -4046,6 +4053,58 @@ defined over it. Nothing in this row supports a claim about how often the provid
 answers, how often a response is refused by boundary 2, or how it compares with any
 other provider. **Benchmark stays v1.0.13** and `GT_VERSION` stays **1.1.0**.
 
+
+### A.46 Spec 1.4.39 / benchmark 1.0.13 — materiality is undefined without a comparand
+
+**What was found, and where.** A reconnaissance read of `packages/engine/src/s4-solve.ts`
+(recorded in `BENCH_V2_DESIGN.md §1.1`) found that `balances()` returned an **empty**
+projection when `bank_evidence === null`, so `§6`'s `materiality` computed as `0`,
+`0 ≤ τ` held, `solve` returned `IMMATERIALLY_AMBIGUOUS`, and `apps/cli`'s
+`classifyTarget` **committed the top candidate** — on every settlement without an
+`AN2`-matched bank line, which `PREREGISTRATION.md §4.2`'s frozen 30 % clean-`bank_ref`
+share makes the majority of any multi-candidate population. `packages/oracle`'s
+`projectAllocation` posts `P2`/`P4` unconditionally and labelled the same target
+`TRULY_AMBIGUOUS`. **The product's central claim — that under-determined evidence
+produces a typed abstention — did not hold on that population.** The sealed run never
+exercised the cell (`§10` V35), so no sealed figure is re-read; `PREREGISTRATION.md §10`
+**V37** records the pre-fix behaviour against the submitted artifact.
+
+**The rule applied is one this project already states.** `DATA_MODEL.md §17.1.1`:
+*"`I5` is undefined — not satisfied — when no bank-line mapping exists. With no mapping
+there is no right-hand side, so the comparison has no truth value"*, and
+`s5-validate.ts` carries it as `bank_tie_out: null ⇒ skip`, never `pass`. `§6`'s
+materiality shares `I5`'s comparand — the bank leg `§17.1.1` conditions on `AN2` — and
+had been given the permissive reading `§17.1.1` rejects for `I5`. **Derived, not
+chosen:** an absent comparand is undefined, the immateriality branch is evaluated only
+when materiality is defined, and a multi-candidate component without it abstains.
+`UNIQUE` is untouched (one feasible solution has no pair to compare) and
+`DISCRIMINATED` stays reachable (the evidence gap needs no comparand). No threshold
+moves.
+
+**Ratified — a fifth certificate reason, `MATERIALITY_UNDETERMINED`, rather than a
+fold into `EVIDENCE_TIE`.** The four existing reasons each say why the *search* failed
+to separate two allocations; this one says why the *immateriality escape hatch* was
+unavailable — a different axis, implying a different human action (obtain the bank
+line, not adjudicate the evidence). `EVIDENCE_TIE` would assert a materiality finding
+(`> τ`) that was never made, which is the misreport this project exists to avoid. A
+second certificate field was considered and rejected: it would change `§16`'s hashed
+body key set, where an enum widening does not, and no sealed event carries a
+certificate at all (`§10` V35: zero abstentions), so every sealed body parses
+identically under the wider enum. Register row `DATA_MODEL.md §22.2` **M61** maps the
+blast radius: `packages/ledger` `CERTIFICATE_REASONS`, `packages/engine` `s4-solve.ts`,
+`packages/controller` `CertificateReasonSchema`, `apps/web` copy. `BENCHMARK_VERSION`
+stays 1.0.13 for the reason M61 states; runs either side are not comparable.
+
+**Three existing tests pinned the defect** and are retained verbatim, not run, pending
+the reviewer's decision, each with a superseding test beside it:
+`packages/engine/tests/s4-solve.test.ts` *"is the branch the pre-M49 reading could not
+reach"* and *"IMMATERIALLY_AMBIGUOUS when materiality <= τ"*, and
+`packages/engine/tests/s5-validate.test.ts` *"routes IMMATERIALLY_AMBIGUOUS's accepted
+best through the gate"*. The regression test
+(`packages/engine/tests/s4-materiality-undetermined.test.ts`) **failed against the
+spec-1.4.38 engine** before the fix was applied.
+
+---
 
 ## B. Locked project definition
 

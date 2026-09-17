@@ -53,12 +53,20 @@ import { z } from "zod";
 /** `DATA_MODEL.md §20`'s three period outcomes. */
 export const PeriodStatusSchema = z.enum(["CLOSED", "OPEN", "BLOCKED"]);
 
-/** `DATA_MODEL.md §13`'s four certificate reasons, as the ledger declares them. */
+/**
+ * `DATA_MODEL.md §13`'s five certificate reasons, as the ledger declares them.
+ *
+ * `MATERIALITY_UNDETERMINED` is the fifth (spec 1.4.39, M61): the target has no
+ * `AN2` bank line, so `§6`'s materiality is undefined and the immateriality
+ * escape hatch could not be evaluated. Its human action is "obtain the bank
+ * line", not "adjudicate the evidence", which is why it is its own value.
+ */
 export const CertificateReasonSchema = z.enum([
   "EVIDENCE_TIE",
   "SEARCH_BOUND_EXCEEDED",
   "PROBE_BUDGET_EXHAUSTED",
   "NO_USEFUL_PROBE_AVAILABLE",
+  "MATERIALITY_UNDETERMINED",
 ]);
 
 /** `DECISION_BRIEF.md §L.1` rule 5's four terminal states. */

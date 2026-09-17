@@ -145,10 +145,10 @@ export const ACTOR_TYPES = Object.freeze([
 export type ActorType = (typeof ACTOR_TYPES)[number];
 
 /**
- * The four abstention reasons of `DATA_MODEL.md §13`.
+ * The five abstention reasons of `DATA_MODEL.md §13`.
  *
  * **`NO_USEFUL_PROBE_AVAILABLE` was added at spec 1.4.25, register row M40**, and
- * it is the **fourth and final** member. It closes `RECONCILIATION_SPEC.md §6`'s
+ * was the **fourth** member (the "final" of its axis; see below). It closes `RECONCILIATION_SPEC.md §6`'s
  * `A2` middle case — `0 < attempts < P_max`, the loop having stopped because no
  * usable probe remained — which spec 1.4.23 surfaced and expressly declined to
  * fill *"for the phase that made it reachable"*. `R3` is that phase: a proposer
@@ -157,14 +157,36 @@ export type ActorType = (typeof ACTOR_TYPES)[number];
  * constructible argument, so **both arms** reach the interval.
  *
  * `packages/engine`'s `certificateReason` is total over `attempts` and is the
- * only producer; no fourth unrelated reason is added and no existing reason is
- * re-pointed. Order is declaration order and carries no meaning.
+ * only producer of those four; none is re-pointed. Order is declaration order
+ * and carries no meaning.
+ *
+ * **`MATERIALITY_UNDETERMINED` is the FIFTH member, added at spec 1.4.39,
+ * register row M61 — and it is on a different axis from the four above.** They
+ * each say why the *search* failed to separate two allocations. This one says
+ * why `RECONCILIATION_SPEC.md §6`'s *immateriality escape hatch* was unavailable:
+ * the target has no `AN2`-matched bank line, `DATA_MODEL.md §17.1.1` conditions
+ * `P2`/`P4` on that line, so the two allocations' projections have **no
+ * comparand** and `materiality` is undefined — *"undefined, not satisfied"*, the
+ * rule `§17.1.1` already states for `I5` and `s5-validate.ts` carries as
+ * `bank_tie_out: null ⇒ skip`. Through spec 1.4.38 `s4-solve.ts` computed that
+ * absence as `0`, `0 ≤ τ` held, and the caller committed the top candidate on
+ * every such target. The human action it implies is also different — obtain the
+ * bank line, rather than adjudicate the evidence — which is why it is not folded
+ * into `EVIDENCE_TIE`. It takes precedence over the attempts-derived reasons.
+ *
+ * **What this widening does and does not touch.** The value is admitted by
+ * `sealCertificate` below like any other member, so it enters the hashed event
+ * body of a **new** run. No sealed event carries it: `runs/seal-v1.0.13` records
+ * zero abstentions, so every sealed `certificate` is `null`, and a wider enum
+ * parses every sealed body identically. `CERTIFICATE_KEYS` is unchanged;
+ * `materiality_paise` keeps its shape (see the field's comment).
  */
 export const CERTIFICATE_REASONS = Object.freeze([
   "EVIDENCE_TIE",
   "SEARCH_BOUND_EXCEEDED",
   "PROBE_BUDGET_EXHAUSTED",
   "NO_USEFUL_PROBE_AVAILABLE",
+  "MATERIALITY_UNDETERMINED",
 ] as const);
 
 /** `DATA_MODEL.md §13`. */
@@ -237,6 +259,15 @@ export interface AmbiguityCertificate {
   readonly solution_b: CertificateSolution;
   readonly shared_hard_constraints: readonly ConstraintId[];
   readonly evidence_score_gap_bps: number;
+  /**
+   * `max |balance_a − balance_b|` over accounts — or **`0` with `reason` set to
+   * `MATERIALITY_UNDETERMINED` or `SEARCH_BOUND_EXCEEDED`**, the two reasons
+   * under which `S4` computed no materiality (`SolveResult.materiality_paise`
+   * is `null` there). The field keeps its non-nullable shape so the hashed
+   * body's key set and codec do not move (spec 1.4.39, M61); the `reason` is the
+   * discriminator, exactly as it already was for `SEARCH_BOUND_EXCEEDED`. A
+   * reader must not take `0` here as "immaterial" without reading `reason`.
+   */
   readonly materiality_paise: Paise;
   readonly epsilon_bps: number;
   readonly tau_paise: Paise;
