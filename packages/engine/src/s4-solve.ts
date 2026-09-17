@@ -39,6 +39,17 @@ import type { Candidate, Member, Target } from "./s2-candidates.js";
  * `0 < attempts < P_max` returns `DATA_MODEL.md §13`'s
  * `NO_USEFUL_PROBE_AVAILABLE` (register row M40), so `certificateReason` is total
  * and no caller has an undecided branch to confront.
+ *
+ * **What this stage decides on, stated plainly (spec 1.4.39, `§4.2`
+ * "Implementation status", `PREREGISTRATION.md §10` V38).** `solve` abstains on
+ * **admissibility and materiality**: more than one candidate survived `S2`, and
+ * the two best differ in the books by more than `τ` — or, from M61, that
+ * difference cannot be established. The `SE1`–`SE5` score in `scoreCandidate`
+ * only orders the candidates. Three of its five signals are `const 0` here
+ * (`SE1`, `SE2`, `SE4`: specified, not implemented) and `SE5` is `0` until a
+ * `fetch_settlement_recon` result arrives, so pre-probe the score is `SE3`
+ * alone, bounded to a 469-bps gap against `ε = 1500`; the `DISCRIMINATED`
+ * branch below is unreachable before a probe and no recorded run has spent one.
  */
 
 // ---------------------------------------------------------------------------

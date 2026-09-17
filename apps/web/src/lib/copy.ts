@@ -96,11 +96,50 @@ export const RECONCILIATION_SCOPE =
 export function probeSummary(probeCount: number, reason: string): string {
   if (probeCount === 0) {
     return reason === "EVIDENCE_TIE"
-      ? "0 probes required — the evidence scores were already tied."
+      ? EVIDENCE_TIE_ZERO_PROBE_SUMMARY
       : "0 probes were run.";
   }
   return probeAttemptedSummary(probeCount);
 }
+
+/**
+ * The zero-probe `EVIDENCE_TIE` sentence, and why it no longer says "the
+ * evidence scores were already tied".
+ *
+ * That wording presented the tie as a measurement. It is not one:
+ * `RECONCILIATION_SPEC.md §4.2` ("Implementation status", spec 1.4.39) records
+ * that of the five specified evidence signals only `SE3` is computed before a
+ * probe — `SE1`, `SE2` and `SE4` are constants, `SE5` is zero until a probe
+ * runs — and the spec bounds the pre-probe gap at 469 bps against ε = 1500. The
+ * tie is structural. What the abstention rests on is the two lines above it on
+ * the page: both allocations admissible, materially different.
+ */
+export const EVIDENCE_TIE_ZERO_PROBE_SUMMARY =
+  "0 probes were run. Before a probe the evidence score cannot separate candidates — " +
+  "only one of the five specified signals is computed and the gap is bounded below ε " +
+  "by construction — so the abstention rests on two admissible allocations that differ " +
+  "materially, not on a measured tie.";
+
+/**
+ * The certificate's gap callout. States the arithmetic reason the gap is small
+ * rather than presenting a structural zero as "no decisive advantage".
+ */
+export function gapInterpretation(gapBps: number, epsilonBps: number): string {
+  return (
+    `Evidence gap (${String(gapBps)} bps) is within ε (${String(epsilonBps)} bps) — by ` +
+    "construction: before a probe only SE3 (settlement-lag proximity) is computed, so the " +
+    "gap cannot reach ε. It ranks the two allocations; it does not decide the abstention. " +
+    "That rests on the two facts above — both allocations are admissible and they differ " +
+    "materially — and abstention is the correct safety response."
+  );
+}
+
+/** What the evidence-score section is, and is not, evidence of. */
+export const EVIDENCE_SCORE_SECTION_NOTE =
+  "Of the five specified signals SE1–SE5, only SE3 (settlement-lag proximity) is computed " +
+  "before a probe and SE5 (recon-report corroboration) after one; SE1, SE2 and SE4 are " +
+  "specified and not implemented. The score orders candidates. Admissibility and " +
+  "materiality decide the abstention.";
 
 /**
  * The same distinction, in the sentence the controller's escalation record

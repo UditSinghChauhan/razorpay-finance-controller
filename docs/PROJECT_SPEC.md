@@ -2,10 +2,24 @@
 
 **Track:** 04 — AI Finance Controller
 **Status:** Specification. Frozen scope for implementation.
-**Spec version:** 1.4.38
-**Date:** 2026-09-03
+**Spec version:** 1.4.39
+**Date:** 2026-09-17
 
-**At spec 1.4.38** this document is unchanged apart from the version header and **one
+**At spec 1.4.39** this document is unchanged apart from the version header and this
+note, because its thesis already reads the way the code works: ASSAY *"abstains with a
+machine-checkable certificate whenever the evidence admits more than one materially
+different allocation"* (§1) — **admissibility and materiality, not evidence scoring.**
+Two things are now stated elsewhere that qualify how that thesis was met on the sealed
+run: through spec 1.4.38 the engine read an absent bank comparand as materiality `0` and
+committed where it should have abstained (`DATA_MODEL.md §22.2` M61; `PREREGISTRATION.md
+§10` V37, fixed post-submission); and of `RECONCILIATION_SPEC.md §4.2`'s five evidence
+signals only `SE3` is computed pre-probe, so the evidence-gap arm of `§6` has never fired
+(`§4.2` "Implementation status"; V38). `§10` step 2's *"three probes were attempted"* is
+a demo script written against the design, not a description of any recorded run. **No
+success criterion moves**; S4's abstention-precision bar is untested on the sealed corpus
+(V35) rather than met.
+
+**At spec 1.4.38** this document was unchanged apart from the version header and **one
 `§6.1` table row**. Register row `DATA_MODEL.md §22.2` **M60** adds a fifth
 `LlmProvider` implementation, **`gemini`** — `@google/genai` against the Gemini Developer
 API — and `§6.1`'s list of interchangeable implementations moves from four to five to

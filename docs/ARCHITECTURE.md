@@ -1,8 +1,17 @@
 # ARCHITECTURE — ASSAY
 
-**Spec version:** 1.4.38 · **Date:** 2026-09-03
+**Spec version:** 1.4.39 · **Date:** 2026-09-17
 
-**At spec 1.4.38** `§6.5`'s provider table gains a **fifth row, `gemini`**, and `§6.5`'s
+**At spec 1.4.39** `§3`'s pipeline gains a status note under `S4` and `§5`'s worked
+example gains a reading note, both saying the same thing from the code: of
+`RECONCILIATION_SPEC.md §4.2`'s five evidence signals only `SE3` is computed before a
+probe and `SE5` after one; `SE1`, `SE2` and `SE4` are specified and not implemented; so
+`§6`'s evidence-gap arm is inert pre-probe and has never fired, and **what the engine
+abstains on is admissibility and materiality** — more than one admissible allocation,
+materially different in the books, or that difference undeterminable (`DATA_MODEL.md
+§22.2` M61; `PREREGISTRATION.md §10` V37, V38). No boundary, package or rule moves.
+
+**At spec 1.4.38** `§6.5`'s provider table gained a **fifth row, `gemini`**, and `§6.5`'s
 `LlmProvider.id` union, `§3`'s diagram and package table, `§4` boundary 2's schema-check
 sentence and `§13`'s trade-off row are updated to match. Register row `DATA_MODEL.md
 §22.2` **M60** carries the argument: `openai-compatible` is scoped to the chat-completions
@@ -314,6 +323,15 @@ carries.
    │   S4 solve       exact solve + no-good cut -> second-best certificate  │
    │   S5 validate    invariants I1..I9   ◀── THE ONLY GATE THAT MAY POST   │
    └───────────┬──────────────────────────────────────┬─────────────────────┘
+
+   S4's abstention test, as implemented (spec 1.4.39; RECONCILIATION_SPEC.md
+   §4.2 "Implementation status"): a component abstains when MORE THAN ONE
+   allocation is ADMISSIBLE under C1-C8 and the admissible allocations DIFFER
+   MATERIALLY in the books, or that difference cannot be established (M61).
+   The soft-evidence score SE1..SE5 ranks candidates; it does not decide the
+   abstention. Pre-probe the score is SE3 alone (SE1/SE2/SE4 are constants,
+   SE5 is zero until a probe runs), its largest gap is 469 bps < epsilon 1500,
+   and the DISCRIMINATED "evidence-gap" arm has never fired on any run.
                │ residual / degraded cases            │ validated decisions
                │                                      │
    ┌───────────▼──────────── TRUST BOUNDARY 2 ────────┼─────────────────────┐
@@ -560,6 +578,12 @@ bank credit line  ₹4,52,310  value_date 2026-08-14  narration "NEFT-RZPX0001�
   │                no-good cut → second-best: {setl_B, setl_C} also sums ✓
   │                materiality = ₹4,52,310 > τ · evidence gap Δs = 0 bps
   │                → ABSTAIN, certificate {A} vs {B,C}
+  │                (reading note, spec 1.4.39: the abstention is decided by the
+  │                 two lines above it — two admissible allocations, materially
+  │                 different. "Δs = 0 bps" is not a measured tie: pre-probe
+  │                 only SE3 is computed and the gap is bounded at 469 < ε by
+  │                 construction, so this arm never decides. See
+  │                 RECONCILIATION_SPEC.md §4.2, PREREGISTRATION.md §10 V38.)
   │
   ├─ R2 LLM        classify_exception → UTR_PREFIX_COLLISION
   │                R3 propose_probe   → fetch_settlement_recon(setl_A, date)

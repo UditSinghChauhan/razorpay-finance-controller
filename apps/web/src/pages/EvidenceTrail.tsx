@@ -9,7 +9,14 @@ import {
   type DecisionEvidence,
   type EventActor,
 } from "../hooks/useAssayApi.js";
-import { LEDGER_EVENT_BASIS, LEDGER_EVENT_HEADING, probeSummary, UNRESOLVED_MEANING } from "../lib/copy.js";
+import {
+  LEDGER_EVENT_BASIS,
+  LEDGER_EVENT_HEADING,
+  materialityIsMeasured,
+  materialityUnmeasuredLabel,
+  probeSummary,
+  UNRESOLVED_MEANING,
+} from "../lib/copy.js";
 import { formatActor, formatPaise, formatTimestamp } from "../lib/format.js";
 
 /**
@@ -154,7 +161,11 @@ export function DecisionVerdict({
             />
             <ReasonLine text="Evidence gap" value={`${String(cert.evidence_score_gap_bps)} bps`} />
             <ReasonLine text="Tolerance ε" value={`${String(cert.epsilon_bps)} bps`} />
-            <ReasonLine text="Amount at stake" value={formatPaise(cert.materiality_paise)} />
+            <ReasonLine text="The gap ranks the two; it does not decide — before a probe only one of five specified signals is computed" />
+            <ReasonLine
+              text="Amount at stake"
+              value={materialityIsMeasured(cert.reason) ? formatPaise(cert.materiality_paise) : materialityUnmeasuredLabel(cert.reason)}
+            />
             <ReasonLine text="Materiality floor τ" value={formatPaise(cert.tau_paise)} />
           </>
         ) : abstained ? (

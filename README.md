@@ -13,7 +13,13 @@ independent views of the same money — the payment gateway's recon report, the
 bank statement, and the merchant's own ledger — posts every decision into a
 hash-chained double-entry shadow ledger, and **abstains with a machine-checkable
 certificate** whenever the available evidence does not uniquely determine the
-correct allocation.
+correct allocation — precisely: whenever **more than one allocation is admissible**
+under the frozen hard constraints and the admissible allocations **differ
+materially** in the books, or that difference cannot be established. ASSAY
+abstains on **admissibility and materiality**, not on evidence scoring; the
+evidence-score model is a design that is partly unimplemented, and
+[*What the evidence model is*](#what-the-evidence-model-is-and-is-not) says which
+part.
 
 ## Who decides what
 
@@ -118,9 +124,10 @@ property the sealed benchmark measures, and this section claims nothing about it
 - **Ten packages and three apps**, committed — `money`, `domain`, `ledger`,
   `engine`, `probe`, `oracle`, `generator`, `eval`, `llm`, `controller`, and
   `apps/cli`, `apps/api`, `apps/web`.
-- **3,673 tests across 151 files**, with no type errors.
-- **A sealed, signed benchmark** — spec version 1.4.38, benchmark version
-  1.0.13, tag `bench-v1.0.13`. `docs/PREREGISTRATION.md §9`'s eight steps were
+- **3,702 tests across 153 files**, with no type errors.
+- **A sealed, signed benchmark** — sealed at spec version 1.4.37 under
+  benchmark version 1.0.13, tag `bench-v1.0.13` (the engine is now at spec
+  1.4.39 — see `V37` below; the sealed artifacts are untouched). `docs/PREREGISTRATION.md §9`'s eight steps were
   executed in order; step 7 wrote **50 conforming `metrics.json`** — five agents
   (`ASSAY`, `B0-IDONLY`, `A1-NOVALIDATE`, `A2-NOABSTAIN`, `A3-NOLLM`) × ten TEST
   seeds under `--llm=offline` — committed under
@@ -154,7 +161,11 @@ be assumed:**
 - **Not abstention accuracy.** `truly_ambiguous`, `abstentions` and
   `probes_spent` are `0` on all 50 scored units, so the corpus never posed the
   question — `V35`. The mechanism is shown on `demo/` fixtures, which are a
-  demonstration and never evidence.
+  demonstration and never evidence. Two further rows qualify the sealed
+  mechanism itself: `V37` (the sealed engine committed, rather than abstained,
+  on a multi-candidate settlement without a bank line — fixed post-submission)
+  and `V38` (the evidence-gap arm of the ladder has never fired). Both are
+  stated under [*What the evidence model is*](#what-the-evidence-model-is-and-is-not).
 - **Not exception-class accuracy.** `exception_class_confusion` is
   `NOT COMPUTABLE` on the frozen population. The *list* is honest; its
   classification is unscored.
@@ -187,7 +198,7 @@ The queue — the `setl_AMBIG000000000` row is the abstained settlement; the fiv
 
 ![The Ambiguity Certificate: Solution A and Solution B both reconciling to ₹1,00,000.00, 8 / 8 hard constraints satisfied, evidence gap 0 bps, epsilon 1500 bps, materiality ₹590.00, tau ₹204.13, and the callout that abstention is the correct safety response](docs/assets/05-ambiguity-certificate.png)
 
-The certificate — two allocations that both tie out, `8 / 8` hard constraints, an evidence gap of `0 bps` against ε `1500 bps`, materiality `₹590.00`, τ `₹204.13`: the machine declining to guess.
+The certificate — two allocations that both tie out, `8 / 8` hard constraints, materiality `₹590.00` above τ `₹204.13`: the machine declining to guess. The `0 bps` evidence gap it also shows is **not** a measured tie — it is zero because the only signal computed before a probe is `SE3`, which reads settlement lag that both allocations share; the rest of the weighted sum is constants (see [*What the evidence model is*](#what-the-evidence-model-is-and-is-not)).
 
 ![Verify Ledger: Chain verified, chain integrity Intact, root matches Yes, trial balance Balanced, 490 events re-hashed, and the recomputed root shown in full beside the stored root, identical](docs/assets/06-verify-ledger.png)
 
@@ -201,10 +212,22 @@ running product rather than drawn.
 ![The ASSAY Ambiguity Certificate for settlement setl_AMBIG000000000: Solution A allocating three recon lines and Solution B allocating two, both totalling ₹1,00,000.00 against the same ₹1,00,000.00 target, 8 of 8 shared hard constraints satisfied by both, an evidence gap of 0 bps against an epsilon of 1500 bps, and an amber callout reading "Evidence gap (0 bps) is within epsilon (1500 bps). No hypothesis has a decisive advantage. Abstention is the correct safety response."](docs/assets/ambiguity-certificate.png)
 
 Two allocations of the same ₹1,00,000.00 settlement. Both tie out to the target,
-both satisfy all 8 hard constraints, and the evidence separating them is **`0`
-bps against an ε of `1500` bps** — so ASSAY declines to pick one and says why in
-a record a reviewer can check. This is the product's whole argument: the
+both satisfy all 8 hard constraints, and they **differ materially in the books**
+(`₹590.00` against a τ of `₹204.13`) — so ASSAY declines to pick one and says why
+in a record a reviewer can check. This is the product's whole argument: the
 interesting output of a finance system is the case it refuses to decide.
+
+**About the `0 bps` on that page.** The certificate also prints an evidence gap
+of `0 bps` against an ε of `1500 bps`. That figure is literally true and must not
+be read as a measured tie between two informative scores: of the five evidence
+signals `docs/RECONCILIATION_SPEC.md §4.2` specifies, only `SE3` (settlement-lag
+proximity, 1,500 bps) is computed before a probe, `SE5` is zero until a probe runs
+and no probe has ever run, and `SE1`, `SE2` and `SE4` (6,500 bps between them)
+are `const … = 0` in the engine. The gap is zero as a consequence of the frozen
+evidence model, and the spec bounds it at 469 bps in any case — below ε by
+construction, so the "evidence gap" arm of the decision ladder has never fired.
+The abstention rests on the other two lines of the certificate: two admissible
+allocations, materially different. That is what ASSAY abstains on.
 
 **What this image is and is not.** `demo-500` is a product fixture, not benchmark
 data. The sealed TEST corpus contains **zero truly ambiguous targets**, so
@@ -397,6 +420,58 @@ changed to accommodate this: no benchmark data, threshold, metric formula,
 posting rule or engine behaviour moved, and no re-run or re-score was performed.
 A repair belongs to a future `BENCHMARK_VERSION` with fresh seeds. V36 records
 the measurement, the reproduction and the rejected alternatives.
+
+### What the evidence model is, and is not
+
+`docs/RECONCILIATION_SPEC.md §4.2` specifies five soft-evidence signals,
+`SE1`–`SE5`, with frozen weights summing to 10,000 bps. **That is a design, and
+it is partly unimplemented.** Read from `packages/engine/src/s4-solve.ts`:
+
+| Signal | Weight | In the engine | Status (the project's own register vocabulary) |
+|---|---|---|---|
+| `SE1` UTR prefix match | 3,500 bps | `const se1Unit = 0` | **inactive** (spec 1.4.10) |
+| `SE2` order-ref similarity | 2,000 bps | `const se2Unit = 0` | **specified, not implemented** — expected-non-binding (1.4.20) |
+| `SE3` settlement-lag proximity | 1,500 bps | computed | **live** |
+| `SE4` method/network agreement | 1,000 bps | `const se4Unit = 0` | **specified, not implemented** — expected-non-binding (1.4.11) |
+| `SE5` recon-report corroboration | 2,000 bps | computed from probe results | **live, post-probe only** — `0` before a probe, and no probe has run on any recorded run |
+
+So before a probe the evidence score **is `SE3` alone**, the spec bounds the
+gap between any two candidates at **469 bps against ε = 1,500**, and the
+`DISCRIMINATED` branch of `docs/RECONCILIATION_SPEC.md §6` — the arm that would
+accept an allocation *because the evidence separates it* — **is structurally
+unreachable pre-probe and has never fired**. Every `0 bps` gap on a certificate
+is that arithmetic, not a finding.
+
+**What ASSAY actually abstains on is admissibility and materiality:** more than
+one allocation admissible under `C1`–`C8`, and the admissible allocations
+differing in the books by more than τ — or, since the post-submission fix
+below, that difference being undeterminable. Evidence scoring picks *which*
+admissible allocation is best; it never decides *whether* to abstain. That is
+a narrower claim than "a five-signal evidence model", it is the one the code
+supports, and it is what `docs/PREREGISTRATION.md §5.4`'s oracle certifies.
+
+**V37 — found after sealing, present in the submitted artifact, fixed
+post-submission.** Through spec 1.4.38 the engine computed materiality as `0`
+whenever a settlement had no `AN2`-matched bank line — the comparand for the
+bank leg was absent and the code read absence as zero — so on such a
+settlement a second admissible allocation produced `IMMATERIALLY_AMBIGUOUS`
+and a **commit**, where the oracle labelled the same target `TRULY_AMBIGUOUS`.
+Under the frozen 30 % clean-`bank_ref` share that is the majority of any
+multi-candidate population. Spec 1.4.39 applies the rule the project already
+states for `I5` (*"undefined — not satisfied — when no bank-line mapping
+exists"*): materiality is undefined without a comparand, the immateriality
+branch is skipped rather than passed, and the component abstains with a fifth
+certificate reason, `MATERIALITY_UNDETERMINED`. **No sealed number is re-read
+by this:** the sealed corpus had zero multi-candidate targets (`V35`), so the
+defective branch was never entered there. The v1.0.13 artifacts stand as
+recorded; runs either side of the fix are not comparable.
+
+**V38 — the evidence-gap arm never fired, on any recorded run.** No figure in
+the sealed run references an evidence score except metric 7 `ece`, which is
+`null` on every unit with `N = 0` — correctly, since its population is
+`DISCRIMINATED` decisions and there were none. `V38` states the reason in
+full: the sealed engine's five-signal model was, in effect, a one-signal model
+bounded below ε.
 
 **Coverage, all four published views, `ASSAY` across the ten sealed TEST
 seeds.** `docs/EVALUATION_SPEC.md §4.1` defines four and `§5.2` requires them

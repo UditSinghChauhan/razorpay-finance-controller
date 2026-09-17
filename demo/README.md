@@ -70,9 +70,16 @@ Two allocations survive `C1`–`C8`:
 
 Both tie out exactly under `C6`, both settle inside `C4`'s T+1..T+7 window, and
 both carry identical soft evidence — so `RECONCILIATION_SPEC.md §6`'s evidence
-gap is far below `ε`. They differ in fee structure, so the two allocations post
-materially different amounts to `1100_GATEWAY_RECEIVABLE`,
-`5100_PG_FEE_EXPENSE` and `1300_GST_INPUT_CREDIT` — above `τ`.
+gap is `0`. (That gap could not have decided anything in either direction: before
+a probe only `SE3` of the five specified signals is computed, and the spec bounds
+the pre-probe gap at 469 bps against `ε = 1500` — `RECONCILIATION_SPEC.md §4.2`
+"Implementation status", `PREREGISTRATION.md §10` V38.) They differ in fee
+structure, so the two allocations post materially different amounts to
+`1100_GATEWAY_RECEIVABLE`, `5100_PG_FEE_EXPENSE` and `1300_GST_INPUT_CREDIT` —
+above `τ`. **That materiality, on two admissible allocations, is what the
+abstention rests on.** The settlement carries a clean UTR so its bank line is
+`AN2`-matched and the materiality is measured; from spec 1.4.39 a settlement
+without one would abstain too, with `MATERIALITY_UNDETERMINED` (M61).
 
 `§6`'s ladder therefore reaches `AMBIGUOUS`, and ASSAY **abstains and mints an
 Ambiguity Certificate** rather than committing a match it cannot justify. That
