@@ -91,14 +91,14 @@ ledger from genesis, and diffs the pair. This is the real output:
     verify:determinism  api=http://127.0.0.1:8787  dataset=demo-500
 
     run_id                  same       run_1aced16fd786c5c2ebb91b7a0a0274303316dc8b0ed14e762591a4550b228eb9
-    ledger_root_hash        same       f4c9c7a962be138423636b94c8c431ebf6bb9a30a76e1e56d70d5769e6a68124
-    recomputed_root_hash    same       f4c9c7a962be138423636b94c8c431ebf6bb9a30a76e1e56d70d5769e6a68124
+    ledger_root_hash        same       0797e8dd2d242cb7d6fe718d8e675bd71d3bb3e407131a8ece3c2a45f8f2a718
+    recomputed_root_hash    same       0797e8dd2d242cb7d6fe718d8e675bd71d3bb3e407131a8ece3c2a45f8f2a718
     event_count             same       490
     total_dr_paise          same       259474718
     unresolved_value_paise  same       10000000
 
-    run 1: chain recomputes genesis→root yes, trial balance ok (259474718 dr = 259474718 cr), period OPEN, 0.48s wall clock on this machine — not a throughput rate
-    run 2: chain recomputes genesis→root yes, trial balance ok (259474718 dr = 259474718 cr), period OPEN, 0.33s wall clock on this machine — not a throughput rate
+    run 1: chain recomputes genesis→root yes, trial balance ok (259474718 dr = 259474718 cr), period OPEN, 0.43s wall clock on this machine — not a throughput rate
+    run 2: chain recomputes genesis→root yes, trial balance ok (259474718 dr = 259474718 cr), period OPEN, 0.39s wall clock on this machine — not a throughput rate
 
     PASS: 6 fields identical across two independent runs; both chains verify. The run id and root hash are functions of the input, not of a clock.
     Note: demo-500 is a product fixture, not benchmark evidence (see demo/README.md).
@@ -106,9 +106,14 @@ ledger from genesis, and diffs the pair. This is the real output:
 **Your machine prints the same two hashes.** The run id and the ledger root are
 functions of the **input** — the observations, the frozen thresholds, the posting
 rules — and not of a clock, a map-iteration order or a random seed. Two runs on
-two machines a week apart reach `run_1aced16f…` and `f4c9c7a9…` or one of them
+two machines a week apart reach `run_1aced16f…` and `0797e8dd…` or one of them
 is wrong, and `GET /runs/:id/ledger/verify` recomputes the whole chain from
-genesis to say which. `259474718 dr = 259474718 cr` is the trial balance closing
+genesis to say which. (Before spec 1.4.39 the root was `f4c9c7a9…`; the run id
+is unchanged. The root moved because the engine's version stamp enters the
+genesis hash — `engine_commit: 1.4.38 → 1.4.39` — and for **no other reason**:
+with the stamp equalised, the pre-fix and post-fix engines produce this run
+byte-for-byte identically, because no demo-500 settlement reaches the branch
+the fix changed. See *What the evidence model is* below.) `259474718 dr = 259474718 cr` is the trial balance closing
 on the 490 events the run posted.
 
 **What this does and does not show.** The ~half-second wall clock is for this
@@ -196,7 +201,7 @@ The controller's trace — `ESCALATED` after `10 / 64` steps, `4` read-only tool
 
 The queue — the `setl_AMBIG000000000` row is the abstained settlement; the five `pay_AMB…` rows beneath it are its members, each carrying the same certificate badge.
 
-![The Ambiguity Certificate: Solution A and Solution B both reconciling to ₹1,00,000.00, 8 / 8 hard constraints satisfied, evidence gap 0 bps, epsilon 1500 bps, materiality ₹590.00, tau ₹204.13, and the callout that abstention is the correct safety response](docs/assets/05-ambiguity-certificate.png)
+![The Ambiguity Certificate: Solution A and Solution B both reconciling to ₹1,00,000.00, 8 / 8 hard constraints satisfied, materiality ₹590.00 against tau ₹204.13, evidence gap 0 bps against epsilon 1500 bps with a note that only SE3 of the five specified signals is computed before a probe, and the callout that the gap is within epsilon by construction, ranks rather than decides, and that abstention rests on two admissible, materially different allocations](docs/assets/05-ambiguity-certificate.png)
 
 The certificate — two allocations that both tie out, `8 / 8` hard constraints, materiality `₹590.00` above τ `₹204.13`: the machine declining to guess. The `0 bps` evidence gap it also shows is **not** a measured tie — it is zero because the only signal computed before a probe is `SE3`, which reads settlement lag that both allocations share; the rest of the weighted sum is constants (see [*What the evidence model is*](#what-the-evidence-model-is-and-is-not)).
 
@@ -209,7 +214,7 @@ running product rather than drawn.
 
 ### 1. The Ambiguity Certificate — the machine declining to guess
 
-![The ASSAY Ambiguity Certificate for settlement setl_AMBIG000000000: Solution A allocating three recon lines and Solution B allocating two, both totalling ₹1,00,000.00 against the same ₹1,00,000.00 target, 8 of 8 shared hard constraints satisfied by both, an evidence gap of 0 bps against an epsilon of 1500 bps, and an amber callout reading "Evidence gap (0 bps) is within epsilon (1500 bps). No hypothesis has a decisive advantage. Abstention is the correct safety response."](docs/assets/ambiguity-certificate.png)
+![The ASSAY Ambiguity Certificate for settlement setl_AMBIG000000000: Solution A allocating three recon lines and Solution B allocating two, both totalling ₹1,00,000.00 against the same ₹1,00,000.00 target, 8 of 8 shared hard constraints satisfied by both, an evidence gap of 0 bps against an epsilon of 1500 bps, a note that of the five specified signals only SE3 is computed before a probe and SE5 after one, and an amber callout reading "Evidence gap (0 bps) is within ε (1500 bps) — by construction: before a probe only SE3 (settlement-lag proximity) is computed, so the gap cannot reach ε. It ranks the two allocations; it does not decide the abstention. That rests on the two facts above — both allocations are admissible and they differ materially — and abstention is the correct safety response."](docs/assets/ambiguity-certificate.png)
 
 Two allocations of the same ₹1,00,000.00 settlement. Both tie out to the target,
 both satisfy all 8 hard constraints, and they **differ materially in the books**
@@ -253,6 +258,19 @@ Both are unretouched page regions from a real Chromium session driving the real
 `apps/web` against the real `apps/api` on `demo-500` — clipped in page
 coordinates rather than cropped from a window, which is why neither carries
 browser chrome. Nothing in either image is drawn, mocked or composited.
+
+**Re-captured on 2026-09-18 against the spec-1.4.39 engine** (the post-submission
+fix, `V37`), with the same harness: headless Chromium, 1400×900 viewport at 2×,
+icon font loaded, each region clipped in page coordinates. Every `demo-500`
+figure — 1 abstention, 6 affected observations, 20 exceptions, 26 queue rows,
+₹1,00,000.00 unresolved, 490 events, materiality ₹590.00, τ ₹204.13, gap
+0 bps — is **unchanged**, because no `demo-500` settlement reaches the branch
+the fix altered; the Command Center, controller and queue captures are
+byte-identical to the submission's. What did change on screen is the
+certificate's copy (the gap callout and the note under *Evidence Score
+Comparison* now say why the gap is zero) and the ledger root on Verify Ledger
+(`0797e8dd…`, moved by the engine's version stamp alone — see *Verify it in
+sixty seconds*).
 
 To reproduce them by hand: start the app as *Run the demo* below describes, pick
 **`demo-500`**, and press **Run Demo**.
