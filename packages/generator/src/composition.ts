@@ -27,6 +27,7 @@ import { roundHalfUp } from "@assay/money";
 
 import {
   ADJUSTMENT_RATE,
+  AMB1_PAIR_RATE,
   AUTHORISED_NOT_CAPTURED_RATE,
   DISPUTE_RATE,
   DRIVER_PAYMENTS_PER_FAMILY,
@@ -124,6 +125,12 @@ export const F06_PAIR_COUNT = realize(F06_PAIR_RATE, COMPOSITION.S);
 /** `§4.2`: 40% of refunds are partial. */
 export const PARTIAL_REFUND_COUNT = realize(REFUND_PARTIAL_SHARE, COMPOSITION.R);
 
+/**
+ * bench-v2 `AMB-1` (`docs/BENCH_V2_DESIGN.md §B.2`): `round_half_up(0.10 x 31)`
+ * capture days settled in two batches, one twin pair each.
+ */
+export const AMB1_PAIR_COUNT = realize(AMB1_PAIR_RATE, COMPOSITION.S);
+
 /** `§4.2`: T+1 for 10% of batches. */
 export const T_PLUS_1_BATCHES = realize(
   { num: SETTLEMENT_CYCLE.t_plus_1.rate_num, den: SETTLEMENT_CYCLE.t_plus_1.rate_den },
@@ -157,6 +164,8 @@ export const FAMILY_DELTA: Readonly<Record<FamilyId, number>> = Object.freeze({
   F10: 0,
   F11: 0,
   F12: 0,
+  // bench-v2 `AMB-1`: one extra settlement and one extra bank line per split day.
+  A01: +2 * AMB1_PAIR_COUNT,
 });
 
 /** The derived `target_record_count` for every family. `F11`/`F12` are not implemented. */

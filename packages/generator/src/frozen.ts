@@ -20,12 +20,22 @@ export const FAMILY_IDS = Object.freeze([
   "F01", "F02", "F03", "F04", "F05", "F06", "F07", "F08", "F09", "F10", "F11", "F12",
 ] as const);
 
-/** `PREREGISTRATION.md §4.1`'s family table, `DATA_MODEL.md §1` `GroundTruth.family_id`. */
-export type FamilyId = (typeof FAMILY_IDS)[number];
+/**
+ * `PREREGISTRATION.md §4.1`'s family table, `DATA_MODEL.md §1` `GroundTruth.family_id`
+ * — widened at bench-v2 by {@link BENCH_V2_FAMILY_IDS}, a separate namespace.
+ * `FAMILY_IDS` itself is untouched: it is the v1 table `manifest.ts` transcribes.
+ */
+export type FamilyId = (typeof FAMILY_IDS)[number] | (typeof BENCH_V2_FAMILY_IDS)[number];
 
-/** The ten families this generator implements (`§4.1`; `F11`/`F12` are NOT IMPLEMENTED). */
+/**
+ * The families this generator implements: `§4.1`'s ten (`F11`/`F12` are NOT
+ * IMPLEMENTED) followed by bench-v2's (`docs/BENCH_V2_DESIGN.md §B`). The v1
+ * order is unchanged and bench-v2 ids follow it, so `dataset.ts`'s table order
+ * and `families.ts`'s single-carrier guard both see the new families.
+ */
 export const IMPLEMENTED_FAMILIES = Object.freeze([
   "F01", "F02", "F03", "F04", "F05", "F06", "F07", "F08", "F09", "F10",
+  "A01",
 ] as const satisfies readonly FamilyId[]);
 
 /** `§4.1`: "specified, NOT IMPLEMENTED". Their `target_record_count` is 0. */
@@ -68,6 +78,8 @@ export const PUBLISHED_TARGET_RECORD_COUNTS = Object.freeze({
   F01: 2621, F02: 2621, F03: 2621, F04: 2624, F05: 2618,
   F06: 2621, F07: 2623, F08: 2621, F09: 2621, F10: 2621,
   F11: 0, F12: 0,
+  // bench-v2 (`docs/BENCH_V2_DESIGN.md §B.2`): `base + 2 x AMB1_PAIR_COUNT`.
+  A01: 2627,
 } as const satisfies Record<FamilyId, number>);
 
 /** `§4.1` / `PROJECT_SPEC.md §9`: observations per `(split, seed)` dataset. */
@@ -225,7 +237,8 @@ export const DEGRADATION_OPS = Object.freeze([
   "CONFLICT_REFERENCE", "ROUND_BANK_AMOUNT",
 ] as const);
 
-export type DegradationOp = (typeof DEGRADATION_OPS)[number];
+/** `§4.3`'s ten, widened at bench-v2 by {@link BENCH_V2_DEGRADATION_OPS}; `DEGRADATION_OPS` is untouched. */
+export type DegradationOp = (typeof DEGRADATION_OPS)[number] | (typeof BENCH_V2_DEGRADATION_OPS)[number];
 
 /**
  * `§4.3`'s operator -> family mapping, verbatim.
@@ -247,6 +260,8 @@ export const OPERATOR_DECLARING_FAMILY = Object.freeze({
   SHIFT_TIMESTAMP: null,
   SWAP_ORDER_REF: null,
   ROUND_BANK_AMOUNT: null,
+  // bench-v2 (`docs/BENCH_V2_DESIGN.md §B`, D2): declared by `AMB-1` and nothing else.
+  DROP_BATCH_IDENTITY: "A01",
 } as const satisfies Record<DegradationOp, FamilyId | null>);
 
 /**
@@ -862,3 +877,63 @@ export const GT_VERSION = "1.1.0";
  * must not be.**
  */
 export const SPEC_VERSION = "1.4.39";
+
+// ---------------------------------------------------------------------------
+// bench-v2 — additive. Nothing above this line moves (docs/BENCH_V2_DESIGN.md §A).
+// ---------------------------------------------------------------------------
+
+/**
+ * bench-v2's family namespace, separate from `§4.1`'s `F01..F12`.
+ *
+ * `A01` is `docs/BENCH_V2_DESIGN.md §3.1`'s `AMB-1`: same-day split batches
+ * hosting equal-credit twins on different fee rates, both twins' batch identity
+ * removed. It is a **stress family** — its prevalence is a declared parameter,
+ * not a base rate (`§A`). `FAMILY_IDS` is untouched: `manifest.ts` transcribes
+ * that table into a v1 manifest, and bench-v2 is a new `BENCHMARK_VERSION`
+ * whose manifest is the next order's.
+ */
+export const BENCH_V2_FAMILY_IDS = Object.freeze(["A01"] as const);
+
+/**
+ * bench-v2's operators, beside `§4.3`'s ten. `DEGRADATION_OPS` is untouched.
+ *
+ * `DROP_BATCH_IDENTITY` (`docs/BENCH_V2_DESIGN.md §B`, D2) sets **both**
+ * `settlement_id` and `settlement_utr` to `null` on a recon line and touches no
+ * other field. `DROP_SETTLEMENT_ID` leaves the UTR on the row, and the
+ * settlement observation carries the same `utr`, so a twin detached by it is
+ * recoverable by a join — an ambiguity family built on it would be one a
+ * reviewer resolves in one step, and its targets would not be undetermined.
+ */
+export const BENCH_V2_DEGRADATION_OPS = Object.freeze(["DROP_BATCH_IDENTITY"] as const);
+
+/**
+ * `AMB-1`: share of the 31 capture days settled in two batches, each pair
+ * hosting one twin pair. **Convention 1, provisionally** — `§B.2` records that
+ * `§3.1` proposed 20 % and that `§9.4` is still open; the frozen default for an
+ * undeclared rate is used so that this increment chooses no new number.
+ * Realized as `round_half_up(rate x 31) = 3` in `composition.ts`.
+ */
+export const AMB1_PAIR_RATE = CONVENTION_1;
+
+/**
+ * `AMB-1`: the twins' shared credit is drawn conditioned on `credit >= Rs 9,000`.
+ *
+ * `docs/BENCH_V2_DESIGN.md §2` T4-a: at 200 vs 300 bps the gross amounts that
+ * net to one credit `X0` differ by about 1.253 % of `X0`, which clears `TAU`'s
+ * Rs 100 floor for `X0 >= Rs 7,981`. Rs 9,000 is that threshold with a margin,
+ * so `materiality > tau` holds by at least Rs 12 and never rests on rounding.
+ */
+export const AMB1_MIN_CREDIT_PAISE = 900_000;
+
+/**
+ * `AMB-1`: twin A's method is drawn from the 200-bps methods **excluding card**.
+ *
+ * Twin B is `emi` (300 bps, `FEE_RATE_BPS`). Card is excluded so that
+ * `card_network`, `card_issuer` and `card_type` are `null` on both twins:
+ * the twins must differ in nothing but their ids and the deliberate
+ * `(amount, fee, tax, method)` difference that makes them material (`§B.2`).
+ */
+export const AMB1_BASE_METHODS = Object.freeze(["upi", "netbanking", "wallet"] as const);
+
+/** `AMB-1`: twin B's method, the only 300-bps method in `FEE_RATE_BPS`. */
+export const AMB1_TWIN_METHOD = "emi" as const;

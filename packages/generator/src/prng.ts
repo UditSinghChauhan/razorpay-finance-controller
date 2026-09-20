@@ -219,4 +219,7 @@ export const STREAMS = Object.freeze({
   OP_DUPLICATE_ROW: "op:DUPLICATE_ROW",
   OP_INJECT_NOTES: "op:INJECT_NOTES",
   OP_CONFLICT_REFERENCE: "op:CONFLICT_REFERENCE",
+  // bench-v2 (docs/BENCH_V2_DESIGN.md §B.2).
+  AMB1: "amb1",
+  OP_DROP_BATCH_IDENTITY: "op:DROP_BATCH_IDENTITY",
 } as const);

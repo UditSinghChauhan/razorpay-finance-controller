@@ -63,6 +63,11 @@ const FAMILY_TABLE = Object.freeze({
     why: "Real for exporters, but a separate truth model. SPECIFIED, NOT IMPLEMENTED" },
   F12: { name: "Split settlement across two bank credits", split: "test",
     why: "Large settlements split by banking limits. NOT REPRESENTABLE under the frozen model: invariant I5 ties a bank line to the sum of settlement amounts. SPECIFIED, NOT IMPLEMENTED" },
+  // bench-v2 (docs/BENCH_V2_DESIGN.md §B.2). Not a §4.1 row: `benchmarkScenarios()`
+  // maps `FAMILY_IDS` and never reaches this entry; it exists so the table stays
+  // total over `FamilyId` until bench-v2's own manifest is declared.
+  A01: { name: "AMB-1 — material twins in same-day split batches (bench-v2 STRESS family)", split: "test",
+    why: "STRESS CORPUS, declared rate, not a base rate. Two captures on different pricing tiers netting to one credit, settled at one instant in two on-demand batches, both batch identities absent from the merchant's copy. Exists because bench-v1.0.13 contained zero truly-ambiguous targets (PREREGISTRATION.md §10 V35)" },
 } as const satisfies Record<FamilyId, { name: string; split: "dev" | "test" | "both"; why: string }>);
 
 /** The twelve declared scenarios. `F11` and `F12` carry `target_record_count: 0`. */

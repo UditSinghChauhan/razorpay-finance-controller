@@ -62,6 +62,54 @@ export function drawAmount(prng: Prng): Paise {
   return paise(drawn);
 }
 
+/**
+ * bench-v2 `AMB-1`: one draw from the frozen distribution **conditioned** on a
+ * predicate over the gross amount — the atoms the predicate admits, uniformly.
+ *
+ * Exactly one 64-bit word is consumed per draw, as `drawAmount`. The support is
+ * the committed table's, so the draw is the frozen distribution truncated, not a
+ * new distribution; `docs/BENCH_V2_DESIGN.md §3.1` conditions the twins' credit
+ * on a floor and this is that condition.
+ */
+export function drawAmountWhere(prng: Prng, admit: (amount: Paise) => boolean): Paise {
+  const admitted = AMOUNT_QUANTILES.filter((atom) => admit(paise(atom)));
+  if (admitted.length === 0) {
+    throw new RangeError("drawAmountWhere: the predicate admits no atom of the committed table.");
+  }
+  const drawn = admitted[prng.below(admitted.length)];
+  /* c8 ignore next */
+  if (drawn === undefined) throw new RangeError("drawAmountWhere: index out of range");
+  return paise(drawn);
+}
+
+/**
+ * bench-v2 `AMB-1`: the smallest gross amount whose credit at `rateBps` is
+ * exactly `credit`.
+ *
+ * `credit(amount) = amount - fee(amount)` with `fee` non-decreasing in `amount`,
+ * so `credit` rises by at most one paisa per paisa of gross and every integer
+ * credit in range is attained; the search is bounded to a window around
+ * `credit / (1 - rate x 1.18)` and refuses rather than approximates if the
+ * window misses, which the step bound makes impossible for a positive credit.
+ */
+export function amountForCredit(credit: Paise, rateBps: number): Paise {
+  if (!Number.isSafeInteger(credit) || credit <= 0) {
+    throw new RangeError(`amountForCredit: credit must be a positive integer, received ${String(credit)}`);
+  }
+  const keep = 10_000 * 10_000 - rateBps * (10_000 + GST_RATE_BPS);
+  const centre = Math.floor((credit * 10_000 * 10_000) / keep);
+  const WINDOW = 4;
+  for (let amount = centre - WINDOW; amount <= centre + WINDOW; amount += 1) {
+    if (amount <= 0) continue;
+    if (feeBreakdown(paise(amount), rateBps).credit === credit) return paise(amount);
+  }
+  /* c8 ignore next 4 */
+  throw new RangeError(
+    `amountForCredit: no gross within ${String(WINDOW)} paise of ${String(centre)} nets ${String(credit)} ` +
+      `at ${String(rateBps)} bps; the one-paisa step bound on credit should make this unreachable.`,
+  );
+}
+
 /** `DATA_MODEL.md §6`'s fee model, at a given rate. `rate_bps` is EX-GST. */
 export function feeBreakdown(amount: Paise, rateBps: number): FeeBreakdown {
   if (!Number.isSafeInteger(rateBps) || rateBps < 0) {

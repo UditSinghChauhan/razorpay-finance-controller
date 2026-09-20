@@ -41,6 +41,14 @@ export interface Emission {
   readonly untrusted_text: readonly UntrustedText[];
   /** `F05`: the `pay_…` whose `recon_line` was withheld, per selected settlement. */
   readonly withheld_recon_lines: readonly string[];
+  /**
+   * bench-v2 `AMB-1`: the `pay_…` twins whose batch identity `DROP_BATCH_IDENTITY`
+   * removes — selected **by construction from the pair**, not by a rate
+   * (`docs/BENCH_V2_DESIGN.md §3.0`, §B.2). Carried here beside `F05`'s list on
+   * the same principle: the selection is made where the true state is in hand,
+   * and `degrade()` still takes no `TrueState`. Empty for every `§4.1` family.
+   */
+  readonly batch_identity_drops: readonly string[];
 }
 
 /** A record before provenance is stamped on it. */
@@ -301,10 +309,20 @@ export function emit(state: TrueState): Emission {
     }
   }
 
+  // bench-v2 AMB-1: both twins of every split day, in split order.
+  const batchIdentityDrops = state.split_batches.flatMap((split) => {
+    const a = state.payments[split.twin_a];
+    const b = state.payments[split.twin_b];
+    /* c8 ignore next */
+    if (a === undefined || b === undefined) throw new Error("emit: AMB-1 twin index out of range");
+    return [a.id, b.id];
+  });
+
   return Object.freeze({
     observations,
     untrusted_text: untrusted,
     withheld_recon_lines: withheldIds,
+    batch_identity_drops: batchIdentityDrops,
   });
 }
 

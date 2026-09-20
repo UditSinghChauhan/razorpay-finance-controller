@@ -18,6 +18,9 @@ export {
   UNIMPLEMENTED_FAMILIES, HELD_OUT_FAMILIES, DEGRADATION_OPS,
   OPERATOR_DECLARING_FAMILY, PUBLISHED_TARGET_RECORD_COUNTS, BENCHMARK_VERSION,
   GT_VERSION, SPEC_VERSION, PERIOD, SPLIT_TABLE,
+  // bench-v2 (docs/BENCH_V2_DESIGN.md §B).
+  BENCH_V2_FAMILY_IDS, BENCH_V2_DEGRADATION_OPS, AMB1_PAIR_RATE, AMB1_MIN_CREDIT_PAISE,
+  AMB1_BASE_METHODS, AMB1_TWIN_METHOD,
 } from "./frozen.js";
 
 export {
@@ -40,8 +43,8 @@ export { assertOrderRefsInjective, buildReceipt, receiptToOrderRef } from "./rec
 export { type FamilyMechanics, FAMILY_MECHANICS } from "./families.js";
 
 export {
-  type SettlementIndex, type TrueState, NegativeSettlementError, settlementsByMember,
-  simulate,
+  type SettlementIndex, type SimSplitBatch, type TrueState, NegativeSettlementError,
+  settlementsByMember, simulate,
 } from "./simulate.js";
 
 export {

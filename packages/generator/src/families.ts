@@ -35,6 +35,11 @@ export interface FamilyMechanics {
   readonly f07_chargebacks: boolean;
   /** `F09`: the final three capture days settle at T+3, so their rows leave the period. */
   readonly f09_forced_late: boolean;
+  /**
+   * bench-v2 `A01` (`AMB-1`): same-day split batches hosting equal-credit twins
+   * on different fee rates (`docs/BENCH_V2_DESIGN.md §B.2`).
+   */
+  readonly amb1_material_twins: boolean;
   /** The degradation operators this family declares, in composition order. */
   readonly operators: readonly DegradationOp[];
 }
@@ -42,6 +47,7 @@ export interface FamilyMechanics {
 const NONE = {
   f03_repricing: false, f02_refund_boundary: false, f05_withhold: false,
   f06_collisions: false, f07_chargebacks: false, f09_forced_late: false,
+  amb1_material_twins: false,
   operators: [] as readonly DegradationOp[],
 } as const;
 
@@ -70,6 +76,12 @@ export const FAMILY_MECHANICS: Readonly<Record<FamilyId, FamilyMechanics>> = Obj
   /** `§4.1`: "specified, NOT IMPLEMENTED". */
   F11: { ...NONE },
   F12: { ...NONE },
+  /**
+   * bench-v2 `AMB-1` — "material twins" (`docs/BENCH_V2_DESIGN.md §3.1`, §B.2).
+   * True state: split batches and twins. Operator: `DROP_BATCH_IDENTITY` on
+   * exactly the twins, selected by construction from the pair.
+   */
+  A01: { ...NONE, amb1_material_twins: true, operators: [OP("DROP_BATCH_IDENTITY")] },
 });
 
 /** Assert at authoring time that an operator is one `§4.3` maps to a family. */

@@ -68,6 +68,7 @@ const OP_STREAM: Readonly<Record<DegradationOp, string>> = Object.freeze({
   SHIFT_TIMESTAMP: "op:SHIFT_TIMESTAMP",
   SWAP_ORDER_REF: "op:SWAP_ORDER_REF",
   ROUND_BANK_AMOUNT: "op:ROUND_BANK_AMOUNT",
+  DROP_BATCH_IDENTITY: STREAMS.OP_DROP_BATCH_IDENTITY,
 });
 
 /**
@@ -94,7 +95,10 @@ export function degrade(emission: Emission, family: FamilyId, seed: number): Deg
       );
     }
     const prng = substream(seed, family, OP_STREAM[op]);
-    const result = APPLY[op]({ observations, untrusted, prng, seed, family, degradations });
+    const result = APPLY[op]({
+      observations, untrusted, prng, seed, family, degradations,
+      batch_identity_drops: emission.batch_identity_drops,
+    });
     observations = result.observations;
     untrusted = result.untrusted;
   }
@@ -116,6 +120,8 @@ interface OpContext {
   seed: number;
   family: FamilyId;
   degradations: DegradationRecord[];
+  /** bench-v2 `DROP_BATCH_IDENTITY`'s selection, from the `Emission` (see `emit.ts`). */
+  batch_identity_drops: readonly string[];
 }
 
 type OpResult = { observations: Observation[]; untrusted: UntrustedText[] };
@@ -333,6 +339,50 @@ const APPLY: Readonly<Record<DegradationOp, (ctx: OpContext) => OpResult>> = Obj
           settlement_utr: conflicting,
           was: target.payload.settlement_utr,
         },
+      });
+    }
+    return { observations: ctx.observations, untrusted: ctx.untrusted };
+  },
+
+  /**
+   * bench-v2 `A01` (`docs/BENCH_V2_DESIGN.md §B`, D2): the merchant's copy lacks
+   * the PG's batch identity — **both** `settlement_id` and `settlement_utr`.
+   * `DROP_SETTLEMENT_ID` above leaves the UTR, and the settlement observation
+   * carries the same `utr`, so a line it detaches is recoverable by a join; a
+   * twin detached that way would not be undetermined. `settled`, `settled_at`
+   * and every other field are untouched.
+   *
+   * **No draw.** The lines are the family's twins, selected by construction from
+   * the pair and carried on the `Emission` (`batch_identity_drops`); the
+   * operator's sub-stream exists for uniformity and is never consumed. Selecting
+   * at a rate would leave the pair intact most of the time, which is not the
+   * family. Nothing is added: the operator removes two fields' values.
+   */
+  DROP_BATCH_IDENTITY: (ctx) => {
+    const selected = new Set(ctx.batch_identity_drops);
+    const eligible = indicesWhere(
+      ctx.observations,
+      (o) => o.kind === "recon_line" && selected.has(o.payload.entity_id),
+    );
+    if (eligible.length !== selected.size) {
+      /* c8 ignore next 4 */
+      throw new Error(
+        `degrade: DROP_BATCH_IDENTITY names ${String(selected.size)} recon lines but ` +
+          `${String(eligible.length)} were found in the emission.`,
+      );
+    }
+    for (const index of eligible) {
+      const target = at(ctx.observations, index);
+      /* c8 ignore next */
+      if (target.kind !== "recon_line") throw new Error("degrade: eligibility drifted");
+      ctx.observations[index] = reseal({
+        ...target,
+        payload: { ...target.payload, settlement_id: null, settlement_utr: null },
+      });
+      ctx.degradations.push({
+        op: "DROP_BATCH_IDENTITY",
+        target_id: target.payload.entity_id,
+        params: { fields: ["settlement_id", "settlement_utr"], to: null },
       });
     }
     return { observations: ctx.observations, untrusted: ctx.untrusted };

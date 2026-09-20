@@ -123,12 +123,17 @@ describe("the true allocation satisfies every hard constraint", () => {
           // exceeds the sum of the lines it can see, which is E01" (§4.2).
           expect(broken).toHaveLength(F05_SELECTED_SETTLEMENTS);
           for (const shortfall of broken) expect(shortfall).toBeGreaterThan(0);
-        } else if (family === "F08") {
+        } else if (family === "F08" || family === "A01") {
           // `DROP_SETTLEMENT_ID` detaches a line from its batch identifier, so
           // it leaves the set reachable by `AN1` without ceasing to exist. The
           // line is still emitted, still ties out arithmetically, and is still
           // recoverable through `settlement_utr` — which is what makes F08 a
           // matching problem rather than a corruption.
+          //
+          // bench-v2's `A01` detaches its two twins per split day the same way,
+          // through `DROP_BATCH_IDENTITY` (both identifiers nulled, so NOT
+          // recoverable by a join — that is the family). The identity below
+          // holds for it unchanged: the discrepancy is the detached net.
           //
           // The discrepancy is therefore EXACTLY the net contribution of the
           // detached lines, and its sign is not uniform: detaching a payment
@@ -136,7 +141,7 @@ describe("the true allocation satisfies every hard constraint", () => {
           // raises it. Asserted as an identity rather than as a direction.
           const dropped = new Set(
             result.ground_truth.degradations
-              .filter((d) => d.op === "DROP_SETTLEMENT_ID")
+              .filter((d) => d.op === "DROP_SETTLEMENT_ID" || d.op === "DROP_BATCH_IDENTITY")
               .map((d) => d.target_id),
           );
           const detachedNet = new Map<string, number>();
@@ -255,7 +260,10 @@ describe("what degradation is allowed to break, and what it is not", () => {
 
   it("leaves `settled` and `settlement_id` coherent everywhere no operator ran", () => {
     for (const family of IMPLEMENTED_FAMILIES) {
-      if (family === "F08") continue;
+      // F08 (`DROP_SETTLEMENT_ID`) and bench-v2's A01 (`DROP_BATCH_IDENTITY`) are
+      // the two families whose operator detaches a settled line; each has its
+      // own test of exactly what its operator leaves incoherent.
+      if (family === "F08" || family === "A01") continue;
       for (const observation of dataset(family, SEED).observations) {
         if (observation.kind !== "recon_line" && observation.kind !== "adjustment") continue;
         expect(observation.payload.settled).toBe(observation.payload.settlement_id !== null);
