@@ -613,11 +613,29 @@ would be a guess wearing the authority of a changelog.
 **What has not changed since.** The sealed benchmark — `bench/`, the artifacts
 under `runs/seal-v1.0.13/`, and every figure and disclosure they support in
 [Benchmark disclosures](#benchmark-disclosures) — is byte-identical to the frozen
-commit. Post-buildathon work lands on the branch `assay-post-buildathon` and is
-**additive**: it alters no financial semantic, threshold, posting rule,
-invariant, benchmark artifact or authority boundary. If a change ever does, it
-will be a new benchmark version with its own seal and its own disclosures, not
-an edit to this one.
+commit. Post-buildathon work lands on `main` and is **additive**: it alters no
+financial semantic, threshold, posting rule, invariant, benchmark artifact or
+authority boundary. If a change ever does, it will be a new benchmark version
+with its own seal and its own disclosures, not an edit to this one.
+
+**A note on the commit graph.** After submission this repository's history was
+rebased to normalise commit trailers, and the rebase reached back through the
+submission commit. The line of development on `main` therefore starts from a
+rewritten copy of it, `255709ac`, and `956575fc` itself is not an ancestor of
+`main` — `git log main` will not pass through it, and GitHub will show the tag
+as diverged from the branch. The submitted commit is unchanged and still here,
+at the tag: the two differ in one commit trailer and in nothing else, and their
+trees are the same object (`6124382a…`). That is checkable rather than
+something to take on trust —
+
+    git diff assay-buildathon-submission-2026 255709ac    # no output
+
+`956575fc868e54472e4c9c9bdaec8ae3786ded10` remains the submitted artifact and
+the hash every document here cites. `git show assay-buildathon-submission-2026`
+shows it exactly as submitted, trailer included. The same applies to
+`bench-v1.0.13`: the tag points at the sealed commit `2e93efed`, whose
+rewritten copy on `main` is `e5c3300f`, and `git diff bench-v1.0.13 e5c3300f`
+is likewise empty.
 
 ## Credentials
 
