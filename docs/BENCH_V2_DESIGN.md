@@ -1,10 +1,13 @@
 # bench-v2 — design proposal: making under-determination reachable
 
-**Status: PROPOSAL. Nothing here is decided, nothing here is implemented, no seed
-is drawn.** This document is the single deliverable of a reconnaissance order. It
-reads the frozen code, states what it found with line references, corrects the
-starting sketch where the code contradicts it, and leaves every decision that is
-the reviewer's to make as an explicit open question (§9).
+**Status: PROPOSAL, with three decisions taken and one increment built.** No
+seed is drawn, no corpus is generated, nothing is sealed. §A below states what
+this corpus is not; §B records the three decisions the reviewer has taken and
+the one increment (`AMB-1` alone) built under them. Everything after §0 is the
+reconnaissance this document began as: it reads the frozen code, states what it
+found with line references, corrects the starting sketch where the code
+contradicts it, and leaves every decision not listed in §B as an explicit open
+question (§9).
 
 Ground rules this proposal was written under, restated so the reader can check
 them against every line below:
@@ -20,6 +23,212 @@ them against every line below:
   `SEARCH_BOUND = {k_max: 22, c_max: 5000}`, `P_MAX = 3`, `SE_WEIGHTS_BPS`.
 - `packages/engine`, `packages/ledger`, `packages/controller`,
   `packages/domain`, `packages/money` are not touched.
+
+---
+
+## A. What bench-v2 is NOT
+
+Five statements, each of which is a hard boundary rather than a caution. They
+are written before any number in this document, so that every number after
+them is born qualified.
+
+1. **bench-v2 is a STRESS CORPUS.** Its ambiguity prevalence is chosen to
+   exercise a path — `RECONCILIATION_SPEC.md §6`'s `AMBIGUOUS` outcome and the
+   `EVIDENCE_TIE` certificate — not to estimate how often under-determination
+   occurs in real settlement data. The rate at which twins, split batches and
+   detached lines appear is a **declared family parameter**, set so that the
+   path is reached often enough to be measured. It is not a base rate, was
+   never estimated from any production population, and no production
+   population was consulted in choosing it.
+2. **No rate read off this corpus is a real-world frequency.** Abstention
+   rate, truly-ambiguous share, coverage on the ambiguity families, the
+   A2-vs-ASSAY delta, the value committed on undetermined evidence — every one
+   of them is a function of the declared prevalence and would move with it. A
+   figure from bench-v2 says *what the system does when a case of this shape
+   occurs*; it says nothing about how often such a case occurs.
+3. **No figure from it may be presented as one.** Not in a README, not in a
+   decision brief, not beside a production expectation, not as "ASSAY abstains
+   on X % of settlements". `EVALUATION_SPEC.md §5.5`'s rule that only numbers in
+   a committed run artifact may be quoted applies; the sentence that quotes one
+   must also say *stress corpus, declared rate*, every time.
+4. **It exists because `bench-v1.0.13` could not measure the behaviour the
+   system was built for.** `PREREGISTRATION.md §10` **V35** records that the
+   sealed TEST population contained **zero** truly-ambiguous targets — 1,580
+   `NO_SOLUTION`, 1,535 `UNAMBIGUOUS`, nothing else — so `truly_ambiguous`,
+   `abstentions` and `probes_spent` were `0` on all fifty scored units, and
+   `A2-NOABSTAIN` was indistinguishable from `ASSAY`. bench-v2 is the corpus
+   in which those quantities are non-zero **by construction**, which is the
+   only way they could have become non-zero without editing a sealed result.
+5. **It changes nothing sealed.** `runs/seal-v1.0.13/`, `bench/test/**`, tag
+   `bench-v1.0.13` and tag `assay-buildathon-submission-2026` are untouched and
+   remain the reported v1 result. bench-v2 is a new `BENCHMARK_VERSION` with
+   its own pre-registration, its own seeds and its own families; no v1
+   family, oracle predicate, metric formula or `§7` threshold moves
+   (`EPSILON_BPS`, `TAU`, `SEARCH_BOUND`, `P_MAX`, `SE_WEIGHTS_BPS`).
+
+## B. Decisions taken, and the increment built under them
+
+Three of §9's open questions were decided by the reviewer's order of
+2026-09-20. They are recorded here as decided, with the reasoning, so that §9
+reads as the list of what remains open.
+
+| # | Decision | Closes | Reasoning |
+|---|---|---|---|
+| D1 | **Same-day split batch** is the twin host. A capture day's lines are settled in **two** batches at **one** `settled_at`; membership is dealt from the family's PRNG sub-stream, independently of `created_at`. The cross-day co-instant form (`(d, T+2)` with `(d+1, T+1)`) is **rejected**. | §9.1 | §1.5 found that every batch's lines share a capture day 100 % of the time in this generator. Under the cross-day form the twin from the other batch is the only member of the target's instant class captured on a different day, so `created_at` — a structural field the engine may read — identifies its batch. `RECONCILIATION_SPEC.md §5.4`'s evidence model does not encode "a batch's lines share a day", so the frozen scorer would still tie; a competent reviewer would not. Exchangeability of the twins with respect to the target is the property the whole corpus rests on (§8 R1), and it is not traded for the convenience of needing no new true-state mechanism. |
+| D2 | **`DROP_BATCH_IDENTITY`** is a new `§4.3`-style operator that nulls **both** `settlement_id` **and** `settlement_utr` on a recon line, and nothing else. `DROP_SETTLEMENT_ID` is not reused. | §9.3 | §1.5 found the existing operator leaves `settlement_utr` on the row, and the settlement observation carries the same `utr`: the answer is literally in the record. The engine reads no normative rule off `settlement_utr` today (`DECISION_BRIEF.md §A.17`, M24), which is why v1's `F08` is not thereby broken — but an ambiguity family built on that hole would be one a reviewer could resolve by a join, and calling its targets undetermined would be false. A **new** operator rather than a second carrier for the old one, because `families.ts` asserts at load that each operator has exactly its declaring family as carrier, and §B.1 below states what that guard protects. The `§6.2` recon report is unaffected (built from the true state, pre-operator), so a future probe still sees truth. |
+| D3 | **Stress-corpus framing** (§A) is the declared status of bench-v2, written before any number. | §8 R2, R10 | The prevalence is a parameter chosen after V35 was observed; that is unavoidable and the defence is procedural, not statistical — a new version, fresh pre-registered seeds, rates and predictions written before generation, and the v1 artifact untouched and still reported. What would make it rigged is presenting a declared rate as an estimate. §A forecloses that in the document every bench-v2 figure will cite. |
+
+**The increment built under D1–D3 is `AMB-1` alone**, §3.1's material twins,
+as the first (and so far only) bench-v2 family. Nothing else in §3 is built:
+`AMB-1D`, `AMB-2`, `AMB-3`, `AMB-4`, `AMB-5` and `BENIGN` wait for the next
+order. No seed block is declared, no corpus is generated, no metric is added,
+the oracle's `truly_ambiguous` predicate is untouched, and nothing is sealed.
+The increment's acceptance criterion was one generated settlement on which the
+real engine reaches `AMBIGUOUS` with certificate reason **`EVIDENCE_TIE`** —
+*not* `MATERIALITY_UNDETERMINED`, which is spec 1.4.39's M61 path for a target
+without a bank comparand and exercises the M61 fix rather than the thesis. The
+family therefore gives both twin-hosting settlements a clean `bank_ref` by
+declaration, so that `§17.1.1`'s `P2` projection exists on both candidates and
+materiality is a number, not `null`. §B.2 records what was built and how it
+departs from §3.1's sketch.
+
+### B.1 The single-carrier guard, and why D2 does not collide with it
+
+`packages/generator/src/families.ts:83-97` runs at module load:
+
+```ts
+for (const [op, declaring] of Object.entries(OPERATOR_DECLARING_FAMILY)) {
+  const carriers = IMPLEMENTED_FAMILIES.filter((f) => FAMILY_MECHANICS[f].operators.includes(op));
+  const expected = declaring === null ? [] : [declaring];
+  if (carriers.join(",") !== expected.join(",")) throw ...
+}
+```
+
+**What it protects.** Two invariants of `PREREGISTRATION.md §4.3`'s frozen
+operator → family table, checked in both directions so the mechanics table
+cannot drift from the table it transcribes: (i) an operator the table maps to a
+family is carried by **exactly** that family — no second carrier, no missing
+carrier; (ii) an operator the table leaves unassigned (`DROP_FIELD`,
+`SHIFT_TIMESTAMP`, `SWAP_ORDER_REF`, `ROUND_BANK_AMOUNT`) is carried by **no**
+family — `§4.3`'s disposal rule, *"assigning them would invent a family pairing
+this specification does not state"*. The carrier universe it checks over is
+`IMPLEMENTED_FAMILIES`.
+
+**Why the new operator does not collide.** The guard is over pairings, not over
+families. `DROP_BATCH_IDENTITY → A01` is added to `OPERATOR_DECLARING_FAMILY`
+and `A01.operators = [DROP_BATCH_IDENTITY]` to `FAMILY_MECHANICS`; `A01` is
+registered in `IMPLEMENTED_FAMILIES` (it is implemented: `generateFamily`
+accepts it and `TARGET_RECORD_COUNT` derives its count). The guard then finds
+carriers `[A01]` against expected `[A01]` and passes **as written**. Nothing is
+relaxed, nothing is weakened, and the guard now also protects the new pairing:
+a second family declaring `DROP_BATCH_IDENTITY`, or `A01` declaring
+`DROP_SETTLEMENT_ID`, fails at load exactly as a v1 drift would.
+
+**The collision that was avoided, stated so it is not re-proposed.** Had `A01`
+been kept in a separate list outside `IMPLEMENTED_FAMILIES` — to leave the v1
+list byte-identical — the guard would have computed carriers `[]` against
+expected `[A01]` and refused to load. The only ways through would have been to
+widen the guard's universe (a change to the guard) or to leave the new pairing
+out of `OPERATOR_DECLARING_FAMILY` (which makes `degrade()` refuse the operator
+under the disposal rule, or requires a parallel table the guard does not see).
+Registering the family where the guard looks is the additive path.
+
+### B.2 `AMB-1` as built
+
+The family id is **`A01`** — a separate namespace from `§4.1`'s `F01..F12`
+(§9.2, now decided by construction: `FAMILY_IDS`, the v1 table `benchmarkScenarios()`
+transcribes into a manifest, is untouched; `BENCH_V2_FAMILY_IDS` holds the new
+namespace and `FamilyId` is the union). Every parameter below is a new
+pre-registered constant in `frozen.ts`'s bench-v2 section; no v1 constant moves.
+
+| Piece | As built | Departure from §3.1 |
+|---|---|---|
+| Split days | `round_half_up(AMB1_PAIR_RATE × 31)` days, `AMB1_PAIR_RATE = 10 %` (Convention 1) → **3 pairs, 6 targets per instance**. | §3.1 proposed 20 %; §9.4 is still open. Convention 1 is the frozen default for an undeclared rate and is used **provisionally** so that no new number is chosen in this increment; the bench-v2 pre-registration may re-declare it before any seed is drawn. |
+| Twin selection | Two captured, settling payments of the split day, neither refunded nor disputed, drawn from the `amb1` sub-stream. | §3.1 said nothing about refunds/disputes. Excluding them keeps the twins' `payment` observations identical in `status` and `amount_refunded` and keeps every `refund`/`dispute` row off the pair — a refund on one twin would be a field that distinguishes them. |
+| Twin A | Method drawn from `{upi, netbanking, wallet}` — the 200-bps methods **excluding card**; gross drawn from the frozen amount table **conditioned on `credit ≥ ₹9,000`** (`AMB1_MIN_CREDIT_PAISE`). | Card is excluded so that `card_network`/`card_issuer`/`card_type` are `null` on both twins rather than three further differing fields. The condition is on the twin's own credit, a margin over §2's ₹7,981 threshold. |
+| Twin B | `emi` (300 bps); gross solved by bounded search so that `credit(B) = credit(A)` exactly. | As §3.1. The search is total: `credit` rises by at most one paisa per paisa of gross, so every integer credit in range is attained. |
+| Shared clock | `created_at(B) := created_at(A)` — drawn once, shared, the `F06` discipline. | §3.1 relied on same-day alone. With one `settled_at` and one `created_at` the twins tie on `SE3` **exactly**, so the only live signal is silent and the ordering of best/second is the canonical-key tie-break alone. Two captures in one second is a declared construction, not a claim about volume. |
+| Split | The day's batch is dealt into `S₁` (keeps the day's id, cycle and instant) and `S₂` (new id, new UTR, same `settled_at`). Which twin stays is a coin from the `amb1` stream; every other member is dealt by its own coin. Debit members are admitted per half by `§4.2`'s ascending-amount rule; a debit its dealt half cannot carry goes to the other half, and one neither half can carry is emitted UNSETTLED, exactly as `§4.2` already does for a day batch. | New mechanism, as §3.0 sketched; the debit rule is the one addition, needed because a split half has less credit than the whole day. |
+| Bank side | Both `S₁` and `S₂` carry a clean `bank_ref` **by declaration**, in addition to the frozen 30 % draw over all settlements. | §3.1's T5. The dark arm is `AMB-1D`, not built. |
+| Operator | `DROP_BATCH_IDENTITY` on exactly the two twins per split day, selected **by construction from the pair** and carried on the `Emission` beside `F05`'s `withheld_recon_lines`; the operator draws nothing. It sets `settlement_id` and `settlement_utr` to `null` and touches no other field; the degradation record names both fields. | As §3.0. The selection is the family's, not a rate; the operator still only removes information from observations. |
+| Composition | `S = 34`, `B = 34` → `target_record_count = 2621 + 6 = 2627`. | As §3.0's `δ = +2k`. |
+
+Predicted outcomes, recorded before the run in §B.3: engine `AMBIGUOUS` /
+`EVIDENCE_TIE` on all six targets per instance; `Δs = 0` bps; materiality
+`≈ 1.25 % × credit`, i.e. ≥ ₹112 against `τ = max(₹100, 10 bps × (amount(A) +
+amount(B)))`; oracle `TRULY_AMBIGUOUS` with `solution_count = 2`.
+
+### B.3 The end-to-end run
+
+`generateFamily("A01", 7001)` (7001 is in no `§6.1` block) through
+`runAssayComposedFull(..., { agentId: "ASSAY" })` — the composition
+`agentById("ASSAY").run` drives, evidence returned instead of discarded.
+Pinned by `apps/cli/tests/bench-v2-amb1.test.ts`. **Not benchmark evidence**
+(§A): one instance of a stress family at a test seed.
+
+```
+solve_outcomes   UNIQUE 21 · IMMATERIALLY_AMBIGUOUS 0 · DISCRIMINATED 0 · AMBIGUOUS 6 · INTRACTABLE 0
+abstentions      6   (the six twin-hosting settlements, and nothing else)
+EPSILON_BPS      1500          TAU  { floor_paise: 10000, component_value_bps: 10 }
+oracle           TRULY_AMBIGUOUS 6 (solution_count 2 on each) · UNAMBIGUOUS 28 · NO_SOLUTION 34
+```
+
+Per target (every one `outcome AMBIGUOUS`, `certificate_reason EVIDENCE_TIE`,
+`evidence_score_gap_bps 0`, `probes_attempted []`,
+`shared_hard_constraints [C1..C8]` — eight, both candidates identically):
+
+| target | pair | component | materiality_paise | tau_paise | τ arithmetic |
+|---|---|---|---|---|---|
+| `setl_VthVS5x5cWj1q6` (S₁, day 6) | A `pay_kz8dUDmyIgJysF` wallet ₹58,222.21 / B `pay_sQ1jUDAzMMTXCA` emi ₹58,934.45, credit ₹56,848.17 each | `comp_2820…` | **71,224** = \|5,893,445 − 5,822,221\| | **11,715** | `max(10,000, floor(10 bps × 11,715,666))` = `max(10,000, 11,715)` |
+| `setl_FQVoLeEzZpQHcs` (S₂, day 6) | same pair | same | 71,224 | 11,715 | same |
+| `setl_BUUgxGHCYH34Wy` (S₁, day 18) | emi ₹12,808.82 / wallet ₹12,654.02, credit ₹12,355.39 | `comp_7b82…` | 15,480 | 10,000 | `max(10,000, floor(10 bps × 2,546,284) = 2,546)` |
+| `setl_JGzPoPPhOGtj9Q` (S₂, day 18) | same | same | 15,480 | 10,000 | same |
+| `setl_peE5fLGlUraOq2` (S₁, day 21) | netbanking ₹9,699.88 / emi ₹9,818.54, credit ₹9,470.96 | `comp_15eb…` | 11,866 | 10,000 | `max(10,000, 1,951)` |
+| `setl_NAlyFEihRGaTsc` (S₂, day 21) | same | same | 11,866 | 10,000 | same |
+
+Materiality is the `1100_GATEWAY_RECEIVABLE` leg of `P2` — `Σ amount` differs,
+`1200_BANK` cannot (`C6`), as §1.1 point 4 predicted. The oracle's `tau_paise`
+on the day-6 pair is **11,716** against the engine's **11,715**: §1.6's
+`roundHalfUp` vs `Math.floor` divergence, observed at exactly one paisa.
+
+Both candidate allocations, day-6 pair, target `setl_VthVS5x5cWj1q6`
+(nine anchored members shared; the tenth is the twin):
+
+```
+solution_a  cand_14c7…  [ …9 anchored…, obs_dxudBUJz1tswNr ]   = pay_kz8dUDmyIgJysF  wallet  amount 5,822,221
+solution_b  cand_e71c…  [ …9 anchored…, obs_tTqro0DwcKvYGv ]   = pay_sQ1jUDAzMMTXCA  emi     amount 5,893,445
+```
+
+Both twin-hosting settlements carry an `AN2` link (`bnk_NYR7PGISn2SmkE`
+`bank_ref 2774104925c956bp` ↔ `setl_VthVS5x5cWj1q6`; `bnk_bTEdH4rkpPQiel`
+`1479789551e11o15` ↔ `setl_FQVoLeEzZpQHcs`), which is why `materiality_paise`
+is a number and the reason is `EVIDENCE_TIE`, not `MATERIALITY_UNDETERMINED`.
+
+**Adversarial check on the construction — the twins field by field.** The two
+`recon_line` observations differ in `entity_id`, `order_id` (identity) and
+`amount`, `fee`, `tax`, `method` (the deliberate, material difference) and in
+**nothing else**: `created_at`, `settled_at`, `credit`, `settled`,
+`settlement_id = null`, `settlement_utr = null`, `card_*`, `dispute_id`,
+`payment_id`, `posted_at`, `credit_type`, `on_hold`, `currency`, `type`, `debit`
+are equal. The `payment` observations differ in `id`, `order_id`, `amount`,
+`method` only; the `order` observations in `id`, `amount`, `amount_paid` only.
+**One residual difference outside the observations `S2` reads:** the merchant
+`ledger_entry` of twin A carries a `booked_at` one day earlier than its
+`created_at` — `§4.2`'s 10 % merchant-clock offset, drawn from the `merchant`
+sub-stream before and independently of the family's coin. It cannot indicate
+batch membership (both batches are the same day and instant) and no live
+signal reads it, but it is a field that differs and is recorded here as such;
+excluding offset captures from twin candidacy is a one-line change if the
+reviewer wants the ledger side identical too (§9.10).
+
+**An engine observation, not a defect claim.** An abstained settlement commits
+no allocation, so its anchored constituents get no `targetOfMember` entry and
+`classifyMember` sends them to `E02_MISSING_SETTLEMENT` (payments) /
+`E11_TIMING_BOUNDARY` (refunds) — 54 lines here, across the six targets —
+rather than to `ABSTAINED` with the component's certificate. That is
+`apps/cli/src/agents/assay.ts` as written and has never been reached on
+generated data before; it bears on `unresolved_value_paise` and on the `A2`
+comparison and is for the next order to read, not this one to change.
 
 ---
 
@@ -995,14 +1204,14 @@ should be disclosed as a v1 limitation row when bench-v2 is registered.
 
 ## 9. Open questions for the reviewer
 
-1. **Same-day split batches vs cross-day co-instant batches for the twin
-   host.** §3.0 proposes `split_batch` (new true-state mechanism, changes
+1. **DECIDED — §B D1 (same-day).** Same-day split batches vs cross-day co-instant batches for the twin
+   host. §3.0 proposes `split_batch` (new true-state mechanism, changes
    `S`/`B` per instance) because the cross-day form leaks `created_at` (R1).
    The cross-day form needs no new mechanism. Which, or both as two families?
-2. **Family id namespace.** Extend `F13..F19`, or a separate `A01..` namespace
+2. **DECIDED by construction — §B.2 (`A01..`).** Family id namespace. Extend `F13..F19`, or a separate `A01..` namespace
    for ambiguity families? `FamilyId` is one closed union either way; the
    choice is about how `§4.1`'s table reads.
-3. **`DROP_BATCH_IDENTITY` as a new operator** vs relaxing
+3. **DECIDED — §B D2 (new operator).** `DROP_BATCH_IDENTITY` as a new operator vs relaxing
    `families.ts:83-97`'s single-carrier assertion so new families may declare
    `DROP_SETTLEMENT_ID` plus a separate `DROP_FIELD(settlement_utr)`
    (`DROP_FIELD` is declared and unassigned today). The new operator is
@@ -1026,6 +1235,11 @@ should be disclosed as a v1 limitation row when bench-v2 is registered.
 9. **`AMB-4` in phase 1 at all?** It is indistinguishable from `AMB-1` until
    the probe is wired. Including it now fixes its seeds before anyone sees a
    probe result, which is the pre-registration argument for it.
+10. **Merchant-clock offset on a twin's ledger entry** (§B.3). Exclude offset
+   captures from twin candidacy so the `ledger_entry` side is identical too,
+   or leave it, since no batch information reaches it? Costs one condition in
+   the selection; the offset draw would have to be read before the twins are
+   chosen.
 
 ---
 
