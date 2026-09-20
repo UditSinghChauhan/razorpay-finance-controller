@@ -328,21 +328,6 @@ describe("S4 → S5 integration", () => {
     expect(r.valid).toBe(true);
   });
 
-  // PINNED THE M61 DEFECT — retained verbatim, not run, pending the reviewer's
-  // decision (spec 1.4.39). `solveFixture` passes `bank_evidence: null`, so the
-  // IMMATERIALLY_AMBIGUOUS this test expected was reached only by reading an
-  // absent comparand as materiality 0. What it meant to pin — that an accepted
-  // immaterial best routes through the gate — is pinned by the test below it,
-  // which supplies the comparand.
-  it.skip("routes IMMATERIALLY_AMBIGUOUS's accepted best through the gate [PINNED M61 DEFECT — superseded]", () => {
-    const m = [member(1), member(2)];
-    const s4 = solveFixture(m, [[1], [2]]);
-    expect(s4.outcome).toBe("IMMATERIALLY_AMBIGUOUS");
-    const chosen = m.filter((x) => s4.best?.candidate.member_obs_ids.includes(x.obs_id));
-    const r = validate(base({ members: chosen }));
-    expect(r.valid).toBe(true);
-  });
-
   it("routes IMMATERIALLY_AMBIGUOUS's accepted best through the gate (with a comparand)", () => {
     const m = [member(1), member(2)];
     const s4 = solve({
@@ -376,10 +361,32 @@ describe("S4 → S5 integration", () => {
     expect(r.valid).toBe(true);
   });
 
+  /**
+   * The S4→S5 hand-off this fixture pinned through the wrong door through spec
+   * 1.4.38, asserted as what now actually happens.
+   *
+   * Under the name *"routes IMMATERIALLY_AMBIGUOUS's accepted best through the
+   * gate"*, this exact call — `solveFixture(m, [[1], [2]])`, which passes
+   * `bank_evidence: null` — asserted, verbatim:
+   *
+   *     expect(s4.outcome).toBe("IMMATERIALLY_AMBIGUOUS");
+   *     ...
+   *     expect(r.valid).toBe(true);
+   *
+   * That pinned a defect: what it meant to check — that an ACCEPTED immaterial
+   * best is routed to the gate and validates — it reached only because an
+   * absent comparand was read as materiality `0`, so S4 accepted a best it had
+   * no measurement for and S5 validated a commit that should never have been
+   * offered. The routing itself is pinned by the test above, which supplies
+   * the comparand. On this fixture, `§6` (spec 1.4.39, `DATA_MODEL.md §22.2`
+   * M61) abstains, and there is no accepted best for the gate to route.
+   */
   it("does NOT route a MATERIALITY_UNDETERMINED component to an accept (M61)", () => {
     const m = [member(1), member(2)];
     const s4 = solveFixture(m, [[1], [2]]);
     expect(s4.outcome).toBe("AMBIGUOUS");
+    expect(s4.outcome).not.toBe("IMMATERIALLY_AMBIGUOUS");
+    expect(s4.materiality_paise).toBeNull();
     expect(s4.certificate_reason).toBe("MATERIALITY_UNDETERMINED");
   });
 
