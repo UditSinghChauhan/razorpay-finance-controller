@@ -1,13 +1,16 @@
 # bench-v2 — design proposal: making under-determination reachable
 
-**Status: PROPOSAL, with three decisions taken and one increment built.** No
+**Status: PROPOSAL, with three decisions taken and two increments built.** No
 seed is drawn, no corpus is generated, nothing is sealed. §A below states what
 this corpus is not; §B records the three decisions the reviewer has taken and
-the one increment (`AMB-1` alone) built under them. Everything after §0 is the
+the first increment (`AMB-1` alone) built under them; §C records the second
+increment — four investigations the reviewer ordered before any new family,
+the four remaining families (`AMB-2`, `AMB-3`, `AMB-5`, `BENIGN`), and the
+rates it proposes for the pre-registration. Everything after §0 is the
 reconnaissance this document began as: it reads the frozen code, states what it
 found with line references, corrects the starting sketch where the code
-contradicts it, and leaves every decision not listed in §B as an explicit open
-question (§9).
+contradicts it, and leaves every decision not listed in §B or §C as an explicit
+open question (§9).
 
 Ground rules this proposal was written under, restated so the reader can check
 them against every line below:
@@ -229,6 +232,262 @@ rather than to `ABSTAINED` with the component's certificate. That is
 `apps/cli/src/agents/assay.ts` as written and has never been reached on
 generated data before; it bears on `unresolved_value_paise` and on the `A2`
 comparison and is for the next order to read, not this one to change.
+
+
+---
+
+## C. Increment 2 — four investigations, four families, the rates
+
+Order of 2026-09-21. Same constraints as §B: additive in `packages/generator`
+and its tests plus `apps/cli/tests`; no engine, oracle predicate, metric or
+`§7` threshold moves; every `§4.1` family and `A01` byte-identical (checked
+against the pre-increment generator at seeds 7001 and 7002 over observations,
+untrusted text, ground truth and recon report — 22 digests, all equal).
+Nothing here is benchmark evidence (§A): every number below is one stress
+family at a test seed, measuring a mechanism, not a rate.
+
+### C.1 The four investigations
+
+**A1 — the "seven missing targets" do not exist.** The two figures are over two
+populations. The oracle labels **every** settlement, anchored or not
+(`enumerate.ts:294` emits `status: "ANCHORED"` with one solution for a
+settlement whose anchored members tie out), and every bank line; the engine's
+`solve_outcomes` tallies **`seam.targets` only**. On `A01` at 7001:
+
+| population | oracle | engine stage | engine terminal state |
+|---|---|---|---|
+| 28 settlements, fully `AN1`-anchored | `UNAMBIGUOUS`, `solution_count 1` | `S1`, `AN1_ALREADY_TIED_OUT` — never enter `S2` | `RECONCILED`, all 28 |
+| 6 twin-hosting settlements | `TRULY_AMBIGUOUS` | `S4` `AMBIGUOUS` | `ABSTAINED` / `EVIDENCE_TIE` |
+| 13 bank lines `AN2` matched | `NO_SOLUTION` | `S1`, `AN2_MATCHED` | `RECONCILED` |
+| 21 bank lines not matched | `NO_SOLUTION` | `S2` with zero candidates → `solve` returns `UNIQUE` with `best === null` | `EXCEPTION` / `E03` |
+
+The 28 `UNAMBIGUOUS` and the 21 `UNIQUE` are **disjoint sets**; `28 − 21 = 7`
+is a coincidence of two unrelated counts. Every oracle-determinable target
+reached the oracle's one solution. Verdict: none of (i), (ii), (iii) — a
+denominator misread, and finding (iii) is **zero**, so no redesign. Two
+consequences for the metric definitions to come: (a) on `AMB-1` alone the
+false-abstention denominator is **empty** — no determinable settlement reaches
+`S2` — which is what `BENIGN` is for; (b) `solve_outcomes.UNIQUE` is not
+"targets committed on one solution": it also counts every zero-candidate target
+(`s4-solve.ts:681`), so a per-family outcome distribution (§4.3) must split
+`UNIQUE` by `best === null`. Pinned in `apps/cli/tests/bench-v2-families.test.ts`.
+
+**A2 — the `tau` divergence, guarded.** Confirmed: engine
+`max(10_000, Math.floor(V × 10 / 10_000))` (`s4-solve.ts` `tauFor`), oracle
+`max(10_000, roundHalfUp(V × 10 / 10_000))` (`classify.ts:112`), `V` the
+component's unanchored value. They differ by exactly one paisa when `V mod
+1,000 ≥ 500` and the proportional term exceeds the floor (`V > ₹1,00,000`);
+over 20 seeds of `A01` the two differed on **18 of 120** abstained targets (46
+had the proportional term binding). The disagreement window is
+`(tau_floor, tau_round_half_up]`: a materiality inside it is `AMBIGUOUS` to the
+engine and `IMMATERIALLY_AMBIGUOUS` to the oracle. **The guard**
+(`packages/generator/tests/bench-v2-families.test.ts`, "the tau guard"): over
+seeds 7001–7020 and every split of `A01`, `A02`, `A03`, the materiality
+computed from the true state is never inside the window and is at least ₹1
+clear of both values, on the side the family declares. Both formulas are
+restated in the test (this package may import neither). **Nothing trips it:**
+the smallest `materiality − max(tau)` observed is 1,420 paise (`A01`, ₹9,000
+credit floor → Δ ≈ ₹112.8 against ₹100), `A02`'s smallest over the whole
+committed table is ₹156, and `A03`'s components are worth ~₹10k so the floor
+binds on both formulas and they cannot diverge. The engine-side companion
+(`apps/cli/tests`, "A2") checks certificate `tau_paise` against the oracle
+label's on the same targets: `|diff| ≤ 1`, never straddling.
+
+**A3 — exchangeability, measured.** Frame: the twin that **stays** in the day's
+own batch (`settlement_a`, keeps id/cycle/instant) versus the twin that
+**moves** to the appended batch. Merchant-ledger `booked_at` offset, `A01`:
+
+| seeds | pairs | offset on stay only | on move only | both | share on stay |
+|---|---|---|---|---|---|
+| 7001–7020 | 60 | 10 | 5 | 0 | 0.667 |
+| 7001–7040 | 120 | 16 | 8 | 1 | 0.667 |
+| 7001–7100 | 300 | 27 | 27 | 3 | **0.500** |
+| 7001–7200 | 600 | 52 | 56 | 8 | 0.481 |
+
+The offset is drawn from the `merchant` stream before and independently of the
+family's coin, so the expected share is exactly ½. The 20-seed figure the
+order asked for is a **15-pair sample** (10:5; two-sided p ≈ 0.30 on a fair
+coin) and says nothing either way — at 10 % offset incidence, 20 seeds yield
+too few single-offset pairs to measure a rate, which is why the pin is over
+200 seeds. Pinned for `A01`, `A02` and `A03` (`bench-v2-exchangeability.test.ts`):
+share in `[0.33, 0.67]`, the fair-coin 99 % band at ~55 single-offset pairs. The offset is **not removed**
+(§9.10): an independent difference is evidence the construction is not scrubbed.
+
+*Correlation sweep, every field.* For each of the twins' four observations
+(`recon_line`, `payment`, `order`, `ledger_entry`), their envelope (`obs_id`,
+`source_line`, `ingest_hash`) and their quarantined text (`order_receipt`,
+`memo`), the sign of `compare(stay, move)` over 300 pairs (100 seeds):
+**48 fields identical on every pair; 33 fields differ and every one splits
+within 135:165** — the identity fields, the deliberate `(amount, fee, tax,
+method)` difference and what derives from it (`gross_paise`,
+`expected_net_paise`, `memo`), the envelope (minted and line-numbered in
+payment-index order, and the index is a coin: lower index stays 154/300), and
+`booked_at`. No field is skewed. Pinned at 40 seeds with the coin set listed
+exhaustively, so a new differing field fails the test by name.
+**One asymmetry, on the targets:** the appended batch's `settlement` and
+`bank_line` observations always carry a later `source_line` (300/300) — a
+reader can tell which of the two batches is the split-off one. It names no
+twin: the twin-to-batch coin is independent of everything (EMI twin stays
+135/300), which is what the sweep measures. Pinned as a known asymmetry.
+Through the engine, over 20 seeds, **`best` — what `A2-NOABSTAIN` commits — is
+the truth twin on 60 of 120 abstained targets (0.500)**; pinned in
+`[0.38, 0.62]`.
+
+**A4 — the abstention cascade, quantified (`A01` at 7001, nothing changed).**
+
+| target | half | anchored constituents | ASSAY constituent states | own Suspense items | A2 target | A2 constituents | A2 twin |
+|---|---|---|---|---|---|---|---|
+| `setl_VthVS…` day 6 | S₁ | 9 (9 pay) | 9 × E02 | 9 | RECONCILED | 9 RECONCILED | committed, **right** |
+| `setl_FQVo…` day 6 | S₂ | 9 (8 pay, 1 refund) | 8 × E02, 1 × E11 | 8 | EXCEPTION/E05 | 8 × E02, 1 × E11 | none |
+| `setl_BUUg…` day 18 | S₁ | 15 (13 pay, 2 refund) | 13 × E02, 2 × E11 | 13 | RECONCILED | 15 RECONCILED | committed, **wrong** |
+| `setl_JGzP…` day 18 | S₂ | 4 (4 pay) | 4 × E02 | 4 | EXCEPTION/E05 | 4 × E02 | none |
+| `setl_peE5…` day 21 | S₁ | 11 (11 pay) | 11 × E02 | 11 | EXCEPTION/E05 | 11 × E02 | none |
+| `setl_NAly…` day 21 | S₂ | 6 (6 pay) | 6 × E02 | 6 | RECONCILED | 6 RECONCILED | committed, **wrong** |
+| **total** | | **54** | **51 E02, 3 E11** (+ 3 `refund` views E11) | **51** | 3 / 3 | 30 RECONCILED, 23 E02, 1 E11 | 3 committed |
+
+Rupees. ASSAY: `value_abstained_paise` = **5,16,851.95** (the six settlement
+amounts); the 51 E02 lines post P6 and open their own Suspense items worth
+**₹3,85,992.17** (38,599,217 paise) — value that is already inside the six
+abstained amounts, so `unresolved_value_paise` (₹54,21,169.37 on this
+instance) carries it twice; the six twins are `ABSTAINED`/`MEMBER` and post
+nothing (§17.1.1's third abstention row, working as written). A2: commits
+**33 lines worth ₹3,06,575.00** (30,657,500 paise) where ASSAY excepts or
+abstains — 30 constituents (₹2,25,998.89) plus the three tie-broken twins
+(₹80,576.11), of which two twins (₹22,353.90) are wrong in fact; the other
+three targets fail `I2` on the already-committed twin and land in
+`EXCEPTION/E05` with their 24 constituents cascading exactly as under ASSAY.
+A2's `unresolved_value_paise` is lower than ASSAY's by ₹6,60,814.85.
+
+*Is E02/E11 correct?* **No.** `DATA_MODEL.md §15` defines `E02` as *"captured
+and past the settlement window, never settled"* and `E11` as an event outside
+the period or a refund whose settlement falls outside it. These lines are
+`settled: true`, carry a `settled_at` and a `settlement_id`, and `AN1` anchored
+them to a settlement observation that exists in period. They were settled;
+their settlement is undetermined. The taxonomy that fits is the one the twins
+already get — `ABSTAINED`/`MEMBER` carrying the component's certificate — and
+the cascade produces a misleading class because `classifyMember`
+(`assay.ts:1705`) gives that state only to **pool** members of an abstained
+component; anchored members are not in the component's member list
+(`s3-decompose.ts` nodes are unanchored members and targets) and fall through.
+Under A2 the `E05_AMOUNT_MISMATCH` class on the `I2` fallout is a second
+misnomer: the tie-out did not fail by a delta, the member was already
+allocated. Both are `apps/cli/src/agents/assay.ts` as written, reachable only
+on this corpus, reported here and not changed. **Headline framing this
+decides:** "ASSAY abstains on 6 settlements (₹5.17 lakh)" is the true sentence
+about the mechanism; "ASSAY leaves 54 items unresolved" is also true but
+counts the same break 55 times and mislabels 54 of them; the honest metric is
+per **target** with the cascade disclosed and `unresolved_value_paise` reported
+beside its double-counted component.
+
+### C.2 The families, as built and as observed
+
+Every parameter is a new constant in `frozen.ts`'s bench-v2 section; rates are
+**Convention 1, provisionally** (three days each), as `AMB-1`'s, with §C.3
+proposing the final values. Each family carries `DROP_BATCH_IDENTITY`, whose
+`OPERATOR_DECLARING_FAMILY` row is now a **list** `["A01", "A02", "A03",
+"A05", "B01"]`; `families.ts`'s guard is unchanged in both directions
+(carriers must be exactly the declared ones, in order — a family that runs the
+operator unlisted, or a listed one that drops it, still refuses to load), and
+the `§4.3` rows stay single-valued. `TrueState` gains `identity_drops`
+(members selected by construction) and `SimSplitBatch` a `construction` tag and
+an `A02` `refund` index; `emit.ts` maps drops to entity ids and decides nothing.
+
+| id | family | construction | expected | **observed at 7001** | matches? |
+|---|---|---|---|---|---|
+| `A02` | `AMB-2` refund netting | 3 split days; `P` and `P2` on one non-card method, one clock; an **existing** refund rewritten onto `P2` (`R = max(₹250, 5 % × credit(P))`, same day, after the capture, forced into `P2`'s half first); `credit(P2) − R = credit(P)`; all three lines detached; both halves clean `bank_ref` | `AMBIGUOUS` / `EVIDENCE_TIE`; oracle `TRULY_AMBIGUOUS`, 2 solutions; `Δ2200 = R`, `Δ1100 ≈ R/0.9764` | 6 × `AMBIGUOUS`/`EVIDENCE_TIE`, materiality 25,604 or 103,336 vs `tau` 10,000; solutions `{P}` vs `{P2, R1}` on every target; oracle `TRULY_AMBIGUOUS` × 6, `solution_count 2`, 8 subsets enumerated over a 3-line pool; gate passes; **gap 6–15 bps, not 0** | yes — the non-zero gap is the refund's later clock (sub-ε). **Finding:** `best` is the refund-carrying allocation on **both** targets of a pair (`SE3` mean favours the shorter refund lag), so A2 is right on exactly one per pair — ½ by symmetry, not by coin |
+| `A03` | `AMB-3` sub-`tau` boundary | `AMB-1`'s twins with the gross delta drawn in **[₹51, ₹80]** (155 table atoms; credit ≈ ₹4,070–6,385); both halves clean `bank_ref` | `IMMATERIALLY_AMBIGUOUS` at frozen `tau`, commit; `AMBIGUOUS` at the ₹50 and ₹10 sweep floors; oracle `IMMATERIALLY_AMBIGUOUS` | 6 × `IMMATERIALLY_AMBIGUOUS`, 0 abstentions, oracle `IMMATERIALLY_AMBIGUOUS` × 6 at `tau` 10,000; at `tauFloorPaise` 5,000 and 1,000: 6 × `AMBIGUOUS`, 6 abstentions — **the sweep is non-flat** | yes. **Finding:** the immaterial accept on a coupled pair commits **one** target (the smaller canonical key's twin, to whichever target posts first) and the other fails `I2` → `EXCEPTION/E05`; the uncommitted twin lands in `E02`. Three of six touched targets are exceptions on a family the oracle calls determinable |
+| `A05` | `AMB-5` search bound | 3 batches at pairwise-distinct instants, **15** payment lines each detached; no split; frozen `bank_ref` draw | `S2` `INTRACTABLE` → `ABSTAINED` / `SEARCH_BOUND_EXCEEDED`; oracle enumerates `2^15`, `UNAMBIGUOUS`; metric 4 false abstention | 3 × `ABSTAINED`/`SEARCH_BOUND_EXCEEDED`; oracle `UNAMBIGUOUS`, 1 solution, 32,768 enumerated over a 15-line pool; `abstentionMetrics`: abstained 3, truly ambiguous 0, **precision 0** — reported as such | yes on the verdict. **Finding:** `solve_outcomes.INTRACTABLE` is **0** — the bound is `S2`'s `GenerationStatus`, `solve` sees no candidate and returns `UNIQUE` with `best === null`, and the §6 tally counts these under `UNIQUE`; `certificateFor` fills `solution_a`/`solution_b` with **empty** allocations and `materiality 0`. And the A4 cascade reaches all 45 detached lines: `E02` each |
+| `B01` | `BENIGN` | three disjoint day blocks in one instance: `BEN-1` one line detached (3 days), `BEN-2` two lines (3 days), `BEN-3` a same-day split with one line from each half and credits differing ≥ ₹1 (3 days, 6 targets); `BEN-1`/`2` days avoid `BEN-3`'s days **and instants** | `UNIQUE` / `UNAMBIGUOUS` on all 12; every one reaches `S2` | 12 × `RECONCILED`, oracle `UNAMBIGUOUS` with 1 solution; pools of 1 (`BEN-1`) or 2 (`BEN-2`, `BEN-3`), 2 or 4 subsets enumerated; every detached line committed to its true settlement; 0 abstentions | yes. `BEN-3` is `AMB-1`'s host with nothing rewritten — same split, same pooling, same 2-line class — so the only difference from `AMB-1` is that the credits differ, which is what makes it the direct control |
+| — | `AMB-4` | **deferred** to the probe phase (§3.4): indistinguishable from `AMB-1` while the loop is inert | — | — | — |
+
+`AMB-2`'s equal-value/different-cardinality form (§3.2 `AMB-2i`, two same-rate
+captures against one) is **not built**: it is `IMMATERIALLY_AMBIGUOUS`, which
+`A03` already exercises as a boundary control with a declared margin, and as an
+ambiguity case it is not useful. If it is ever wanted it is a
+`DISCRIMINATED`-unreachable immaterial control, not an ambiguity family.
+
+### C.3 Rates, derived
+
+`AMB1_PAIR_RATE` and its siblings are Convention 1 (three days of 31) in the
+code. The pre-registration should re-declare them from what each metric
+needs, and the derivation is below. Units: `T` truly-ambiguous targets per
+seed, `B` determinable targets reaching `S2` per seed; a block is five seeds;
+`n` is the count the metric divides by. Three tools: a proportion's resolution
+is `1/n`; its standard error at `p = ½` is `0.5/√n`; with zero events observed
+the 95 % upper bound on the rate is `3/n` (rule of three).
+
+1. **Abstention recall per family** (§4.1's per-family cut) predicts 1.0 on the
+   clean-bank arm; what the corpus can *say* is `≥ 1 − 3/n`. To claim ≥ 0.95
+   per family at block level needs `n ≥ 60` per family per block, i.e. **12
+   targets per instance = 6 split days = 20 % of 31**, for `AMB-1` and for
+   `AMB-2` each. At 10 % (`n = 30`) the bound is 0.90, and a single miss reads
+   as 3.3 % of a seed's targets rather than 8 %. Seed-level recall (`n = 12`)
+   resolves only to 1/12 and is a diagnostic, not a result.
+2. **The R3 leak detector** (§4.4, `a2_misallocation / committed ≈ ½`) is a
+   block-level statistic: at `T = 12` from `AMB-1` alone, `n = 60` per block,
+   SE 0.065, so a leak at 0.7 is 3σ; at seed level (`n = 12`, SE 0.14) it is
+   not readable. `AMB-2` does not add to this test — its ratio is ½ by
+   symmetry (§C.2) — so the detector rests on `AMB-1`'s 6 pairs.
+3. **False-abstention rate** needs a denominator on which one false abstention
+   moves the rate by less than the effect anyone would act on. The
+   mechanism-level expectation is ~0.05 % (a subset-sum coincidence needs
+   equal credits from a 2,048-atom table); no feasible block resolves that,
+   so the criterion is: **one event must read below 0.5 %**, i.e. `B ≥ 200`
+   per block, and the zero-event upper bound then sits at 1.5 %. Per `B01`
+   instance the yield is `BEN-3` days × 2 + `BEN-1` days + `BEN-2` days,
+   bounded by 31 days and by `BEN-1`/`2` having to avoid `BEN-3`'s instants
+   (a `T+2` day's instant is shared by its `T+1` successor and `T+3`
+   predecessor; ~3 and ~5 such days exist, so ≤ 8 days can be blocked).
+   **`BEN-3` 8 days (26 %), `BEN-1` 6 (19 %), `BEN-2` 6 (19 %) → 28 targets
+   per instance, 140 per block**, with 20 days used and ≥ 11 − 8 spare
+   against the instant constraint. `AMB-3`'s targets are determinable and
+   reach `S2` (12 per instance at 20 %, 60 per block) and count in `B`, so
+   `B = 200` per block from one `B01` and one `A03`. A second benign slot
+   would need a **second family id** (`B02`, same mechanics) because two
+   instances of one id at one seed are byte-identical; it takes `B` to 340
+   (upper bound 0.9 %) at the cost of one instance per seed, and is
+   recommended if the band allows it.
+4. **`AMB-3`** at 20 % (6 pairs, 12 targets) for the same per-family reason
+   as 1: the `tau` sweep's non-flatness is `2k` flips per seed, and the
+   `I2`-fallout finding (half its targets except) is a per-family count that
+   should be measurable at `n ≥ 60`.
+5. **`AMB-5`** is qualitative: metric 4's precision on it is 0 by the
+   metric's own construction whatever the count, and in a mixed block it
+   would be `T/(T + 5k)` — a number chosen, not measured. Keep **3 batches
+   (Convention 1)** for within-seed replication, and keep it in its **own seed
+   block** as §3.7 does, so the primary block's precision measures the benign
+   mechanism and the search-bound block's measures the bound. Its 45 `E02`
+   lines per instance (the cascade) will dominate that block's exception
+   counts, which is the point.
+
+Resulting per-seed shape for the primary block: `[A01, A02, A03, B01]` (+
+`B02`) → `T = 24`, `B = 40` (+ 28), abstentions expected 24, ~13.1k records
+(+2.6k) — inside the band. Per-instant pooling across `A01`/`A02`/`A03` at
+20 % each is expected on ~4–5 days per seed; it merges no component (the
+families' candidates share no member) and adds a third solution only on an
+exact-credit coincidence, which the oracle labels and the per-family
+`solution_count` distribution (§8 R5) makes visible. Disjoint declared day
+ranges per family remain the cleaner composition and are the next order's
+call, as is the search-bound block's fourth instance (`[A05, B01, B02]` is
+below the 10,000 floor).
+
+### C.4 Findings for the next order, collected
+
+Reported, not repaired, all in `apps/cli/src/agents/assay.ts` or the §6 tally:
+
+1. **The cascade** (§C.1 A4): anchored constituents of an abstained target are
+   classed `E02`/`E11` and the `E02` lines re-post their value to Suspense.
+2. **Immaterial accept on a coupled pair** (`A03`): one commit, one
+   `I2` refusal reported as `E05_AMOUNT_MISMATCH`, one twin in `E02`.
+3. **`SEARCH_BOUND_EXCEEDED` is invisible in `solve_outcomes`** (`A05`): the
+   bound is `S2`'s and the tally counts the target under `UNIQUE`; the
+   certificate carries two empty solutions.
+4. **`UNIQUE` conflates one solution with none** (§C.1 A1): zero-candidate
+   targets tally as `UNIQUE` with `best === null`.
+5. **Metric 4 disagrees with the engine's own bound** (`A05`): a true engine
+   bound on an oracle-determinable target is a false abstention under the
+   frozen formula. Reported as such; §4.2's `EXPLORATORY` companion is where
+   the other reading lives.
 
 ---
 
@@ -1216,10 +1475,11 @@ should be disclosed as a v1 limitation row when bench-v2 is registered.
    `DROP_SETTLEMENT_ID` plus a separate `DROP_FIELD(settlement_utr)`
    (`DROP_FIELD` is declared and unassigned today). The new operator is
    cleaner; the relaxation touches an existing check.
-4. **Rates and counts.** `AMB-1` pairs per instance (3 at 10 %, 6 at 20 %);
-   `BENIGN` selection rates; one or two `BENIGN` slots per seed. §3.6's
-   `n ≈ 215` gives a ~1.4 % upper bound on the false-abstention rate; is that
-   enough, or should the benign block be larger than the ambiguity block?
+4. **Rates and counts — PROPOSED in §C.3, not yet declared.** `AMB-1`,
+   `AMB-2`, `AMB-3` at 20 % (6 split days, 12 targets each); `BENIGN` at
+   `BEN-3` 8 / `BEN-1` 6 / `BEN-2` 6 days (28 targets); `AMB-5` at Convention
+   1 in its own block; a second benign id `B02` if the band allows. The code
+   carries Convention 1 everywhere until the pre-registration re-declares.
 5. **`GroundTruth` shape.** No new field is required for any metric in §4.
    Recording which twin was constructed (a `construction` tag per allocation)
    would help per-family debugging but is exactly the kind of annotation `§3`
