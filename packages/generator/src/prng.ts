@@ -219,7 +219,12 @@ export const STREAMS = Object.freeze({
   OP_DUPLICATE_ROW: "op:DUPLICATE_ROW",
   OP_INJECT_NOTES: "op:INJECT_NOTES",
   OP_CONFLICT_REFERENCE: "op:CONFLICT_REFERENCE",
-  // bench-v2 (docs/BENCH_V2_DESIGN.md §B.2).
+  // bench-v2 (docs/BENCH_V2_DESIGN.md §B.2, §C). One stream per family
+  // mechanism, so no family's draws shift another's.
   AMB1: "amb1",
+  AMB2: "amb2",
+  AMB3: "amb3",
+  AMB5: "amb5",
+  BENIGN: "benign",
   OP_DROP_BATCH_IDENTITY: "op:DROP_BATCH_IDENTITY",
 } as const);

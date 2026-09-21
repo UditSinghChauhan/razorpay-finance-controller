@@ -28,6 +28,12 @@ import { roundHalfUp } from "@assay/money";
 import {
   ADJUSTMENT_RATE,
   AMB1_PAIR_RATE,
+  AMB2_PAIR_RATE,
+  AMB3_PAIR_RATE,
+  AMB5_DAY_RATE,
+  BEN1_DAY_RATE,
+  BEN2_DAY_RATE,
+  BEN3_DAY_RATE,
   AUTHORISED_NOT_CAPTURED_RATE,
   DISPUTE_RATE,
   DRIVER_PAYMENTS_PER_FAMILY,
@@ -131,6 +137,20 @@ export const PARTIAL_REFUND_COUNT = realize(REFUND_PARTIAL_SHARE, COMPOSITION.R)
  */
 export const AMB1_PAIR_COUNT = realize(AMB1_PAIR_RATE, COMPOSITION.S);
 
+/** bench-v2 `AMB-2` (`§3.2`): split days hosting a refund-netting pair. */
+export const AMB2_PAIR_COUNT = realize(AMB2_PAIR_RATE, COMPOSITION.S);
+
+/** bench-v2 `AMB-3` (`§3.3`): split days hosting a sub-`tau` twin pair. */
+export const AMB3_PAIR_COUNT = realize(AMB3_PAIR_RATE, COMPOSITION.S);
+
+/** bench-v2 `AMB-5` (`§3.5`): batches that lose `AMB5_DROP_COUNT` lines. No split. */
+export const AMB5_DAY_COUNT = realize(AMB5_DAY_RATE, COMPOSITION.S);
+
+/** bench-v2 `BENIGN` (`§3.6`): the three day blocks, disjoint, in one instance. */
+export const BEN1_DAY_COUNT = realize(BEN1_DAY_RATE, COMPOSITION.S);
+export const BEN2_DAY_COUNT = realize(BEN2_DAY_RATE, COMPOSITION.S);
+export const BEN3_DAY_COUNT = realize(BEN3_DAY_RATE, COMPOSITION.S);
+
 /** `§4.2`: T+1 for 10% of batches. */
 export const T_PLUS_1_BATCHES = realize(
   { num: SETTLEMENT_CYCLE.t_plus_1.rate_num, den: SETTLEMENT_CYCLE.t_plus_1.rate_den },
@@ -164,8 +184,14 @@ export const FAMILY_DELTA: Readonly<Record<FamilyId, number>> = Object.freeze({
   F10: 0,
   F11: 0,
   F12: 0,
-  // bench-v2 `AMB-1`: one extra settlement and one extra bank line per split day.
+  // bench-v2: one extra settlement and one extra bank line per split day.
+  // `AMB-2` rewrites an EXISTING refund onto `P2` rather than adding one, so its
+  // delta is the split alone; `AMB-5` splits nothing; `BENIGN`'s split days are `BEN-3`'s.
   A01: +2 * AMB1_PAIR_COUNT,
+  A02: +2 * AMB2_PAIR_COUNT,
+  A03: +2 * AMB3_PAIR_COUNT,
+  A05: 0,
+  B01: +2 * BEN3_DAY_COUNT,
 });
 
 /** The derived `target_record_count` for every family. `F11`/`F12` are not implemented. */

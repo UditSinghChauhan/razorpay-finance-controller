@@ -20,7 +20,7 @@
  */
 
 import {
-  add, paise, sub, sum, type Paise,
+  add, paise, roundHalfUp, sub, sum, type Paise,
 } from "@assay/money";
 import type {
   AdjustmentId, DisputeId, OrderId, PaymentId, RefundId, SettlementId,
@@ -32,13 +32,17 @@ import {
   type FeeBreakdown, type Method,
 } from "./amount.js";
 import {
-  AMB1_PAIR_COUNT, COMPOSITION, F05_SELECTED_SETTLEMENTS, F06_PAIR_COUNT,
+  AMB1_PAIR_COUNT, AMB2_PAIR_COUNT, AMB3_PAIR_COUNT, AMB5_DAY_COUNT,
+  BEN1_DAY_COUNT, BEN2_DAY_COUNT, BEN3_DAY_COUNT,
+  COMPOSITION, F05_SELECTED_SETTLEMENTS, F06_PAIR_COUNT,
   PARTIAL_REFUND_COUNT, T_PLUS_1_BATCHES, T_PLUS_3_BATCHES, evenSplit, realize,
 } from "./composition.js";
 import { CARD_ISSUER_SET } from "./conventions.js";
 import { FAMILY_MECHANICS } from "./families.js";
 import {
   ADJUSTMENT_REASON_MIX, AMB1_BASE_METHODS, AMB1_MIN_CREDIT_PAISE, AMB1_TWIN_METHOD,
+  AMB2_MIN_REFUND_PAISE, AMB2_REFUND_BPS, AMB3_DELTA_RANGE_PAISE, AMB5_DROP_COUNT,
+  BEN1_DROP_COUNT, BEN2_DROP_COUNT, BEN3_MIN_CREDIT_GAP_PAISE,
   BANK_CLOCK_MAX_OFFSET_SECONDS, BANK_REF_CLEAN_RATE,
   CARD_NETWORK_MIX, CARD_TYPE_MIX, DISPUTE_STATUS_MIX, F03_CARD_RATE_BPS_AFTER,
   F09_LATE_WINDOW_DAYS, FEE_RATE_BPS, MERCHANT_CLOCK_OFFSET_RATE, METHOD_MIX,
@@ -169,15 +173,19 @@ export interface SimLedgerEntry {
 }
 
 /**
- * bench-v2 `AMB-1`: one capture day settled in two batches at one instant, each
- * carrying one twin (`docs/BENCH_V2_DESIGN.md §B.2`).
+ * bench-v2: one capture day settled in two batches at one instant, each
+ * carrying one twin (`docs/BENCH_V2_DESIGN.md §B.2`, §C).
  *
  * True state, never persisted: `GroundTruth` gains no field from it (`§9.5`),
- * and `emit.ts` reads it only to name the two twins whose batch identity
- * `DROP_BATCH_IDENTITY` removes. Which twin sits in which batch is a coin from
- * the family sub-stream, drawn independently of every other field (`§8` R3).
+ * and `emit.ts` reads it only through {@link TrueState.identity_drops}. Which
+ * twin sits in which batch is a coin from the family sub-stream, drawn
+ * independently of every other field (`§8` R3). Four constructions host a
+ * split: `A01` (material twins), `A02` (refund-netting twins, where the half
+ * holding `P2` also carries `P2`'s refund), `A03` (sub-`tau` twins) and
+ * `B01`'s `BEN-3` (two ordinary lines with differing credits — the control).
  */
 export interface SimSplitBatch {
+  readonly construction: "A01" | "A02" | "A03" | "BEN3";
   readonly day: number;
   /** The day's own batch, keeping its id, cycle and instant. */
   readonly settlement_a_index: number;
@@ -187,6 +195,12 @@ export interface SimSplitBatch {
   readonly twin_a: number;
   /** The twin carried by `settlement_b` (payment index). */
   readonly twin_b: number;
+  /**
+   * `A02` only: the construction's refund (index into `refunds`), carried by
+   * whichever half holds its parent capture — `twin_a`'s or `twin_b`'s, as the
+   * stay coin fell. `null` for every other construction.
+   */
+  readonly refund: number | null;
 }
 
 /** Everything the simulation knows. Never visible to the engine (`AL1`, `AL2`). */
@@ -201,8 +215,15 @@ export interface TrueState {
   readonly settlements: readonly SimSettlement[];
   readonly bank_lines: readonly SimBankLine[];
   readonly ledger_entries: readonly SimLedgerEntry[];
-  /** bench-v2 `AMB-1`'s split days; empty for every `§4.1` family. */
+  /** bench-v2's split days; empty for every `§4.1` family and for `A05`. */
   readonly split_batches: readonly SimSplitBatch[];
+  /**
+   * bench-v2: the members whose `recon_line` loses its batch identity under
+   * `DROP_BATCH_IDENTITY` — selected here, BY CONSTRUCTION, never at a rate
+   * (`docs/BENCH_V2_DESIGN.md §3.0`). `emit.ts` maps them to entity ids and
+   * `degrade.ts` nulls exactly those lines. Empty for every `§4.1` family.
+   */
+  readonly identity_drops: readonly SimMember[];
 }
 
 /** `SimSettlement.members`, inverted: which settlement carried each member. */
@@ -307,6 +328,10 @@ export function simulate(family: FamilyId, seed: number): TrueState {
   const f06P = s(STREAMS.F06);
   const f07P = s(STREAMS.F07);
   const amb1P = s(STREAMS.AMB1);
+  const amb2P = s(STREAMS.AMB2);
+  const amb3P = s(STREAMS.AMB3);
+  const amb5P = s(STREAMS.AMB5);
+  const benignP = s(STREAMS.BENIGN);
 
   const { P, A, N, R, D } = COMPOSITION;
 
@@ -555,67 +580,113 @@ export function simulate(family: FamilyId, seed: number): TrueState {
     }
   }
 
-  // --- bench-v2 AMB-1, part 1: the twins (docs/BENCH_V2_DESIGN.md §B.2) ------
+  // --- bench-v2, part 1: the twins (docs/BENCH_V2_DESIGN.md §B.2, §C) --------
   // Two captures of one day, neither refunded nor disputed, are rewritten so
-  // that they net to ONE credit on two fee rates: twin A on a 200-bps non-card
-  // method, twin B on EMI. The credit is drawn once (the F06 discipline) via
-  // A's gross, conditioned on `credit >= AMB1_MIN_CREDIT_PAISE`; B's gross is
-  // solved from it. `created_at` is shared too, so the twins tie on `SE3`
-  // exactly. This runs BEFORE the batches are built so every batch closes on
-  // the final amounts, and AFTER refunds and disputes so neither can name a
-  // twin — a refund on one twin would be a field that distinguishes them.
-  const twinPairs: { day: number; a: number; b: number }[] = [];
+  // that they net to ONE credit: `A01` and `A03` on two fee rates (twin A on a
+  // 200-bps non-card method, twin B on EMI), `A02` on one rate with twin B
+  // carrying a partial refund of its own. The credit is drawn once (the F06
+  // discipline) via A's gross; B's gross is solved from it. `created_at` is
+  // shared too, so the twins tie on `SE3` exactly. `BEN-3` selects two captures
+  // of one day the same way and rewrites NOTHING: it is the split alone. This
+  // runs BEFORE the batches are built so every batch closes on the final
+  // amounts, and AFTER refunds and disputes so neither can name a twin — a
+  // refund on one twin would be a field that distinguishes them (`A02`'s refund
+  // is the deliberate difference and is constructed here, not drawn there).
+  const twinPairs: SplitPlan[] = [];
+  const eligibleByDay = twinEligibleByDay(payments, refunds, disputes);
   if (mechanics.amb1_material_twins) {
-    const refunded = new Set(refunds.map((r) => r.payment_index));
-    const disputed = new Set(disputes.map((d) => d.payment_index));
-    const eligibleByDay = new Map<number, number[]>();
-    for (const payment of payments) {
-      if (!payment.captured || !payment.settles) continue;
-      if (refunded.has(payment.index) || disputed.has(payment.index)) continue;
-      eligibleByDay.set(payment.day, [...(eligibleByDay.get(payment.day) ?? []), payment.index]);
-    }
-    const eligibleDays = [...eligibleByDay.entries()]
-      .filter(([, members]) => members.length >= 2)
-      .map(([day]) => day)
-      .sort((x, y) => x - y);
-    if (eligibleDays.length < AMB1_PAIR_COUNT) {
-      /* c8 ignore next 4 */
-      throw new Error(
-        `simulate: AMB-1 needs ${String(AMB1_PAIR_COUNT)} days holding two unrefunded, undisputed ` +
-          `captures; only ${String(eligibleDays.length)} qualify.`,
-      );
-    }
-    for (const dayIndex of amb1P.sample(eligibleDays.length, AMB1_PAIR_COUNT)) {
-      const day = requireIndex(eligibleDays, dayIndex, "eligibleDays");
-      const members = eligibleByDay.get(day) ?? [];
-      const [first, second] = amb1P.sample(members.length, 2).map((k) => requireIndex(members, k, "members"));
-      /* c8 ignore next */
-      if (first === undefined || second === undefined) throw new Error("simulate: AMB-1 pair draw failed");
+    for (const day of drawTwinDays(amb1P, eligibleByDay, AMB1_PAIR_COUNT, "AMB-1")) {
+      const [first, second] = drawTwinPair(amb1P, eligibleByDay.get(day) ?? [], "AMB-1");
       // Which of the two becomes A (200 bps) is itself a coin, so that neither
       // payment index nor id order correlates with rate or batch (§8 R3).
       const [a, b] = amb1P.chance(1, 2) ? [first, second] : [second, first];
       const methodA: Method = amb1P.pick(AMB1_BASE_METHODS);
       const rateA = FEE_RATE_BPS[methodA];
-      const rateB = FEE_RATE_BPS[AMB1_TWIN_METHOD];
       const amountA = drawAmountWhere(amb1P, (gross) => feeBreakdown(gross, rateA).credit >= AMB1_MIN_CREDIT_PAISE);
-      const feeA = feeBreakdown(amountA, rateA);
-      const amountB = amountForCredit(feeA.credit, rateB);
-      const feeB = feeBreakdown(amountB, rateB);
+      rewriteRateTwins(payments, orders, a, b, methodA, amountA);
+      twinPairs.push({ construction: "A01", day, a, b, forced: [] });
+    }
+  }
+  if (mechanics.amb3_subtau_twins) {
+    for (const day of drawTwinDays(amb3P, eligibleByDay, AMB3_PAIR_COUNT, "AMB-3")) {
+      const [first, second] = drawTwinPair(amb3P, eligibleByDay.get(day) ?? [], "AMB-3");
+      const [a, b] = amb3P.chance(1, 2) ? [first, second] : [second, first];
+      const methodA: Method = amb3P.pick(AMB1_BASE_METHODS);
+      const rateA = FEE_RATE_BPS[methodA];
+      // The window is on the DELTA between the two grosses (§3.3): the atoms of
+      // the committed table whose EMI twin sits Rs 51 to Rs 80 away, uniformly.
+      const amountA = drawAmountWhere(amb3P, (gross) => {
+        const delta = Math.abs(amountForCredit(feeBreakdown(gross, rateA).credit, FEE_RATE_BPS[AMB1_TWIN_METHOD]) - gross);
+        return delta >= AMB3_DELTA_RANGE_PAISE.min && delta <= AMB3_DELTA_RANGE_PAISE.max;
+      });
+      rewriteRateTwins(payments, orders, a, b, methodA, amountA);
+      twinPairs.push({ construction: "A03", day, a, b, forced: [] });
+    }
+  }
+  if (mechanics.amb2_refund_netting) {
+    // The refund is an EXISTING refund rewritten onto P2 — the composition's
+    // refund count is frozen (`R = round_half_up(4.5 % x N)`) and adding one
+    // would move `target_record_count`. Distinct refunds, one per pair, drawn
+    // once; their original payments cannot be twins, because a twin is
+    // unrefunded by eligibility.
+    const days = drawTwinDays(amb2P, eligibleByDay, AMB2_PAIR_COUNT, "AMB-2");
+    const rewrittenRefunds = amb2P.sample(refunds.length, AMB2_PAIR_COUNT);
+    for (const [k, day] of days.entries()) {
+      const [first, second] = drawTwinPair(amb2P, eligibleByDay.get(day) ?? [], "AMB-2");
+      const [p, p2] = amb2P.chance(1, 2) ? [first, second] : [second, first];
+      const method: Method = amb2P.pick(AMB1_BASE_METHODS);
+      const rate = FEE_RATE_BPS[method];
+      const amountP = drawAmount(amb2P);
+      const feeP = feeBreakdown(amountP, rate);
+      const refundAmount = paise(Math.max(AMB2_MIN_REFUND_PAISE, roundHalfUp(feeP.credit * AMB2_REFUND_BPS, 10_000)));
+      const amountP2 = amountForCredit(add(feeP.credit, refundAmount), rate);
+      const feeP2 = feeBreakdown(amountP2, rate);
       /* c8 ignore next */
-      if (feeB.credit !== feeA.credit) throw new Error("simulate: AMB-1 twins do not net to one credit");
-      const sharedCreatedAt = requireIndex(payments, a, "payments").created_at;
-      for (const [index, amount, method, fee, rate] of [
-        [a, amountA, methodA, feeA, rateA],
-        [b, amountB, AMB1_TWIN_METHOD, feeB, rateB],
-      ] as const) {
+      if (sub(feeP2.credit, refundAmount) !== feeP.credit) throw new Error("simulate: AMB-2 twins do not net to one credit");
+      const sharedCreatedAt = requireIndex(payments, p, "payments").created_at;
+      for (const [index, amount, fee] of [[p, amountP, feeP], [p2, amountP2, feeP2]] as const) {
         const payment = requireIndex(payments, index, "payments");
         const order = requireIndex(orders, index, "orders");
-        payments[index] = {
-          ...payment, amount, method, card: null, rate_bps: rate, fee, created_at: sharedCreatedAt,
-        };
+        payments[index] = { ...payment, amount, method, card: null, rate_bps: rate, fee, created_at: sharedCreatedAt };
         orders[index] = { ...order, amount, amount_paid: amount, created_at: sharedCreatedAt };
       }
-      twinPairs.push({ day, a, b });
+      // The rewrite: the refund now belongs to P2, is partial, is raised on the
+      // capture day after the capture, and settles in the day's batch — the
+      // same clocks §4.2 gives a same-day refund. Its former payment loses it.
+      const refundIndex = requireIndex(rewrittenRefunds, k, "rewrittenRefunds");
+      const old = requireIndex(refunds, refundIndex, "refunds");
+      const former = requireIndex(payments, old.payment_index, "payments");
+      payments[old.payment_index] = { ...former, refunded_paise: sub(former.refunded_paise, old.amount) };
+      const lowerBound = sharedCreatedAt - dayInstant(day, 0);
+      refunds[refundIndex] = {
+        ...old,
+        payment_index: p2,
+        amount: refundAmount,
+        partial: true,
+        day,
+        created_at: dayInstant(day, amb2P.between(lowerBound, DAY_EVENT_WINDOW_SECONDS - 1)),
+        settlement_day: day,
+      };
+      const twinB = requireIndex(payments, p2, "payments");
+      payments[p2] = { ...twinB, refunded_paise: add(twinB.refunded_paise, refundAmount) };
+      twinPairs.push({ construction: "A02", day, a: p, b: p2, forced: [{ kind: "refund", index: refundIndex }] });
+    }
+  }
+  const benignSplitDays = new Set<number>();
+  if (mechanics.benign_controls) {
+    // BEN-3: AMB-1's host with nothing rewritten. Among the day's eligible
+    // captures, a pair whose credits differ by at least the declared gap,
+    // uniformly over such pairs; if none exists the day is not eligible.
+    const ben3Eligible = new Map<number, number[]>();
+    for (const [day, members] of eligibleByDay) {
+      if (creditGapPairs(payments, members).length > 0) ben3Eligible.set(day, members);
+    }
+    for (const day of drawTwinDays(benignP, ben3Eligible, BEN3_DAY_COUNT, "BEN-3")) {
+      const pairs = creditGapPairs(payments, ben3Eligible.get(day) ?? []);
+      const [first, second] = requireIndex(pairs, benignP.below(pairs.length), "pairs");
+      const [a, b] = benignP.chance(1, 2) ? [first, second] : [second, first];
+      twinPairs.push({ construction: "BEN3", day, a, b, forced: [] });
+      benignSplitDays.add(day);
     }
   }
 
@@ -710,88 +781,90 @@ export function simulate(family: FamilyId, seed: number): TrueState {
     });
   }
 
-  // --- bench-v2 AMB-1, part 2: the split (docs/BENCH_V2_DESIGN.md §B.2) ------
+  // --- bench-v2, part 2: the split (docs/BENCH_V2_DESIGN.md §B.2, §C) --------
   // The day's batch is dealt into S1 (keeps the day's id, cycle and instant)
   // and S2 (new id, new UTR, the SAME settled_at). Which twin stays is a coin;
   // every other member is dealt by its own coin, independently of created_at
   // (§8 R3). Debits are admitted per half by §4.2's ascending-amount rule; one
   // its half cannot carry goes to the other half, and one neither can carry is
-  // emitted UNSETTLED, exactly as a day batch already does.
+  // emitted UNSETTLED, exactly as a day batch already does. A02's refund is
+  // FORCED into twin B's half, before any other debit, because it is the
+  // construction and not a dealt member.
   const splitBatches: SimSplitBatch[] = [];
+  const identityDrops: SimMember[] = [];
+  const streamOf = { A01: amb1P, A02: amb2P, A03: amb3P, BEN3: benignP } as const;
   for (const pair of twinPairs) {
-    const original = requireIndex(settlements, pair.day - 1, "settlements");
-    const aStays = amb1P.chance(1, 2);
-    const [stay, move] = aStays ? [pair.a, pair.b] : [pair.b, pair.a];
-    const halves: [SimMember[], SimMember[]] = [[], []];
-    const nets: [number, number] = [0, 0];
-    const debits: { member: SimMember; amount: Paise; preferred: 0 | 1 }[] = [];
-    for (const member of original.members) {
-      if (member.kind === "payment") {
-        const fee = requireIndex(payments, member.index, "payments").fee;
-        /* c8 ignore next */
-        if (fee === null) throw new Error("simulate: a settled payment carries no fee breakdown");
-        const half: 0 | 1 = member.index === stay ? 0 : member.index === move ? 1 : amb1P.chance(1, 2) ? 0 : 1;
-        halves[half].push(member);
-        nets[half] = add(paise(nets[half]), fee.credit);
-        continue;
-      }
-      const amount =
-        member.kind === "refund"
-          ? requireIndex(refunds, member.index, "refunds").amount
-          : requireIndex(adjustments, member.index, "adjustments").amount;
-      if (member.kind === "adjustment" && requireIndex(adjustments, member.index, "adjustments").direction === "credit") {
-        const half: 0 | 1 = amb1P.chance(1, 2) ? 0 : 1;
-        halves[half].push(member);
-        nets[half] = add(paise(nets[half]), amount);
-        continue;
-      }
-      debits.push({ member, amount, preferred: amb1P.chance(1, 2) ? 0 : 1 });
+    const prng = streamOf[pair.construction];
+    const split = splitBatch(settlements, payments, refunds, adjustments, minter, prng, pair);
+    splitBatches.push(split);
+    identityDrops.push({ kind: "payment", index: split.twin_a }, { kind: "payment", index: split.twin_b });
+    if (split.refund !== null) identityDrops.push({ kind: "refund", index: split.refund });
+  }
+
+  // --- bench-v2 AMB-5: the search bound (§3.5) ---------------------------------
+  // `AMB5_DROP_COUNT` payment lines of one batch lose their identity, on days
+  // whose settlement instants are pairwise distinct so that two classes never
+  // pool. No split: the batch is the day's own.
+  if (mechanics.amb5_search_bound) {
+    const candidates = settlements
+      .filter((st) => st.members.filter((m) => m.kind === "payment").length >= AMB5_DROP_COUNT)
+      .map((st) => st.index);
+    const taken: SimSettlement[] = [];
+    for (const k of amb5P.permutation(candidates.length)) {
+      if (taken.length === AMB5_DAY_COUNT) break;
+      const st = requireIndex(settlements, requireIndex(candidates, k, "candidates"), "settlements");
+      if (taken.some((t) => t.settled_at === st.settled_at)) continue;
+      taken.push(st);
     }
-    const ordered = [...debits].sort((x, y) => x.amount - y.amount || x.member.index - y.member.index);
-    for (const { member, amount, preferred } of ordered) {
-      const other: 0 | 1 = preferred === 0 ? 1 : 0;
-      const half: 0 | 1 | null =
-        nets[preferred] - amount >= 0 ? preferred : nets[other] - amount >= 0 ? other : null;
-      if (half === null) {
-        if (member.kind === "refund") {
-          refunds[member.index] = { ...requireIndex(refunds, member.index, "refunds"), settlement_day: null };
-        } else {
-          adjustments[member.index] = {
-            ...requireIndex(adjustments, member.index, "adjustments"), settlement_day: null,
-          };
-        }
-        continue;
-      }
-      halves[half].push(member);
-      nets[half] = sub(paise(nets[half]), amount);
+    if (taken.length < AMB5_DAY_COUNT) {
+      /* c8 ignore next 4 */
+      throw new Error(
+        `simulate: AMB-5 needs ${String(AMB5_DAY_COUNT)} batches of ${String(AMB5_DROP_COUNT)}+ payment lines at ` +
+          `distinct instants; only ${String(taken.length)} qualify.`,
+      );
     }
-    const byKind = (x: SimMember, y: SimMember): number => x.kind.localeCompare(y.kind) || x.index - y.index;
-    settlements[pair.day - 1] = { ...original, amount: paise(nets[0]), members: halves[0].sort(byKind) };
-    const second: SimSettlement = {
-      index: settlements.length,
-      id: minter.settlement(),
-      day: pair.day,
-      cycle_days: original.cycle_days,
-      settled_at: original.settled_at,
-      utr: mintUtr(amb1P),
-      amount: paise(nets[1]),
-      members: halves[1].sort(byKind),
-    };
-    settlements.push(second);
-    splitBatches.push({
-      day: pair.day,
-      settlement_a_index: original.index,
-      settlement_b_index: second.index,
-      twin_a: stay,
-      twin_b: move,
-    });
+    for (const st of taken.sort((x, y) => x.index - y.index)) {
+      const lines = st.members.filter((m) => m.kind === "payment");
+      for (const k of amb5P.sample(lines.length, AMB5_DROP_COUNT)) identityDrops.push(requireIndex(lines, k, "lines"));
+    }
+  }
+
+  // --- bench-v2 BENIGN, BEN-1 and BEN-2 (§3.6) ---------------------------------
+  // One (BEN-1) or two (BEN-2) payment lines of an ordinary batch, on days
+  // disjoint from BEN-3's and at instants disjoint from BEN-3's, so the control
+  // classes never pool with the split classes (§8 R5).
+  if (mechanics.benign_controls) {
+    const splitInstants = new Set(splitBatches.map((sb) => requireIndex(settlements, sb.settlement_a_index, "settlements").settled_at));
+    const ordinary = settlements
+      .filter((st) => st.members.filter((m) => m.kind === "payment").length >= BEN2_DROP_COUNT)
+      .filter((st) => !benignSplitDays.has(st.day) && !splitInstants.has(st.settled_at))
+      .map((st) => st.index);
+    const need = BEN1_DAY_COUNT + BEN2_DAY_COUNT;
+    if (ordinary.length < need) {
+      /* c8 ignore next 4 */
+      throw new Error(
+        `simulate: BENIGN needs ${String(need)} ordinary batches away from BEN-3's instants; only ` +
+          `${String(ordinary.length)} qualify.`,
+      );
+    }
+    const order = benignP.permutation(ordinary.length).map((k) => requireIndex(ordinary, k, "ordinary"));
+    const ben1 = order.slice(0, BEN1_DAY_COUNT).sort((x, y) => x - y);
+    const ben2 = order.slice(BEN1_DAY_COUNT, need).sort((x, y) => x - y);
+    for (const [block, count] of [[ben1, BEN1_DROP_COUNT], [ben2, BEN2_DROP_COUNT]] as const) {
+      for (const index of block) {
+        const lines = requireIndex(settlements, index, "settlements").members.filter((m) => m.kind === "payment");
+        for (const k of benignP.sample(lines.length, count)) identityDrops.push(requireIndex(lines, k, "lines"));
+      }
+    }
   }
 
   // --- bank lines: 1:1 with settlements (I5) --------------------------------
   const cleanRefPositions = new Set(bankP.sample(settlements.length, realize(BANK_REF_CLEAN_RATE, settlements.length)));
-  // bench-v2 AMB-1 (§B.2, T5): both twin-hosting settlements carry a clean
+  // bench-v2 (§B.2, T5): both halves of every split day carry a clean
   // `bank_ref` by declaration, in addition to the frozen 30 % draw, so that
-  // `AN2` links them and §17.1.1's P2 projection exists on both candidates.
+  // `AN2` links them and §17.1.1's P2 projection exists on both candidates —
+  // for A03 that is what makes its verdict rest on MATERIALITY rather than on
+  // an absent comparand. A05's and BEN-1/2's settlements take the frozen draw.
   for (const split of splitBatches) {
     cleanRefPositions.add(split.settlement_a_index);
     cleanRefPositions.add(split.settlement_b_index);
@@ -839,6 +912,7 @@ export function simulate(family: FamilyId, seed: number): TrueState {
     bank_lines: bankLines,
     ledger_entries: ledgerEntries,
     split_batches: splitBatches,
+    identity_drops: identityDrops,
   });
 }
 
@@ -893,6 +967,222 @@ function deal(indices: readonly number[], perDay: readonly number[], prng: Prng,
       cursor += 1;
     }
   }
+}
+
+
+// ---------------------------------------------------------------------------
+// bench-v2 helpers (docs/BENCH_V2_DESIGN.md §B.2, §C)
+// ---------------------------------------------------------------------------
+
+/** A split day before it is split: the two lines, and any debit forced into B's half. */
+interface SplitPlan {
+  readonly construction: SimSplitBatch["construction"];
+  readonly day: number;
+  /** The line that becomes twin A or twin B is decided by the split's coin. */
+  readonly a: number;
+  readonly b: number;
+  /** Debit members that MUST land in `b`'s half, admitted before any dealt debit. */
+  readonly forced: readonly SimMember[];
+}
+
+/** Captures that settle, carry no refund and no dispute, by capture day. */
+function twinEligibleByDay(
+  payments: readonly SimPayment[],
+  refunds: readonly SimRefund[],
+  disputes: readonly SimDispute[],
+): Map<number, number[]> {
+  const refunded = new Set(refunds.map((r) => r.payment_index));
+  const disputed = new Set(disputes.map((d) => d.payment_index));
+  const out = new Map<number, number[]>();
+  for (const payment of payments) {
+    if (!payment.captured || !payment.settles) continue;
+    if (refunded.has(payment.index) || disputed.has(payment.index)) continue;
+    out.set(payment.day, [...(out.get(payment.day) ?? []), payment.index]);
+  }
+  return out;
+}
+
+/**
+ * Draw `count` distinct days holding two eligible captures — one `sample`.
+ *
+ * The PAIR on each day is drawn by the caller, per day, so that a
+ * construction's own draws (coin, method, amount) interleave with the pair
+ * draw exactly as `A01`'s did before this helper existed: a stream's position
+ * is part of the frozen output and is not re-ordered by a refactor.
+ */
+function drawTwinDays(
+  prng: Prng,
+  eligibleByDay: ReadonlyMap<number, readonly number[]>,
+  count: number,
+  label: string,
+): number[] {
+  const eligibleDays = [...eligibleByDay.entries()]
+    .filter(([, members]) => members.length >= 2)
+    .map(([day]) => day)
+    .sort((x, y) => x - y);
+  if (eligibleDays.length < count) {
+    /* c8 ignore next 4 */
+    throw new Error(
+      `simulate: ${label} needs ${String(count)} days holding two unrefunded, undisputed ` +
+        `captures; only ${String(eligibleDays.length)} qualify.`,
+    );
+  }
+  return prng.sample(eligibleDays.length, count).map((k) => requireIndex(eligibleDays, k, "eligibleDays"));
+}
+
+/** Two distinct eligible captures of one day — one `sample` of two. */
+function drawTwinPair(prng: Prng, members: readonly number[], label: string): [number, number] {
+  const [first, second] = prng.sample(members.length, 2).map((k) => requireIndex(members, k, "members"));
+  /* c8 ignore next */
+  if (first === undefined || second === undefined) throw new Error(`simulate: ${label} pair draw failed`);
+  return [first, second];
+}
+
+/**
+ * `A01` / `A03`: twin A takes `methodA` and `amountA`; twin B takes EMI and the
+ * gross that nets to A's credit exactly; both take A's clock. Cards are nulled
+ * on both (`AMB1_BASE_METHODS` excludes card).
+ */
+function rewriteRateTwins(
+  payments: SimPayment[],
+  orders: SimOrder[],
+  a: number,
+  b: number,
+  methodA: Method,
+  amountA: Paise,
+): void {
+  const rateA = FEE_RATE_BPS[methodA];
+  const rateB = FEE_RATE_BPS[AMB1_TWIN_METHOD];
+  const feeA = feeBreakdown(amountA, rateA);
+  const amountB = amountForCredit(feeA.credit, rateB);
+  const feeB = feeBreakdown(amountB, rateB);
+  /* c8 ignore next */
+  if (feeB.credit !== feeA.credit) throw new Error("simulate: rate twins do not net to one credit");
+  const sharedCreatedAt = requireIndex(payments, a, "payments").created_at;
+  for (const [index, amount, method, fee, rate] of [
+    [a, amountA, methodA, feeA, rateA],
+    [b, amountB, AMB1_TWIN_METHOD, feeB, rateB],
+  ] as const) {
+    const payment = requireIndex(payments, index, "payments");
+    const order = requireIndex(orders, index, "orders");
+    payments[index] = {
+      ...payment, amount, method, card: null, rate_bps: rate, fee, created_at: sharedCreatedAt,
+    };
+    orders[index] = { ...order, amount, amount_paid: amount, created_at: sharedCreatedAt };
+  }
+}
+
+/** `BEN-3`: the pairs of a day's eligible captures whose credits differ by the declared gap, in index order. */
+function creditGapPairs(payments: readonly SimPayment[], members: readonly number[]): [number, number][] {
+  const credit = (i: number): number => requireIndex(payments, i, "payments").fee?.credit ?? 0;
+  const out: [number, number][] = [];
+  for (let i = 0; i < members.length; i += 1) {
+    for (let j = i + 1; j < members.length; j += 1) {
+      const x = requireIndex(members, i, "members");
+      const y = requireIndex(members, j, "members");
+      if (Math.abs(credit(x) - credit(y)) >= BEN3_MIN_CREDIT_GAP_PAISE) out.push([x, y]);
+    }
+  }
+  return out;
+}
+
+/**
+ * Deal one day's batch into two at one instant (part 2 above). Mutates
+ * `settlements` in place — the day's entry becomes S1 and S2 is appended — and
+ * marks a debit neither half can carry UNSETTLED on `refunds` / `adjustments`.
+ * Draw order on `prng`: the stay coin, one coin per dealt member in batch order,
+ * one coin per dealt debit, then the new UTR — `A01`'s order, unchanged.
+ */
+function splitBatch(
+  settlements: SimSettlement[],
+  payments: readonly SimPayment[],
+  refunds: SimRefund[],
+  adjustments: SimAdjustment[],
+  minter: Minter,
+  prng: Prng,
+  pair: SplitPlan,
+): SimSplitBatch {
+  const original = requireIndex(settlements, pair.day - 1, "settlements");
+  const aStays = prng.chance(1, 2);
+  const [stay, move] = aStays ? [pair.a, pair.b] : [pair.b, pair.a];
+  const forcedKeys = new Set(pair.forced.map((m) => `${m.kind}:${String(m.index)}`));
+  const halves: [SimMember[], SimMember[]] = [[], []];
+  const nets: [number, number] = [0, 0];
+  const debits: { member: SimMember; amount: Paise; preferred: 0 | 1 }[] = [];
+  for (const member of original.members) {
+    if (member.kind === "payment") {
+      const fee = requireIndex(payments, member.index, "payments").fee;
+      /* c8 ignore next */
+      if (fee === null) throw new Error("simulate: a settled payment carries no fee breakdown");
+      const half: 0 | 1 = member.index === stay ? 0 : member.index === move ? 1 : prng.chance(1, 2) ? 0 : 1;
+      halves[half].push(member);
+      nets[half] = add(paise(nets[half]), fee.credit);
+      continue;
+    }
+    const amount =
+      member.kind === "refund"
+        ? requireIndex(refunds, member.index, "refunds").amount
+        : requireIndex(adjustments, member.index, "adjustments").amount;
+    if (member.kind === "adjustment" && requireIndex(adjustments, member.index, "adjustments").direction === "credit") {
+      const half: 0 | 1 = prng.chance(1, 2) ? 0 : 1;
+      halves[half].push(member);
+      nets[half] = add(paise(nets[half]), amount);
+      continue;
+    }
+    if (forcedKeys.has(`${member.kind}:${String(member.index)}`)) {
+      // The construction's own debit: it rides with `b`, whichever half `b`
+      // was dealt to, and is admitted first. `b`'s credit exceeds it by
+      // construction, so the half can always carry it.
+      const half: 0 | 1 = move === pair.b ? 1 : 0;
+      /* c8 ignore next */
+      if (nets[half] - amount < 0) throw new Error("simulate: a forced debit exceeds its half's credit");
+      halves[half].push(member);
+      nets[half] = sub(paise(nets[half]), amount);
+      continue;
+    }
+    debits.push({ member, amount, preferred: prng.chance(1, 2) ? 0 : 1 });
+  }
+  const ordered = [...debits].sort((x, y) => x.amount - y.amount || x.member.index - y.member.index);
+  for (const { member, amount, preferred } of ordered) {
+    const other: 0 | 1 = preferred === 0 ? 1 : 0;
+    const half: 0 | 1 | null =
+      nets[preferred] - amount >= 0 ? preferred : nets[other] - amount >= 0 ? other : null;
+    if (half === null) {
+      if (member.kind === "refund") {
+        refunds[member.index] = { ...requireIndex(refunds, member.index, "refunds"), settlement_day: null };
+      } else {
+        adjustments[member.index] = {
+          ...requireIndex(adjustments, member.index, "adjustments"), settlement_day: null,
+        };
+      }
+      continue;
+    }
+    halves[half].push(member);
+    nets[half] = sub(paise(nets[half]), amount);
+  }
+  const byKind = (x: SimMember, y: SimMember): number => x.kind.localeCompare(y.kind) || x.index - y.index;
+  settlements[pair.day - 1] = { ...original, amount: paise(nets[0]), members: halves[0].sort(byKind) };
+  const second: SimSettlement = {
+    index: settlements.length,
+    id: minter.settlement(),
+    day: pair.day,
+    cycle_days: original.cycle_days,
+    settled_at: original.settled_at,
+    utr: mintUtr(prng),
+    amount: paise(nets[1]),
+    members: halves[1].sort(byKind),
+  };
+  settlements.push(second);
+  const forcedRefund = pair.forced.find((m) => m.kind === "refund");
+  return {
+    construction: pair.construction,
+    day: pair.day,
+    settlement_a_index: original.index,
+    settlement_b_index: second.index,
+    twin_a: stay,
+    twin_b: move,
+    refund: forcedRefund === undefined ? null : forcedRefund.index,
+  };
 }
 
 /**

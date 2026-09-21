@@ -6,13 +6,16 @@ import {
 } from "@assay/domain";
 
 import { COMPOSITION, F05_SELECTED_SETTLEMENTS } from "../src/composition.js";
-import { CONVENTION_1, IMPLEMENTED_FAMILIES } from "../src/frozen.js";
+import { CONVENTION_1, IMPLEMENTED_FAMILIES, OPERATOR_DECLARING_FAMILY } from "../src/frozen.js";
 import { degrade } from "../src/degrade.js";
 import { emit } from "../src/emit.js";
 import { simulate } from "../src/simulate.js";
 import { PERIOD_FROM, PERIOD_TO, SECONDS_PER_DAY } from "../src/period.js";
 import { realize } from "../src/composition.js";
 import { dataset, TEST_SEEDS } from "./fixtures.js";
+
+/** The bench-v2 families, every one of which carries `DROP_BATCH_IDENTITY` (`frozen.ts`). */
+const DETACHING_BENCH_V2_FAMILIES: ReadonlySet<string> = new Set(OPERATOR_DECLARING_FAMILY.DROP_BATCH_IDENTITY);
 
 const SEED = TEST_SEEDS[0];
 
@@ -123,17 +126,19 @@ describe("the true allocation satisfies every hard constraint", () => {
           // exceeds the sum of the lines it can see, which is E01" (§4.2).
           expect(broken).toHaveLength(F05_SELECTED_SETTLEMENTS);
           for (const shortfall of broken) expect(shortfall).toBeGreaterThan(0);
-        } else if (family === "F08" || family === "A01") {
+        } else if (family === "F08" || DETACHING_BENCH_V2_FAMILIES.has(family)) {
           // `DROP_SETTLEMENT_ID` detaches a line from its batch identifier, so
           // it leaves the set reachable by `AN1` without ceasing to exist. The
           // line is still emitted, still ties out arithmetically, and is still
           // recoverable through `settlement_utr` — which is what makes F08 a
           // matching problem rather than a corruption.
           //
-          // bench-v2's `A01` detaches its two twins per split day the same way,
-          // through `DROP_BATCH_IDENTITY` (both identifiers nulled, so NOT
-          // recoverable by a join — that is the family). The identity below
-          // holds for it unchanged: the discrepancy is the detached net.
+          // bench-v2's families detach lines the same way, through
+          // `DROP_BATCH_IDENTITY` (both identifiers nulled, so NOT recoverable
+          // by a join — that is the family): A01/A03 their two twins per split
+          // day, A02 its twins and the refund, A05 fifteen lines per batch,
+          // B01 one or two per batch. The identity below holds for every one
+          // unchanged: the discrepancy is the detached net.
           //
           // The discrepancy is therefore EXACTLY the net contribution of the
           // detached lines, and its sign is not uniform: detaching a payment
@@ -260,10 +265,10 @@ describe("what degradation is allowed to break, and what it is not", () => {
 
   it("leaves `settled` and `settlement_id` coherent everywhere no operator ran", () => {
     for (const family of IMPLEMENTED_FAMILIES) {
-      // F08 (`DROP_SETTLEMENT_ID`) and bench-v2's A01 (`DROP_BATCH_IDENTITY`) are
-      // the two families whose operator detaches a settled line; each has its
+      // F08 (`DROP_SETTLEMENT_ID`) and bench-v2's families (`DROP_BATCH_IDENTITY`)
+      // are the families whose operator detaches a settled line; each has its
       // own test of exactly what its operator leaves incoherent.
-      if (family === "F08" || family === "A01") continue;
+      if (family === "F08" || DETACHING_BENCH_V2_FAMILIES.has(family)) continue;
       for (const observation of dataset(family, SEED).observations) {
         if (observation.kind !== "recon_line" && observation.kind !== "adjustment") continue;
         expect(observation.payload.settled).toBe(observation.payload.settlement_id !== null);

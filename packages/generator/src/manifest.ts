@@ -68,6 +68,14 @@ const FAMILY_TABLE = Object.freeze({
   // total over `FamilyId` until bench-v2's own manifest is declared.
   A01: { name: "AMB-1 — material twins in same-day split batches (bench-v2 STRESS family)", split: "test",
     why: "STRESS CORPUS, declared rate, not a base rate. Two captures on different pricing tiers netting to one credit, settled at one instant in two on-demand batches, both batch identities absent from the merchant's copy. Exists because bench-v1.0.13 contained zero truly-ambiguous targets (PREREGISTRATION.md §10 V35)" },
+  A02: { name: "AMB-2 — refund-netting twins, {P} vs {P2, refund} (bench-v2 STRESS family)", split: "test",
+    why: "STRESS CORPUS, declared rate. A capture and a larger capture net of its own partial refund settle for the same credit at one instant in two batches; all three batch identities absent. The refund-liability leg separates the two readings of the books — the cardinality-different alternative that must abstain when material" },
+  A03: { name: "AMB-3 — sub-tau boundary twins, gross delta in [Rs 51, Rs 80] (bench-v2 control)", split: "test",
+    why: "STRESS CORPUS, declared rate. AMB-1's construction with the difference held below tau's Rs 100 floor and above the sweep's Rs 50 point: the frozen engine must COMMIT, and the tau sweep must move. A negative control for abstention and the family that makes the sweep non-flat" },
+  A05: { name: "AMB-5 — search bound, 15 lines of one batch detached (bench-v2 STRESS family)", split: "test",
+    why: "STRESS CORPUS, declared rate. 2^15 - 1 subsets exceed C_max = 5,000 so ASSAY reports SEARCH_BOUND_EXCEEDED; the oracle enumerates 2^15 and labels the target UNAMBIGUOUS, so frozen metric 4 scores this a FALSE abstention. Reported as such: a metric that disagrees with the engine's own bound is a finding" },
+  B01: { name: "BENIGN — determinable targets that reach S2 (bench-v2 negative control)", split: "test",
+    why: "STRESS CORPUS, declared rate. One line, two lines, and one line from each half of a same-day split batch detached, credits differing: every target enumerates and none may abstain. Gives false-abstention rate a real denominator; fully-anchored F01 never reaches S2 and cannot" },
 } as const satisfies Record<FamilyId, { name: string; split: "dev" | "test" | "both"; why: string }>);
 
 /** The twelve declared scenarios. `F11` and `F12` carry `target_record_count: 0`. */

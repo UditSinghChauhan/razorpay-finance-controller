@@ -42,11 +42,11 @@ export interface Emission {
   /** `F05`: the `pay_…` whose `recon_line` was withheld, per selected settlement. */
   readonly withheld_recon_lines: readonly string[];
   /**
-   * bench-v2 `AMB-1`: the `pay_…` twins whose batch identity `DROP_BATCH_IDENTITY`
-   * removes — selected **by construction from the pair**, not by a rate
-   * (`docs/BENCH_V2_DESIGN.md §3.0`, §B.2). Carried here beside `F05`'s list on
-   * the same principle: the selection is made where the true state is in hand,
-   * and `degrade()` still takes no `TrueState`. Empty for every `§4.1` family.
+   * bench-v2: the entity ids (`pay_…`, `rfnd_…`) whose batch identity
+   * `DROP_BATCH_IDENTITY` removes — selected **by construction**, not by a rate
+   * (`docs/BENCH_V2_DESIGN.md §3.0`, §B.2, §C). Carried here beside `F05`'s list
+   * on the same principle: the selection is made where the true state is in
+   * hand, and `degrade()` still takes no `TrueState`. Empty for every `§4.1` family.
    */
   readonly batch_identity_drops: readonly string[];
 }
@@ -309,13 +309,18 @@ export function emit(state: TrueState): Emission {
     }
   }
 
-  // bench-v2 AMB-1: both twins of every split day, in split order.
-  const batchIdentityDrops = state.split_batches.flatMap((split) => {
-    const a = state.payments[split.twin_a];
-    const b = state.payments[split.twin_b];
+  // bench-v2: the members `simulate.ts` selected by construction, as entity ids
+  // — the twins of every split day in split order, A02's refund, A05's fifteen
+  // per batch, BENIGN's one or two per batch. This module names them and
+  // decides nothing.
+  const batchIdentityDrops = state.identity_drops.map((member) => {
+    const entity =
+      member.kind === "payment" ? state.payments[member.index]
+      : member.kind === "refund" ? state.refunds[member.index]
+      : state.adjustments[member.index];
     /* c8 ignore next */
-    if (a === undefined || b === undefined) throw new Error("emit: AMB-1 twin index out of range");
-    return [a.id, b.id];
+    if (entity === undefined) throw new Error(`emit: identity drop ${member.kind}:${String(member.index)} out of range`);
+    return entity.id;
   });
 
   return Object.freeze({

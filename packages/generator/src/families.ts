@@ -40,6 +40,21 @@ export interface FamilyMechanics {
    * on different fee rates (`docs/BENCH_V2_DESIGN.md §B.2`).
    */
   readonly amb1_material_twins: boolean;
+  /**
+   * bench-v2 `A02` (`AMB-2`): same-day split batches hosting `{P}` vs
+   * `{P2, R1}` — a capture against a larger capture net of its own partial
+   * refund, equal net, the refund leg material (`§3.2` T4-b).
+   */
+  readonly amb2_refund_netting: boolean;
+  /**
+   * bench-v2 `A03` (`AMB-3`): `AMB-1`'s twins with the gross difference held
+   * in `[Rs 51, Rs 80]` — below `tau`'s floor, above the sweep's Rs 50 point.
+   */
+  readonly amb3_subtau_twins: boolean;
+  /** bench-v2 `A05` (`AMB-5`): 15 lines of one batch detached, so `S2` hits `C_max`. */
+  readonly amb5_search_bound: boolean;
+  /** bench-v2 `B01` (`BENIGN`): `BEN-1`/`BEN-2`/`BEN-3`, determinable targets that reach `S2`. */
+  readonly benign_controls: boolean;
   /** The degradation operators this family declares, in composition order. */
   readonly operators: readonly DegradationOp[];
 }
@@ -47,7 +62,8 @@ export interface FamilyMechanics {
 const NONE = {
   f03_repricing: false, f02_refund_boundary: false, f05_withhold: false,
   f06_collisions: false, f07_chargebacks: false, f09_forced_late: false,
-  amb1_material_twins: false,
+  amb1_material_twins: false, amb2_refund_netting: false, amb3_subtau_twins: false,
+  amb5_search_bound: false, benign_controls: false,
   operators: [] as readonly DegradationOp[],
 } as const;
 
@@ -82,6 +98,14 @@ export const FAMILY_MECHANICS: Readonly<Record<FamilyId, FamilyMechanics>> = Obj
    * exactly the twins, selected by construction from the pair.
    */
   A01: { ...NONE, amb1_material_twins: true, operators: [OP("DROP_BATCH_IDENTITY")] },
+  /** bench-v2 `AMB-2` — refund-netting twins (`§3.2` T4-b). Same operator, same selection principle. */
+  A02: { ...NONE, amb2_refund_netting: true, operators: [OP("DROP_BATCH_IDENTITY")] },
+  /** bench-v2 `AMB-3` — sub-`tau` boundary twins (`§3.3`). A negative control for abstention. */
+  A03: { ...NONE, amb3_subtau_twins: true, operators: [OP("DROP_BATCH_IDENTITY")] },
+  /** bench-v2 `AMB-5` — the search bound (`§3.5`). No split day. */
+  A05: { ...NONE, amb5_search_bound: true, operators: [OP("DROP_BATCH_IDENTITY")] },
+  /** bench-v2 `BENIGN` — `BEN-1`, `BEN-2`, `BEN-3` on disjoint day blocks (`§3.6`). */
+  B01: { ...NONE, benign_controls: true, operators: [OP("DROP_BATCH_IDENTITY")] },
 });
 
 /** Assert at authoring time that an operator is one `§4.3` maps to a family. */
@@ -98,10 +122,14 @@ function OP(op: DegradationOp): DegradationOp {
 
 // Every operator §4.3 maps to a family must appear in exactly that family's list,
 // and no family may run an operator §4.3 leaves unassigned. Checked at load so the
-// mapping cannot drift away from the table it transcribes.
-for (const [op, declaring] of Object.entries(OPERATOR_DECLARING_FAMILY) as [DegradationOp, FamilyId | null][]) {
+// mapping cannot drift away from the table it transcribes. A bench-v2 operator
+// declares a LIST of carriers (`docs/BENCH_V2_DESIGN.md §C`); the check is the
+// same in both directions — the carriers must be exactly the declared ones, in
+// declaration order — so a family that runs `DROP_BATCH_IDENTITY` without being
+// listed, or a listed family that drops it, still refuses to load.
+for (const [op, declaring] of Object.entries(OPERATOR_DECLARING_FAMILY) as [DegradationOp, FamilyId | readonly FamilyId[] | null][]) {
   const carriers = IMPLEMENTED_FAMILIES.filter((f) => FAMILY_MECHANICS[f].operators.includes(op));
-  const expected = declaring === null ? [] : [declaring];
+  const expected = declaring === null ? [] : typeof declaring === "string" ? [declaring] : [...declaring];
   if (carriers.join(",") !== expected.join(",")) {
     throw new Error(
       `families: PREREGISTRATION.md §4.3 maps ${op} to ${declaring ?? "no family"}, but this table ` +

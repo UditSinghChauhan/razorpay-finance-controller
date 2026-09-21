@@ -35,7 +35,7 @@ export type FamilyId = (typeof FAMILY_IDS)[number] | (typeof BENCH_V2_FAMILY_IDS
  */
 export const IMPLEMENTED_FAMILIES = Object.freeze([
   "F01", "F02", "F03", "F04", "F05", "F06", "F07", "F08", "F09", "F10",
-  "A01",
+  "A01", "A02", "A03", "A05", "B01",
 ] as const satisfies readonly FamilyId[]);
 
 /** `§4.1`: "specified, NOT IMPLEMENTED". Their `target_record_count` is 0. */
@@ -78,8 +78,9 @@ export const PUBLISHED_TARGET_RECORD_COUNTS = Object.freeze({
   F01: 2621, F02: 2621, F03: 2621, F04: 2624, F05: 2618,
   F06: 2621, F07: 2623, F08: 2621, F09: 2621, F10: 2621,
   F11: 0, F12: 0,
-  // bench-v2 (`docs/BENCH_V2_DESIGN.md §B.2`): `base + 2 x AMB1_PAIR_COUNT`.
-  A01: 2627,
+  // bench-v2 (`docs/BENCH_V2_DESIGN.md §B.2`, §C): `base + 2 x <split days>`.
+  // A05 splits no day (its drop is within one batch); B01's split days are BEN-3's.
+  A01: 2627, A02: 2627, A03: 2627, A05: 2621, B01: 2627,
 } as const satisfies Record<FamilyId, number>);
 
 /** `§4.1` / `PROJECT_SPEC.md §9`: observations per `(split, seed)` dataset. */
@@ -260,9 +261,13 @@ export const OPERATOR_DECLARING_FAMILY = Object.freeze({
   SHIFT_TIMESTAMP: null,
   SWAP_ORDER_REF: null,
   ROUND_BANK_AMOUNT: null,
-  // bench-v2 (`docs/BENCH_V2_DESIGN.md §B`, D2): declared by `AMB-1` and nothing else.
-  DROP_BATCH_IDENTITY: "A01",
-} as const satisfies Record<DegradationOp, FamilyId | null>);
+  // bench-v2 (`docs/BENCH_V2_DESIGN.md §B`, D2; §C): declared by every bench-v2
+  // family that detaches a line, and by nothing in `§4.1`. A LIST, not a single
+  // family: the v1 rows above are single-valued because `§4.3` maps each
+  // operator to one family, and that shape is untouched. `families.ts`'s guard
+  // still requires the carriers to be EXACTLY this list, in this order.
+  DROP_BATCH_IDENTITY: ["A01", "A02", "A03", "A05", "B01"],
+} as const satisfies Record<DegradationOp, FamilyId | readonly FamilyId[] | null>);
 
 /**
  * `§4.3`: "`F08` is the only family declaring more than one operator. They
@@ -887,12 +892,16 @@ export const SPEC_VERSION = "1.4.39";
  *
  * `A01` is `docs/BENCH_V2_DESIGN.md §3.1`'s `AMB-1`: same-day split batches
  * hosting equal-credit twins on different fee rates, both twins' batch identity
- * removed. It is a **stress family** — its prevalence is a declared parameter,
- * not a base rate (`§A`). `FAMILY_IDS` is untouched: `manifest.ts` transcribes
- * that table into a v1 manifest, and bench-v2 is a new `BENCHMARK_VERSION`
- * whose manifest is the next order's.
+ * removed. `A02` is `AMB-2`, the refund-netting twins (`§3.2` T4-b); `A03` is
+ * `AMB-3`, the sub-`tau` boundary twins (`§3.3`); `A05` is `AMB-5`, the search
+ * bound (`§3.5`); `B01` is `BENIGN`, the determinable controls (`§3.6`).
+ * `AMB-4` is deferred with the probe loop and has no id. Every one is a
+ * **stress family** — its prevalence is a declared parameter, not a base rate
+ * (`§A`). `FAMILY_IDS` is untouched: `manifest.ts` transcribes that table into
+ * a v1 manifest, and bench-v2 is a new `BENCHMARK_VERSION` whose manifest is
+ * the next order's.
  */
-export const BENCH_V2_FAMILY_IDS = Object.freeze(["A01"] as const);
+export const BENCH_V2_FAMILY_IDS = Object.freeze(["A01", "A02", "A03", "A05", "B01"] as const);
 
 /**
  * bench-v2's operators, beside `§4.3`'s ten. `DEGRADATION_OPS` is untouched.
@@ -937,3 +946,83 @@ export const AMB1_BASE_METHODS = Object.freeze(["upi", "netbanking", "wallet"] a
 
 /** `AMB-1`: twin B's method, the only 300-bps method in `FEE_RATE_BPS`. */
 export const AMB1_TWIN_METHOD = "emi" as const;
+
+// --- AMB-2 (A02) — refund-netting twins, the material form (§3.2 T4-b) ------
+
+/**
+ * `AMB-2`: share of the 31 capture days settled in two batches, each hosting
+ * one refund-netting pair `{P}` vs `{P2, R1}`. Convention 1, provisionally, as
+ * `AMB1_PAIR_RATE`; `§C` proposes the final rate.
+ */
+export const AMB2_PAIR_RATE = CONVENTION_1;
+
+/**
+ * `AMB-2`: the refund on `P2` is `max(AMB2_MIN_REFUND_PAISE, round_half_up(credit(P)
+ * x AMB2_REFUND_BPS / 10_000))`, so that the `2200_REFUND_LIABILITY` leg
+ * separates the two allocations by at least Rs 250 whatever the drawn amount.
+ *
+ * `docs/BENCH_V2_DESIGN.md §2` T4-b: material for `R >= Rs 98`; Rs 250 is that
+ * with a margin. The proportional term of `tau` is 10 bps of roughly `2 x
+ * (amount + R)`, i.e. about 0.2 % of the credit, and a 5 % refund clears it by
+ * a factor of ~25 at every atom of the committed table (checked in the tests:
+ * the smallest `materiality - tau` over the whole table is Rs 156).
+ */
+export const AMB2_MIN_REFUND_PAISE = 25_000;
+export const AMB2_REFUND_BPS = 500;
+
+// --- AMB-3 (A03) — sub-tau boundary twins (§3.3 AMB-3b) ---------------------
+
+/** `AMB-3`: share of split days, Convention 1 provisionally, as `AMB1_PAIR_RATE`. */
+export const AMB3_PAIR_RATE = CONVENTION_1;
+
+/**
+ * `AMB-3`: the twins' gross amounts differ by `delta` in **[Rs 51, Rs 80]**,
+ * inclusive — below `TAU`'s Rs 100 floor by at least Rs 20 and above the
+ * `EVALUATION_SPEC.md §5.3` sweep's Rs 50 point by at least Rs 1, so the
+ * frozen engine reaches `IMMATERIALLY_AMBIGUOUS` and the Rs 10 and Rs 50 sweep
+ * floors reach `AMBIGUOUS`. The window is on the DELTA, not on the credit:
+ * `delta ~ 1.253 % x credit` (T4-a), so it corresponds to a credit of roughly
+ * Rs 4,070 to Rs 6,385, where the proportional term of `tau` (~Rs 20) is below
+ * the floor and the engine's `floor` and the oracle's `round_half_up` cannot
+ * disagree (`§1.6`).
+ */
+export const AMB3_DELTA_RANGE_PAISE = Object.freeze({ min: 5_100, max: 8_000 } as const);
+
+// --- AMB-5 (A05) — the search bound (§3.5) ---------------------------------
+
+/** `AMB-5`: share of capture days whose batch loses `AMB5_DROP_COUNT` lines. Convention 1, provisionally. */
+export const AMB5_DAY_RATE = CONVENTION_1;
+
+/**
+ * `AMB-5`: lines detached per selected batch. `2^15 - 1 = 32,767 > C_max =
+ * 5,000` so `S2` stops `INTRACTABLE`; `15 <= K_max = 22` so the bound is
+ * `C_max`'s and not `K_max`'s; `2^15 <= C_ORACLE = 2,000,000` so the oracle
+ * enumerates it and labels the target `UNAMBIGUOUS`. The selected days have
+ * pairwise-distinct settlement instants by construction, so two 15-line
+ * classes never pool into one 30-line class (which would trip `K_max` instead).
+ */
+export const AMB5_DROP_COUNT = 15;
+
+// --- BENIGN (B01) — determinable controls (§3.6) ---------------------------
+
+/**
+ * `BENIGN`: three shapes on three disjoint day blocks of one family instance,
+ * every one expected `UNIQUE` / `UNAMBIGUOUS`. Rates are Convention 1
+ * provisionally; `§C` derives the final block sizes from what a
+ * false-abstention rate needs.
+ *
+ * - `BEN-1`: ONE payment line of an ordinary batch detached.
+ * - `BEN-2`: TWO payment lines of an ordinary batch detached (three subsets
+ *   enumerated, one admissible).
+ * - `BEN-3`: a same-day split batch — `AMB-1`'s host — with one payment line
+ *   detached from EACH half, the two lines' credits differing by at least
+ *   `BEN3_MIN_CREDIT_GAP_PAISE`. Same pooling, same class size, same instant
+ *   as `AMB-1`; the ONLY difference is that the credits differ, which is what
+ *   makes it the direct control.
+ */
+export const BEN1_DAY_RATE = CONVENTION_1;
+export const BEN2_DAY_RATE = CONVENTION_1;
+export const BEN3_DAY_RATE = CONVENTION_1;
+export const BEN1_DROP_COUNT = 1;
+export const BEN2_DROP_COUNT = 2;
+export const BEN3_MIN_CREDIT_GAP_PAISE = 100;

@@ -175,11 +175,14 @@ describe("primitive (b) — DROP_BATCH_IDENTITY (D2)", () => {
   });
 });
 
-describe("the single-carrier guard, unchanged (families.ts:83-97)", () => {
-  it("maps DROP_BATCH_IDENTITY to A01 and A01 alone, and A01 declares nothing else", () => {
-    expect(OPERATOR_DECLARING_FAMILY.DROP_BATCH_IDENTITY).toBe("A01");
+describe("the single-carrier guard (families.ts), over a declared carrier list", () => {
+  it("lists A01 first among DROP_BATCH_IDENTITY's carriers, and A01 declares nothing else", () => {
+    // The second increment widened the bench-v2 row to a LIST (docs/BENCH_V2_DESIGN.md
+    // §C); the guard still requires the carriers to be exactly the declared
+    // ones. A01's own declaration is unchanged.
+    expect(OPERATOR_DECLARING_FAMILY.DROP_BATCH_IDENTITY[0]).toBe("A01");
     const carriers = IMPLEMENTED_FAMILIES.filter((f) => FAMILY_MECHANICS[f].operators.includes("DROP_BATCH_IDENTITY"));
-    expect(carriers).toStrictEqual(["A01"]);
+    expect(carriers).toStrictEqual([...OPERATOR_DECLARING_FAMILY.DROP_BATCH_IDENTITY]);
     expect(FAMILY_MECHANICS.A01.operators).toStrictEqual(["DROP_BATCH_IDENTITY"]);
     // DROP_SETTLEMENT_ID is NOT reused: F08 is still its only carrier.
     expect(IMPLEMENTED_FAMILIES.filter((f) => FAMILY_MECHANICS[f].operators.includes("DROP_SETTLEMENT_ID")))
