@@ -81,6 +81,43 @@ export const EPSILON_BPS = 1_500;
  */
 export const EPSILON_SWEEP_BPS = Object.freeze({ min: 0, max: 10_000 } as const);
 
+// ---------------------------------------------------------------------------
+// bench-v2 — the documented evidence model's inputs, transcribed
+// (docs/BENCH_V2_PREREGISTRATION.md §3; PREREGISTRATION.md §10 V40)
+// ---------------------------------------------------------------------------
+
+/**
+ * `RECONCILIATION_SPEC.md §4.2`'s five soft-evidence weights, in basis points.
+ *
+ * `PREREGISTRATION.md §7` freezes them under `AL3` and `packages/engine/src/frozen.ts`
+ * carries the engine's copy; this package may not import the engine
+ * (`eslint.config.js`, `DECISION_BRIEF.md §L.1` rule 3), so the documented
+ * model in `documented-model/` reads this transcription. **Identical by
+ * inspection, and asserted identical by `apps/cli`'s bench-v2 suite**, which
+ * may import both. The three weights the engine does not compute (`SE1`,
+ * `SE2`, `SE4` — V38) are transcribed too: the documented model is the
+ * SPECIFIED one, and what it can and cannot compute from them is its finding.
+ */
+export const SE_WEIGHTS_BPS = Object.freeze({
+  SE1: 3_500,
+  SE2: 2_000,
+  SE3: 1_500,
+  SE4: 1_000,
+  SE5: 2_000,
+} as const);
+
+/**
+ * `RECONCILIATION_SPEC.md §4.3` / `PREREGISTRATION.md §7`: the engine's `S2`
+ * search bound — `K_max = 22` members per candidate class, `C_max = 5,000`
+ * candidates enumerated. Transcribed for the same reason as
+ * {@link SE_WEIGHTS_BPS}: `packages/oracle`'s `structuralLabels` takes the
+ * bound as a parameter (it may not import the engine either) and this package
+ * supplies it, so a target the engine could not enumerate is labelled
+ * `SEARCH_BOUND_ORACLE` **before** any bench-v2 figure exists and is counted
+ * inline beside every rate it leaves.
+ */
+export const SEARCH_BOUND = Object.freeze({ k_max: 22, c_max: 5_000 } as const);
+
 /** `EVALUATION_SPEC.md §4.6`: "bin predictions into 10 equal-width bins". */
 export const CALIBRATION_BINS = 10;
 

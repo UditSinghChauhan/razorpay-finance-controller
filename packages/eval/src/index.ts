@@ -70,6 +70,8 @@ export {
   type Metric17BaselineRow,
   QUEUE_TOP_N,
   SEEDS_PER_CONFIGURATION,
+  SE_WEIGHTS_BPS,
+  SEARCH_BOUND,
   SPEC_VERSION,
   TAU_SWEEP_FLOOR_PAISE,
 } from "./frozen.js";
@@ -294,3 +296,49 @@ export {
   intervalsOverlap,
   offlineParity,
 } from "./bootstrap.js";
+
+// bench-v2 (docs/BENCH_V2_PREREGISTRATION.md §3–§4): the documented evidence
+// model — a re-implementation of the SPECIFIED SE1–SE5, deliberately divergent
+// from s4-solve.ts and not the oracle — and the seven metrics over it.
+export {
+  type ReconReportRowLike,
+  type SeDisposition,
+  type SeId,
+  type SeStatus,
+  SE_DISPOSITIONS,
+  SE_IDS,
+  SE_IN_GAP,
+  SE_UNDETERMINABLE,
+  documentedModeDays,
+  documentedRStar,
+  documentedSe3,
+  documentedSe5,
+} from "./documented-model/se.js";
+
+export {
+  type DocumentedClass,
+  type DocumentedScore,
+  type DocumentedTargetRow,
+  DOCUMENTED_CLASSES,
+  documentedCounts,
+  documentedDiscriminable,
+  documentedRows,
+  documentedSingle,
+  documentedTrulyAmbiguous,
+} from "./documented-model/documented.js";
+
+export {
+  type BenchV2Metric,
+  type BenchV2MetricId,
+  type BenchV2Report,
+  type BenchV2Unit,
+  type CertificateReasonMix,
+  type ForcedChoiceHarm,
+  BENCH_V2_METRIC_IDS,
+  DENOMINATOR_EMPTY,
+  benchV2ByFamily,
+  benchV2Metrics,
+  entityAmountsPaise,
+  formatBenchV2Metric,
+  formatForcedChoiceHarm,
+} from "./metrics/bench-v2.js";
