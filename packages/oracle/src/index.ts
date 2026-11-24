@@ -122,3 +122,15 @@ export {
   UNDECLARED_FAMILY,
   completenessGate,
 } from "./completeness-gate.js";
+
+// bench-v2 (docs/BENCH_V2_PREREGISTRATION.md §3): the structural label, from
+// the oracle's own enumeration. `AMBIGUITY_LABELS` and `classify` are untouched.
+export {
+  type SearchBounds,
+  type StructuralLabel,
+  type StructuralRow,
+  STRUCTURAL_LABELS,
+  structurallyExchangeable,
+  structuralLabels,
+  structuralCounts,
+} from "./structural.js";
