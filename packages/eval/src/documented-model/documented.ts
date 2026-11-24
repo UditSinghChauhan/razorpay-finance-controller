@@ -52,9 +52,10 @@ import {
 /**
  * A target's class under the documented model. Exactly one per target.
  *
- * - `TRULY_AMBIGUOUS`: `structurally_exchangeable ∧ gap ≤ ε ∧ materiality > τ`.
- * - `DISCRIMINABLE`: `structurally_exchangeable ∧ gap > ε`.
- * - `IMMATERIAL`: `structurally_exchangeable ∧ gap ≤ ε ∧ materiality ≤ τ` —
+ * - `TRULY_AMBIGUOUS`: `structurally_exchangeable ∧ gap < ε ∧ materiality > τ`.
+ * - `DISCRIMINABLE`: `structurally_exchangeable ∧ gap ≥ ε` — `RECONCILIATION_SPEC.md
+ *   §6`'s `DISCRIMINATED` boundary (`Δs ≥ ε`), as the engine applies it.
+ * - `IMMATERIAL`: `structurally_exchangeable ∧ gap < ε ∧ materiality ≤ τ` —
  *   the documented model's `IMMATERIALLY_AMBIGUOUS`; in neither population.
  * - `SINGLE`: exactly one admissible allocation on a target that needed
  *   enumeration — metric M-G's denominator.
@@ -198,11 +199,29 @@ export function documentedRows(
       const second = scores[1]?.score_bps ?? 0;
       const gap = top - second;
       const material = label.max_materiality_paise > label.tau_paise;
-      const documented: DocumentedClass =
-        gap > EPSILON_BPS ? "DISCRIMINABLE" : material ? "TRULY_AMBIGUOUS" : "IMMATERIAL";
+      const documented = exchangeableClassOf(gap, material);
       return { ...base, documented, gap_bps: gap, scores };
     }),
   );
+}
+
+/**
+ * The class of a structurally exchangeable target, from its documented gap and
+ * whether its materiality exceeds `τ`.
+ *
+ * `RECONCILIATION_SPEC.md §6` step 3 (line 1045): `DISCRIMINATED` when
+ * **`Δs ≥ ε`**; the two ambiguous branches when `Δs < ε` (lines 1048, 1051).
+ * The boundary is the specification's and the engine's (`s4-solve.ts`'s
+ * `deltaS >= epsilonBps`). Aligned at bench-v2 Work Order 3c: through it this
+ * read `> ε`, which disagreed with both at exactly `ε` — a gap no bench-v2
+ * construction produces, but a boundary is stated, not assumed unreached.
+ */
+export function exchangeableClassOf(
+  gapBps: number,
+  material: boolean,
+): "DISCRIMINABLE" | "TRULY_AMBIGUOUS" | "IMMATERIAL" {
+  if (gapBps >= EPSILON_BPS) return "DISCRIMINABLE";
+  return material ? "TRULY_AMBIGUOUS" : "IMMATERIAL";
 }
 
 /** Counts by documented class, every class present. */

@@ -24,7 +24,11 @@
  * (`apps/cli` reads it off its own evidence). Per-family and overall figures
  * are computed by the same function over one unit and over the union.
  *
- * **M-D is two figures, and the rupee one is the headline.** Scored on the
+ * **M-D is NOT a headline** (Work Order 3b, Part 2a). Its rupee value is fixed
+ * by the generator's amount table and its 0.5 by exchangeability, so it is
+ * reported as the SHARE of the ambiguous value the arm misbooks, with the
+ * corpus's total settlement value beside it — *"≈0.5 by construction; measured
+ * to confirm the arm behaves as modelled"*. Scored on the
  * `A2-NOABSTAIN` unit: the RATE is wrong commits over committed documented-TA
  * targets; the VALUE is the paise that arm books to the wrong allocation on
  * documented-TA targets the reference arm (`ASSAY`) held under a certificate
@@ -89,6 +93,14 @@ export interface BenchV2Unit {
   readonly reference_abstentions?: ReadonlySet<string>;
   /** Observed `amount` per entity, paise — {@link entityAmountsPaise}. Required with `reference_abstentions`. */
   readonly entity_amount_paise?: ReadonlyMap<string, number>;
+  /**
+   * M-D's share term: the entities whose observed batch identity is absent —
+   * {@link detachedEntityIds}. On a documented-TA target these are the lines
+   * the admissible allocations dispute; the anchored rest is common to them.
+   */
+  readonly detached_entity_ids?: ReadonlySet<string>;
+  /** This dataset's total settlement value, paise — {@link settlementValuePaise}. Printed beside M-D's share. */
+  readonly settlement_value_paise?: number;
 }
 
 /**
@@ -108,6 +120,23 @@ export interface ForcedChoiceHarm {
   readonly held_committed: number;
   /** TA targets outside the value's population, by reason; and wrong entities with no amount. */
   readonly excluded_by: Readonly<Record<string, number>>;
+  /**
+   * `Σ |amount|` over the DETACHED entities the scored arm committed on held
+   * TA targets — the ambiguous value it had to choose an owner for. `null`
+   * where no unit carried a reference arm and the detached set.
+   */
+  readonly contested_paise: number | null;
+  /**
+   * **M-D's reported figure** (Work Order 3b, Part 2a): `value_paise /
+   * contested_paise`, the share of the ambiguous value the arm misbooks.
+   * **≈ 0.5 by construction** — the arm commits one of two exchangeable
+   * allocations on a coin — and measured to confirm the arm behaves as modelled,
+   * not as evidence of anything. `DENOMINATOR_EMPTY` on no contested value;
+   * `null` as `contested_paise`.
+   */
+  readonly share: number | typeof DENOMINATOR_EMPTY | null;
+  /** `Σ` settlement value over the units, paise; printed beside `share`. `null` if any unit lacked it. */
+  readonly corpus_settlement_value_paise: number | null;
 }
 
 /** The seven metrics for one population (a family, or all families pooled). */
@@ -131,6 +160,26 @@ export function entityAmountsPaise(observations: readonly Observation[]): Readon
     if (m !== null) out.set(m.entity_id, Math.abs(m.amount));
   }
   return out;
+}
+
+/**
+ * The entities whose observed batch identity is absent: `recon_line`s with
+ * `settlement_id: null` — what {@link BenchV2Unit.detached_entity_ids} expects.
+ * On bench-v2 these are exactly the lines `DROP_BATCH_IDENTITY` detached.
+ */
+export function detachedEntityIds(observations: readonly Observation[]): ReadonlySet<string> {
+  const out = new Set<string>();
+  for (const o of observations) {
+    if (o.kind === "recon_line" && o.payload.settlement_id === null) out.add(o.payload.entity_id);
+  }
+  return out;
+}
+
+/** `Σ amount` over the dataset's `settlement` observations, paise. */
+export function settlementValuePaise(observations: readonly Observation[]): number {
+  let total = 0;
+  for (const o of observations) if (o.kind === "settlement") total += Math.abs(o.payload.amount);
+  return total;
 }
 
 function metric(
@@ -166,6 +215,7 @@ interface Tally {
   harmPaise: number; harmWrongTargets: number; harmWrongEntities: number;
   heldTargets: number; heldCommitted: number; heldExcepted: number; heldSelfAbstained: number;
   notHeld: number; noReference: number; amountUnknown: number;
+  contestedPaise: number; contestedUnits: number; settlementPaise: number; settlementUnits: number;
 }
 
 function emptyTally(): Tally {
@@ -177,6 +227,7 @@ function emptyTally(): Tally {
     referenceUnits: 0, harmPaise: 0, harmWrongTargets: 0, harmWrongEntities: 0,
     heldTargets: 0, heldCommitted: 0, heldExcepted: 0, heldSelfAbstained: 0,
     notHeld: 0, noReference: 0, amountUnknown: 0,
+    contestedPaise: 0, contestedUnits: 0, settlementPaise: 0, settlementUnits: 0,
   };
 }
 
@@ -191,8 +242,20 @@ function tallyUnit(unit: BenchV2Unit, into: Tally): void {
   const committed = new Set<string>();
   // A set per target: an entity is charged once however many edges name it.
   const wrongEntitiesOf = new Map<string, Set<string>>();
+  const detachedCommittedOf = new Map<string, Set<string>>();
+  const detached = unit.detached_entity_ids;
+  if (unit.settlement_value_paise !== undefined) {
+    into.settlementPaise += unit.settlement_value_paise;
+    into.settlementUnits += 1;
+  }
+  if (unit.reference_abstentions !== undefined && detached !== undefined) into.contestedUnits += 1;
   for (const e of unit.run.allocations) {
     committed.add(e.target_id);
+    if (detached?.has(e.entity_id) === true) {
+      const bucket = detachedCommittedOf.get(e.target_id);
+      if (bucket === undefined) detachedCommittedOf.set(e.target_id, new Set([e.entity_id]));
+      else bucket.add(e.entity_id);
+    }
     if (unit.true_target_of_entity.get(e.entity_id) !== e.target_id) {
       const bucket = wrongEntitiesOf.get(e.target_id);
       if (bucket === undefined) wrongEntitiesOf.set(e.target_id, new Set([e.entity_id]));
@@ -222,6 +285,9 @@ function tallyUnit(unit: BenchV2Unit, into: Tally): void {
         else {
           into.heldCommitted += 1;
           if (wrongHere.size > 0) into.harmWrongTargets += 1;
+          for (const entity of detachedCommittedOf.get(row.target_id) ?? []) {
+            into.contestedPaise += unit.entity_amount_paise?.get(entity) ?? 0;
+          }
           for (const entity of wrongHere) {
             const amount = unit.entity_amount_paise?.get(entity);
             if (amount === undefined) into.amountUnknown += 1;
@@ -300,7 +366,11 @@ export function benchV2Metrics(units: readonly BenchV2Unit[], population: string
   // M-G spurious_abstention_rate = abstained ∩ SINGLE / SINGLE
   const mG = metric("M-G", "spurious_abstention_rate", t.singleAbstained, t.single, bound);
 
+  const contested = t.contestedUnits === 0 ? null : t.contestedPaise;
   const forcedChoiceHarm: ForcedChoiceHarm = Object.freeze({
+    contested_paise: contested,
+    share: contested === null ? null : contested === 0 ? DENOMINATOR_EMPTY : t.harmPaise / contested,
+    corpus_settlement_value_paise: units.length > 0 && t.settlementUnits === units.length ? t.settlementPaise : null,
     value_paise: t.referenceUnits === 0 ? null : t.harmPaise,
     wrong_targets: t.harmWrongTargets,
     wrong_entities: t.harmWrongEntities,
@@ -362,8 +432,16 @@ export function formatForcedChoiceHarm(h: ForcedChoiceHarm): string {
     excluded === 0 ? "0 excluded" : `${String(excluded)} excluded (${entries.map(([k, v]) => `${k} ${String(v)}`).join(", ")})`;
   if (h.value_paise === null) return `M-D forced_choice_harm = NO_REFERENCE_ARM (${exclusions})`;
   const rupees = (h.value_paise / 100).toFixed(2);
+  const share =
+    h.share === null
+      ? "share NOT_COMPUTED (no detached set)"
+      : h.share === DENOMINATOR_EMPTY
+        ? `share ${DENOMINATOR_EMPTY}`
+        : `share ${h.share.toFixed(4)} of ${String(h.contested_paise)} contested paise (≈0.5 by construction; measured to confirm the arm behaves as modelled)`;
+  const corpus =
+    h.corpus_settlement_value_paise === null ? "corpus settlement value unknown" : `corpus settlement value ${String(h.corpus_settlement_value_paise)} paise`;
   return (
-    `M-D forced_choice_harm = Rs ${rupees} (${String(h.value_paise)} paise, ${String(h.wrong_entities)} entities) ` +
+    `M-D ${share}; ${corpus}; Rs ${rupees} (${String(h.value_paise)} paise, ${String(h.wrong_entities)} entities) ` +
     `booked to the wrong allocation on ${String(h.wrong_targets)} of ${String(h.held_committed)} committed targets ` +
     `the reference arm held (${String(h.held_targets)} held; ${exclusions})`
   );

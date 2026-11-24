@@ -1,0 +1,17 @@
+{
+  "purpose": "Every seed any test file uses (literal, computed and fast-check). docs/BENCH_V2_PREREGISTRATION.md section 7 gate G-F refuses a bench-v2 corpus seed inside any range here; tests/test-seed-registry.test.ts fails on a test seed outside every range here.",
+  "ranges": [
+    { "from": 0, "to": 2, "source": "run configs over demo/ fixtures and unit inputs (seed 0), and argument-parser cases (seeds 1, 2)" },
+    { "from": 42, "to": 42, "source": "generic unit-test seed" },
+    { "from": 77, "to": 77, "source": "ablation unit-test config seed (apps/cli/tests/a1-a2-a3.test.ts)" },
+    { "from": 2000, "to": 2004, "source": "RunKey, metrics-path and metric-17 unit-test config seeds" },
+    { "from": 4207, "to": 4207, "source": "single generator unit-test seed" },
+    { "from": 7001, "to": 7200, "source": "bench-v2 test seeds: TEST_SEEDS 7001-7005, the 20-seed sweeps 7001+i, and the 200-seed offset sweep 7001+i; the predictions were informed by 7001-7020" },
+    { "from": 8200, "to": 8399, "source": "labels in tests/seal-bench-v2.test.ts's fixture report; no dataset is generated for them" },
+    { "from": 9000, "to": 9009, "source": "PREREGISTRATION.md section 6.1 declared seeds (sealed TEST block and successors), read by tests" },
+    { "from": 9100, "to": 9109, "source": "PREREGISTRATION.md section 6.1 declared seeds (DEV block and successors), read by tests" },
+    { "from": 20000, "to": 999999, "source": "fast-check seedArb (min 20_000, max 999_999) and the deterministic loops 30_000-30_029, 40_000-40_019, 60_000-60_029 inside it" },
+    { "from": 20260825, "to": 20260826, "source": "date-stamped unit-test seeds" },
+    { "from": 1592594996, "to": 1592594996, "source": "0x5eed_1234n, a PRNG unit-test seed" }
+  ]
+}

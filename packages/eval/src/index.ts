@@ -325,6 +325,7 @@ export {
   documentedRows,
   documentedSingle,
   documentedTrulyAmbiguous,
+  exchangeableClassOf,
 } from "./documented-model/documented.js";
 
 export {
@@ -338,7 +339,9 @@ export {
   DENOMINATOR_EMPTY,
   benchV2ByFamily,
   benchV2Metrics,
+  detachedEntityIds,
   entityAmountsPaise,
   formatBenchV2Metric,
+  settlementValuePaise,
   formatForcedChoiceHarm,
 } from "./metrics/bench-v2.js";

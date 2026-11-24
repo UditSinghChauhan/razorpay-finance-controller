@@ -16,8 +16,11 @@ import {
   documentedSe5,
   documentedSingle,
   documentedTrulyAmbiguous,
+  detachedEntityIds,
   entityAmountsPaise,
   EPSILON_BPS,
+  exchangeableClassOf,
+  settlementValuePaise,
   formatBenchV2Metric,
   formatForcedChoiceHarm,
   SE_DISPOSITIONS,
@@ -303,6 +306,9 @@ describe("M-D's value — the rupees A2 books to the wrong allocation where ASSA
   it("charges the wrongly allocated entity at its observed amount, and not the correctly placed anchored member", () => {
     const report = benchV2Metrics([a2([[PAY(1), SETL(1)], [PAY(3), SETL(1)]], [SETL(1)])], "X");
     expect(report.forced_choice_harm).toStrictEqual({
+      contested_paise: null,
+      share: null,
+      corpus_settlement_value_paise: null,
       value_paise: 520_000,
       wrong_targets: 1,
       wrong_entities: 1,
@@ -313,8 +319,45 @@ describe("M-D's value — the rupees A2 books to the wrong allocation where ASSA
     const rate = report.metrics.find((m) => m.id === "M-D");
     expect(rate).toMatchObject({ numerator: 1, denominator: 1, value: 1 });
     expect(formatForcedChoiceHarm(report.forced_choice_harm)).toBe(
-      "M-D forced_choice_harm = Rs 5200.00 (520000 paise, 1 entities) booked to the wrong allocation on 1 of 1 committed targets the reference arm held (1 held; 0 excluded)",
+      "M-D share NOT_COMPUTED (no detached set); corpus settlement value unknown; Rs 5200.00 (520000 paise, 1 entities) booked to the wrong allocation on 1 of 1 committed targets the reference arm held (1 held; 0 excluded)",
     );
+  });
+
+  describe("the share of ambiguous value misbooked — M-D's reported figure (Work Order 3b, Part 2a)", () => {
+    const withShare = (edges: [string, string][]): BenchV2Unit => ({
+      ...a2(edges, [SETL(1)]),
+      detached_entity_ids: detachedEntityIds(obs),
+      settlement_value_paise: settlementValuePaise(obs),
+    });
+
+    it("detaches exactly the lines with no observed settlement_id", () => {
+      expect([...detachedEntityIds(obs)].sort()).toStrictEqual([PAY(2), PAY(3)].sort());
+      expect(settlementValuePaise(obs)).toBe(1000);
+    });
+
+    it("is 1 when the arm committed the wrong twin, 0 when it committed the true one", () => {
+      const wrong = benchV2Metrics([withShare([[PAY(1), SETL(1)], [PAY(3), SETL(1)]])], "X").forced_choice_harm;
+      expect(wrong).toMatchObject({ contested_paise: 520_000, share: 1, corpus_settlement_value_paise: 1000 });
+      const right = benchV2Metrics([withShare([[PAY(1), SETL(1)], [PAY(2), SETL(1)]])], "X").forced_choice_harm;
+      expect(right).toMatchObject({ contested_paise: 500_000, share: 0 });
+    });
+
+    it("is the value-weighted wrong share across units, and never charges the anchored member", () => {
+      const h = benchV2Metrics(
+        [withShare([[PAY(1), SETL(1)], [PAY(3), SETL(1)]]), withShare([[PAY(1), SETL(1)], [PAY(2), SETL(1)]])],
+        "X",
+      ).forced_choice_harm;
+      expect(h.contested_paise).toBe(1_020_000);
+      expect(h.share).toBeCloseTo(520_000 / 1_020_000, 12);
+      expect(h.corpus_settlement_value_paise).toBe(2000);
+      expect(formatForcedChoiceHarm(h)).toContain("≈0.5 by construction; measured to confirm the arm behaves as modelled");
+      expect(formatForcedChoiceHarm(h)).toContain("corpus settlement value 2000 paise");
+    });
+
+    it("prints DENOMINATOR_EMPTY, not 0, when nothing contested was committed", () => {
+      const h = benchV2Metrics([withShare([[PAY(1), SETL(1)]])], "X").forced_choice_harm;
+      expect(h).toMatchObject({ contested_paise: 0, share: DENOMINATOR_EMPTY });
+    });
   });
 
   it("charges an entity once even if two edges name it", () => {
@@ -396,7 +439,7 @@ describe("properties of the documented predicates (fast-check)", () => {
             expect(documentedTrulyAmbiguous(r) || documentedDiscriminable(r)).toBe(false);
             expect(r.gap_bps).toBeNull();
           }
-          if (r.gap_bps !== null) expect(documentedDiscriminable(r)).toBe(r.gap_bps > EPSILON_BPS);
+          if (r.gap_bps !== null) expect(documentedDiscriminable(r)).toBe(r.gap_bps >= EPSILON_BPS);
         }
       }),
       { numRuns: RUNS },
@@ -405,6 +448,17 @@ describe("properties of the documented predicates (fast-check)", () => {
     expect(seen.has("TRULY_AMBIGUOUS") || seen.has("IMMATERIAL")).toBe(true);
     expect(seen.has("DISCRIMINABLE")).toBe(true);
     expect(seen.has("SINGLE")).toBe(true);
+  });
+
+  it("puts the boundary where RECONCILIATION_SPEC.md §6 does: Δs ≥ ε discriminates, Δs < ε does not", () => {
+    // §6 step 3 (line 1045) and the engine's `deltaS >= epsilonBps`. Aligned at
+    // Work Order 3c; this module read `> ε` before.
+    expect(exchangeableClassOf(EPSILON_BPS, true)).toBe("DISCRIMINABLE");
+    expect(exchangeableClassOf(EPSILON_BPS, false)).toBe("DISCRIMINABLE");
+    expect(exchangeableClassOf(EPSILON_BPS - 1, true)).toBe("TRULY_AMBIGUOUS");
+    expect(exchangeableClassOf(EPSILON_BPS - 1, false)).toBe("IMMATERIAL");
+    expect(exchangeableClassOf(EPSILON_BPS + 1, true)).toBe("DISCRIMINABLE");
+    expect(exchangeableClassOf(0, true)).toBe("TRULY_AMBIGUOUS");
   });
 
   it("is invariant under any reordering of the observations and of the report rows", () => {

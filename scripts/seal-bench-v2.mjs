@@ -1,12 +1,12 @@
 /**
- * `node scripts/seal-bench-v2.mjs` — the bench-v2 seal, behind five refusal
+ * `node scripts/seal-bench-v2.mjs` — the bench-v2 seal, behind six refusal
  * gates (`docs/BENCH_V2_PREREGISTRATION.md §7`).
  *
  * **Written at bench-v2 increment 3 and NOT run.** No bench-v2 corpus exists
  * when this file is committed; the scoring command that produces the report it
  * reads is the seal order's work (`§8`). Every gate is evaluated, every failure
  * is printed with the gate that raised it, and the process exits non-zero on
- * any failure. Nothing is written unless all five gates pass, and nothing is
+ * any failure. Nothing is written unless all six gates pass, and nothing is
  * ever overwritten.
  *
  * ```
@@ -22,7 +22,21 @@
  *        commit touches the file. The SHA is recorded in the seal output
  *   G-E  nothing under runs/seal-v1.0.13/**, bench/test/** or bench/dev/** differs
  *        from the pre-registration commit, in HEAD or in the working tree
+ *   G-F  no corpus seed in the report lies in any range of the declared test-seed
+ *        registry (scripts/test-seed-registry.json): the predictions were informed
+ *        by test seeds, so the corpus must share none of them (Work Order 3b, 1.3)
  * ```
+ *
+ * **The evidence that the predictions preceded the results is the PUSH time,
+ * not the commit time** (Work Order 3b, 1.1): a commit date is set by the
+ * author's clock. G-D requires the pre-registration commit to be on a
+ * remote-tracking branch; the server-recorded push time is read after the push
+ * from `gh api repos/<owner>/<repo>/activity` and goes into the RESULTS
+ * document. This script prints the commit date only as a convenience.
+ *
+ * **Tested before it is ever run for real** — `tests/seal-bench-v2.test.ts`
+ * drives every refusal path and the all-pass path against throwaway git
+ * repositories (Work Order 3b, 1.7).
  *
  * **The pre-registration commit** is the commit that ADDED the document
  * (`git log --diff-filter=A`), unless `--prereg-commit <sha>` names a later one;
@@ -64,6 +78,7 @@ const PREREG_PATH = "docs/BENCH_V2_PREREGISTRATION.md";
 const PROTECTED_PATHS = ["runs/seal-v1.0.13", "bench/test", "bench/dev"];
 const SEAL_DIR = "runs/bench-v2-seal";
 const SEAL_FILE = `${SEAL_DIR}/seal.json`;
+const REGISTRY_PATH = "scripts/test-seed-registry.json";
 
 /** `§5`: the headline metrics and the arm each is scored on. */
 const HEADLINE = Object.freeze([
@@ -302,6 +317,44 @@ function gateC(refusals, report) {
   return checked;
 }
 
+// --- G-F ------------------------------------------------------------------
+
+/**
+ * Corpus seeds against the declared test-seed registry. The registry is the
+ * union of every seed any test file uses — literal, computed and fast-check
+ * ranges — kept complete by `tests/test-seed-registry.test.ts`, which fails on a
+ * test seed outside it.
+ */
+function gateF(refusals, report) {
+  const record = { registry: REGISTRY_PATH };
+  if (!existsSync(REGISTRY_PATH)) {
+    refusals.add("G-F", `${REGISTRY_PATH} is missing: corpus seeds cannot be shown disjoint from test seeds.`);
+    return record;
+  }
+  const bytes = readFileSync(REGISTRY_PATH);
+  record.registry_sha256 = sha256(bytes);
+  let ranges;
+  try {
+    ranges = JSON.parse(bytes.toString("utf8")).ranges;
+  } catch (error) {
+    refusals.add("G-F", `${REGISTRY_PATH} is not valid JSON: ${String(error)}`);
+    return record;
+  }
+  if (!Array.isArray(ranges) || ranges.length === 0 || !ranges.every((r) => Number.isInteger(r.from) && Number.isInteger(r.to) && r.from <= r.to)) {
+    refusals.add("G-F", `${REGISTRY_PATH} must hold a non-empty "ranges" array of { from, to } integers with from <= to.`);
+    return record;
+  }
+  const seeds = [...new Set(report.units.map((u) => Number(u.seed)))].sort((a, b) => a - b);
+  record.corpus_seeds = seeds;
+  for (const seed of seeds) {
+    const hit = ranges.find((r) => seed >= r.from && seed <= r.to);
+    if (hit !== undefined) {
+      refusals.add("G-F", `corpus seed ${String(seed)} lies in test-seed range [${String(hit.from)}, ${String(hit.to)}] (${String(hit.source ?? "")}): a test informed it.`);
+    }
+  }
+  return record;
+}
+
 // ---------------------------------------------------------------------------
 
 function main() {
@@ -319,9 +372,10 @@ function main() {
   const loaded = readReport(refusals, args.report);
   const populations = loaded === null ? null : { ...gateA(refusals, loaded.report), ...gateB(refusals, loaded.report) };
   const headline = loaded === null ? null : gateC(refusals, loaded.report);
+  const testSeeds = loaded === null ? null : gateF(refusals, loaded.report);
 
   out("bench-v2 seal");
-  out(`  pre-registration commit  ${prereg.prereg_commit ?? "(none)"}  ${prereg.commit_date ?? ""}`);
+  out(`  pre-registration commit  ${prereg.prereg_commit ?? "(none)"}  committed ${prereg.commit_date ?? ""} (author clock; the evidence is the push time, recorded in the results document)`);
   out(`  pre-registration sha256  ${prereg.sha256_at_commit ?? "(none)"}`);
   if ((prereg.prior_versions ?? []).length > 0) out(`  prior versions           ${prereg.prior_versions.join(" | ")}`);
   if (loaded !== null) out(`  report sha256            ${loaded.sha256}`);
@@ -349,7 +403,8 @@ function main() {
     report: { path: args.report, sha256: loaded.sha256 },
     populations,
     headline,
-    gates: ["G-A", "G-B", "G-C", "G-D", "G-E"].map((gate) => ({ gate, passed: true })),
+    test_seed_registry: testSeeds,
+    gates: ["G-A", "G-B", "G-C", "G-D", "G-E", "G-F"].map((gate) => ({ gate, passed: true })),
   };
   mkdirSync(SEAL_DIR, { recursive: true });
   writeFileSync(SEAL_FILE, `${JSON.stringify(seal, null, 2)}\n`, { flag: "wx" });

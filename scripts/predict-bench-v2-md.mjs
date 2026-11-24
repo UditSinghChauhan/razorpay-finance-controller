@@ -32,7 +32,11 @@ import process from "node:process";
 
 const TABLE = "packages/generator/src/amount-table.ts";
 const DRAWS = 200_000;
-const SEEDS_PER_BLOCK = 5;
+/**
+ * `docs/BENCH_V2_PREREGISTRATION.md §2.2` (Work Order 3c): block P is seeds
+ * 9200–9216 (17), sized by Work Order 3b's rule; block S is 9300–9304 (5).
+ */
+const SEEDS = Object.freeze({ P: 17, S: 5 });
 
 const src = readFileSync(TABLE, "utf8");
 const start = src.indexOf("Object.freeze([", src.indexOf("export const AMOUNT_QUANTILES")) + "Object.freeze(".length;
@@ -69,19 +73,31 @@ function next() {
 const below = (n) => Math.floor(next() * n);
 const coin = () => next() < 0.5;
 
-/** One coupled AMB-1-shaped pair: the wrong value if A2's commit is wrong, else 0. */
+/**
+ * One coupled AMB-1-shaped pair. `paise` gains the wrong twin's gross if A2's
+ * commit is wrong; `contested` gains the gross of whichever twin A2 committed —
+ * the detached line it had to choose an owner for (M-D's share denominator).
+ */
 function twinPair(tally) {
   const a = amb1[below(amb1.length)];
   const b = amountForCredit(credit(a, 200), 300);
-  if (coin()) {
+  const wrong = coin();
+  const trueIsA = coin();
+  const [truth, other] = trueIsA ? [a, b] : [b, a];
+  if (wrong) {
     tally.wrong += 1;
-    tally.paise += coin() ? a : b;
+    tally.paise += other;
+    tally.contested += other;
+  } else {
+    tally.contested += truth;
   }
 }
 
+const tally = () => ({ paise: 0, contested: 0, wrong: 0, committed: 0, excepted: 0 });
+
 function blockP() {
-  const t = { paise: 0, wrong: 0, committed: 0, excepted: 0 };
-  for (let seed = 0; seed < SEEDS_PER_BLOCK; seed += 1) {
+  const t = tally();
+  for (let seed = 0; seed < SEEDS.P; seed += 1) {
     for (let p = 0; p < 3; p += 1) { t.committed += 1; t.excepted += 1; twinPair(t); } // A01
     for (let p = 0; p < 3; p += 1) { // A02
       t.committed += 1;
@@ -90,6 +106,8 @@ function blockP() {
       const cP = credit(aP, 200);
       const r = Math.max(25_000, rhu(cP * 500, 10_000));
       const aP2 = amountForCredit(cP + r, 200);
+      // A2 commits {P2, R1} whichever target posts first; contested either way.
+      t.contested += aP2 + r;
       if (coin()) { t.wrong += 1; t.paise += aP2 + r; }
     }
     for (let p = 0; p < 3; p += 1) { // A04 S1
@@ -100,8 +118,8 @@ function blockP() {
 }
 
 function blockS() {
-  const t = { paise: 0, wrong: 0, committed: 0, excepted: 0 };
-  for (let k = 0; k < 3 * SEEDS_PER_BLOCK; k += 1) { t.committed += 1; t.excepted += 1; twinPair(t); }
+  const t = tally();
+  for (let k = 0; k < 3 * SEEDS.S; k += 1) { t.committed += 1; t.excepted += 1; twinPair(t); }
   return t;
 }
 
@@ -114,9 +132,11 @@ for (const [name, fn] of [["P", blockP], ["S", blockS]]) {
   const runs = sample(fn);
   const value = runs.map((r) => r.paise);
   const rate = runs.map((r) => r.wrong / r.committed);
+  const share = runs.map((r) => (r.contested === 0 ? 0 : r.paise / r.contested));
   out(
-    `block ${name}  value paise  median ${String(quantile(value, 0.5))}  p2.5 ${String(quantile(value, 0.025))}  p97.5 ${String(quantile(value, 0.975))}` +
+    `block ${name}  share median ${quantile(share, 0.5).toFixed(3)}  p2.5 ${quantile(share, 0.025).toFixed(3)}  p97.5 ${quantile(share, 0.975).toFixed(3)}` +
       `  |  rate median ${quantile(rate, 0.5).toFixed(3)}  p2.5 ${quantile(rate, 0.025).toFixed(3)}  p97.5 ${quantile(rate, 0.975).toFixed(3)}` +
-      `  |  excepted median ${String(quantile(runs.map((r) => r.excepted), 0.5))}`,
+      `  |  value paise median ${String(quantile(value, 0.5))}  p2.5 ${String(quantile(value, 0.025))}  p97.5 ${String(quantile(value, 0.975))}` +
+      `  |  committed median ${String(quantile(runs.map((r) => r.committed), 0.5))}  excepted median ${String(quantile(runs.map((r) => r.excepted), 0.5))}`,
   );
 }
