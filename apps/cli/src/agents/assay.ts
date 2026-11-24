@@ -89,6 +89,7 @@ import {
   type UnresolvedItemRecord,
 } from "@assay/ledger";
 import type { Paise } from "@assay/money";
+import type { ProbeLoopState } from "@assay/probe";
 
 import { valueOf } from "../values.js";
 
@@ -1057,6 +1058,13 @@ async function runAssayComposed(
   }
 
   // --- S4, and §6.2's loop where it is required ---------------------------
+  // `P_max` is "a budget per component" (RECONCILIATION_SPEC.md §6.2; register
+  // row DATA_MODEL.md §22.2 M64). The loop runs once per AMBIGUOUS target, so
+  // the state -- attempts, accumulated reports, probes_attempted -- is the
+  // COMPONENT's and is threaded through every target in it. Before M64 each
+  // target started from a fresh state, and a two-target component could have
+  // spent 2 x P_max; that was dormant only because no probe was ever dispatched.
+  const probeStateByComponent = new Map<ComponentId, ProbeLoopState>();
   const outcomes = new Map<ObservationId, TargetOutcome>();
   for (const [index, target] of seam.targets.entries()) {
     const context = seam.contexts[index];
@@ -1083,19 +1091,35 @@ async function runAssayComposed(
         : { tau_floor_paise: options.tauFloorPaise }),
     } satisfies Omit<SolveInput, "recon_reports" | "probe_attempts">;
 
-    const first = solve({ ...partial, recon_reports: [], probe_attempts: 0 });
     const compId = componentIdFor(component);
+    // The component's evidence so far: what a sibling target's probes already
+    // gathered is this target's evidence too. With no probe spent on the
+    // component it is `[]` and `0` -- the solve this file ran before M64.
+    const prior = probeStateByComponent.get(compId);
+    const first = solve({
+      ...partial,
+      recon_reports: prior?.reports ?? [],
+      probe_attempts: prior?.attempts ?? 0,
+    });
 
     // packages/probe's `decide` owns the gate -- "Probing is gated on AMBIGUOUS
     // alone ... no probe enlarges a bound" -- and re-reaches this same first
     // solve itself. Entering the loop on any other outcome would spend budget on
     // a case §6.2 says it cannot help.
     if (first.outcome !== "AMBIGUOUS") {
+      // A target a sibling's probes settled was resolved by a probe even though
+      // this target spent none: asked only where a probe was spent, so the
+      // ordinary path runs no second solve.
+      const resolvedBySiblingProbe =
+        prior !== undefined &&
+        prior.attempts > 0 &&
+        first.certificate_reason === null &&
+        solve({ ...partial, recon_reports: [], probe_attempts: 0 }).outcome === "AMBIGUOUS";
       outcomes.set(target.obs_id, {
         solve: first,
         probes_spent: 0,
-        probe_ids: [],
-        resolved_by_probe: false,
+        probe_ids: prior?.probes_attempted ?? [],
+        resolved_by_probe: resolvedBySiblingProbe,
         comp_id: compId,
         context,
         generation: generationByTarget.get(target.obs_id) ?? "COMPLETE",
@@ -1114,11 +1138,15 @@ async function runAssayComposed(
       certificate: summarize(first, compId, context, memberById),
       reconDateScope: String(periodTo),
       dispatch: { reconReportPath: "" },
+      ...(prior === undefined ? {} : { prior }),
     });
+    probeStateByComponent.set(compId, loop.state);
 
     outcomes.set(target.obs_id, {
       solve: loop.solve,
-      probes_spent: loop.state.attempts,
+      // This target's own spend, so the run total below is the sum over
+      // components and a probe is never counted once per sibling target.
+      probes_spent: loop.state.attempts - (prior?.attempts ?? 0),
       probe_ids: loop.state.probes_attempted,
       resolved_by_probe: loop.state.attempts > 0 && loop.stop === null,
       comp_id: compId,

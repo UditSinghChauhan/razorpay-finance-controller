@@ -15,12 +15,23 @@ import {
   type LlmProvider,
   type R3Input,
 } from "@assay/llm";
-import { initialState, offerR3Proposal, type ObservationUniverse } from "@assay/probe";
+import {
+  initialState,
+  offerR3Proposal,
+  type ObservationUniverse,
+  type ProbeLoopState,
+} from "@assay/probe";
+import fc from "fast-check";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { encodeJsonl } from "../src/artifacts/jsonl.js";
 import { ProbeSourceUnavailableError, dispatchProbe } from "../src/probe/surface.js";
-import { buildAvailableProbes, runProbeLoop, type ProbeRunInput } from "../src/probe/run.js";
+import {
+  ProbeStateComponentMismatchError,
+  buildAvailableProbes,
+  runProbeLoop,
+  type ProbeRunInput,
+} from "../src/probe/run.js";
 
 /**
  * H1 end to end — `RECONCILIATION_SPEC.md §6.6`'s chain, composed.
@@ -613,6 +624,135 @@ describe("§6.6's chain runs on UNANCHORED members (M49)", () => {
     const result = await runProbeLoop(runInput({ solveInput: unanchoredSolveInput }));
     expect(result.events[0]?.proposer.type).toBe("llm");
     expect(result.calls.every((c) => c.role === "R3_propose_probe")).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// M64 — P_max is a budget per COMPONENT
+// ---------------------------------------------------------------------------
+
+/**
+ * `RECONCILIATION_SPEC.md §6.2`: *"`P_max = 3` is a budget per component"*.
+ *
+ * The composition runs the loop once per AMBIGUOUS target, and before M64 each
+ * run started from a fresh state, so a component with two AMBIGUOUS targets
+ * could spend `2 × P_max`. The fix threads the component's state through
+ * `ProbeRunInput.prior`; these tests drive that threading over the real chain —
+ * the real engine, the real `packages/probe` budget and the real dispatch — with
+ * a report that never resolves the component, so every target keeps asking.
+ */
+describe("P_max is a budget per COMPONENT, not per target (M64)", () => {
+  let barrenPath: string;
+
+  beforeAll(() => {
+    // The probe RUNS and returns nothing for SETL (§12), so it costs budget and
+    // never resolves: the component stays AMBIGUOUS for every target.
+    barrenPath = join(dir, "recon_report_barren.jsonl");
+    writeFileSync(
+      barrenPath,
+      encodeJsonl([{ settlement_id: "setl_othersettlemen", entity_id: entId(9), settled_at: null }]),
+      "utf8",
+    );
+  });
+
+  /** Proposes or declines per call, cycling through `pattern`. */
+  function patterned(pattern: readonly boolean[]): LlmProvider {
+    let n = 0;
+    return {
+      id: "offline",
+      modelId: "rules-v1",
+      requiresNetwork: false,
+      meteredCost: false,
+      invoke: async (req) => {
+        const propose = pattern[n % pattern.length] ?? false;
+        n += 1;
+        const value = propose
+          ? { probe: "fetch_settlement_recon", settlement_id: SETL, date: "d" }
+          : { probe: "NO_USEFUL_PROBE" };
+        return {
+          value: R3OutputSchema.parse(value) as never,
+          meta: metaFor(req.systemPromptId, req.input as R3Input),
+        };
+      },
+    };
+  }
+
+  /** One component with `targets` AMBIGUOUS targets, its state threaded as assay.ts threads it. */
+  async function threadComponent(
+    targets: number,
+    provider: LlmProvider,
+    thread = true,
+  ): Promise<{ total: number; perTarget: number[]; events: number }> {
+    let prior: ProbeLoopState | undefined;
+    let total = 0;
+    let events = 0;
+    const perTarget: number[] = [];
+    for (let t = 0; t < targets; t += 1) {
+      const result = await runProbeLoop(
+        runInput({
+          provider,
+          dispatch: { reconReportPath: barrenPath },
+          ...(thread && prior !== undefined ? { prior } : {}),
+        }),
+      );
+      const spent = result.state.attempts - (thread ? (prior?.attempts ?? 0) : 0);
+      perTarget.push(spent);
+      total += spent;
+      events += result.events.length;
+      prior = result.state;
+    }
+    return { total, perTarget, events };
+  }
+
+  it("for any component and any proposer, attempts across its targets never exceed P_MAX", async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.integer({ min: 1, max: 6 }),
+        fc.array(fc.boolean(), { minLength: 1, maxLength: 8 }),
+        async (targets, pattern) => {
+          const { total, events } = await threadComponent(targets, patterned(pattern));
+          expect(total).toBeLessThanOrEqual(P_MAX);
+          // Every spent probe is one dispatched PROBE event, and nothing else is.
+          expect(events).toBe(total);
+        },
+      ),
+      { numRuns: 60 },
+    );
+  });
+
+  it("a proposer that never stops spends exactly P_MAX on the whole component", async () => {
+    const { total, perTarget } = await threadComponent(4, patterned([true]));
+    expect(total).toBe(P_MAX);
+    // The first target spends the component's budget; its siblings find none left.
+    expect(perTarget).toStrictEqual([P_MAX, 0, 0, 0]);
+  });
+
+  it("the pre-M64 per-target state is the defect: unthreaded, it spends P_MAX per target", async () => {
+    const { total } = await threadComponent(2, patterned([true]), false);
+    expect(total).toBe(2 * P_MAX);
+  });
+
+  it("is a no-op when zero probes are spent: threaded and fresh runs are identical", async () => {
+    const decline = stubProvider({ probe: "NO_USEFUL_PROBE" });
+    let prior: ProbeLoopState | undefined;
+    for (let t = 0; t < 4; t += 1) {
+      const threaded = await runProbeLoop(
+        runInput({ provider: decline, ...(prior === undefined ? {} : { prior }) }),
+      );
+      const fresh = await runProbeLoop(runInput({ provider: decline }));
+      expect(threaded.state).toStrictEqual(initialState("comp_h1"));
+      expect(threaded.state).toStrictEqual(fresh.state);
+      expect(threaded.solve).toStrictEqual(fresh.solve);
+      expect(threaded.stop).toStrictEqual(fresh.stop);
+      expect(threaded.events).toStrictEqual([]);
+      prior = threaded.state;
+    }
+  });
+
+  it("refuses a state that belongs to another component", async () => {
+    await expect(
+      runProbeLoop(runInput({ prior: initialState("comp_someone_else") })),
+    ).rejects.toThrow(ProbeStateComponentMismatchError);
   });
 });
 

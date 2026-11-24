@@ -194,6 +194,36 @@ export interface ProbeRunInput {
   readonly probeIdFor?: (attempt: number) => ProbeId;
   readonly decisionId?: DecisionId | null;
   readonly contextOptions?: BuildContextOptions;
+  /**
+   * The component's loop state so far — `P_max` is *"a budget per component"*
+   * (`RECONCILIATION_SPEC.md §6.2`), not per target.
+   *
+   * A component with several targets runs this loop once per AMBIGUOUS target;
+   * each run continues from the state the previous one returned, so the budget,
+   * the accumulated reports and `probes_attempted` are the component's. Absent
+   * means no probe has been spent on the component yet, which is
+   * `initialState(compId)` exactly — so a caller that spends no probe is
+   * unchanged by threading it (register row `DATA_MODEL.md §22.2` M64).
+   */
+  readonly prior?: ProbeLoopState;
+}
+
+/**
+ * A `prior` state that belongs to another component.
+ *
+ * A caller contract violation: carrying one component's spent budget into
+ * another would let a component run past `P_max` on someone else's account, or
+ * be stopped by budget it never spent.
+ */
+export class ProbeStateComponentMismatchError extends Error {
+  constructor(expected: string, received: string) {
+    super(
+      `probe loop state for component ${JSON.stringify(received)} was passed to the loop ` +
+        `for ${JSON.stringify(expected)}; P_max is a budget per component ` +
+        `(RECONCILIATION_SPEC.md §6.2) and is never shared across components`,
+    );
+    this.name = "ProbeStateComponentMismatchError";
+  }
 }
 
 function defaultProbeId(compId: string, attempt: number): ProbeId {
@@ -201,18 +231,24 @@ function defaultProbeId(compId: string, attempt: number): ProbeId {
 }
 
 /**
- * Drive `§6.2`'s loop for one component to completion.
+ * Drive `§6.2`'s loop for one target to completion, on its component's budget.
  *
  * Terminates on every path: `decide` stops at `P_max`, a decline stops, and a
  * rejected proposal stops (`N1`, spec 1.4.25) — there is no branch that re-issues
- * a proposal, so no input can make this iterate more than `P_max` times.
+ * a proposal, so no input can make this iterate more than `P_max` times. With
+ * {@link ProbeRunInput.prior} threaded across a component's targets, no sequence
+ * of calls can spend more than `P_max` on one component either: every call
+ * starts where the last one stopped, and `decide` reads the component's count.
  */
 export async function runProbeLoop(input: ProbeRunInput): Promise<ProbeRunResult> {
   const compId = input.compId;
   const probeIdFor = input.probeIdFor ?? ((n: number) => defaultProbeId(compId, n));
   const evidenceIdsFor = input.evidenceIdsFor ?? (() => []);
 
-  let state = initialState(compId);
+  if (input.prior !== undefined && input.prior.comp_id !== compId) {
+    throw new ProbeStateComponentMismatchError(compId, input.prior.comp_id);
+  }
+  let state = input.prior ?? initialState(compId);
   const events: ProbeEventDraft[] = [];
   const calls: LlmCall[] = [];
 
