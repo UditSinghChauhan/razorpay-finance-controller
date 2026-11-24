@@ -5,11 +5,13 @@ import { UsageError } from "../errors.js";
 import { a1Agent, a1Swept } from "./a1.js";
 import { a2Agent } from "./a2.js";
 import { a3Agent } from "./a3.js";
+import { assayProbeAgent, boundAssayProbeAgent } from "./assay-probe.js";
 import { assayAgent } from "./assay.js";
 import { b0Agent } from "./b0.js";
 import { b1Agent } from "./b1.js";
 import { b2Agent } from "./b2.js";
 import { SWEPT_AGENT_IDS, assaySwept, isSweptAgent, type SweptRunner } from "./sweep-runner.js";
+import type { ProbeExecutor } from "../probe/surface.js";
 
 /**
  * The seven agents, constructed here and **injected** into `packages/eval`.
@@ -65,7 +67,28 @@ export const ALL_AGENTS: readonly Agent[] = Object.freeze([
   a1Agent,
   a2Agent,
   a3Agent,
+  // §3.3's bench-v2 arm, UNBOUND: it refuses to run until a command binds its
+  // probe executor with `bindProbeExecutor` below (M63).
+  assayProbeAgent,
 ]);
+
+/**
+ * Bind `ASSAY-PROBE`'s probe executor, if it is among `agents` (M63).
+ *
+ * **The composition root's act, not an agent's.** A command knows which split's
+ * recon report a run may read; an agent knows nothing of paths. `executorFor` is
+ * called only when `ASSAY-PROBE` is selected, and the executor it returns reads
+ * nothing until a probe is dispatched — so a run without the arm never touches
+ * the report. Every other agent is returned as given, in order.
+ */
+export function bindProbeExecutor(
+  agents: readonly Agent[],
+  executorFor: () => ProbeExecutor,
+): readonly Agent[] {
+  if (!agents.some((agent) => agent.id === "ASSAY-PROBE")) return agents;
+  const bound = boundAssayProbeAgent(executorFor());
+  return Object.freeze(agents.map((agent) => (agent.id === "ASSAY-PROBE" ? bound : agent)));
+}
 
 /**
  * The agents `EVALUATION_SPEC.md §2`'s protocol loop actually runs.
@@ -182,7 +205,8 @@ export function sweptRunnerFor(id: AgentId): SweptRunner | undefined {
 export { agentDeclaration };
 export { SWEPT_AGENT_IDS, isSweptAgent, type SweptRunner };
 export type { SweepParameters } from "./sweep-runner.js";
-export { a1Agent, a2Agent, a3Agent, assayAgent, b0Agent, b1Agent, b2Agent };
+export { a1Agent, a2Agent, a3Agent, assayAgent, assayProbeAgent, b0Agent, b1Agent, b2Agent };
+export { boundAssayProbeAgent };
 
 /**
  * `ASSAY` executed for its **evidence** rather than for its metrics.

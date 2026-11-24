@@ -49,8 +49,10 @@ describe("the constructed set is EVALUATION_SPEC.md §3's table", () => {
     // §5.1`'s curve-agent list. It is an agent composition, not a command, which
     // is why it sits here; `A1`'s counterpart must stay in `a1.ts`, whose option
     // object carries the lint-allowlisted empty-selection literal.
+    // `assay-probe.ts` joined at Work Order 3c (M63): §3.3's bench-v2 arm,
+    // A3-NOLLM with the probe executor bound by the composition root.
     expect(agentSources.map((s) => s.name)).toEqual([
-      "a1.ts", "a2.ts", "a3.ts", "assay.ts", "b0.ts", "b1.ts", "b2.ts", "index.ts",
+      "a1.ts", "a2.ts", "a3.ts", "assay-probe.ts", "assay.ts", "b0.ts", "b1.ts", "b2.ts", "index.ts",
       "sweep-runner.ts",
     ]);
   });

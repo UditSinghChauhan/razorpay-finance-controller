@@ -25,7 +25,7 @@ import {
   type RejectionReason,
 } from "@assay/probe";
 
-import { dispatchProbe, isDispatchable, type ProbeDispatchOptions } from "./surface.js";
+import { isDispatchable, type ProbeExecutor } from "./surface.js";
 
 /**
  * The `RECONCILIATION_SPEC.md §6.6` chain, composed.
@@ -48,6 +48,12 @@ import { dispatchProbe, isDispatchable, type ProbeDispatchOptions } from "./surf
  * {@link ProbeRunInput.provider} and nothing else: the available-probe context,
  * the budget, the validation, the dispatch, the re-solve and the event body are
  * one code path taken by both arms.
+ *
+ * **`ASSAY-PROBE` runs it too, and differs from `A3-NOLLM` in one respect:
+ * {@link ProbeRunInput.executor}** (Work Order 3c, M63). With it bound, the
+ * composition offers `R3` the component's settlement ids and a proposal can be
+ * answered; without it the context is empty and nothing can be. Everything else
+ * — provider, budget, validation, event body, re-solve — is the same path.
  *
  * **Attribution, stated as a property of the code.** The context this module
  * hands `R3` is built by {@link buildAvailableProbes} **before** the provider is
@@ -198,11 +204,26 @@ export interface ProbeRunInput {
   /** `S4`'s input, minus the evidence this loop accumulates. */
   readonly solveInput: Omit<SolveInput, "recon_reports" | "probe_attempts">;
   readonly universe: ObservationUniverse;
-  readonly context: AvailableProbeContext;
+  /**
+   * The ids this target may offer `R3`, or a function of the component's loop
+   * state returning them — read afresh on every iteration, so a composition can
+   * withdraw what it has already asked (Work Order 3c: *"the component's
+   * settlement ids minus those already probed"*). Either way the three filters
+   * of {@link buildAvailableProbes} run over what it returns.
+   */
+  readonly context: AvailableProbeContext | ((state: ProbeLoopState) => AvailableProbeContext);
   readonly certificate: R3CertificateSummary;
   /** `§6.2`'s second argument, an opaque string. `M31` is not resolved here. */
   readonly reconDateScope: string;
-  readonly dispatch: ProbeDispatchOptions;
+  /**
+   * The probe executor the composition root bound (M63), or absent.
+   *
+   * Absent is every arm but `ASSAY-PROBE`: the composition then offers `R3` an
+   * empty context, so no call can be offered and nothing is dispatched. A call
+   * offered with no executor bound is a composition defect and throws
+   * {@link ProbeExecutorUnboundError} rather than being answered from nowhere.
+   */
+  readonly executor?: ProbeExecutor;
   /** Deterministic ids for the `Evidence` rows a result produced, per attempt. */
   readonly evidenceIdsFor?: (attempt: number) => readonly EvidenceId[];
   readonly probeIdFor?: (attempt: number) => ProbeId;
@@ -219,6 +240,25 @@ export interface ProbeRunInput {
    * unchanged by threading it (register row `DATA_MODEL.md §22.2` M64).
    */
   readonly prior?: ProbeLoopState;
+}
+
+/**
+ * A call was offered for dispatch and no executor is bound.
+ *
+ * Unreachable from the composition, which offers `R3` an empty context whenever
+ * no executor is bound (M63): with nothing offered, nothing can be proposed that
+ * survives the allowlist and pre-call `I6`. Thrown rather than answered, because
+ * an empty answer would spend `P_max` on a probe that never ran.
+ */
+export class ProbeExecutorUnboundError extends Error {
+  constructor(compId: string) {
+    super(
+      `a probe call was offered for component ${JSON.stringify(compId)} but no probe executor ` +
+        `is bound; the composition root binds one (DATA_MODEL.md §22.2 M63), and without it the ` +
+        `context offered to R3 must be empty`,
+    );
+    this.name = "ProbeExecutorUnboundError";
+  }
 }
 
 /**
@@ -296,7 +336,7 @@ export async function runProbeLoop(input: ProbeRunInput): Promise<ProbeRunResult
       comp_id: compId,
       certificate: input.certificate,
       available_probes: buildAvailableProbes(
-        input.context,
+        typeof input.context === "function" ? input.context(state) : input.context,
         input.universe,
         input.contextOptions ?? {},
       ),
@@ -349,7 +389,8 @@ export async function runProbeLoop(input: ProbeRunInput): Promise<ProbeRunResult
     }
 
     const attempt = state.attempts + 1;
-    const detail: ProbeResultDetail = dispatchProbe(offered.call, input.dispatch);
+    if (input.executor === undefined) throw new ProbeExecutorUnboundError(compId);
+    const detail: ProbeResultDetail = input.executor.execute(offered.call);
     const evidenceIds = evidenceIdsFor(attempt);
     const probeId = probeIdFor(attempt);
 

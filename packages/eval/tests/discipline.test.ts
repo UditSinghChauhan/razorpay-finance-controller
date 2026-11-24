@@ -237,7 +237,7 @@ describe("the agent registry — §3's table, as data", () => {
     for (const id of AGENT_IDS) expect(agentDeclaration(id).id).toBe(id);
   });
 
-  it("carries the seven agents ARCHITECTURE §10's diagram names", () => {
+  it("carries the seven agents ARCHITECTURE §10's diagram names, then §3.3's arm, appended", () => {
     expect(AGENT_IDS).toEqual([
       "ASSAY",
       "B0-IDONLY",
@@ -246,7 +246,11 @@ describe("the agent registry — §3's table, as data", () => {
       "A1-NOVALIDATE",
       "A2-NOABSTAIN",
       "A3-NOLLM",
+      // Work Order 3c (M63): appended, never inserted, and out of Tier 0.
+      "ASSAY-PROBE",
     ]);
+    expect(agentDeclaration("ASSAY-PROBE").inTier0).toBe(false);
+    expect(agentDeclaration("ASSAY-PROBE").role).toBe("VARIANT");
   });
 
   it("records B1 as declared-but-not-built rather than omitting it (§3.1)", () => {
@@ -266,7 +270,7 @@ describe("the agent registry — §3's table, as data", () => {
 
   it("gives every agent a role and a description that says what it represents", () => {
     for (const agent of AGENTS) {
-      expect(["SYSTEM_UNDER_TEST", "BASELINE", "ABLATION"]).toContain(agent.role);
+      expect(["SYSTEM_UNDER_TEST", "BASELINE", "ABLATION", "VARIANT"]).toContain(agent.role);
       expect(agent.represents.length).toBeGreaterThan(20);
     }
   });

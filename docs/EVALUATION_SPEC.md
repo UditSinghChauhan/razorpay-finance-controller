@@ -556,6 +556,19 @@ exercised by the normal test suite; and a rigged ablation would break the demo,
 so the incentive runs the right way. A rigged ablation is worse than no ablation,
 because it converts a real result into a fabricated one.
 
+### 3.3 bench-v2 variant — one capability added, not removed
+
+Added at bench-v2 Work Order 3c (2026-11-25; register row `DATA_MODEL.md §22.2`
+M63). An ablation removes one component from `ASSAY`; a **variant** adds one to an
+existing arm and differs from it in exactly that respect, so the difference is
+attributable in the same way. It is **out of Tier 0**: `§2`'s protocol loop, `--agents
+all` and every v1.0.13 figure are unchanged, and the variant is scored only where
+`docs/BENCH_V2_PREREGISTRATION.md` names it.
+
+| ID | Added to | Hypothesis it tests |
+|---|---|---|
+| `ASSAY-PROBE` | `A3-NOLLM`, plus the `RECONCILIATION_SPEC.md §6.2` **probe executor**, bound by the composition root to the split's `recon_report.jsonl`. With it bound, `R3` is offered the component's settlement ids minus those already probed; without it, the context is empty and `R3` can only decline. **`R3` is `PREREGISTRATION.md §7`'s frozen deterministic priority policy here, not a language model** — the arm runs `--llm=offline` exactly as `A3-NOLLM` does | *Evidence the probe returns lets `ASSAY` discriminate where the documented model says it can, and nowhere else.* Expected (`PREREGISTRATION.md §10` V40): every `k = 0` target (`AMB-4`'s single-constituent `S₂`) commits its true allocation; every `k ≥ 1` exchangeable target (`AMB-1`, `AMB-2`) still abstains, now with `NO_USEFUL_PROBE_AVAILABLE`; no component spends more than `P_max`. A wrong commit, or an `AMB-1`/`AMB-2` target resolving, falsifies it. |
+
 ## 4. Metric definitions
 
 ### 4.1 Coverage

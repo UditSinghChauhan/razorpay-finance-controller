@@ -25,7 +25,7 @@ import fc from "fast-check";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { encodeJsonl } from "../src/artifacts/jsonl.js";
-import { ProbeSourceUnavailableError, dispatchProbe } from "../src/probe/surface.js";
+import { ProbeSourceUnavailableError, dispatchProbe, reconReportExecutor } from "../src/probe/surface.js";
 import {
   ProbeStateComponentMismatchError,
   buildAvailableProbes,
@@ -212,7 +212,7 @@ function runInput(over: Partial<ProbeRunInput> = {}): ProbeRunInput {
       materiality_ref: "comp_h1#materiality",
     },
     reconDateScope: "2026-08",
-    dispatch: { reconReportPath },
+    executor: reconReportExecutor(reconReportPath),
     ...over,
   };
 }
@@ -364,7 +364,7 @@ describe("P_max bounds the loop however the proposer behaves", () => {
       "utf8",
     );
     const result = await runProbeLoop(
-      runInput({ dispatch: { reconReportPath: emptyPath } }),
+      runInput({ executor: reconReportExecutor(emptyPath) }),
     );
     expect(result.state.attempts).toBe(P_MAX);
     expect(result.events).toHaveLength(P_MAX);
@@ -375,7 +375,7 @@ describe("P_max bounds the loop however the proposer behaves", () => {
   it("repeated identical probes aggregate by UNION and add nothing (spec 1.4.17)", async () => {
     const emptyPath = join(dir, "recon_report_empty.jsonl");
     const result = await runProbeLoop(
-      runInput({ dispatch: { reconReportPath: emptyPath } }),
+      runInput({ executor: reconReportExecutor(emptyPath) }),
     );
     // Three results accumulated, none de-duplicated here — §4.2 owns the union.
     expect(result.state.reports).toHaveLength(P_MAX);
@@ -406,7 +406,7 @@ describe("P_max bounds the loop however the proposer behaves", () => {
     };
     const emptyPath = join(dir, "recon_report_empty.jsonl");
     const result = await runProbeLoop(
-      runInput({ provider: declineAfterOne, dispatch: { reconReportPath: emptyPath } }),
+      runInput({ provider: declineAfterOne, executor: reconReportExecutor(emptyPath) }),
     );
     expect(result.state.attempts).toBe(1);
     expect(result.stop?.certificate_reason).toBe("NO_USEFUL_PROBE_AVAILABLE");
@@ -691,7 +691,7 @@ describe("P_max is a budget per COMPONENT, not per target (M64)", () => {
       const result = await runProbeLoop(
         runInput({
           provider,
-          dispatch: { reconReportPath: barrenPath },
+          executor: reconReportExecutor(barrenPath),
           ...(thread && prior !== undefined ? { prior } : {}),
         }),
       );

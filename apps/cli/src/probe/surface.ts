@@ -116,17 +116,101 @@ const rowDecoder = {
 };
 
 export interface ProbeDispatchOptions {
-  /** `bench/<split>/<family>/recon_report.jsonl`. */
+  /**
+   * `bench/<split>/recon_report.jsonl` — split-scoped: `assay generate` merges
+   * every seed's rows into one file per split (`commands/generate.ts`).
+   */
   readonly reconReportPath: string;
 }
 
 /**
- * Answer one validated probe call.
+ * The probe **executor**: the one thing that can answer a validated call
+ * (Work Order 3c; register row `DATA_MODEL.md §22.2` **M63**).
+ *
+ * `PREREGISTRATION.md §6.2` `AL8` makes the recon report reachable *"only
+ * through the probe executor, under `P_max`"*. This is that executor, as a
+ * capability: the **composition root** (a command, or a test standing in for
+ * one) binds it to one split's report with {@link reconReportExecutor} and hands
+ * it to the composition through `AssayComposeOptions.probeExecutor`. The agent
+ * receives no path and no reader — `AgentInput` is unchanged — and what it holds
+ * can be asked one thing only: the answer to a {@link ValidatedProbeCall}, which
+ * only `packages/probe` can mint, after `P_max` and pre-call `I6`.
+ */
+export interface ProbeExecutor {
+  /** Answer one validated call from the bound report. */
+  readonly execute: (call: ValidatedProbeCall) => FetchSettlementReconResult;
+  /**
+   * How many times the bound report has been read: `0` until the first call,
+   * then `1` for the executor's lifetime. Exposed so the memoisation is a tested
+   * property rather than a comment.
+   */
+  readonly reads: () => number;
+}
+
+/** The answer to `call` from the report's rows for its settlement, schema-checked. */
+function answer(call: ValidatedProbeCall, constituents: readonly string[]): FetchSettlementReconResult {
+  const kind = kindOf(call);
+  if (!isDispatchable(kind)) throw new ProbeSourceUnavailableError(kind);
+  if (call.probe !== "fetch_settlement_recon") throw new ProbeSourceUnavailableError(kind);
+  return ProbeResultDetailSchema.parse({
+    probe: "fetch_settlement_recon",
+    settlement_id: call.settlement_id as SettlementId,
+    constituent_entity_ids: constituents,
+  }) as FetchSettlementReconResult;
+}
+
+/**
+ * §6.2: "the lines carrying that settlement_id", grouped once.
+ *
+ * Row order is a serialization property (M38) and `SE5` is a set measure, so the
+ * order the lines are collected in carries no meaning — it is preserved (file
+ * order within each settlement) only so two runs agree byte for byte.
+ */
+function readReport(reconReportPath: string): ReadonlyMap<string, readonly string[]> {
+  const rows = decodeJsonl({ path: reconReportPath, zone: "PROBE_DISPATCH" }, rowDecoder);
+  const bySettlement = new Map<string, string[]>();
+  for (const row of rows) {
+    if (row.settlement_id === null) continue;
+    const lines = bySettlement.get(row.settlement_id);
+    if (lines === undefined) bySettlement.set(row.settlement_id, [row.entity_id]);
+    else lines.push(row.entity_id);
+  }
+  return bySettlement;
+}
+
+/**
+ * Bind an executor to one split's recon report. **Reads nothing until asked.**
+ *
+ * The report is read on the first call, under the `PROBE_DISPATCH` zone, and
+ * held for the executor's lifetime — once per run, not once per probe. A run
+ * that dispatches nothing never opens the file.
+ */
+export function reconReportExecutor(reconReportPath: string): ProbeExecutor {
+  let index: ReadonlyMap<string, readonly string[]> | null = null;
+  let reads = 0;
+  return Object.freeze({
+    execute: (call: ValidatedProbeCall): FetchSettlementReconResult => {
+      // Refuse an undispatchable kind before touching the file.
+      const kind = kindOf(call);
+      if (!isDispatchable(kind)) throw new ProbeSourceUnavailableError(kind);
+      if (index === null) {
+        index = readReport(reconReportPath);
+        reads += 1;
+      }
+      const settlementId = call.probe === "fetch_settlement_recon" ? call.settlement_id : null;
+      return answer(call, settlementId === null ? [] : (index.get(settlementId) ?? []));
+    },
+    reads: (): number => reads,
+  });
+}
+
+/**
+ * Answer one validated probe call, reading the report afresh.
  *
  * The result is parsed by **`packages/domain`'s** `ProbeResultDetailSchema`
  * before it is returned, so what leaves this module is the same validated shape
  * `packages/probe` will bind back against its call. Nothing here is trusted on
- * its own account.
+ * its own account. A run binds a {@link ProbeExecutor} instead, which reads once.
  *
  * `date` is **not read**. `DATA_MODEL.md §22.2` M31 leaves the field a query is
  * date-scoped on undecided and spec 1.4.22 makes `settlement_id` *"its only
@@ -139,22 +223,5 @@ export function dispatchProbe(
   call: ValidatedProbeCall,
   options: ProbeDispatchOptions,
 ): FetchSettlementReconResult {
-  const kind = kindOf(call);
-  if (!isDispatchable(kind)) throw new ProbeSourceUnavailableError(kind);
-  if (call.probe !== "fetch_settlement_recon") throw new ProbeSourceUnavailableError(kind);
-
-  const rows = decodeJsonl({ path: options.reconReportPath, zone: "PROBE_DISPATCH" }, rowDecoder);
-
-  // §6.2: "the lines carrying that settlement_id". Row order is a serialization
-  // property (M38) and SE5 is a set measure, so the order they are collected in
-  // carries no meaning — it is preserved only so two runs agree byte for byte.
-  const constituents = rows
-    .filter((row) => row.settlement_id === call.settlement_id)
-    .map((row) => row.entity_id);
-
-  return ProbeResultDetailSchema.parse({
-    probe: "fetch_settlement_recon",
-    settlement_id: call.settlement_id as SettlementId,
-    constituent_entity_ids: constituents,
-  }) as FetchSettlementReconResult;
+  return reconReportExecutor(options.reconReportPath).execute(call);
 }

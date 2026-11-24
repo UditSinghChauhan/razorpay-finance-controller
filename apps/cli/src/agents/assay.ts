@@ -99,6 +99,7 @@ import { valueOf } from "../values.js";
 import { resolveConfig } from "../config.js";
 import { AgentUnavailableError } from "../errors.js";
 import { runProbeLoop, type ProbeEventDraft } from "../probe/run.js";
+import type { ProbeExecutor } from "../probe/surface.js";
 import { buildProvider } from "../providers.js";
 
 /**
@@ -178,7 +179,11 @@ import { buildProvider } from "../providers.js";
  *   the surface is absent. `R3` is still consulted, so the loop, the budget and
  *   the attribution are one code path for `ASSAY` and `A3-NOLLM`; it can only
  *   decline, so no `ValidatedProbeCall` is constructed and the dispatch is
- *   unreachable. Its path is left empty rather than invented.
+ *   unreachable. Its path is left empty rather than invented. **From Work
+ *   Order 3c, `ASSAY-PROBE` is the one arm that probes, and it still receives
+ *   no path:** the composition root binds a probe executor (M63) that answers
+ *   only a `ValidatedProbeCall`, and passes it on `AssayComposeOptions` — see
+ *   `probeExecutor` there and `PREREGISTRATION.md §10` V41.
  * - **A build identity.** `DATA_MODEL.md §16` binds genesis to
  *   `(dataset_hash, engine_commit, config_hash)`. Two of the three are functions
  *   of `AgentInput`; the third is not carried on it, so `SPEC_VERSION` — the
@@ -840,6 +845,25 @@ export interface AssayComposeOptions {
    * read the base"*.
    */
   readonly tauFloorPaise?: number;
+  /**
+   * `ASSAY-PROBE`: the probe executor the composition root bound to one split's
+   * recon report (Work Order 3c; register row `DATA_MODEL.md §22.2` **M63**).
+   *
+   * `undefined` — every other arm — offers `R3` an empty context, exactly as
+   * before: it can only decline, nothing is dispatched, and the run is the one
+   * the default-arm pin records. Present, it offers `R3` the component's
+   * settlement ids minus those already probed, and `R3`'s proposal is answered
+   * by this executor and nothing else.
+   *
+   * **It lives here rather than on `AgentInput` for M51's reason.** An agent's
+   * inputs are *"observations and configuration, and nothing else"*
+   * (`packages/eval`'s `AgentInput`, `eslint.config.js` `G8`), and this object
+   * is already where a per-execution knob that is not an input goes. What it
+   * hands the agent is not a path or a reader: it answers a `ValidatedProbeCall`,
+   * which only `packages/probe` can mint after `P_max` and pre-call `I6`
+   * (`PREREGISTRATION.md §10` V41 states what that does to `G8`'s spirit).
+   */
+  readonly probeExecutor?: ProbeExecutor;
 }
 
 /**
@@ -1037,9 +1061,10 @@ async function runAssayComposed(
   const sorted = [...observations].sort((a, b) => compare(a.obs_id, b.obs_id));
   const byObsId = new Map<ObservationId, Observation>(sorted.map((o) => [o.obs_id, o]));
   const entityIds = new Set<string>(sorted.map((o) => entityIdOf(o)));
-  const obsIdByEntityId = new Map<string, ObservationId>(
-    sorted.map((o) => [entityIdOf(o), o.obs_id]),
-  );
+  // SE5's R* runs through DATA_MODEL.md §12's identifier relation (spec 1.4.14,
+  // M28): "the observation whose `payload.entity_id` equals that entity_id" --
+  // a recon_line, the only kind carrying the field (M66).
+  const observationIdForEntityId = identifierRelation(sorted);
   const memberPool = sorted.filter((o): o is Member => isMember(o));
   const memberById = new Map<ObservationId, Member>(memberPool.map((m) => [m.obs_id, m]));
   // §4.2's SE3 population is "every recon_line observation in the dataset", so
@@ -1121,7 +1146,7 @@ async function runAssayComposed(
       members,
       mode_days: modeDays,
       target_entity_id: targetEntityId(target, byObsId),
-      observationIdForEntityId: (id: string): ObservationId | undefined => obsIdByEntityId.get(id),
+      observationIdForEntityId,
       bank_evidence: bankSide.evidence.get(target.obs_id) ?? null,
       // M51: absent unless a sweep supplied one, so `packages/engine` resolves
       // `PREREGISTRATION.md §7`'s frozen pair and an ordinary run is unchanged.
@@ -1175,11 +1200,25 @@ async function runAssayComposed(
       provider,
       solveInput: partial,
       universe: { hasEntityId: (id: string): boolean => entityIds.has(id) },
-      // Empty by necessity, not by policy: see the module header.
-      context: {},
+      // No executor bound: empty by necessity, not by policy (module header),
+      // so R3 can only decline and nothing is dispatched. ASSAY-PROBE (M63):
+      // the component's settlement ids minus those already probed -- a
+      // repeated fetch adds nothing to SE5's union (RECONCILIATION_SPEC.md
+      // §4.2, spec 1.4.17), so offering it again could only burn the budget.
+      context:
+        options.probeExecutor === undefined
+          ? {}
+          : (state: ProbeLoopState) => {
+              const probed = new Set(state.reports.map((r) => r.settlement_id as string));
+              return {
+                settlement_ids: settlementEntityIdsOf(component, byObsId).filter(
+                  (id) => !probed.has(id),
+                ),
+              };
+            },
       certificate: summarize(first, compId, context, memberById),
       reconDateScope: String(periodTo),
-      dispatch: { reconReportPath: "" },
+      ...(options.probeExecutor === undefined ? {} : { executor: options.probeExecutor }),
       ...(prior === undefined ? {} : { prior }),
     });
     probeStateByComponent.set(compId, loop.state);
@@ -1658,6 +1697,52 @@ function targetEntityId(
   if (target.kind !== "settlement") return null;
   const obs = byObsId.get(target.obs_id);
   return obs === undefined || obs.kind !== "settlement" ? null : obs.payload.id;
+}
+
+/**
+ * `DATA_MODEL.md §12`'s identifier relation (spec 1.4.14, register row M28), as
+ * `SolveInput.observationIdForEntityId` — `SE5`'s map from a probe-returned
+ * `constituent_entity_id` to the `ObservationId` a candidate may carry.
+ *
+ * `§12`: *"the corresponding observation is the one whose **`payload.entity_id`**
+ * equals that `entity_id`"*. Only a `recon_line` carries that field, so the
+ * relation runs over `recon_line`s and nothing else, and it is one-to-one on a
+ * conforming dataset (M28: no operator emits a `recon_line` twice).
+ *
+ * **Before register row M66 this was `entityIdOf` over EVERY observation.** A
+ * `pay_…` id is also the business identifier of its `payment` row, and a
+ * `rfnd_…` id of its `refund` row, so the map kept whichever of the two sorted
+ * last by `obs_id` — a content digest. Where that was the `payment` row, `R*`
+ * met no candidate's members and `SE5` scored `0` on both sides of a twin, so a
+ * probe that returned exactly the true member resolved nothing. Unreachable
+ * before `ASSAY-PROBE`: `SE5` reads the relation only for a returned id, and no
+ * arm had dispatched a probe (`PREREGISTRATION.md §10` V44).
+ */
+export function identifierRelation(
+  observations: readonly Observation[],
+): (entityId: string) => ObservationId | undefined {
+  const byEntityId = new Map<string, ObservationId>();
+  for (const o of observations) {
+    if (o.kind === "recon_line") byEntityId.set(o.payload.entity_id, o.obs_id);
+  }
+  return (entityId: string): ObservationId | undefined => byEntityId.get(entityId);
+}
+
+/**
+ * The settlement entity ids among a component's targets, in `S3`'s target order
+ * — `ASSAY-PROBE`'s available-probe context (M63). A bank-line target names no
+ * settlement and contributes none.
+ */
+function settlementEntityIdsOf(
+  component: DecomposedComponent,
+  byObsId: ReadonlyMap<ObservationId, Observation>,
+): string[] {
+  const out: string[] = [];
+  for (const id of component.target_ids) {
+    const obs = byObsId.get(id as ObservationId);
+    if (obs !== undefined && obs.kind === "settlement") out.push(obs.payload.id);
+  }
+  return out;
 }
 
 /**

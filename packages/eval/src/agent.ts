@@ -34,11 +34,16 @@ import type { LlmProviderId } from "@assay/ledger";
 import type { AgentRun } from "./run.js";
 
 /**
- * The seven agents `EVALUATION_SPEC.md §3` and `ARCHITECTURE.md §10` name.
+ * The seven agents `EVALUATION_SPEC.md §3` and `ARCHITECTURE.md §10` name, then
+ * `§3.3`'s bench-v2 arm.
  *
- * Ordered as `§10`'s diagram writes them. `B1-GREEDY` is on the list because
- * `§3.1` names it; {@link AGENTS} records that it is a stretch item and not
- * built, which is a different statement from it not existing.
+ * The first seven are ordered as `§10`'s diagram writes them. `B1-GREEDY` is on
+ * the list because `§3.1` names it; {@link AGENTS} records that it is a stretch
+ * item and not built, which is a different statement from it not existing.
+ *
+ * **`ASSAY-PROBE` is appended, never inserted** (Work Order 3c, register row
+ * `DATA_MODEL.md §22.2` M63): `A3-NOLLM` with the `§6.2` probe executor bound.
+ * It is out of Tier 0, so `--agents all` and every v1.0.13 sweep are unchanged.
  */
 export const AGENT_IDS = Object.freeze([
   "ASSAY",
@@ -48,12 +53,17 @@ export const AGENT_IDS = Object.freeze([
   "A1-NOVALIDATE",
   "A2-NOABSTAIN",
   "A3-NOLLM",
+  "ASSAY-PROBE",
 ] as const);
 
 export type AgentId = (typeof AGENT_IDS)[number];
 
-/** Whether an agent is a baseline (`§3.1`), an ablation (`§3.2`), or ASSAY itself. */
-export type AgentRole = "SYSTEM_UNDER_TEST" | "BASELINE" | "ABLATION";
+/**
+ * Whether an agent is a baseline (`§3.1`), an ablation (`§3.2`), ASSAY itself,
+ * or a `§3.3` variant — an ablation's converse, which ADDS one capability to an
+ * existing arm and differs from it in exactly that respect.
+ */
+export type AgentRole = "SYSTEM_UNDER_TEST" | "BASELINE" | "ABLATION" | "VARIANT";
 
 /** What `§3` declares about one agent, as data. */
 export interface AgentDeclaration {
@@ -127,6 +137,15 @@ export const AGENTS: readonly AgentDeclaration[] = Object.freeze([
       "`ASSAY --llm=offline`, so the ablation and the offline demo path are the " +
       "same code (§3.2).",
     inTier0: true,
+  },
+  {
+    id: "ASSAY-PROBE",
+    role: "VARIANT",
+    represents:
+      "A3-NOLLM with the §6.2 probe executor bound to the split's recon report, " +
+      "and nothing else changed: R3 is the frozen deterministic §7 policy, " +
+      "offered the component's settlement ids minus those already probed (§3.3).",
+    inTier0: false,
   },
 ]);
 

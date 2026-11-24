@@ -24,7 +24,8 @@ import {
   type ScoredSweeps,
 } from "../artifacts/metrics.js";
 import { metricsPath } from "../artifacts/metrics-path.js";
-import { selectAgents, sweptRunnerFor } from "../agents/index.js";
+import { bindProbeExecutor, selectAgents, sweptRunnerFor } from "../agents/index.js";
+import { reconReportExecutor } from "../probe/surface.js";
 import {
   BASELINE_AGENT_IDS,
   BASELINE_DEFERRED_AGENT,
@@ -63,6 +64,8 @@ const OBSERVATIONS = "observations.jsonl";
 const GROUND_TRUTH = "ground_truth.jsonl";
 /** `§9` step 3's per-seed artifact, read and never regenerated (`§5.3`, M51). */
 const ORACLE_LABELS = "oracle_labels.jsonl";
+/** Split-scoped, as `assay generate` writes it: one merged report per split. */
+const RECON_REPORT = "recon_report.jsonl";
 
 /**
  * `assay bench` — the scored benchmark sweep.
@@ -191,9 +194,15 @@ async function run(context: CommandContext): Promise<void> {
   // this split, read from the frozen table's one reader -- oracle.ts's own line.
   const declared = SEED_BLOCKS.filter((b) => b.split === split).flatMap((b) => [...b.seeds]);
   const seeds = requireSeeds(context.args, declared);
-  const agents = selectAgents(stringFlag(context.args, "agents") ?? "all");
   const runId = requireFlag(context.args, "run-id");
   const benchRoot = stringFlag(context.args, "bench") ?? "bench";
+  // §3.3's ASSAY-PROBE is bound HERE, by the composition root, to this split's
+  // recon report (M63): the one artifact AL8 lets the probe executor read. The
+  // executor is lazy, so a run that never dispatches never opens the file, and
+  // memoised, so a run that does reads it once.
+  const agents = bindProbeExecutor(selectAgents(stringFlag(context.args, "agents") ?? "all"), () =>
+    reconReportExecutor(join(join(benchRoot, split), RECON_REPORT)),
+  );
   const llmMode = readLlmMode(context.config.llmProvider);
 
   for (const seed of seeds) checkSeed(seed, split);
