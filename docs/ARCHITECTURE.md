@@ -493,6 +493,28 @@ persist without a corrupted event, and a corrupted event breaks the hash chain.
 *Prevents:* partial writes, out-of-band edits, and the "we fixed it in the
 database" class of audit failure.
 
+**Dated addition, 2026-11-25 (register row `DATA_MODEL.md §22.2` M65; the
+paragraph above is unedited).** The paragraph above and `§6`'s probe-chain
+diagram contradicted each other: this one gives `packages/ledger` *"exactly one
+mutating function"* accepting only a `ValidatedDecision`, and `§6` ends *"`packages/ledger`
+appends the `PROBE` event body `packages/probe` assembled"*. No function did
+the second, so every `PROBE` event the loop produced was silently dropped
+(`PREREGISTRATION.md §10` V42), against `THREAT_MODEL.md §T7`'s *"every probe
+logged with its proposer"* and `DATA_MODEL.md §16`, which declares `PROBE` a
+chain event kind. The resolution: **money moves only through a
+`ValidatedDecision` minted by `S5`. The ledger's only other entry point,
+`postProbeEvent`, records a probe: it accepts only a `ValidatedProbeEvent`,
+which `packages/probe` alone can mint and only from a validated call and the
+result that answered it, and it refuses money.** The guarantee is enforced the
+way `ValidatedDecision`'s is — a non-exported unique-symbol brand declared in
+`packages/ledger`, one widening assertion in the workspace
+(`packages/probe/src/event.ts`, counted by that package's discipline suite) and
+a compile-time test that a hand-built body does not type-check — and it is
+re-checked at runtime: kind `PROBE`, no journal line, no certificate, no
+`decision_id`, and an `evt_id` new to the chain. A `PROBE` event therefore moves
+no balance, enters no gate as a posting, and cannot be mistaken for the decision
+it informed. `apps/cli` still may not call `appendEvent`.
+
 #### The `ValidatedDecision` contract `[ASSAY-MODEL]`
 
 Four documents named this type and none defined it. It is defined here, because

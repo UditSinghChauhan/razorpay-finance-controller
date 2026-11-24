@@ -45,9 +45,13 @@
  * now present** — `postValidatedDecision`, and nothing else. `ARCHITECTURE.md
  * §4` boundary 3: *"`packages/ledger` exposes exactly one mutating function,
  * and it accepts only a `ValidatedDecision` — a type that can only be
- * constructed by S5. There is no other write path."* The count of mutating
- * functions on this surface is one, and `tests/projection.test.ts` asserts both
- * the count and the name. The type is exported; **no constructor is**, and the
+ * constructed by S5. There is no other write path."* Through spec 1.4.39 the
+ * count of mutating functions on this surface was one. Boundary 3's dated
+ * addition of 2026-11-25 (register row `DATA_MODEL.md §22.2` M65) adds
+ * `postProbeEvent`, which `ARCHITECTURE.md §6`'s chain already required and
+ * which accepts only a `ValidatedProbeEvent` and refuses money;
+ * `tests/projection.test.ts` asserts exactly those two names. Money still moves
+ * through `postValidatedDecision` alone. The type is exported; **no constructor is**, and the
  * brand that makes "only S5 may construct" a property rather than a convention
  * is a non-exported unique symbol. Persistence arrives through the injected
  * `LedgerStore` port: this package opens no file and no database, because
@@ -125,6 +129,13 @@ export {
 export type { ValidatedDecision } from "./validated-decision.js";
 
 /**
+ * The `PROBE` event body only `packages/probe` may mint (M65). A **type only**,
+ * like `ValidatedDecision`: the brand is module-private and no constructor is
+ * exported.
+ */
+export type { ValidatedProbeEvent } from "./validated-probe-event.js";
+
+/**
  * The persistence port. A **type only** — this package holds no adapter.
  *
  * `ARCHITECTURE.md §8` names the physical store *"SQLite, single file, WAL
@@ -135,17 +146,23 @@ export type { ValidatedDecision } from "./validated-decision.js";
 export type { LedgerCommit, LedgerStore } from "./store.js";
 
 /**
- * The single mutating write path — `DECISION_BRIEF.md §L.1` rule 4.
+ * The write path — `DECISION_BRIEF.md §L.1` rule 4, and `ARCHITECTURE.md §4`
+ * boundary 3 with its dated addition (M65).
  *
- * One function, accepting only a `ValidatedDecision`. `openWriteState` is not a
- * second one: it builds the value `postValidatedDecision` threads, and mutates
+ * **Money moves only through a `ValidatedDecision` minted by `S5`**, and
+ * `postValidatedDecision` is the one function that accepts one. The ledger's
+ * only other entry point, `postProbeEvent`, records a probe: it accepts only a
+ * `ValidatedProbeEvent` `packages/probe` minted, and refuses money.
+ * `openWriteState` is neither: it builds the value both thread, and mutates
  * nothing.
  */
 export {
   DuplicatePostError,
   LedgerWriteError,
   RejectedDecisionError,
+  RejectedProbeEventError,
   openWriteState,
+  postProbeEvent,
   postValidatedDecision,
   type EventStamp,
   type LedgerWriteResult,

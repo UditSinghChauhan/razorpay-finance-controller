@@ -1,6 +1,6 @@
 import type { ProbeResultDetail } from "@assay/domain";
 import { solve, type SolveInput, type SolveResult } from "@assay/engine";
-import type { CertificateReason, DecisionId, EvidenceId, ProbeId, RunId } from "@assay/ledger";
+import type { CertificateReason, EvidenceId, LlmProviderId, ProbeId, RunId } from "@assay/ledger";
 import {
   R3OutputSchema,
   R3_SYSTEM_PROMPT_ID,
@@ -60,14 +60,28 @@ import { dispatchProbe, isDispatchable, type ProbeDispatchOptions } from "./surf
  * sole constructor of a call, and this file cannot build one.
  */
 
-/** One `PROBE` event this run produced, ready for `packages/ledger`. */
+/**
+ * One dispatched probe, ready for `packages/ledger`'s `postProbeEvent` (M65).
+ *
+ * Produced **only** after a dispatch returned and `acceptResult` took the
+ * answer: a decline, a rejection and a stop produce none, so an arm that
+ * dispatches nothing puts nothing on the chain.
+ */
 export interface ProbeEventDraft {
+  /** Minted by `packages/probe` from the call and its answer — the ledger's `ValidatedProbeEvent`. */
   readonly body: ProbeEventBody;
-  /** `THREAT_MODEL.md §T7`: *"every probe logged with its proposer"*. */
+  /** The probe's id on the component's certificate (`probes_attempted`). */
+  readonly probe_id: ProbeId;
+  /**
+   * `THREAT_MODEL.md §T7`: *"every probe logged with its proposer"*. Read off
+   * the `§19` record of the call whose answer was accepted, so a fallback to
+   * `offline` is recorded as `offline` rather than as the provider first asked.
+   */
   readonly proposer: {
     readonly type: "llm";
-    readonly llm_provider: string;
+    readonly llm_provider: LlmProviderId;
     readonly model_id: string;
+    readonly prompt_hash: string | null;
     readonly llm_call_id: string | null;
   };
 }
@@ -192,7 +206,6 @@ export interface ProbeRunInput {
   /** Deterministic ids for the `Evidence` rows a result produced, per attempt. */
   readonly evidenceIdsFor?: (attempt: number) => readonly EvidenceId[];
   readonly probeIdFor?: (attempt: number) => ProbeId;
-  readonly decisionId?: DecisionId | null;
   readonly contextOptions?: BuildContextOptions;
   /**
    * The component's loop state so far — `P_max` is *"a budget per component"*
@@ -338,26 +351,34 @@ export async function runProbeLoop(input: ProbeRunInput): Promise<ProbeRunResult
     const attempt = state.attempts + 1;
     const detail: ProbeResultDetail = dispatchProbe(offered.call, input.dispatch);
     const evidenceIds = evidenceIdsFor(attempt);
+    const probeId = probeIdFor(attempt);
 
+    // The answer is bound to its call twice over, by the same rule: once by
+    // `acceptResult` for the state, once by `probeEventBody` for the event. The
+    // event is minted from the accepted answer, never from the call alone.
+    const accepted = acceptResult(state, offered.call, detail, probeId);
+    const answeredBy = adjudicated.calls.at(-1);
     events.push(
       Object.freeze({
         body: probeEventBody({
           call: offered.call,
+          result: detail,
           comp_id: compId,
           attempts_before: state.attempts,
           evidence_ids: evidenceIds,
-          decision_id: input.decisionId ?? null,
         }),
+        probe_id: probeId,
         proposer: Object.freeze({
           type: "llm" as const,
-          llm_provider: adjudicated.acceptedFrom ?? input.provider.id,
-          model_id: input.provider.modelId,
-          llm_call_id: adjudicated.calls.at(-1)?.llm_call_id ?? null,
+          llm_provider: answeredBy?.provider ?? adjudicated.acceptedFrom ?? input.provider.id,
+          model_id: answeredBy?.model_id ?? input.provider.modelId,
+          prompt_hash: answeredBy?.system_prompt_hash ?? null,
+          llm_call_id: answeredBy?.llm_call_id ?? null,
         }),
       }),
     );
 
-    state = acceptResult(state, offered.call, detail, probeIdFor(attempt));
+    state = accepted;
     current = resolve(state);
   }
 }

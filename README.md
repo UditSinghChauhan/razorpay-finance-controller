@@ -68,7 +68,7 @@ nothing and the controller books nothing.** Everything below is the working.
 | Component | Authority it has | Authority it does not have |
 |---|---|---|
 | **Reconciliation Engine** | The only component that decides an allocation, and `S5` is the only gate that may post | — |
-| **Shadow Ledger** | The only component that books; every entry is hash-chained and replayable | Cannot be written except through a `ValidatedDecision` `S5` constructed |
+| **Shadow Ledger** | The only component that books; every entry is hash-chained and replayable | Money moves only through a `ValidatedDecision` minted by `S5`. The ledger's only other entry point records a probe, accepts only what `packages/probe` minted, and refuses money (`docs/ARCHITECTURE.md §4` boundary 3, dated addition) |
 | **Close Controller** | Reads, plans, escalates, within a step bound | **No financial write.** Its tool surface is four reads; its terminal state is human review, never a ledger event |
 | **Explanation Model** | Explains a decision that has already been made and sealed | **Not a financial authority.** It decides nothing, emits no number that is persisted, and every id it names must already exist |
 | **Human Review** | Resolves what the evidence could not | — |

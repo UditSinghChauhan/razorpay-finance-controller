@@ -21,6 +21,7 @@ import {
   type JournalLine,
   type LedgerEvent,
   type ValidatedDecision,
+  type ValidatedProbeEvent,
 } from "@assay/ledger";
 
 import type { LedgerCommit, LedgerStore } from "../src/store.js";
@@ -28,7 +29,9 @@ import {
   DuplicatePostError,
   LedgerWriteError,
   RejectedDecisionError,
+  RejectedProbeEventError,
   openWriteState,
+  postProbeEvent,
   postValidatedDecision,
   type EventStamp,
   type LedgerWriteState,
@@ -740,7 +743,7 @@ function specifiers(text: string): string[] {
 
 const LEDGER_SOURCES = sourcesUnder(LEDGER_SRC);
 
-describe("exactly one write path, and it is unreachable from elsewhere", () => {
+describe("money has one write path, a probe one entry point, and neither is reachable from elsewhere", () => {
   it("finds the boundary where §L.1 rule 4 puts it", () => {
     expect(LEDGER_SOURCES.map((s) => s.name)).toContain("write.ts");
     expect(LEDGER_SOURCES.map((s) => s.name)).toContain("store.ts");
@@ -748,18 +751,38 @@ describe("exactly one write path, and it is unreachable from elsewhere", () => {
 
   it("declares exactly one function taking a ValidatedDecision", () => {
     // §4 boundary 3: "exposes exactly one mutating function, and it accepts
-    // only a ValidatedDecision. There is no other write path."
+    // only a ValidatedDecision. There is no other write path." Its dated
+    // addition (M65) adds a probe entry point, which takes no ValidatedDecision.
     const params = LEDGER_SOURCES.flatMap(({ name, text }) =>
       [...code(text).matchAll(/:\s*ValidatedDecision\b/g)].map(() => name),
     );
     expect(params).toEqual(["write.ts"]);
   });
 
-  it("commits through the injected port from one call site", () => {
+  it("declares exactly one function taking a ValidatedProbeEvent (M65)", () => {
+    const params = LEDGER_SOURCES.flatMap(({ name, text }) =>
+      [...code(text).matchAll(/:\s*ValidatedProbeEvent\b/g)].map(() => name),
+    );
+    expect(params).toEqual(["write.ts"]);
+  });
+
+  it("commits through the injected port from two call sites, one per entry point", () => {
+    // postValidatedDecision's and postProbeEvent's (M65), both in write.ts.
     const calls = LEDGER_SOURCES.flatMap(({ name, text }) =>
       [...code(text).matchAll(/\bstore\s*\.\s*commit\s*\(/g)].map(() => name),
     );
-    expect(calls).toEqual(["write.ts"]);
+    expect(calls).toEqual(["write.ts", "write.ts"]);
+  });
+
+  it("mints no ValidatedProbeEvent and exports no constructor for one (M65)", () => {
+    // packages/probe/src/event.ts is the sole constructor; this package declares
+    // the type and accepts it, and nothing here can produce one.
+    for (const { name, text } of LEDGER_SOURCES) {
+      if (name === "validated-probe-event.ts") continue;
+      expect(code(text), name).not.toMatch(/as\s+(unknown\s+as\s+)?ValidatedProbeEvent\b/);
+      expect(code(text), name).not.toMatch(/export\s+(function|const)\s+\w*(mint|create|make|as)ValidatedProbeEvent/);
+      expect(code(text), name).not.toMatch(/PROBE_EVENT_BRAND/);
+    }
   });
 
   it("mints no ValidatedDecision and exports no constructor for one", () => {
@@ -833,7 +856,7 @@ describe("exactly one write path, and it is unreachable from elsewhere", () => {
     expect(others.length).toBeGreaterThan(0);
 
     const banned =
-      /postValidatedDecision|openWriteState|LedgerWriteState|LedgerStore|LedgerCommit|ledger\/src\/write|ledger\/src\/store/;
+      /postValidatedDecision|postProbeEvent|openWriteState|LedgerWriteState|LedgerStore|LedgerCommit|ledger\/src\/write|ledger\/src\/store/;
     for (const name of others) {
       const dir = join(PACKAGES, name, "src");
       for (const source of sourcesUnder(dir)) {
@@ -841,5 +864,115 @@ describe("exactly one write path, and it is unreachable from elsewhere", () => {
         expect(banned.test(code(source.text))).toBe(false);
       }
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// postProbeEvent — the ledger's only other entry point (M65)
+// ---------------------------------------------------------------------------
+
+/**
+ * This suite's stand-in for `packages/probe`'s `probeEventBody`, and the
+ * second widening in the file — visible for the reason {@link validated} is.
+ * `overrides` is untyped on purpose: the refusal tests below build values the
+ * type forbids, which is exactly what a runtime check exists to catch.
+ */
+function probeEvent(overrides: Record<string, unknown> = {}): ValidatedProbeEvent {
+  return Object.freeze({
+    kind: "PROBE",
+    subject_ids: [SETTLEMENT_ID],
+    evidence_ids: [],
+    decision_id: null,
+    inputs_hash: digest(9),
+    journal_lines: [],
+    certificate: null,
+    ...overrides,
+  }) as unknown as ValidatedProbeEvent;
+}
+
+const probeActor = (): EventStamp["actor"] =>
+  makeActor({ type: "llm", component: "llm.r3_propose_probe", llm_provider: "offline", model_id: "rules-v1" });
+
+describe("postProbeEvent records a probe and refuses money (M65)", () => {
+  it("appends one PROBE event that the chain verifies, and indexes no decision", () => {
+    const store = new RecordingStore();
+    const before = emptyState();
+    const { state, event } = postProbeEvent(before, probeEvent(), stamp(1, { actor: probeActor() }), store);
+
+    expect(event.kind).toBe("PROBE");
+    expect(event.journal_lines).toEqual([]);
+    expect(event.certificate).toBeNull();
+    expect(event.decision_id).toBeNull();
+    expect(event.subject_ids).toEqual([SETTLEMENT_ID]);
+    expect(state.chain.events).toHaveLength(1);
+    expect(store.commits).toHaveLength(1);
+    expect(state.posted_decision_ids.size).toBe(0);
+    expect(state.posted_event_ids.has(event.evt_id)).toBe(true);
+    expect(verifyChain(GENESIS, state.chain.events, state.chain.root_hash).ok).toBe(true);
+    // Unchanged: the argument state is a value, as for postValidatedDecision.
+    expect(snapshot(before)).toEqual(snapshot(emptyState()));
+  });
+
+  it("moves no balance: the projection after a probe is the projection before it", () => {
+    const store = new RecordingStore();
+    const withDecision = postValidatedDecision(emptyState(), decision(), stamp(1), store).state;
+    const withProbe = postProbeEvent(withDecision, probeEvent(), stamp(2, { actor: probeActor() }), store).state;
+    expect(projectChain(withProbe.chain).balances).toEqual(projectChain(withDecision.chain).balances);
+    expect(withProbe.chain.total_dr_paise).toBe(withDecision.chain.total_dr_paise);
+    expect(withProbe.chain.total_cr_paise).toBe(withDecision.chain.total_cr_paise);
+  });
+
+  it("does not block the decision the probe informed: probe first, then the decision", () => {
+    const store = new RecordingStore();
+    const probed = postProbeEvent(emptyState(), probeEvent(), stamp(1, { actor: probeActor() }), store).state;
+    const decided = postValidatedDecision(probed, decision(), stamp(2), store).state;
+    expect(decided.chain.events.map((e) => e.kind)).toEqual(["PROBE", "ABSTAIN"]);
+    expect(verifyChain(GENESIS, decided.chain.events, decided.chain.root_hash).ok).toBe(true);
+  });
+
+  const refusals: readonly [string, Record<string, unknown>][] = [
+    ["journal lines", { journal_lines: [line("1200_BANK", 100, 0), line("1100_GATEWAY_RECEIVABLE", 0, 100)] }],
+    ["a certificate", { certificate: makeCertificate() }],
+    ["a decision_id", { decision_id: id("dec_", 7) }],
+    ["a kind other than PROBE", { kind: "RECONCILE" }],
+  ];
+
+  for (const [what, overrides] of refusals) {
+    it(`refuses ${what}, before anything is built or stored`, () => {
+      const store = new RecordingStore();
+      const state = emptyState();
+      expect(() => postProbeEvent(state, probeEvent(overrides), stamp(1, { actor: probeActor() }), store)).toThrow(
+        RejectedProbeEventError,
+      );
+      expect(store.commits).toHaveLength(0);
+      expect(snapshot(state)).toEqual(snapshot(emptyState()));
+    });
+  }
+
+  it("refuses ANY non-empty journal, whatever it would post", () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 1, max: 1_000_000_000 }), (paise) => {
+        const store = new RecordingStore();
+        expect(() =>
+          postProbeEvent(
+            emptyState(),
+            probeEvent({ journal_lines: [line("1200_BANK", paise, 0), line("1100_GATEWAY_RECEIVABLE", 0, paise)] }),
+            stamp(1, { actor: probeActor() }),
+            store,
+          ),
+        ).toThrow(RejectedProbeEventError);
+        expect(store.commits).toHaveLength(0);
+      }),
+      { numRuns: 50 },
+    );
+  });
+
+  it("refuses an evt_id already in the chain", () => {
+    const store = new RecordingStore();
+    const posted = postValidatedDecision(emptyState(), decision(), stamp(1), store).state;
+    expect(() => postProbeEvent(posted, probeEvent(), stamp(1, { actor: probeActor() }), store)).toThrow(
+      RejectedProbeEventError,
+    );
+    expect(store.commits).toHaveLength(1);
   });
 });

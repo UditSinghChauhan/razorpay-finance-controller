@@ -914,18 +914,23 @@ describe("the package's public surface is exactly T0-6's", () => {
     }
   });
 
-  it("exposes EXACTLY ONE mutating write path, and it is postValidatedDecision", async () => {
+  it("exposes EXACTLY TWO mutating entry points: postProbeEvent and postValidatedDecision", async () => {
     // ARCHITECTURE.md §4 boundary 3: "packages/ledger exposes exactly one
     // mutating function, and it accepts only a ValidatedDecision ... There is
-    // no other write path." The count is the assertion. `openWriteState` is
-    // excluded by the ^ anchor rather than by an exception: it builds the value
-    // the write threads and mutates nothing.
+    // no other write path." Its dated addition of 2026-11-25 (register row
+    // DATA_MODEL.md §22.2 M65) resolves the contradiction with §6's chain
+    // diagram — "packages/ledger appends the PROBE event body" — by adding ONE
+    // entry point that records a probe, accepts only a ValidatedProbeEvent and
+    // refuses money (write.test.ts proves the refusals). The count is still the
+    // assertion, and money still has one path. `openWriteState` is excluded by
+    // the ^ anchor rather than by an exception: it builds the value the writes
+    // thread and mutates nothing.
     const ledger: Record<string, unknown> = await import("@assay/ledger");
     const mutators = Object.keys(ledger)
       .filter((name) => /^(write|persist|save|commit|post)[A-Z]/.test(name))
       .sort();
 
-    expect(mutators).toEqual(["postValidatedDecision"]);
+    expect(mutators).toEqual(["postProbeEvent", "postValidatedDecision"]);
   });
 
   it("routes persistence through an injected port and opens nothing itself", async () => {

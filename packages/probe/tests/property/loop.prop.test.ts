@@ -131,10 +131,16 @@ describe("determinism", () => {
         const mk = () =>
           probeEventBody({
             call: v.call,
+            // The answer the call was dispatched for: M65 mints a body only
+            // from a call and its own result.
+            result: {
+              probe: "fetch_settlement_recon",
+              settlement_id: id,
+              constituent_entity_ids: [],
+            } as unknown as ProbeResultDetail,
             comp_id: "c",
             attempts_before: before,
             evidence_ids: [],
-            decision_id: null,
           });
         expect(mk()).toEqual(mk());
       }),

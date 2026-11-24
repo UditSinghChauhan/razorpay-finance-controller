@@ -5,6 +5,7 @@ import {
   type Observation,
   type ObservationId,
   type ObservationKind,
+  type Sha256,
   type UnixSeconds,
 } from "@assay/domain";
 import {
@@ -50,7 +51,7 @@ import type {
   RunConfig,
   ScoredLlmMode,
 } from "@assay/eval";
-import type { R3CertificateSummary } from "@assay/llm";
+import type { LlmCall, R3CertificateSummary } from "@assay/llm";
 import {
   attemptClose,
   computeGenesisHash,
@@ -58,6 +59,7 @@ import {
   hashCanonical,
   journalFor,
   openWriteState,
+  postProbeEvent,
   postValidatedDecision,
   projectByDecisionState,
   projectChain,
@@ -81,6 +83,7 @@ import {
   type LedgerProjection,
   type LedgerStore,
   type LedgerWriteState,
+  type LlmCallId,
   type ObservationState,
   type PostedDecisionRecord,
   type ProbeId,
@@ -95,7 +98,7 @@ import { valueOf } from "../values.js";
 
 import { resolveConfig } from "../config.js";
 import { AgentUnavailableError } from "../errors.js";
-import { runProbeLoop } from "../probe/run.js";
+import { runProbeLoop, type ProbeEventDraft } from "../probe/run.js";
 import { buildProvider } from "../providers.js";
 
 /**
@@ -271,6 +274,26 @@ const ACTOR_A1_NOVALIDATE: EventActor = Object.freeze({
   ...ACTOR,
   component: "engine.s5_validate.a1_novalidate",
 });
+
+/**
+ * A `PROBE` event's actor: its proposer (`THREAT_MODEL.md §T7`, *"every probe
+ * logged with its proposer"*), read off the `§19` record of the call whose
+ * answer was accepted. `§16`'s actor block exists so a reviewer can answer *"was
+ * a model involved, and which one?"* without prose; under `--llm=offline` the
+ * answer it records is `offline` / `rules-v1` — `PREREGISTRATION.md §7`'s frozen
+ * deterministic policy, not a language model.
+ */
+function probeActorFor(draft: ProbeEventDraft): EventActor {
+  return Object.freeze({
+    type: "llm",
+    component: "llm.r3_propose_probe",
+    engine_commit: SPEC_VERSION,
+    llm_provider: draft.proposer.llm_provider,
+    model_id: draft.proposer.model_id,
+    prompt_hash: draft.proposer.prompt_hash as Sha256 | null,
+    llm_call_id: draft.proposer.llm_call_id as LlmCallId | null,
+  });
+}
 
 /** `ASSAY`'s actor, or `A1`'s when `S5`'s invariant evaluation was removed. */
 function actorFor(selection: InvariantSelection | undefined): EventActor {
@@ -949,6 +972,19 @@ export interface RunEvidence {
   readonly close: CloseAttempt;
   /** Layer B — balances re-projected from the event log, never cached. */
   readonly projection: LedgerProjection;
+  /**
+   * `DATA_MODEL.md §19`'s per-call record for every `R3` call the run made,
+   * accepted, rejected or declined, in the order made — `§19`: *"`provider` is
+   * recorded on **every** call, including offline ones"*.
+   *
+   * **Its home, from Work Order 3c B2 (M65).** Before it, `runProbeLoop`
+   * returned the records and this composition dropped them
+   * (`PREREGISTRATION.md §10` V42). The run's evidence is the record's home for
+   * the reason the chain's is: no `assay run` persists a run yet, and the API
+   * reads this value. It is a NEW field; no existing one moved — the default-arm
+   * pin names it as the one permitted addition.
+   */
+  readonly llm_calls: readonly LlmCall[];
 }
 
 /**
@@ -1065,6 +1101,12 @@ async function runAssayComposed(
   // target started from a fresh state, and a two-target component could have
   // spent 2 x P_max; that was dormant only because no probe was ever dispatched.
   const probeStateByComponent = new Map<ComponentId, ProbeLoopState>();
+  // What the loop produces, kept rather than discarded (M65, PREREGISTRATION.md
+  // §10 V42): every R3 call's DATA_MODEL.md §19 record, in the order made, and
+  // one PROBE event per DISPATCHED probe -- a decline produces a call record
+  // and no event, so an arm that dispatches nothing puts nothing on the chain.
+  const llmCalls: LlmCall[] = [];
+  const probeEvents: { readonly ts: UnixSeconds; readonly draft: ProbeEventDraft }[] = [];
   const outcomes = new Map<ObservationId, TargetOutcome>();
   for (const [index, target] of seam.targets.entries()) {
     const context = seam.contexts[index];
@@ -1141,6 +1183,9 @@ async function runAssayComposed(
       ...(prior === undefined ? {} : { prior }),
     });
     probeStateByComponent.set(compId, loop.state);
+    llmCalls.push(...loop.calls);
+    const probedAt = byObsId.get(target.obs_id)?.ingested_at ?? periodTo;
+    for (const draft of loop.events) probeEvents.push({ ts: probedAt, draft });
 
     outcomes.set(target.obs_id, {
       solve: loop.solve,
@@ -1167,6 +1212,21 @@ async function runAssayComposed(
   // nothing: `apps/cli`'s own commands own `ARCHITECTURE.md §8`'s database.
   const store: LedgerStore = { commit: (): void => undefined };
   let writeState: LedgerWriteState = openWriteState(createChain(genesis, runId));
+
+  // §6.2's PROBE events, each BEFORE the decision it informed: every probe ran
+  // while S4 was still deciding, and no decision is posted until the solving
+  // is done, so appending them first puts each one ahead of its decision.
+  // `postProbeEvent` is packages/ledger's probe entry point (ARCHITECTURE.md §4
+  // boundary 3's dated addition, M65): it takes only what packages/probe
+  // minted and refuses money, so no balance, gate input or decision moves.
+  for (const { ts, draft } of probeEvents) {
+    writeState = postProbeEvent(
+      writeState,
+      draft.body,
+      { evt_id: idFor("evt_", `probe/${draft.probe_id}`) as EventId, ts, actor: probeActorFor(draft) },
+      store,
+    ).state;
+  }
 
   const posted: Posted[] = [];
   const allocatedEntityIds = new Set<string>();
@@ -1581,6 +1641,7 @@ async function runAssayComposed(
       certificates: Object.freeze(certificates),
       close: attempt,
       projection,
+      llm_calls: Object.freeze(llmCalls),
     },
   };
 }

@@ -67,6 +67,7 @@ import { appendEvent, type LedgerChain } from "./hash-chain.js";
 import type { DecisionState } from "./projection.js";
 import type { LedgerStore } from "./store.js";
 import type { ValidatedDecision } from "./validated-decision.js";
+import type { ValidatedProbeEvent } from "./validated-probe-event.js";
 
 // ---------------------------------------------------------------------------
 // Errors
@@ -420,5 +421,137 @@ export function postValidatedDecision(
       posted_event_ids: eventIds,
     }),
     event,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// The second entry point — a probe, never money (M65)
+// ---------------------------------------------------------------------------
+
+/**
+ * `postProbeEvent` refused a `PROBE` event.
+ *
+ * Not a {@link LedgerWriteError}: that supertype is keyed on the decision a
+ * refused post belonged to, and a `PROBE` event belongs to none. Every reason it
+ * is thrown is a caller defect — `packages/probe` mints only well-formed bodies,
+ * so reaching one of these means a value crossed a cast.
+ */
+export class RejectedProbeEventError extends Error {
+  readonly evt_id: EventId;
+
+  constructor(evtId: EventId, message: string) {
+    super(message);
+    this.name = "RejectedProbeEventError";
+    this.evt_id = evtId;
+  }
+}
+
+/**
+ * **The ledger's only other entry point.** Record one dispatched probe.
+ *
+ * `ARCHITECTURE.md §6`'s chain diagram has `packages/ledger` append *"the
+ * `PROBE` event body `packages/probe` assembled"*, and `THREAT_MODEL.md §T7`
+ * requires *"every probe logged with its proposer"*. Boundary 3 said the package
+ * had exactly one mutating function; the two contradicted each other and, until
+ * register row `DATA_MODEL.md §22.2` **M65**, the events were dropped
+ * (`PREREGISTRATION.md §10` V42). Boundary 3's dated addition states the
+ * resolution: **money moves only through a `ValidatedDecision` minted by `S5`;
+ * this entry point records a probe, accepts only what `packages/probe` minted,
+ * and refuses money.**
+ *
+ * The refusals, all before anything is built, so a refusal leaves nothing
+ * behind:
+ *
+ * 1. `kind` must be `"PROBE"`.
+ * 2. **No journal line** — a probe asserts no rupee movement.
+ * 3. **No certificate** — a probe is not an abstention.
+ * 4. **No `decision_id`** — a probe is not a decision; carrying one would make
+ *    `openWriteState` index this event as that decision's post.
+ * 5. The `evt_id` must be new to the chain.
+ *
+ * The type already forbids 1–4; they are checked at runtime as well because a
+ * value that crossed a cast is the case a type cannot see. After them the path
+ * is {@link postValidatedDecision}'s: `appendEvent` seals, positions, links and
+ * hashes, then the store commits, then the new state is returned. A `PROBE`
+ * event posts no line, so `I1` holds trivially and no projection moves.
+ *
+ * @throws RejectedProbeEventError on any of the five refusals
+ * @throws LedgerEventError if any field is one `DATA_MODEL.md §16` does not admit
+ */
+export function postProbeEvent(
+  state: LedgerWriteState,
+  event: ValidatedProbeEvent,
+  stamp: EventStamp,
+  store: LedgerStore,
+): LedgerWriteResult {
+  // Read through a widened view: the branded type makes these comparisons
+  // statically impossible, which is the point of the type and exactly why the
+  // runtime check has to look past it.
+  const raw = event as unknown as {
+    readonly kind: unknown;
+    readonly journal_lines: unknown;
+    readonly certificate: unknown;
+    readonly decision_id: unknown;
+  };
+  const refuse = (why: string): never => {
+    throw new RejectedProbeEventError(
+      stamp.evt_id,
+      `PROBE event ${stamp.evt_id} refused: ${why}. postProbeEvent records a probe and ` +
+        `refuses money; a posting reaches the ledger only through a ValidatedDecision ` +
+        `minted by S5 (ARCHITECTURE.md §4 boundary 3, M65)`,
+    );
+  };
+  if (raw.kind !== "PROBE") refuse(`kind is ${JSON.stringify(raw.kind)}, not "PROBE"`);
+  if (!Array.isArray(raw.journal_lines) || raw.journal_lines.length !== 0) {
+    refuse("it carries journal lines");
+  }
+  if (raw.certificate !== null) refuse("it carries a certificate");
+  if (raw.decision_id !== null) refuse("it carries a decision_id");
+  if (state.posted_event_ids.has(stamp.evt_id)) {
+    refuse("its evt_id is already in this chain (verifyChain's EVENT_ID_UNIQUE check)");
+  }
+
+  const draft: LedgerEventDraft = {
+    evt_id: stamp.evt_id,
+    run_id: state.chain.run_id,
+    ts: stamp.ts,
+    actor: stamp.actor,
+    kind: "PROBE",
+    subject_ids: event.subject_ids,
+    evidence_ids: event.evidence_ids,
+    decision_id: null,
+    inputs_hash: event.inputs_hash,
+    journal_lines: [],
+    certificate: null,
+  };
+
+  const chain = appendEvent(state.chain, draft);
+  const appended = chain.events.at(-1);
+  if (appended === undefined) {
+    throw new Error(
+      "appendEvent returned a chain with no events; this is a bug in " +
+        "packages/ledger/src/hash-chain.ts",
+    );
+  }
+
+  store.commit({
+    run_id: chain.run_id,
+    genesis_hash: chain.genesis_hash,
+    events: Object.freeze([appended]),
+    root_hash: chain.root_hash,
+  });
+
+  const eventIds = new Set(state.posted_event_ids);
+  eventIds.add(appended.evt_id);
+
+  return Object.freeze({
+    state: Object.freeze({
+      chain,
+      // Unchanged: a PROBE event is not a decision, and indexing one here would
+      // refuse the decision it informed as a duplicate.
+      posted_decision_ids: new Set(state.posted_decision_ids),
+      posted_event_ids: eventIds,
+    }),
+    event: appended,
   });
 }

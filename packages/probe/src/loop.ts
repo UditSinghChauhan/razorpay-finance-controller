@@ -281,7 +281,9 @@ export class ProbeResultMismatchError extends Error {
  * brand exists to prevent, reappearing one step later. The probe kind must match,
  * and where both carry an entity id, so must the id.
  */
-function bindResultToCall(call: ValidatedProbeCall, detail: ProbeResultDetail): void {
+// Exported to `event.ts` only (not from the package index): the `PROBE` event
+// body is minted under this same binding, so no body exists for an unanswered call.
+export function bindResultToCall(call: ValidatedProbeCall, detail: ProbeResultDetail): void {
   if (detail.probe !== call.probe) {
     throw new ProbeResultMismatchError(call.probe, detail.probe);
   }

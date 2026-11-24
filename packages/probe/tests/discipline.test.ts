@@ -137,6 +137,34 @@ describe("§T7's controls are here and are not bypassable", () => {
     expect(call).not.toMatch(/export\s+(const|declare const)\s+validatedProbeCall/);
   });
 
+  it("holds the workspace's ONLY widening to ValidatedProbeEvent, in event.ts (M65)", () => {
+    // ARCHITECTURE.md §4 boundary 3's dated addition: the ledger's probe entry
+    // point accepts only what packages/probe minted. The brand is module-private
+    // in packages/ledger; this counts the widenings in every package's and app's
+    // src, so a second minting site anywhere fails here.
+    const repo = join(ROOT, "..", "..");
+    const roots = ["packages", "apps"].flatMap((top) =>
+      readdirSync(join(repo, top))
+        .map((name) => join(repo, top, name, "src"))
+        .filter((dir) => {
+          try {
+            return statSync(dir).isDirectory();
+          } catch {
+            return false;
+          }
+        }),
+    );
+    const found = roots
+      .flatMap((dir) => sourceFiles(dir))
+      .flatMap((file) =>
+        [...code(readFileSync(file, "utf8")).matchAll(/\bas\s+(unknown\s+as\s+)?ValidatedProbeEvent\b/g)].map(
+          () => file.replaceAll("\\", "/"),
+        ),
+      );
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatch(/packages\/probe\/src\/event\.ts$/);
+  });
+
   it("P_MAX is read from packages/engine, never re-spelled", () => {
     const loop = readFileSync(join(SRC, "loop.ts"), "utf8");
     expect(loop).toContain('from "@assay/engine"');
