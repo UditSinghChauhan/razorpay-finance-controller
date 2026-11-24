@@ -37,6 +37,15 @@ if (DECLARED_SEEDS.includes(SEED)) throw new Error(`bench-v2-families: ${String(
 
 const config = (seed: number): RunConfig => Object.freeze({ llm_mode: "offline", strict_replay: false, split: "train", seed });
 
+/**
+ * The A4 cascade is a KNOWN DEFECT, deferred on the record
+ * (`docs/BENCH_V2_PREREGISTRATION.md §10` V39; `docs/DATA_MODEL.md §22.2` M62).
+ * The A4 pins below assert the defective behaviour as observed, so they pass
+ * today and FAIL the day the fix lands — which is the point: the fix must
+ * arrive with these numbers re-derived, not with the assertion relaxed.
+ */
+const CASCADE_DEFERRED = "M62: anchored members fall to E02 instead of ABSTAINED/MEMBER; deferred until bench-v2 is sealed (PREREGISTRATION §10 V39). Do not relax this assertion to make the suite green.";
+
 interface Instance {
   readonly family: ReturnType<typeof generateFamily>;
   readonly state: TrueState;
@@ -199,6 +208,53 @@ describe("A03 — sub-tau twins are IMMATERIALLY_AMBIGUOUS at the frozen tau, AM
     const twins = i.family.ground_truth.degradations.map((d) => decisions.get(d.target_id));
     expect(twins.filter((d) => d?.state === "RECONCILED")).toHaveLength(3);
     expect(twins.filter((d) => d?.exception_class === "E02_MISSING_SETTLEMENT")).toHaveLength(3);
+  });
+});
+
+describe("A04 — the single-constituent split is AMB-1 to the frozen engine; k = 0 on S2 is what the documented model needs", () => {
+  it("reaches AMBIGUOUS / EVIDENCE_TIE with a zero gap on all six, exactly as A01 does; the oracle says TRULY_AMBIGUOUS", async () => {
+    // The probe loop is inert and SE5 is 0 on every candidate, so the engine
+    // sees the same two-line, two-solution class as AMB-1 and abstains the same
+    // way. The family's difference is invisible HERE by design (§3.4;
+    // PREREGISTRATION §10 V40): it exists for packages/eval's documented model.
+    const i = await instance("A04");
+    expect(i.assay.solve_outcomes.AMBIGUOUS).toBe(6);
+    expect(i.assay.solve_outcomes.DISCRIMINATED).toBe(0);
+    expect(i.assay.solve_outcomes.INTRACTABLE).toBe(0);
+    const decisions = decisionsOf(i);
+    const labels = labelsOf(i);
+    const targets = touchedTargets(i);
+    expect(targets).toHaveLength(6);
+    for (const target of targets) {
+      const d = decisions.get(target);
+      expect(d?.state, target).toBe("ABSTAINED");
+      const c = d?.certificate;
+      if (c === undefined || c === null) throw new Error("no certificate");
+      expect(c.reason).toBe("EVIDENCE_TIE");
+      expect(c.evidence_score_gap_bps).toBe(0);
+      expect(c.materiality_paise).toBeGreaterThan(c.tau_paise);
+      expect(labels.get(target)?.label).toBe("TRULY_AMBIGUOUS");
+      expect(labels.get(target)?.solution_count).toBe(2);
+    }
+    const gate = completenessGate(i.oracle.results, trueAllocations([i.family.ground_truth], i.family.observations));
+    expect(gate.passed).toBe(true);
+  });
+
+  it("anchors NOTHING on settlement_b (k = 0) and at least one line on settlement_a (k >= 1), per pair", async () => {
+    const i = await instance("A04");
+    const sorted = [...i.family.observations].sort((a, b) => (a.obs_id < b.obs_id ? -1 : 1));
+    const seam = buildSeam({ observations: sorted, anchors: anchor(sorted) });
+    const settlementObs = new Map(sorted.filter((o) => o.kind === "settlement").map((o) => [o.kind === "settlement" ? o.payload.id : "", o.obs_id]));
+    const anchoredCount = new Map<string, number>();
+    for (const t of seam.targets) {
+      if (t.kind === "settlement") anchoredCount.set(t.obs_id, t.anchored_members.length);
+    }
+    for (const split of i.state.split_batches) {
+      const s1 = i.state.settlements[split.settlement_a_index]?.id ?? "";
+      const s2 = i.state.settlements[split.settlement_b_index]?.id ?? "";
+      expect(anchoredCount.get(settlementObs.get(s2) ?? "")).toBe(0);
+      expect(anchoredCount.get(settlementObs.get(s1) ?? "") ?? 0).toBeGreaterThanOrEqual(1);
+    }
   });
 });
 
@@ -373,22 +429,22 @@ describe("§C Part A, pinned", () => {
     const by = settlementOfMember(i.state);
     const twins = new Set(i.family.ground_truth.degradations.map((d) => d.target_id));
     const abstained = new Set(i.assay.run.abstentions.map((a) => a.source_entity_id));
-    expect(abstained.size).toBe(6);
+    expect(abstained.size, CASCADE_DEFERRED).toBe(6);
     const constituents = [...by].filter(([id, s]) => abstained.has(s) && !twins.has(id)).map(([id]) => id);
-    expect(constituents).toHaveLength(54);
+    expect(constituents, CASCADE_DEFERRED).toHaveLength(54);
     const states = constituents.map((id) => `${decisions.get(id)?.state ?? "?"}/${String(decisions.get(id)?.exception_class)}`);
-    expect(states.filter((s) => s === "EXCEPTION/E02_MISSING_SETTLEMENT")).toHaveLength(51);
-    expect(states.filter((s) => s === "EXCEPTION/E11_TIMING_BOUNDARY")).toHaveLength(3);
+    expect(states.filter((s) => s === "EXCEPTION/E02_MISSING_SETTLEMENT"), CASCADE_DEFERRED).toHaveLength(51);
+    expect(states.filter((s) => s === "EXCEPTION/E11_TIMING_BOUNDARY"), CASCADE_DEFERRED).toHaveLength(3);
     const ownSuspense = constituents.filter((id) => decisions.get(id)?.suspense_key !== null);
-    expect(ownSuspense).toHaveLength(51);
+    expect(ownSuspense, CASCADE_DEFERRED).toHaveLength(51);
     const constituentSuspenseValue = ownSuspense.reduce((t, id) => t + (decisions.get(id)?.value_paise ?? 0), 0);
-    expect(constituentSuspenseValue).toBe(38_599_217);
-    expect(i.assay.run.close?.value_abstained_paise).toBe(51_685_195);
+    expect(constituentSuspenseValue, CASCADE_DEFERRED).toBe(38_599_217);
+    expect(i.assay.run.close?.value_abstained_paise, CASCADE_DEFERRED).toBe(51_685_195);
     // The twins themselves are ABSTAINED/MEMBER and post nothing: §17.1.1's
     // third abstention row, working as written.
     for (const twin of twins) {
-      expect(decisions.get(twin)?.state).toBe("ABSTAINED");
-      expect(decisions.get(twin)?.suspense_key).toBeNull();
+      expect(decisions.get(twin)?.state, CASCADE_DEFERRED).toBe("ABSTAINED");
+      expect(decisions.get(twin)?.suspense_key, CASCADE_DEFERRED).toBeNull();
     }
   });
 
@@ -399,22 +455,22 @@ describe("§C Part A, pinned", () => {
     const decisions = new Map(a2.evidence.decisions.map((d) => [d.entity_id, d]));
     const abstainedByAssay = new Set(i.assay.run.abstentions.map((a) => a.source_entity_id));
     const states = [...abstainedByAssay].map((t) => `${decisions.get(t)?.state ?? "?"}${decisions.get(t)?.exception_class === null ? "" : "/" + String(decisions.get(t)?.exception_class)}`).sort();
-    expect(states).toStrictEqual([
+    expect(states, CASCADE_DEFERRED).toStrictEqual([
       "EXCEPTION/E05_AMOUNT_MISMATCH", "EXCEPTION/E05_AMOUNT_MISMATCH", "EXCEPTION/E05_AMOUNT_MISMATCH",
       "RECONCILED", "RECONCILED", "RECONCILED",
     ]);
-    expect(a2.run.abstentions).toHaveLength(0);
+    expect(a2.run.abstentions, CASCADE_DEFERRED).toHaveLength(0);
     // Rupees committed where ASSAY abstained: the three targets' constituents
     // and the three tie-broken twins. The wrong-in-fact share is one of three
     // twins on this seed — the twenty-seed rate is the A3 block above.
     const amountOf = new Map(i.family.observations.filter((o) => o.kind === "recon_line").map((o) => [o.kind === "recon_line" ? o.payload.entity_id : "", o.kind === "recon_line" ? o.payload.amount : 0]));
     const committed = a2.run.allocations.filter((e) => abstainedByAssay.has(e.target_id));
-    expect(committed).toHaveLength(33);
-    expect(committed.reduce((t, e) => t + (amountOf.get(e.entity_id) ?? 0), 0)).toBe(30_657_500);
+    expect(committed, CASCADE_DEFERRED).toHaveLength(33);
+    expect(committed.reduce((t, e) => t + (amountOf.get(e.entity_id) ?? 0), 0), CASCADE_DEFERRED).toBe(30_657_500);
     const truth = new Map(i.family.ground_truth.allocations.map((a) => [a.entity_id, a.settlement_id]));
     const wrong = committed.filter((e) => truth.get(e.entity_id) !== e.target_id);
-    expect(wrong).toHaveLength(2);
-    expect(wrong.reduce((t, e) => t + (amountOf.get(e.entity_id) ?? 0), 0)).toBe(2_235_390);
-    expect((i.assay.run.close?.unresolved_value_paise ?? 0) - (a2.run.close?.unresolved_value_paise ?? 0)).toBe(66_081_485);
+    expect(wrong, CASCADE_DEFERRED).toHaveLength(2);
+    expect(wrong.reduce((t, e) => t + (amountOf.get(e.entity_id) ?? 0), 0), CASCADE_DEFERRED).toBe(2_235_390);
+    expect((i.assay.run.close?.unresolved_value_paise ?? 0) - (a2.run.close?.unresolved_value_paise ?? 0), CASCADE_DEFERRED).toBe(66_081_485);
   });
 });
