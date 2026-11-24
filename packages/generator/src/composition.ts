@@ -29,7 +29,7 @@ import {
   ADJUSTMENT_RATE,
   AMB1_PAIR_RATE,
   AMB2_PAIR_RATE,
-  AMB3_PAIR_RATE,
+  AMB3_PAIR_RATE, AMB4_PAIR_RATE,
   AMB5_DAY_RATE,
   BEN1_DAY_RATE,
   BEN2_DAY_RATE,
@@ -143,6 +143,9 @@ export const AMB2_PAIR_COUNT = realize(AMB2_PAIR_RATE, COMPOSITION.S);
 /** bench-v2 `AMB-3` (`§3.3`): split days hosting a sub-`tau` twin pair. */
 export const AMB3_PAIR_COUNT = realize(AMB3_PAIR_RATE, COMPOSITION.S);
 
+/** bench-v2 `AMB-4` (`§3.4`): split days whose second batch holds one twin alone. */
+export const AMB4_PAIR_COUNT = realize(AMB4_PAIR_RATE, COMPOSITION.S);
+
 /** bench-v2 `AMB-5` (`§3.5`): batches that lose `AMB5_DROP_COUNT` lines. No split. */
 export const AMB5_DAY_COUNT = realize(AMB5_DAY_RATE, COMPOSITION.S);
 
@@ -190,6 +193,7 @@ export const FAMILY_DELTA: Readonly<Record<FamilyId, number>> = Object.freeze({
   A01: +2 * AMB1_PAIR_COUNT,
   A02: +2 * AMB2_PAIR_COUNT,
   A03: +2 * AMB3_PAIR_COUNT,
+  A04: +2 * AMB4_PAIR_COUNT,
   A05: 0,
   B01: +2 * BEN3_DAY_COUNT,
 });

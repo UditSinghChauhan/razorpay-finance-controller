@@ -4,12 +4,12 @@ import { paise } from "@assay/money";
 
 import { amountForCredit, feeBreakdown } from "../src/amount.js";
 import {
-  AMB2_PAIR_COUNT, AMB3_PAIR_COUNT, AMB5_DAY_COUNT, BEN1_DAY_COUNT, BEN2_DAY_COUNT, BEN3_DAY_COUNT,
+  AMB2_PAIR_COUNT, AMB3_PAIR_COUNT, AMB4_PAIR_COUNT, AMB5_DAY_COUNT, BEN1_DAY_COUNT, BEN2_DAY_COUNT, BEN3_DAY_COUNT,
   COMPOSITION, TARGET_RECORD_COUNT,
 } from "../src/composition.js";
 import { FAMILY_MECHANICS } from "../src/families.js";
 import {
-  AMB1_BASE_METHODS, AMB1_TWIN_METHOD, AMB2_MIN_REFUND_PAISE, AMB2_REFUND_BPS, AMB3_DELTA_RANGE_PAISE,
+  AMB1_BASE_METHODS, AMB1_MIN_CREDIT_PAISE, AMB1_TWIN_METHOD, AMB2_MIN_REFUND_PAISE, AMB2_REFUND_BPS, AMB3_DELTA_RANGE_PAISE,
   AMB5_DROP_COUNT, BEN1_DROP_COUNT, BEN2_DROP_COUNT, BEN3_MIN_CREDIT_GAP_PAISE, BENCH_V2_FAMILY_IDS,
   FEE_RATE_BPS, IMPLEMENTED_FAMILIES, OPERATOR_DECLARING_FAMILY, PUBLISHED_TARGET_RECORD_COUNTS,
 } from "../src/frozen.js";
@@ -18,8 +18,8 @@ import { dataset, TEST_SEEDS } from "./fixtures.js";
 
 /**
  * bench-v2's second increment — `A02` (`AMB-2`), `A03` (`AMB-3`), `A05`
- * (`AMB-5`) and `B01` (`BENIGN`) — checked against what the engine will READ
- * (`docs/BENCH_V2_DESIGN.md §C`).
+ * (`AMB-5`) and `B01` (`BENIGN`) — and the third's `A04` (`AMB-4`), checked
+ * against what the engine will READ (`docs/BENCH_V2_DESIGN.md §C`, §3.4).
  *
  * **Every one is a STRESS family** (`§A`): its prevalence is a declared
  * parameter and nothing asserted here is a rate. `§6.1` condition 3: nothing
@@ -53,18 +53,19 @@ const tauEngine = (v: number): number => Math.max(10_000, Math.floor((v * 10) / 
 const tauOracle = (v: number): number => Math.max(10_000, Math.floor((v * 10) / 10_000 + 0.5));
 
 describe("registration — ids, counts, the single-carrier guard", () => {
-  it("declares A02, A03, A05 and B01 beside A01, all implemented, none in §4.1's table", () => {
-    expect(BENCH_V2_FAMILY_IDS).toStrictEqual(["A01", "A02", "A03", "A05", "B01"]);
+  it("declares A02, A03, A04, A05 and B01 beside A01, all implemented, none in §4.1's table", () => {
+    expect(BENCH_V2_FAMILY_IDS).toStrictEqual(["A01", "A02", "A03", "A04", "A05", "B01"]);
     for (const family of BENCH_V2_FAMILY_IDS) expect(IMPLEMENTED_FAMILIES).toContain(family);
   });
 
   it("derives every published target_record_count as base + 2 x split days", () => {
     expect(TARGET_RECORD_COUNT.A02).toBe(COMPOSITION.base + 2 * AMB2_PAIR_COUNT);
     expect(TARGET_RECORD_COUNT.A03).toBe(COMPOSITION.base + 2 * AMB3_PAIR_COUNT);
+    expect(TARGET_RECORD_COUNT.A04).toBe(COMPOSITION.base + 2 * AMB4_PAIR_COUNT);
     expect(TARGET_RECORD_COUNT.A05).toBe(COMPOSITION.base);
     expect(TARGET_RECORD_COUNT.B01).toBe(COMPOSITION.base + 2 * BEN3_DAY_COUNT);
-    expect(PUBLISHED_TARGET_RECORD_COUNTS).toMatchObject({ A02: 2627, A03: 2627, A05: 2621, B01: 2627 });
-    for (const family of ["A02", "A03", "A05", "B01"] as const) {
+    expect(PUBLISHED_TARGET_RECORD_COUNTS).toMatchObject({ A02: 2627, A03: 2627, A04: 2627, A05: 2621, B01: 2627 });
+    for (const family of ["A02", "A03", "A04", "A05", "B01"] as const) {
       expect(dataset(family, TEST_SEEDS[0]).observations).toHaveLength(PUBLISHED_TARGET_RECORD_COUNTS[family]);
     }
   });
@@ -73,7 +74,7 @@ describe("registration — ids, counts, the single-carrier guard", () => {
     // §B.1's guard, in both directions, now over a LIST for the bench-v2
     // operator. The v1 rows are still single-valued and F08 is still the only
     // carrier of DROP_SETTLEMENT_ID.
-    expect(OPERATOR_DECLARING_FAMILY.DROP_BATCH_IDENTITY).toStrictEqual(["A01", "A02", "A03", "A05", "B01"]);
+    expect(OPERATOR_DECLARING_FAMILY.DROP_BATCH_IDENTITY).toStrictEqual(["A01", "A02", "A03", "A04", "A05", "B01"]);
     const carriers = IMPLEMENTED_FAMILIES.filter((f) => FAMILY_MECHANICS[f].operators.includes("DROP_BATCH_IDENTITY"));
     expect(carriers).toStrictEqual([...OPERATOR_DECLARING_FAMILY.DROP_BATCH_IDENTITY]);
     expect(IMPLEMENTED_FAMILIES.filter((f) => FAMILY_MECHANICS[f].operators.includes("DROP_SETTLEMENT_ID")))
@@ -81,7 +82,7 @@ describe("registration — ids, counts, the single-carrier guard", () => {
   });
 
   it("names exactly the constructed members as identity drops, and degrades exactly those", () => {
-    for (const family of ["A02", "A03", "A05", "B01"] as const) {
+    for (const family of ["A02", "A03", "A04", "A05", "B01"] as const) {
       for (const seed of TEST_SEEDS) {
         const built = dataset(family, seed);
         const expected = built.true_state.identity_drops.map((m) => memberId(built.true_state, m)).sort();
@@ -275,6 +276,66 @@ describe("A03 — sub-tau boundary twins, delta in [Rs 51, Rs 80] (§3.3)", () =
   });
 });
 
+describe("A04 — single-constituent split, the moving twin alone in its batch (§3.4, k = 0)", () => {
+  it("builds AMB-1's twins and deals the moving twin ALONE into settlement_b; settlement_a keeps everything else", () => {
+    for (const seed of TEST_SEEDS) {
+      const state = dataset("A04", seed).true_state;
+      expect(AMB4_PAIR_COUNT).toBe(3);
+      expect(state.split_batches).toHaveLength(AMB4_PAIR_COUNT);
+      expect(state.identity_drops).toHaveLength(2 * AMB4_PAIR_COUNT);
+      for (const split of state.split_batches) {
+        expect(split.construction).toBe("A04");
+        expect(split.refund).toBeNull();
+        const a = state.payments[split.twin_a];
+        const b = state.payments[split.twin_b];
+        if (a === undefined || b === undefined) throw new Error("twin missing");
+        // AMB-1's twins, exactly: one credit, two rates, one clock, no card, material.
+        expect(a.fee?.credit).toBe(b.fee?.credit);
+        expect(a.fee?.credit ?? 0).toBeGreaterThanOrEqual(AMB1_MIN_CREDIT_PAISE);
+        expect(new Set([a.method, b.method]).has(AMB1_TWIN_METHOD)).toBe(true);
+        expect([a.method, b.method].some((m) => (AMB1_BASE_METHODS as readonly string[]).includes(m))).toBe(true);
+        expect(a.created_at).toBe(b.created_at);
+        expect(a.card).toBeNull();
+        expect(b.card).toBeNull();
+        // The deal: S2 is the moving twin and nothing else (k = 0); S1 holds
+        // the stay twin AND at least one other anchored line (k >= 1).
+        const s1 = state.settlements[split.settlement_a_index];
+        const s2 = state.settlements[split.settlement_b_index];
+        if (s1 === undefined || s2 === undefined) throw new Error("split settlement missing");
+        expect(s2.members).toStrictEqual([{ kind: "payment", index: split.twin_b }]);
+        expect(s2.amount).toBe(b.fee?.credit);
+        expect(s2.settled_at).toBe(s1.settled_at);
+        expect(s2.day).toBe(s1.day);
+        expect(s1.members.some((m) => m.kind === "payment" && m.index === split.twin_a)).toBe(true);
+        expect(s1.members.filter((m) => m.kind === "payment").length).toBeGreaterThanOrEqual(2);
+        // Nothing of the day was dealt to S2 and nothing was lost: every member
+        // of the day settles in S1 or S2, or is a debit S1 could not carry.
+        for (const m of s1.members) expect(m.kind === "payment" && m.index === split.twin_b).toBe(false);
+        for (const refund of state.refunds) {
+          if (refund.settlement_day === s1.day) expect(settlementOf(state, { kind: "refund", index: refund.index })).toBe(s1.index);
+        }
+      }
+    }
+  });
+
+  it("is the twin-batch coin, not the rate, that decides which twin sits alone", () => {
+    // Over twenty seeds the EMI twin is the lone one about half the time.
+    // `method` must not tell which batch is the singleton (§8 R3).
+    let pairs = 0;
+    let emiAlone = 0;
+    for (const seed of Array.from({ length: 20 }, (_, i) => 7001 + i)) {
+      const state = simulate("A04", seed);
+      for (const split of state.split_batches) {
+        pairs += 1;
+        if (state.payments[split.twin_b]?.method === AMB1_TWIN_METHOD) emiAlone += 1;
+      }
+    }
+    expect(pairs).toBe(60);
+    expect(emiAlone / pairs).toBeGreaterThanOrEqual(0.33);
+    expect(emiAlone / pairs).toBeLessThanOrEqual(0.67);
+  });
+});
+
 describe("A05 — the search bound, 15 lines of one batch (§3.5)", () => {
   it("detaches 15 payment lines from each of three batches at pairwise-distinct instants, splitting nothing", () => {
     for (const seed of TEST_SEEDS) {
@@ -386,7 +447,7 @@ describe("the tau guard — no materiality inside the engine/oracle disagreement
   // component's value is the sum of the detached lines' amounts (§1.4).
   const SEEDS = Array.from({ length: 20 }, (_, i) => 7001 + i);
 
-  function materialCases(family: "A01" | "A02" | "A03", seed: number): { materiality: number; value: number }[] {
+  function materialCases(family: "A01" | "A02" | "A03" | "A04", seed: number): { materiality: number; value: number }[] {
     const state = simulate(family, seed);
     return state.split_batches.map((split) => {
       const a = state.payments[split.twin_a];
@@ -403,7 +464,7 @@ describe("the tau guard — no materiality inside the engine/oracle disagreement
     });
   }
 
-  it.each(["A01", "A02", "A03"] as const)("%s: every case sits outside (tau_floor, tau_round_half_up] and at least Rs 1 from both", (family) => {
+  it.each(["A01", "A02", "A03", "A04"] as const)("%s: every case sits outside (tau_floor, tau_round_half_up] and at least Rs 1 from both", (family) => {
     let cases = 0;
     let divergent = 0;
     for (const seed of SEEDS) {

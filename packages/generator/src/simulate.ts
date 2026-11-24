@@ -32,7 +32,7 @@ import {
   type FeeBreakdown, type Method,
 } from "./amount.js";
 import {
-  AMB1_PAIR_COUNT, AMB2_PAIR_COUNT, AMB3_PAIR_COUNT, AMB5_DAY_COUNT,
+  AMB1_PAIR_COUNT, AMB2_PAIR_COUNT, AMB3_PAIR_COUNT, AMB4_PAIR_COUNT, AMB5_DAY_COUNT,
   BEN1_DAY_COUNT, BEN2_DAY_COUNT, BEN3_DAY_COUNT,
   COMPOSITION, F05_SELECTED_SETTLEMENTS, F06_PAIR_COUNT,
   PARTIAL_REFUND_COUNT, T_PLUS_1_BATCHES, T_PLUS_3_BATCHES, evenSplit, realize,
@@ -179,13 +179,14 @@ export interface SimLedgerEntry {
  * True state, never persisted: `GroundTruth` gains no field from it (`§9.5`),
  * and `emit.ts` reads it only through {@link TrueState.identity_drops}. Which
  * twin sits in which batch is a coin from the family sub-stream, drawn
- * independently of every other field (`§8` R3). Four constructions host a
+ * independently of every other field (`§8` R3). Five constructions host a
  * split: `A01` (material twins), `A02` (refund-netting twins, where the half
- * holding `P2` also carries `P2`'s refund), `A03` (sub-`tau` twins) and
- * `B01`'s `BEN-3` (two ordinary lines with differing credits — the control).
+ * holding `P2` also carries `P2`'s refund), `A03` (sub-`tau` twins), `A04`
+ * (material twins, the moving twin ALONE in `settlement_b` — `k = 0` there)
+ * and `B01`'s `BEN-3` (two ordinary lines with differing credits — the control).
  */
 export interface SimSplitBatch {
-  readonly construction: "A01" | "A02" | "A03" | "BEN3";
+  readonly construction: "A01" | "A02" | "A03" | "A04" | "BEN3";
   readonly day: number;
   /** The day's own batch, keeping its id, cycle and instant. */
   readonly settlement_a_index: number;
@@ -330,6 +331,7 @@ export function simulate(family: FamilyId, seed: number): TrueState {
   const amb1P = s(STREAMS.AMB1);
   const amb2P = s(STREAMS.AMB2);
   const amb3P = s(STREAMS.AMB3);
+  const amb4P = s(STREAMS.AMB4);
   const amb5P = s(STREAMS.AMB5);
   const benignP = s(STREAMS.BENIGN);
 
@@ -623,6 +625,23 @@ export function simulate(family: FamilyId, seed: number): TrueState {
       twinPairs.push({ construction: "A03", day, a, b, forced: [] });
     }
   }
+  if (mechanics.amb4_single_constituent) {
+    // AMB-4 (§3.4): AMB-1's twins, draw for draw — the only difference is the
+    // deal, which `splitBatch` reads from the construction: the moving twin is
+    // the whole of `settlement_b`. The day needs a THIRD settling capture so
+    // that `settlement_a` keeps at least one anchored member (`k >= 1`), which
+    // is what holds its documented gap under epsilon (V40).
+    const threePlus = new Map([...eligibleByDay].filter(([, members]) => members.length >= 3));
+    for (const day of drawTwinDays(amb4P, threePlus, AMB4_PAIR_COUNT, "AMB-4")) {
+      const [first, second] = drawTwinPair(amb4P, threePlus.get(day) ?? [], "AMB-4");
+      const [a, b] = amb4P.chance(1, 2) ? [first, second] : [second, first];
+      const methodA: Method = amb4P.pick(AMB1_BASE_METHODS);
+      const rateA = FEE_RATE_BPS[methodA];
+      const amountA = drawAmountWhere(amb4P, (gross) => feeBreakdown(gross, rateA).credit >= AMB1_MIN_CREDIT_PAISE);
+      rewriteRateTwins(payments, orders, a, b, methodA, amountA);
+      twinPairs.push({ construction: "A04", day, a, b, forced: [] });
+    }
+  }
   if (mechanics.amb2_refund_netting) {
     // The refund is an EXISTING refund rewritten onto P2 — the composition's
     // refund count is frozen (`R = round_half_up(4.5 % x N)`) and adding one
@@ -792,7 +811,7 @@ export function simulate(family: FamilyId, seed: number): TrueState {
   // construction and not a dealt member.
   const splitBatches: SimSplitBatch[] = [];
   const identityDrops: SimMember[] = [];
-  const streamOf = { A01: amb1P, A02: amb2P, A03: amb3P, BEN3: benignP } as const;
+  const streamOf = { A01: amb1P, A02: amb2P, A03: amb3P, A04: amb4P, BEN3: benignP } as const;
   for (const pair of twinPairs) {
     const prng = streamOf[pair.construction];
     const split = splitBatch(settlements, payments, refunds, adjustments, minter, prng, pair);
@@ -1092,6 +1111,11 @@ function creditGapPairs(payments: readonly SimPayment[], members: readonly numbe
  * marks a debit neither half can carry UNSETTLED on `refunds` / `adjustments`.
  * Draw order on `prng`: the stay coin, one coin per dealt member in batch order,
  * one coin per dealt debit, then the new UTR — `A01`'s order, unchanged.
+ *
+ * `A04` deals nothing: the moving twin is the whole of S2 and every other
+ * member stays in S1, so its draw order is the stay coin, then the UTR. A
+ * debit S1 can no longer carry (its net lost the moving twin's credit) is
+ * emitted UNSETTLED, never dealt to S2.
  */
 function splitBatch(
   settlements: SimSettlement[],
@@ -1105,6 +1129,7 @@ function splitBatch(
   const original = requireIndex(settlements, pair.day - 1, "settlements");
   const aStays = prng.chance(1, 2);
   const [stay, move] = aStays ? [pair.a, pair.b] : [pair.b, pair.a];
+  const singleton = pair.construction === "A04";
   const forcedKeys = new Set(pair.forced.map((m) => `${m.kind}:${String(m.index)}`));
   const halves: [SimMember[], SimMember[]] = [[], []];
   const nets: [number, number] = [0, 0];
@@ -1114,7 +1139,7 @@ function splitBatch(
       const fee = requireIndex(payments, member.index, "payments").fee;
       /* c8 ignore next */
       if (fee === null) throw new Error("simulate: a settled payment carries no fee breakdown");
-      const half: 0 | 1 = member.index === stay ? 0 : member.index === move ? 1 : prng.chance(1, 2) ? 0 : 1;
+      const half: 0 | 1 = member.index === stay ? 0 : member.index === move ? 1 : singleton ? 0 : prng.chance(1, 2) ? 0 : 1;
       halves[half].push(member);
       nets[half] = add(paise(nets[half]), fee.credit);
       continue;
@@ -1124,7 +1149,7 @@ function splitBatch(
         ? requireIndex(refunds, member.index, "refunds").amount
         : requireIndex(adjustments, member.index, "adjustments").amount;
     if (member.kind === "adjustment" && requireIndex(adjustments, member.index, "adjustments").direction === "credit") {
-      const half: 0 | 1 = prng.chance(1, 2) ? 0 : 1;
+      const half: 0 | 1 = singleton ? 0 : prng.chance(1, 2) ? 0 : 1;
       halves[half].push(member);
       nets[half] = add(paise(nets[half]), amount);
       continue;
@@ -1140,13 +1165,13 @@ function splitBatch(
       nets[half] = sub(paise(nets[half]), amount);
       continue;
     }
-    debits.push({ member, amount, preferred: prng.chance(1, 2) ? 0 : 1 });
+    debits.push({ member, amount, preferred: singleton ? 0 : prng.chance(1, 2) ? 0 : 1 });
   }
   const ordered = [...debits].sort((x, y) => x.amount - y.amount || x.member.index - y.member.index);
   for (const { member, amount, preferred } of ordered) {
     const other: 0 | 1 = preferred === 0 ? 1 : 0;
     const half: 0 | 1 | null =
-      nets[preferred] - amount >= 0 ? preferred : nets[other] - amount >= 0 ? other : null;
+      nets[preferred] - amount >= 0 ? preferred : !singleton && nets[other] - amount >= 0 ? other : null;
     if (half === null) {
       if (member.kind === "refund") {
         refunds[member.index] = { ...requireIndex(refunds, member.index, "refunds"), settlement_day: null };

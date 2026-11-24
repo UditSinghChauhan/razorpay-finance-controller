@@ -35,7 +35,7 @@ export type FamilyId = (typeof FAMILY_IDS)[number] | (typeof BENCH_V2_FAMILY_IDS
  */
 export const IMPLEMENTED_FAMILIES = Object.freeze([
   "F01", "F02", "F03", "F04", "F05", "F06", "F07", "F08", "F09", "F10",
-  "A01", "A02", "A03", "A05", "B01",
+  "A01", "A02", "A03", "A04", "A05", "B01",
 ] as const satisfies readonly FamilyId[]);
 
 /** `§4.1`: "specified, NOT IMPLEMENTED". Their `target_record_count` is 0. */
@@ -80,7 +80,7 @@ export const PUBLISHED_TARGET_RECORD_COUNTS = Object.freeze({
   F11: 0, F12: 0,
   // bench-v2 (`docs/BENCH_V2_DESIGN.md §B.2`, §C): `base + 2 x <split days>`.
   // A05 splits no day (its drop is within one batch); B01's split days are BEN-3's.
-  A01: 2627, A02: 2627, A03: 2627, A05: 2621, B01: 2627,
+  A01: 2627, A02: 2627, A03: 2627, A04: 2627, A05: 2621, B01: 2627,
 } as const satisfies Record<FamilyId, number>);
 
 /** `§4.1` / `PROJECT_SPEC.md §9`: observations per `(split, seed)` dataset. */
@@ -266,7 +266,7 @@ export const OPERATOR_DECLARING_FAMILY = Object.freeze({
   // family: the v1 rows above are single-valued because `§4.3` maps each
   // operator to one family, and that shape is untouched. `families.ts`'s guard
   // still requires the carriers to be EXACTLY this list, in this order.
-  DROP_BATCH_IDENTITY: ["A01", "A02", "A03", "A05", "B01"],
+  DROP_BATCH_IDENTITY: ["A01", "A02", "A03", "A04", "A05", "B01"],
 } as const satisfies Record<DegradationOp, FamilyId | readonly FamilyId[] | null>);
 
 /**
@@ -893,15 +893,18 @@ export const SPEC_VERSION = "1.4.39";
  * `A01` is `docs/BENCH_V2_DESIGN.md §3.1`'s `AMB-1`: same-day split batches
  * hosting equal-credit twins on different fee rates, both twins' batch identity
  * removed. `A02` is `AMB-2`, the refund-netting twins (`§3.2` T4-b); `A03` is
- * `AMB-3`, the sub-`tau` boundary twins (`§3.3`); `A05` is `AMB-5`, the search
+ * `AMB-3`, the sub-`tau` boundary twins (`§3.3`); `A04` is `AMB-4`, the
+ * single-constituent split (`§3.4`, built at increment 3 as the `k = 0`
+ * control that makes the documented model's `documented_discriminable`
+ * non-empty — `PREREGISTRATION.md §10` V40); `A05` is `AMB-5`, the search
  * bound (`§3.5`); `B01` is `BENIGN`, the determinable controls (`§3.6`).
- * `AMB-4` is deferred with the probe loop and has no id. Every one is a
+ * Every one is a
  * **stress family** — its prevalence is a declared parameter, not a base rate
  * (`§A`). `FAMILY_IDS` is untouched: `manifest.ts` transcribes that table into
  * a v1 manifest, and bench-v2 is a new `BENCHMARK_VERSION` whose manifest is
  * the next order's.
  */
-export const BENCH_V2_FAMILY_IDS = Object.freeze(["A01", "A02", "A03", "A05", "B01"] as const);
+export const BENCH_V2_FAMILY_IDS = Object.freeze(["A01", "A02", "A03", "A04", "A05", "B01"] as const);
 
 /**
  * bench-v2's operators, beside `§4.3`'s ten. `DEGRADATION_OPS` is untouched.
@@ -987,6 +990,26 @@ export const AMB3_PAIR_RATE = CONVENTION_1;
  * disagree (`§1.6`).
  */
 export const AMB3_DELTA_RANGE_PAISE = Object.freeze({ min: 5_100, max: 8_000 } as const);
+
+// --- AMB-4 (A04) — single-constituent split, k = 0 (§3.4) -------------------
+
+/**
+ * `AMB-4`: share of the 31 capture days whose batch is split so that one twin
+ * sits ALONE in the second batch. Convention 1, provisionally, as
+ * `AMB1_PAIR_RATE`.
+ *
+ * The construction is `AMB-1`'s twins (`AMB1_MIN_CREDIT_PAISE`,
+ * `AMB1_BASE_METHODS`, `AMB1_TWIN_METHOD`) with a different deal: `S2` holds
+ * the moving twin and nothing else, so `S2` has **zero** anchored members
+ * (`k = 0`) while `S1` keeps every other line of the day (`k >= 1`). Under
+ * `RECONCILIATION_SPEC.md §4.2`'s documented `SE5` the `S2` target's two
+ * allocations then differ by exactly `2000 x (1 + 1) / (0 + 1 + 1) = 2000` bps
+ * `> EPSILON_BPS`, and the `S1` target's by `4000 / (k + 2) < EPSILON_BPS` for
+ * every `k >= 1`. The frozen engine (probe inert, `SE5 = 0`) cannot tell the
+ * two apart from `AMB-1`; that is the finding `PREREGISTRATION.md §10` V40
+ * records, and the family exists to give it a non-empty population.
+ */
+export const AMB4_PAIR_RATE = CONVENTION_1;
 
 // --- AMB-5 (A05) — the search bound (§3.5) ---------------------------------
 

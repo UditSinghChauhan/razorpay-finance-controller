@@ -46,7 +46,7 @@ function hasOffset(state: TrueState, paymentIndex: number): boolean {
 }
 
 describe("the merchant-clock offset lands on the stay twin and the move twin at the same rate", () => {
-  it.each(["A01", "A02", "A03"] as const)("%s: over 200 seeds the single-offset pairs split near one half", (family) => {
+  it.each(["A01", "A02", "A03", "A04"] as const)("%s: over 200 seeds the single-offset pairs split near one half", (family) => {
     let pairs = 0;
     let stayOnly = 0;
     let moveOnly = 0;

@@ -51,6 +51,12 @@ export interface FamilyMechanics {
    * in `[Rs 51, Rs 80]` — below `tau`'s floor, above the sweep's Rs 50 point.
    */
   readonly amb3_subtau_twins: boolean;
+  /**
+   * bench-v2 `A04` (`AMB-4`): `AMB-1`'s twins, the moving twin dealt ALONE into
+   * the second batch (`k = 0` on `S2`, `k >= 1` on `S1`) — the documented
+   * model's only discriminable construction (`§3.4`; `PREREGISTRATION.md §10` V40).
+   */
+  readonly amb4_single_constituent: boolean;
   /** bench-v2 `A05` (`AMB-5`): 15 lines of one batch detached, so `S2` hits `C_max`. */
   readonly amb5_search_bound: boolean;
   /** bench-v2 `B01` (`BENIGN`): `BEN-1`/`BEN-2`/`BEN-3`, determinable targets that reach `S2`. */
@@ -63,7 +69,7 @@ const NONE = {
   f03_repricing: false, f02_refund_boundary: false, f05_withhold: false,
   f06_collisions: false, f07_chargebacks: false, f09_forced_late: false,
   amb1_material_twins: false, amb2_refund_netting: false, amb3_subtau_twins: false,
-  amb5_search_bound: false, benign_controls: false,
+  amb4_single_constituent: false, amb5_search_bound: false, benign_controls: false,
   operators: [] as readonly DegradationOp[],
 } as const;
 
@@ -102,6 +108,8 @@ export const FAMILY_MECHANICS: Readonly<Record<FamilyId, FamilyMechanics>> = Obj
   A02: { ...NONE, amb2_refund_netting: true, operators: [OP("DROP_BATCH_IDENTITY")] },
   /** bench-v2 `AMB-3` — sub-`tau` boundary twins (`§3.3`). A negative control for abstention. */
   A03: { ...NONE, amb3_subtau_twins: true, operators: [OP("DROP_BATCH_IDENTITY")] },
+  /** bench-v2 `AMB-4` — the single-constituent split (`§3.4`). Same operator, same selection principle. */
+  A04: { ...NONE, amb4_single_constituent: true, operators: [OP("DROP_BATCH_IDENTITY")] },
   /** bench-v2 `AMB-5` — the search bound (`§3.5`). No split day. */
   A05: { ...NONE, amb5_search_bound: true, operators: [OP("DROP_BATCH_IDENTITY")] },
   /** bench-v2 `BENIGN` — `BEN-1`, `BEN-2`, `BEN-3` on disjoint day blocks (`§3.6`). */

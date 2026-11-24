@@ -224,6 +224,7 @@ export const STREAMS = Object.freeze({
   AMB1: "amb1",
   AMB2: "amb2",
   AMB3: "amb3",
+  AMB4: "amb4",
   AMB5: "amb5",
   BENIGN: "benign",
   OP_DROP_BATCH_IDENTITY: "op:DROP_BATCH_IDENTITY",
